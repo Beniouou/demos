@@ -1,0 +1,35 @@
+# Projet Démos
+
+Jeu solo de construction de nation, organique et en temps réel avec pause.
+Les règles du jeu sont décrites dans le document « Projet Démos — Règles du jeu et glossaire ».
+
+## Organisation (DDD, architecture hexagonale)
+
+| Dossier | Rôle |
+| --- | --- |
+| `src/Demos.Domain` | Règles du jeu, sans aucune dépendance au moteur : modificateurs, temps, classes, idéologies, produits. |
+| `src/Demos.Application` | Simulation (cycle mensuel), état de la partie et ports (interfaces vers l'extérieur). |
+| `src/Demos.Infrastructure` | Adaptateurs de sortie : lecture du contenu en JSON. |
+| `game/` | Projet Godot .NET : adaptateur d'entrée (horloge, pause, affichage). |
+| `game/data/` | Contenu du jeu en JSON (produits…). |
+| `tests/Demos.Tests` | Tests automatiques des règles. |
+
+Règle d'or : `Demos.Domain` ne référence rien. Les autres projets dépendent de lui, jamais l'inverse.
+
+## Prérequis
+
+- [SDK .NET 8](https://dotnet.microsoft.com/download/dotnet/8.0)
+- [Godot 4, version .NET](https://godotengine.org/download) (pas la version standard)
+
+Le projet vise Godot 4.3. Avec une version plus récente, Godot propose de mettre le projet à jour à l'ouverture.
+
+## Lancer les tests
+
+```bash
+dotnet test
+```
+
+## Lancer le jeu
+
+Ouvrir `game/project.godot` dans Godot .NET, puis F5.
+Espace met en pause ou relance le temps ; 1, 2 et 3 changent la vitesse.

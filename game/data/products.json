@@ -1,0 +1,8 @@
+[
+  { "id": "pain", "name": "Pain", "need": "Food" },
+  { "id": "vetements", "name": "Vêtements", "need": "Clothing" },
+  { "id": "meubles", "name": "Meubles", "need": "Furniture" },
+  { "id": "logements", "name": "Logements", "need": "Housing" },
+  { "id": "services", "name": "Services", "need": "Services" },
+  { "id": "energie", "name": "Énergie", "need": "Energy" }
+]

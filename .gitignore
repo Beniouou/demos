@@ -1,0 +1,13 @@
+# Godot
+.godot/
+export/
+*.translation
+
+# .NET
+bin/
+obj/
+*.user
+.vs/
+.idea/
+TestResults/
+mono_crash.*
