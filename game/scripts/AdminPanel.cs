@@ -28,6 +28,7 @@ public partial class AdminPanel : PanelContainer
     private SpinBox _places = null!;
     private SpinBox _rent = null!;
     private SpinBox _price = null!;
+    private SpinBox _posts = null!;
 
     public void Init(Simulation simulation)
     {
@@ -88,6 +89,8 @@ public partial class AdminPanel : PanelContainer
         if (building.HousingPlaces > 0)
             lines.Add($"Loyers possibles : {building.HousingPlaces * building.DailyRent:N0} par jour");
 
+        lines.Add($"Postes de personnages : 0 occupé sur {building.Posts} (recrutement : menu à venir)");
+
         lines.Add(building.Ownership == Ownership.Public
             ? $"Payé par le trésor ({world.Treasury.Balance:N0})"
             : $"Payé par {OwnerName(building.OwnerClassId)}");
@@ -128,6 +131,7 @@ public partial class AdminPanel : PanelContainer
         _places = AddSpin(form, "Places de logement", 0, 100_000, 10);
         _rent = AddSpin(form, "Loyer par place et par jour", 0, 1_000, 0.05);
         _price = AddSpin(form, "Prix du produit au marché", 0, 10_000, 0.1);
+        _posts = AddSpin(form, "Postes de personnages", 0, 20, 1);
 
         _ownership.ItemSelected += _ => _owner.Disabled = _ownership.Selected == 0;
 
@@ -184,6 +188,7 @@ public partial class AdminPanel : PanelContainer
         _wage.Value = building.DailyWage;
         _places.Value = building.HousingPlaces;
         _rent.Value = building.DailyRent;
+        _posts.Value = building.Posts;
 
         var production = building.Production;
         _perWorker.Editable = _price.Editable = production is not null;
@@ -208,6 +213,7 @@ public partial class AdminPanel : PanelContainer
             Production = building.Production is { } production ? production with { QuantityPerWorker = _perWorker.Value } : null,
             HousingPlaces = (int)_places.Value,
             DailyRent = _rent.Value,
+            Posts = (int)_posts.Value,
         };
 
         _simulation.UpdateBuilding(updated);

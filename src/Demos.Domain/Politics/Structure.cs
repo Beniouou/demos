@@ -36,6 +36,10 @@ public readonly record struct Production(string ProductId, double QuantityPerWor
 /// <param name="HousingPlaces">Places de logement offertes dans la commune.</param>
 /// <param name="DailyRent">Loyer d'une place par jour, versé au propriétaire.</param>
 /// <param name="TypeId">Type de bâtiment du catalogue dont il est issu, s'il y en a un.</param>
+/// <param name="Posts">
+/// Nombre de postes de personnages. À ne pas confondre avec les emplois : un poste est occupé par un personnage
+/// et apporte un bonus, mais la structure fonctionne sans personne au poste. Le recrutement reste à écrire.
+/// </param>
 public sealed record Structure(
     string Id,
     string Name,
@@ -48,7 +52,8 @@ public sealed record Structure(
     double DailyWage = 0,
     int HousingPlaces = 0,
     double DailyRent = 0,
-    string? TypeId = null)
+    string? TypeId = null,
+    int Posts = 0)
 {
     public bool IsNational => ParentId is null;
 }

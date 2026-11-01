@@ -126,12 +126,13 @@ public class SimulationTests
     }
 
     [Fact]
-    public void Le_menu_d_administration_peut_changer_le_proprietaire_et_le_prix()
+    public void Le_menu_d_administration_peut_changer_le_proprietaire_les_postes_et_le_prix()
     {
         var simulation = CreatePrototype();
         var farm = simulation.World.Structures["ferme"];
+        Assert.Equal(1, farm.Posts);
 
-        simulation.UpdateBuilding(farm with { Ownership = Ownership.Public, OwnerClassId = null });
+        simulation.UpdateBuilding(farm with { Ownership = Ownership.Public, OwnerClassId = null, Posts = 3 });
         simulation.World.Market.SetPrice("pain", 2);
         simulation.AdvanceDay();
 
@@ -139,6 +140,7 @@ public class SimulationTests
         Assert.True(simulation.World.StateStock.QuantityOf("pain") > 0);
         Assert.Equal(0, simulation.World.Market.QuantityOf("pain"));
         Assert.Equal(2, simulation.World.Market.PriceOf("pain"));
+        Assert.Equal(3, simulation.World.Structures["ferme"].Posts);
     }
 
     [Fact]
