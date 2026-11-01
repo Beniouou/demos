@@ -15,13 +15,16 @@ public sealed record BuildingType(
     Production? Production = null,
     int HousingPlaces = 0,
     double DailyRent = 0,
-    int Posts = 0)
+    int Posts = 0,
+    int SchoolPlaces = 0,
+    double DailyTuition = 0)
 {
     /// <summary>Un bâtiment est fonctionnel quand il a un effet dans la simulation : des emplois ou des places.</summary>
-    public bool IsFunctional => Jobs > 0 || HousingPlaces > 0;
+    public bool IsFunctional => Jobs > 0 || HousingPlaces > 0 || SchoolPlaces > 0;
 
     /// <summary>Crée un bâtiment de ce type dans une structure, avec les paramètres par défaut.</summary>
     public Structure Build(string id, string parentId, Ownership ownership = Ownership.Public, string? ownerClassId = null, string? name = null) =>
         new(id, name ?? Name, StructureKind.Building, parentId, ownership, ownerClassId,
-            Production, Jobs, DailyWage, HousingPlaces, DailyRent, TypeId: Id, Posts: Posts);
+            Production, Jobs, DailyWage, HousingPlaces, DailyRent, TypeId: Id, Posts: Posts,
+            SchoolPlaces: SchoolPlaces, DailyTuition: DailyTuition);
 }

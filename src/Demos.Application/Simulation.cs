@@ -83,13 +83,14 @@ public sealed class Simulation(World world, GameClock clock)
         return commune;
     }
 
-    // Ordre du document de règles : emplois, production et salaires, logement, consommation, ventes,
+    // Ordre du document de règles : emplois, production et salaires, logement, école, consommation, ventes,
     // impôts, légitimité. Les décisions du joueur et les événements restent à écrire.
     private void RunDailyCalculations()
     {
         World.Workers = Employment.Assign(World.Structures, World.Classes);
         WorkDay.Run(World.Structures, World.Workers, World.Classes, World.Laws, World.Treasury, World.StateStock, World.Market);
         Housing.RunDaily(World.Structures, World.Classes, World.Treasury);
+        Education.RunDaily(World.Structures, World.Classes, World.Treasury);
         Consumption.RunDaily(World.Classes, World.Products, World.Market);
         PaySellers();
         Taxation.CollectDaily(World.Classes, World.DailyTaxRate, World.Treasury);
@@ -105,11 +106,14 @@ public sealed class Simulation(World world, GameClock clock)
         }
     }
 
-    // Prévu : climat, transferts de classe, revendications, recherche.
+    // Prévu : climat, autres passages entre classes, revendications, recherche.
     private void RunSeasonalCalculations()
     {
         foreach (var socialClass in World.Classes)
             socialClass.Grow();
+
+        foreach (var created in ClassTransitions.RunSeasonal(World.Classes))
+            World.AddClass(created);
 
         Migration.RunSeasonal(World.Structures, World.Classes);
 

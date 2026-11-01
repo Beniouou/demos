@@ -40,6 +40,8 @@ public readonly record struct Production(string ProductId, double QuantityPerWor
 /// Nombre de postes de personnages. À ne pas confondre avec les emplois : un poste est occupé par un personnage
 /// et apporte un bonus, mais la structure fonctionne sans personne au poste. Le recrutement reste à écrire.
 /// </param>
+/// <param name="SchoolPlaces">Places d'élèves offertes dans la commune ; chaque place occupée rapporte des points d'éducation.</param>
+/// <param name="DailyTuition">Frais de scolarité d'une place par jour, versés au propriétaire (0 pour une école gratuite).</param>
 public sealed record Structure(
     string Id,
     string Name,
@@ -53,7 +55,9 @@ public sealed record Structure(
     int HousingPlaces = 0,
     double DailyRent = 0,
     string? TypeId = null,
-    int Posts = 0)
+    int Posts = 0,
+    int SchoolPlaces = 0,
+    double DailyTuition = 0)
 {
     public bool IsNational => ParentId is null;
 }

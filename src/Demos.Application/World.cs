@@ -11,6 +11,8 @@ namespace Demos.Application;
 public sealed class World
 {
     private readonly Dictionary<string, Structure> _structures;
+    private readonly List<SocialClass> _classes;
+    private readonly Dictionary<string, SocialClass> _classesById;
 
     public World(
         IReadOnlyList<ProductDefinition> products,
@@ -22,8 +24,8 @@ public sealed class World
         Products = products;
         BuildingTypes = buildingTypes.ToDictionary(t => t.Id);
         _structures = structures.ToDictionary(s => s.Id);
-        Classes = classes;
-        ClassesById = classes.ToDictionary(c => c.Id);
+        _classes = classes.ToList();
+        _classesById = _classes.ToDictionary(c => c.Id);
         Laws = laws;
         Market = new Market(products);
     }
@@ -34,8 +36,8 @@ public sealed class World
     public IReadOnlyDictionary<string, BuildingType> BuildingTypes { get; }
 
     public IReadOnlyDictionary<string, Structure> Structures => _structures;
-    public IReadOnlyList<SocialClass> Classes { get; }
-    public IReadOnlyDictionary<string, SocialClass> ClassesById { get; }
+    public IReadOnlyList<SocialClass> Classes => _classes;
+    public IReadOnlyDictionary<string, SocialClass> ClassesById => _classesById;
     public IReadOnlyList<Law> Laws { get; }
 
     /// <summary>Ressource « légitimité » du joueur, un stock par pôle.</summary>
@@ -67,6 +69,13 @@ public sealed class World
     public bool IsGhostTown(string communeId) => Residents(communeId) < 1;
 
     public void AddStructure(Structure structure) => _structures.Add(structure.Id, structure);
+
+    /// <summary>Ajoute une classe née en cours de partie (par exemple d'un passage entre classes).</summary>
+    public void AddClass(SocialClass socialClass)
+    {
+        _classesById.Add(socialClass.Id, socialClass);
+        _classes.Add(socialClass);
+    }
 
     /// <summary>Remplace une structure existante par sa version modifiée (même identifiant).</summary>
     public void UpdateStructure(Structure structure)

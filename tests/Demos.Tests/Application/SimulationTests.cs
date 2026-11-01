@@ -59,7 +59,7 @@ public class SimulationTests
         var afterOneDay = simulation.World.Legitimacy[libertarian];
         simulation.AdvanceDay();
 
-        // Cadres et dirigeants (LI) acceptent la liberté d'entreprendre, loi de l'État : 500 × 0,001 par jour.
+        // Professions intermédiaires et cadres (LI) acceptent la liberté d'entreprendre, loi de l'État : 500 × 0,001 par jour.
         Assert.Equal(0.5, afterOneDay, precision: 6);
         Assert.Equal(1, simulation.World.Legitimacy[libertarian], precision: 6);
     }
@@ -141,6 +141,21 @@ public class SimulationTests
         Assert.Equal(0, simulation.World.Market.QuantityOf("pain"));
         Assert.Equal(2, simulation.World.Market.PriceOf("pain"));
         Assert.Equal(3, simulation.World.Structures["ferme"].Posts);
+    }
+
+    [Fact]
+    public void L_ecole_fait_naitre_des_professions_intermediaires_communistes_au_changement_de_saison()
+    {
+        var simulation = CreatePrototype();
+
+        AdvanceDays(simulation, 58);
+        Assert.DoesNotContain(simulation.World.Classes, c => c.Name == "Professions intermédiaires communistes");
+
+        // 1er mars : les points d'éducation des ouvriers communistes en font monter certains au rang de profession intermédiaire.
+        simulation.AdvanceDay();
+        var intermediates = Assert.Single(simulation.World.Classes, c => c.Name == "Professions intermédiaires communistes");
+        Assert.True(intermediates.Population > 0);
+        Assert.Same(intermediates, simulation.World.ClassesById[intermediates.Id]);
     }
 
     [Fact]

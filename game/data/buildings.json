@@ -32,7 +32,7 @@
   { "id": "dispensaire", "name": "Dispensaire", "category": "Services", "level": 1, "description": "Santé" },
   { "id": "clinique", "name": "Clinique", "category": "Services", "level": 2, "description": "Santé" },
   { "id": "hopital", "name": "Hôpital", "category": "Services", "level": 3, "description": "Santé" },
-  { "id": "ecole", "name": "École", "category": "Services", "level": 1, "description": "Éducation" },
+  { "id": "ecole", "name": "École", "category": "Services", "level": 1, "description": "Éducation : places d'élèves qui rapportent des points d'éducation", "jobs": 25, "dailyWage": 2, "schoolPlaces": 500, "dailyTuition": 0, "posts": 1 },
   { "id": "lycee", "name": "Lycée", "category": "Services", "level": 2, "description": "Éducation" },
   { "id": "universite", "name": "Université", "category": "Services", "level": 3, "description": "Éducation" },
   { "id": "caserne-pompiers", "name": "Caserne de pompiers", "category": "Services", "level": 1, "description": "Sécurité" },

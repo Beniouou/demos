@@ -131,10 +131,10 @@ public partial class Main : Node
         foreach (var socialClass in world.Classes)
         {
             text.AppendLine(
-                $"{socialClass.Name,-12} {socialClass.Ideology.Name,-16} population {socialClass.Population,7:N0}   " +
+                $"{socialClass.Name,-40} population {socialClass.Population,7:N0}   " +
                 $"richesse {socialClass.Wealth,10:N0}   besoins couverts {socialClass.NeedsSatisfaction,4:P0} " +
                 $"(logés {socialClass.HousingCoverage,4:P0})   " +
-                $"adhésion {socialClass.Adhesion,4:P0}");
+                $"adhésion {socialClass.Adhesion,4:P0}   éducation {socialClass.EducationPoints,8:N0}");
         }
 
         text.AppendLine();

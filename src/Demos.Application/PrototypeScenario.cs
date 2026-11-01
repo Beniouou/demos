@@ -7,7 +7,7 @@ namespace Demos.Application;
 
 /// <summary>
 /// Partie de départ du prototype : un État et une seule commune, née du premier camp de base, où vivent
-/// 5 000 habitants. Les bâtiments viennent du catalogue (buildings.json) ; leurs propriétaires sont
+/// 5 000 habitants, avec une école d'État. Les bâtiments viennent du catalogue (buildings.json) ; leurs propriétaires sont
 /// arbitraires, pour tester les trois circuits d'argent, et se changent dans le menu d'administration.
 /// </summary>
 public static class PrototypeScenario
@@ -24,19 +24,20 @@ public static class PrototypeScenario
             new(FirstCommuneId, "Première commune", StructureKind.PoliticalEntity, "etat"),
             types["camp-de-base"].Build("camp-de-base-1", FirstCommuneId),
             types["ferme"].Build("ferme", FirstCommuneId, Ownership.Cooperative, "ouvriers", "Ferme coopérative"),
-            types["atelier"].Build("atelier", FirstCommuneId, Ownership.Private, "dirigeants", "Atelier de couture"),
+            types["atelier"].Build("atelier", FirstCommuneId, Ownership.Private, "cadres", "Atelier de couture"),
             types["carriere"].Build("carriere", FirstCommuneId, Ownership.Cooperative, "ouvriers", "Carrière coopérative"),
             types["camp-forestier"].Build("camp-forestier", FirstCommuneId, name: "Camp forestier d'État"),
             types["logements"].Build("logements-etat", FirstCommuneId, name: "Logements d'État") with { HousingPlaces = 3_000 },
-            types["logements"].Build("logements-prives", FirstCommuneId, Ownership.Private, "dirigeants", "Logements privés")
+            types["logements"].Build("logements-prives", FirstCommuneId, Ownership.Private, "cadres", "Logements privés")
                 with { HousingPlaces = 2_200, DailyRent = 0.5 },
+            types["ecole"].Build("ecole", FirstCommuneId, name: "École d'État"),
         };
 
         SocialClass[] classes =
         [
-            new("ouvriers", "Ouvriers", Rank.Workers, new Ideology(Pole.A, Pole.A, Pole.A), 4_500) { Wealth = 225_000 },
-            new("cadres", "Cadres", Rank.Executives, new Ideology(Pole.A, Pole.A, Pole.B), 450) { Wealth = 135_000 },
-            new("dirigeants", "Dirigeants", Rank.Leaders, new Ideology(Pole.B, Pole.A, Pole.B), 50) { Wealth = 100_000 },
+            new("ouvriers", "Ouvriers communistes", Rank.Workers, new Ideology(Pole.A, Pole.A, Pole.A), 4_500) { Wealth = 225_000 },
+            new("intermediaires", "Professions intermédiaires libertaires", Rank.Intermediate, new Ideology(Pole.A, Pole.A, Pole.B), 450) { Wealth = 135_000 },
+            new("cadres", "Cadres capitalistes", Rank.Executives, new Ideology(Pole.B, Pole.A, Pole.B), 50) { Wealth = 100_000 },
         ];
         foreach (var socialClass in classes)
             socialClass.SetResidence(FirstCommuneId, 1);

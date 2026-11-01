@@ -47,16 +47,16 @@ public class EconomyTests
     {
         var structures = Town(new Structure("ferme", "Ferme", StructureKind.Building, "commune", Jobs: 100));
         var workers = Workers(60);
-        var executives = Resident("cadres", Rank.Executives, 30);
-        var leaders = Resident("dirigeants", Rank.Leaders, 5);
+        var intermediates = Resident("intermediaires", Rank.Intermediate, 30);
+        var executives = Resident("cadres", Rank.Executives, 5);
 
-        var production = Employment.Assign(structures, [workers, executives, leaders]);
+        var production = Employment.Assign(structures, [workers, intermediates, executives]);
 
         // 100 emplois de production, 10 d'encadrement, 1 de direction.
         Assert.Equal(60, production["ferme"], precision: 6);
         Assert.Equal(60, workers.MembersWorkingIn("ferme"), precision: 6);
-        Assert.Equal(10, executives.MembersWorkingIn("ferme"), precision: 6);
-        Assert.Equal(1, leaders.MembersWorkingIn("ferme"), precision: 6);
+        Assert.Equal(10, intermediates.MembersWorkingIn("ferme"), precision: 6);
+        Assert.Equal(1, executives.MembersWorkingIn("ferme"), precision: 6);
     }
 
     [Fact]
@@ -76,7 +76,7 @@ public class EconomyTests
     {
         var market = new Market(Products);
         var structures = Town(new Structure("carriere", "Carrière", StructureKind.Building, "commune",
-            Ownership.Private, "dirigeants", new Production("pierre", 1), Jobs: 60));
+            Ownership.Private, "cadres", new Production("pierre", 1), Jobs: 60));
 
         RunWorkDay(structures, [Workers(60)], new Treasury(), new Inventory(), market);
 
@@ -84,24 +84,24 @@ public class EconomyTests
         Assert.Empty(market.CollectEarnings());
 
         Assert.True(market.TryBuy("pierre", 10));
-        Assert.Equal(30, market.CollectEarnings()["dirigeants"], precision: 6);
+        Assert.Equal(30, market.CollectEarnings()["cadres"], precision: 6);
     }
 
     [Fact]
-    public void Le_tresor_paie_les_salaires_d_un_batiment_public_et_les_cadres_gagnent_le_double()
+    public void Le_tresor_paie_les_salaires_d_un_batiment_public_et_les_professions_intermediaires_gagnent_le_double()
     {
         var structures = Town(new Structure("scierie", "Scierie", StructureKind.Building, "commune", Jobs: 10, DailyWage: 2));
         var workers = Workers(10);
-        var executives = Resident("cadres", Rank.Executives, 1);
+        var intermediates = Resident("intermediaires", Rank.Intermediate, 1);
         var treasury = new Treasury();
         treasury.Deposit(100);
 
-        RunWorkDay(structures, [workers, executives], treasury, new Inventory(), new Market(Products));
+        RunWorkDay(structures, [workers, intermediates], treasury, new Inventory(), new Market(Products));
 
-        // 10 ouvriers × 2 + 1 cadre × 4 = 24.
+        // 10 ouvriers × 2 + 1 profession intermédiaire × 4 = 24.
         Assert.Equal(76, treasury.Balance, precision: 6);
         Assert.Equal(20, workers.Wealth, precision: 6);
-        Assert.Equal(4, executives.Wealth, precision: 6);
+        Assert.Equal(4, intermediates.Wealth, precision: 6);
     }
 
     [Fact]
@@ -199,13 +199,13 @@ public class EconomyTests
         var market = new Market(Products);
         market.Offer("pain", 100, "vendeur");
         var workers = Workers(100, wealth: 10_000);
-        var executives = Resident("cadres", Rank.Executives, 100, wealth: 10_000);
+        var intermediates = Resident("intermediaires", Rank.Intermediate, 100, wealth: 10_000);
 
-        Consumption.RunDaily([workers, executives], Products, market);
+        Consumption.RunDaily([workers, intermediates], Products, market);
 
         // Demande : 100 + 100 pains pour 100 en vente → la moitié de chaque demande est servie.
         Assert.Equal(9_950, workers.Wealth, precision: 6);
-        Assert.Equal(9_950, executives.Wealth, precision: 6);
+        Assert.Equal(9_950, intermediates.Wealth, precision: 6);
     }
 
     [Fact]

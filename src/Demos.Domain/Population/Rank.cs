@@ -2,12 +2,12 @@ namespace Demos.Domain.Population;
 
 public enum Rank
 {
-    /// <summary>Ouvriers.</summary>
+    /// <summary>Ouvriers : emplois de production.</summary>
     Workers,
 
-    /// <summary>Cadres et professions intellectuelles.</summary>
-    Executives,
+    /// <summary>Professions intermédiaires : emplois d'encadrement (techniciens, contremaîtres, instituteurs…).</summary>
+    Intermediate,
 
-    /// <summary>Dirigeants.</summary>
-    Leaders,
+    /// <summary>Cadres : emplois de direction.</summary>
+    Executives,
 }

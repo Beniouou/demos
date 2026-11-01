@@ -33,6 +33,9 @@ public sealed class SocialClass(string id, string name, Rank rank, Ideology ideo
     /// <summary>Part des lois qui s'appliquent à la classe qu'elle accepte, de 0 à 1.</summary>
     public double Adhesion { get; set; } = 1;
 
+    /// <summary>Points d'éducation accumulés à l'école, dépensés pour que des membres changent de rang.</summary>
+    public double EducationPoints { get; set; }
+
     public IReadOnlyDictionary<string, double> Residence => _residence;
 
     public void SetResidence(string communeId, double share) => _residence[communeId] = Math.Clamp(share, 0, 1);
@@ -71,6 +74,31 @@ public sealed class SocialClass(string id, string name, Rank rank, Ideology ideo
     {
         var rate = 0.012 * (NeedsSatisfaction - 0.5);
         Population = (long)Math.Round(Population * (1 + rate));
+    }
+
+    /// <summary>
+    /// Fait passer des membres dans une autre classe. Ils emportent leur part de richesse et gardent leur commune :
+    /// la répartition entre communes de cette classe ne change pas, celle de la classe d'arrivée est recalculée.
+    /// </summary>
+    public void TransferMembersTo(SocialClass target, long count)
+    {
+        count = Math.Min(count, Population);
+        if (count <= 0)
+            return;
+
+        var share = (double)count / Population;
+        var wealth = Wealth * share;
+        Wealth -= wealth;
+        target.Wealth += wealth;
+
+        var targetResidents = target._residence.ToDictionary(r => r.Key, r => r.Value * target.Population);
+        foreach (var (communeId, residence) in _residence)
+            targetResidents[communeId] = targetResidents.GetValueOrDefault(communeId) + residence * count;
+
+        Population -= count;
+        target.Population += count;
+        foreach (var (communeId, residents) in targetResidents)
+            target._residence[communeId] = residents / target.Population;
     }
 
     /// <summary>Poids politique = population × modificateur (multiplicateur de rang, ajusté par les lois).</summary>

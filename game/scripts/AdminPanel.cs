@@ -29,6 +29,8 @@ public partial class AdminPanel : PanelContainer
     private SpinBox _rent = null!;
     private SpinBox _price = null!;
     private SpinBox _posts = null!;
+    private SpinBox _schoolPlaces = null!;
+    private SpinBox _tuition = null!;
 
     public void Init(Simulation simulation)
     {
@@ -43,6 +45,11 @@ public partial class AdminPanel : PanelContainer
         var viewport = GetViewportRect().Size;
         Size = new Vector2(CustomMinimumSize.X, viewport.Y);
         Position = new Vector2(viewport.X - Size.X, 0);
+
+        // De nouvelles classes ont pu naître : la liste des propriétaires possibles est reconstruite.
+        _owner.Clear();
+        foreach (var socialClass in _simulation.World.Classes)
+            _owner.AddItem(socialClass.Name);
 
         var selected = SelectedBuilding()?.Id;
         _buildingIds.Clear();
@@ -88,6 +95,8 @@ public partial class AdminPanel : PanelContainer
             lines.Add($"Salaires dus : {wages:N0} par jour");
         if (building.HousingPlaces > 0)
             lines.Add($"Loyers possibles : {building.HousingPlaces * building.DailyRent:N0} par jour");
+        if (building.SchoolPlaces > 0)
+            lines.Add($"École : jusqu'à {building.SchoolPlaces:N0} points d'éducation par jour, frais possibles {building.SchoolPlaces * building.DailyTuition:N0}");
 
         lines.Add($"Postes de personnages : 0 occupé sur {building.Posts} (recrutement : menu à venir)");
 
@@ -130,6 +139,8 @@ public partial class AdminPanel : PanelContainer
         _perWorker = AddSpin(form, "Production par travailleur", 0, 100, 0.01);
         _places = AddSpin(form, "Places de logement", 0, 100_000, 10);
         _rent = AddSpin(form, "Loyer par place et par jour", 0, 1_000, 0.05);
+        _schoolPlaces = AddSpin(form, "Places d'élèves", 0, 100_000, 10);
+        _tuition = AddSpin(form, "Frais de scolarité par jour", 0, 1_000, 0.05);
         _price = AddSpin(form, "Prix du produit au marché", 0, 10_000, 0.1);
         _posts = AddSpin(form, "Postes de personnages", 0, 20, 1);
 
@@ -188,6 +199,8 @@ public partial class AdminPanel : PanelContainer
         _wage.Value = building.DailyWage;
         _places.Value = building.HousingPlaces;
         _rent.Value = building.DailyRent;
+        _schoolPlaces.Value = building.SchoolPlaces;
+        _tuition.Value = building.DailyTuition;
         _posts.Value = building.Posts;
 
         var production = building.Production;
@@ -213,6 +226,8 @@ public partial class AdminPanel : PanelContainer
             Production = building.Production is { } production ? production with { QuantityPerWorker = _perWorker.Value } : null,
             HousingPlaces = (int)_places.Value,
             DailyRent = _rent.Value,
+            SchoolPlaces = (int)_schoolPlaces.Value,
+            DailyTuition = _tuition.Value,
             Posts = (int)_posts.Value,
         };
 
