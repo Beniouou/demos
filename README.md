@@ -18,10 +18,10 @@ Règle d'or : `Demos.Domain` ne référence rien. Les autres projets dépendent 
 
 ## Prérequis
 
-- [SDK .NET 8](https://dotnet.microsoft.com/download/dotnet/8.0)
+- [SDK .NET 10](https://dotnet.microsoft.com/download/dotnet/10.0)
 - [Godot 4, version .NET](https://godotengine.org/download) (pas la version standard)
 
-Le projet vise Godot 4.3. Avec une version plus récente, Godot propose de mettre le projet à jour à l'ouverture.
+Le projet vise Godot 4.7. Avec une version plus récente, Godot propose de mettre le projet à jour à l'ouverture.
 
 ## Lancer les tests
 
@@ -32,4 +32,4 @@ dotnet test
 ## Lancer le jeu
 
 Ouvrir `game/project.godot` dans Godot .NET, puis F5.
-Espace met en pause ou relance le temps ; 1, 2 et 3 changent la vitesse.
+Espace met en pause ou relance le temps ; 1 à 4 changent la vitesse (un jour dure 5 s en ×1).

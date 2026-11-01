@@ -19,21 +19,21 @@ public sealed class SocialClass(string id, string name, Rank rank, Ideology ideo
     public double NeedsSatisfaction { get; set; } = 0.5;
 
     /// <summary>
-    /// L'approbation se rapproche de 10 % de sa cible à chaque cycle mensuel :
-    /// cible = 50 × satisfaction + 50 × accord idéologique.
+    /// Calcul quotidien : l'approbation parcourt 0,35 % de l'écart avec sa cible (environ 10 % par mois).
+    /// Cible = 50 × satisfaction + 50 × accord idéologique.
     /// </summary>
     public void UpdateApproval(double ideologicalAgreement)
     {
         var target = 50 * NeedsSatisfaction + 50 * ideologicalAgreement;
-        Approval += 0.1 * (target - Approval);
+        Approval += 0.0035 * (target - Approval);
     }
 
     /// <summary>
-    /// Croissance mensuelle : +0,2 % à 100 % de satisfaction, nulle à 50 %, -0,2 % à 0 %.
+    /// Calcul saisonnier : +0,6 % à 100 % de satisfaction, nulle à 50 %, -0,6 % à 0 %.
     /// </summary>
     public void Grow()
     {
-        var rate = 0.004 * (NeedsSatisfaction - 0.5);
+        var rate = 0.012 * (NeedsSatisfaction - 0.5);
         Population = (long)Math.Round(Population * (1 + rate));
     }
 

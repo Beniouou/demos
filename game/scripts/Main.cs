@@ -1,5 +1,6 @@
 using System.Text;
 using Demos.Application;
+using Demos.Domain.Shared;
 using Demos.Infrastructure;
 using Godot;
 
@@ -11,9 +12,9 @@ namespace Demos.Game;
 /// </summary>
 public partial class Main : Node
 {
-    // Jours de jeu par seconde réelle, pour les vitesses ×1, ×2 et ×5.
-    private static readonly double[] DaysPerSecond = [1, 2, 5];
-    private static readonly string[] SpeedLabels = ["×1", "×2", "×5"];
+    // Durée réelle d'un jour de jeu : 5 s en ×1, 2 s en ×2, 0,5 s en ×3, 0,1 s en ×4.
+    private static readonly double[] SecondsPerDay = [5, 2, 0.5, 0.1];
+    private static readonly string[] SpeedLabels = ["×1", "×2", "×3", "×4"];
 
     private Simulation _simulation = null!;
     private Label _status = null!;
@@ -32,7 +33,7 @@ public partial class Main : Node
     {
         if (!_paused)
         {
-            _pendingDays += delta * DaysPerSecond[_speedIndex];
+            _pendingDays += delta / SecondsPerDay[_speedIndex];
             while (_pendingDays >= 1)
             {
                 _pendingDays -= 1;
@@ -54,14 +55,17 @@ public partial class Main : Node
             case Key.Key1: _speedIndex = 0; break;
             case Key.Key2: _speedIndex = 1; break;
             case Key.Key3: _speedIndex = 2; break;
+            case Key.Key4: _speedIndex = 3; break;
         }
     }
 
     private string Describe()
     {
         var text = new StringBuilder();
-        text.AppendLine($"{_simulation.Clock.Today:dd/MM/yyyy}   {(_paused ? "EN PAUSE" : SpeedLabels[_speedIndex])}");
-        text.AppendLine("Espace : pause   1 / 2 / 3 : vitesse");
+        text.AppendLine(
+            $"{_simulation.Clock.Today:dd/MM/yyyy}   {SeasonName(_simulation.Clock.Season)}   " +
+            $"{(_paused ? "EN PAUSE" : SpeedLabels[_speedIndex])}");
+        text.AppendLine("Espace : pause   1 à 4 : vitesse");
         text.AppendLine();
 
         foreach (var socialClass in _simulation.World.Classes)
@@ -75,4 +79,12 @@ public partial class Main : Node
         text.AppendLine($"Produits chargés : {_simulation.World.Products.Count}");
         return text.ToString();
     }
+
+    private static string SeasonName(Season season) => season switch
+    {
+        Season.Winter => "Hiver",
+        Season.Spring => "Printemps",
+        Season.Summer => "Été",
+        _ => "Automne",
+    };
 }

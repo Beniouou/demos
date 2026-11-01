@@ -9,17 +9,36 @@ public class SimulationTests
         PrototypeScenario.Create(new JsonContentSource(_ => "[]"));
 
     [Fact]
-    public void Le_cycle_mensuel_se_declenche_au_changement_de_mois()
+    public void Une_annee_compte_quatre_saisons_et_un_bilan()
     {
         var simulation = CreatePrototype();
-        var months = 0;
-        simulation.MonthPassed += () => months++;
+        var seasons = 0;
+        var years = 0;
+        simulation.SeasonPassed += () => seasons++;
+        simulation.YearPassed += () => years++;
 
-        // Du 1er janvier au 1er mars 1900 : 59 jours, deux changements de mois.
-        for (var day = 0; day < 59; day++)
+        // Du 1er janvier 1900 au 1er janvier 1901 : 1er mars, 1er juin, 1er septembre, 1er décembre.
+        for (var day = 0; day < 365; day++)
             simulation.AdvanceDay();
 
-        Assert.Equal(2, months);
+        Assert.Equal(4, seasons);
+        Assert.Equal(1, years);
+    }
+
+    [Fact]
+    public void La_population_ne_change_qu_au_changement_de_saison()
+    {
+        var simulation = CreatePrototype();
+        var workers = simulation.World.Classes.Single(c => c.Id == "ouvriers");
+        var start = workers.Population;
+
+        // Du 1er janvier au 28 février : toujours l'hiver.
+        for (var day = 0; day < 58; day++)
+            simulation.AdvanceDay();
+        Assert.Equal(start, workers.Population);
+
+        simulation.AdvanceDay();
+        Assert.NotEqual(start, workers.Population);
     }
 
     [Fact]

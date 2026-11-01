@@ -5,20 +5,39 @@ namespace Demos.Tests.Domain;
 public class GameClockTests
 {
     [Fact]
-    public void Un_jour_ordinaire_ne_change_pas_de_mois()
+    public void Un_jour_ordinaire_ne_change_rien_au_calendrier()
     {
         var clock = new GameClock(new DateOnly(1900, 1, 15));
 
-        Assert.False(clock.AdvanceDay());
+        Assert.Equal(CalendarChange.None, clock.AdvanceDay());
         Assert.Equal(new DateOnly(1900, 1, 16), clock.Today);
     }
 
     [Fact]
-    public void Le_dernier_jour_du_mois_annonce_un_nouveau_mois()
+    public void Le_1er_mars_commence_le_printemps()
     {
-        var clock = new GameClock(new DateOnly(1900, 1, 31));
+        var clock = new GameClock(new DateOnly(1900, 2, 28));
 
-        Assert.True(clock.AdvanceDay());
-        Assert.Equal(new DateOnly(1900, 2, 1), clock.Today);
+        Assert.Equal(CalendarChange.NewSeason, clock.AdvanceDay());
+        Assert.Equal(Season.Spring, clock.Season);
+    }
+
+    [Fact]
+    public void Le_1er_janvier_commence_une_annee_sans_changer_de_saison()
+    {
+        var clock = new GameClock(new DateOnly(1900, 12, 31));
+
+        Assert.Equal(CalendarChange.NewYear, clock.AdvanceDay());
+        Assert.Equal(Season.Winter, clock.Season);
+    }
+
+    [Theory]
+    [InlineData(12, Season.Winter)]
+    [InlineData(5, Season.Spring)]
+    [InlineData(8, Season.Summer)]
+    [InlineData(11, Season.Autumn)]
+    public void La_saison_depend_du_mois(int month, Season expected)
+    {
+        Assert.Equal(expected, GameClock.SeasonOf(new DateOnly(1900, month, 1)));
     }
 }
