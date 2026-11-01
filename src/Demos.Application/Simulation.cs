@@ -1,3 +1,4 @@
+using Demos.Domain.Politics;
 using Demos.Domain.Shared;
 
 namespace Demos.Application;
@@ -29,12 +30,9 @@ public sealed class Simulation(World world, GameClock clock)
     }
 
     // Ordre prévu par le document de règles : décisions, production, consommation,
-    // fiscalité, opinion, événements. Seule l'opinion existe pour l'instant.
-    private void RunDailyCalculations()
-    {
-        foreach (var socialClass in World.Classes)
-            socialClass.UpdateApproval(socialClass.Ideology.AgreementWith(World.RegimeIdeology));
-    }
+    // fiscalité, légitimité, événements. Seule la légitimité existe pour l'instant.
+    private void RunDailyCalculations() =>
+        LawEffects.ApplyDaily(World.Classes, World.Laws, World.Structures, World.Legitimacy);
 
     // Prévu : climat, démographie, transferts de classe, revendications, recherche.
     // Seule la démographie existe pour l'instant.

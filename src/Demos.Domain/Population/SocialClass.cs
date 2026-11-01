@@ -1,3 +1,5 @@
+using Demos.Domain.Politics;
+
 namespace Demos.Domain.Population;
 
 /// <summary>
@@ -5,6 +7,9 @@ namespace Demos.Domain.Population;
 /// </summary>
 public sealed class SocialClass(string id, string name, Rank rank, Ideology ideology, long population)
 {
+    // Part des membres soumis à chaque structure locale (où ils vivent ou travaillent), de 0 à 1.
+    private readonly Dictionary<string, double> _sharesByStructure = [];
+
     public string Id { get; } = id;
     public string Name { get; } = name;
     public Rank Rank { get; } = rank;
@@ -12,21 +17,22 @@ public sealed class SocialClass(string id, string name, Rank rank, Ideology ideo
     public long Population { get; private set; } = population;
     public double Wealth { get; set; }
 
-    /// <summary>Soutien au régime, de 0 à 100.</summary>
-    public double Approval { get; private set; } = 50;
+    /// <summary>Part des lois qui s'appliquent à la classe qu'elle accepte, de 0 à 1.</summary>
+    public double Adhesion { get; set; } = 1;
 
-    /// <summary>Part des besoins couverte au dernier cycle, de 0 à 1. Fixée par la consommation.</summary>
+    /// <summary>Part des besoins couverte, de 0 à 1. Fixée par la consommation.</summary>
     public double NeedsSatisfaction { get; set; } = 0.5;
 
     /// <summary>
-    /// Calcul quotidien : l'approbation parcourt 0,35 % de l'écart avec sa cible (environ 10 % par mois).
-    /// Cible = 50 × satisfaction + 50 × accord idéologique.
+    /// Fixe la part des membres soumis à une structure locale. Exemple : 50 membres sur 200
+    /// vivent dans le village A → 0,25 ; 10 d'entre eux travaillent dans l'usine B → 0,05.
     /// </summary>
-    public void UpdateApproval(double ideologicalAgreement)
-    {
-        var target = 50 * NeedsSatisfaction + 50 * ideologicalAgreement;
-        Approval += 0.0035 * (target - Approval);
-    }
+    public void SetShareSubjectTo(string structureId, double share) =>
+        _sharesByStructure[structureId] = Math.Clamp(share, 0, 1);
+
+    /// <summary>Part des membres soumis aux lois d'une structure. L'État couvre toute la classe.</summary>
+    public double ShareSubjectTo(Structure structure) =>
+        structure.IsNational ? 1 : _sharesByStructure.GetValueOrDefault(structure.Id);
 
     /// <summary>
     /// Calcul saisonnier : +0,6 % à 100 % de satisfaction, nulle à 50 %, -0,6 % à 0 %.

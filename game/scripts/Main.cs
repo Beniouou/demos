@@ -3,6 +3,7 @@ using Demos.Application;
 using Demos.Domain.Shared;
 using Demos.Infrastructure;
 using Godot;
+using Orientation = Demos.Domain.Politics.Orientation;
 
 namespace Demos.Game;
 
@@ -72,9 +73,14 @@ public partial class Main : Node
         {
             text.AppendLine(
                 $"{socialClass.Name,-12} {socialClass.Ideology.Name,-16} " +
-                $"population {socialClass.Population,10:N0}   approbation {socialClass.Approval,5:F1}");
+                $"population {socialClass.Population,10:N0}   adhésion {socialClass.Adhesion,4:P0}");
         }
 
+        text.AppendLine();
+        text.Append("Légitimité :");
+        foreach (var pole in Orientation.All)
+            text.Append($"   {pole.Code} {_simulation.World.Legitimacy[pole],8:F1}");
+        text.AppendLine();
         text.AppendLine();
         text.AppendLine($"Produits chargés : {_simulation.World.Products.Count}");
         return text.ToString();

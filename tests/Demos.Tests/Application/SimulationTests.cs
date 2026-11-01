@@ -1,4 +1,6 @@
 using Demos.Application;
+using Demos.Domain.Politics;
+using Demos.Domain.Population;
 using Demos.Infrastructure;
 
 namespace Demos.Tests.Application;
@@ -42,15 +44,28 @@ public class SimulationTests
     }
 
     [Fact]
-    public void Une_classe_mal_servie_et_eloignee_du_regime_perd_de_l_approbation()
+    public void Les_classes_produisent_chaque_jour_la_legitimite_des_lois_qu_elles_acceptent()
+    {
+        var simulation = CreatePrototype();
+        var libertarian = new Orientation(IdeologicalAxis.Property, Pole.B);
+
+        simulation.AdvanceDay();
+        var afterOneDay = simulation.World.Legitimacy[libertarian];
+        simulation.AdvanceDay();
+
+        // Cadres et dirigeants (LI) acceptent la liberté d'entreprendre, loi de l'État : 170 000 × 0,0001 par jour.
+        Assert.Equal(17, afterOneDay, precision: 6);
+        Assert.Equal(34, simulation.World.Legitimacy[libertarian], precision: 6);
+    }
+
+    [Fact]
+    public void Les_ouvriers_communistes_rejettent_la_liberte_d_entreprendre()
     {
         var simulation = CreatePrototype();
         var workers = simulation.World.Classes.Single(c => c.Id == "ouvriers");
-        workers.NeedsSatisfaction = 0.2;
 
-        for (var day = 0; day < 365; day++)
-            simulation.AdvanceDay();
+        simulation.AdvanceDay();
 
-        Assert.True(workers.Approval < 50);
+        Assert.True(workers.Adhesion < 1);
     }
 }

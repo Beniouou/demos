@@ -5,19 +5,7 @@ namespace Demos.Tests.Domain;
 public class SocialClassTests
 {
     private static SocialClass Workers(long population = 1_000_000) =>
-        new("ouvriers", "Ouvriers", Rank.Workers, new Ideology(0, 0, 0), population);
-
-    [Fact]
-    public void L_approbation_se_rapproche_chaque_jour_de_sa_cible()
-    {
-        var workers = Workers();
-        workers.NeedsSatisfaction = 1;
-
-        workers.UpdateApproval(ideologicalAgreement: 1);
-
-        // Cible 100, départ 50 : 50 + 0,0035 × 50 = 50,175.
-        Assert.Equal(50.175, workers.Approval, precision: 6);
-    }
+        new("ouvriers", "Ouvriers", Rank.Workers, new Ideology(Pole.A, Pole.A, Pole.A), population);
 
     [Theory]
     [InlineData(1.0, 1_006_000)]
