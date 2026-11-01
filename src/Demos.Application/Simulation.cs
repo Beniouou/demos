@@ -96,8 +96,53 @@ public sealed class Simulation(World world, GameClock clock)
         buyer.Wealth -= price;
         World.Treasury.Deposit(price);
         World.UpdateStructure(building with { Ownership = Privatization.OwnershipFor(buyer), OwnerClassId = buyer.Id });
+        World.Wages.Forget(building.Id);
+        World.RemoveLaw($"nationalisation-{building.Id}");
         World.AddLaw(new Law($"privatisation-{building.Id}", $"Privatisation : {building.Name}", communeId!, [SalePole]));
         return SaleOutcome.Sold;
+    }
+
+    /// <summary>Pôle d'une nationalisation : protectionniste (PR).</summary>
+    public static readonly Orientation NationalizationPole = new(IdeologicalAxis.Property, Pole.A);
+
+    /// <summary>Une entreprise est en difficulté quand elle a versé moins de 80 % des salaires dus sur 30 jours.</summary>
+    public bool IsStruggling(Structure building) => World.Wages.IsStruggling(building.Id);
+
+    public double NationalizationPriceOf(Structure building, NationalizationMode mode) =>
+        Nationalization.PriceOf(mode, IsStruggling(building), DailyProfitOf(building));
+
+    public double NationalizationLegitimacyCostOf(Structure building, NationalizationMode mode) =>
+        Nationalization.LegitimacyCostOf(mode, IsStruggling(building));
+
+    /// <summary>
+    /// Action du joueur : reprendre un bâtiment privé ou coopératif, par rachat (le trésor paie le propriétaire) ou
+    /// par expropriation (sans payer). Le propriétaire ne peut pas refuser. Le bâtiment redevient public, et la
+    /// nationalisation reste dans la commune comme une loi protectionniste ; la loi de privatisation, s'il y en avait
+    /// une, disparaît. Ne change rien si c'est impossible.
+    /// </summary>
+    public NationalizationOutcome TryNationalize(string buildingId, NationalizationMode mode)
+    {
+        var building = World.Structures[buildingId];
+        if (building.Ownership == Ownership.Public || World.CommuneOf(building) is not { } communeId)
+            return NationalizationOutcome.NotPrivate;
+
+        var price = NationalizationPriceOf(building, mode);
+        var legitimacyCost = NationalizationLegitimacyCostOf(building, mode);
+        if (World.Treasury.Balance < price)
+            return NationalizationOutcome.TreasuryTooPoor;
+        if (!World.Legitimacy.TrySpend(NationalizationPole, legitimacyCost))
+            return NationalizationOutcome.NotEnoughLegitimacy;
+
+        World.Treasury.TrySpend(price);
+        if (building.OwnerClassId is { } ownerId && World.ClassesById.TryGetValue(ownerId, out var owner))
+            owner.Wealth += price;
+
+        World.UpdateStructure(building with { Ownership = Ownership.Public, OwnerClassId = null });
+        World.Wages.Forget(building.Id);
+        World.RemoveLaw($"privatisation-{building.Id}");
+        World.RemoveLaw($"nationalisation-{building.Id}");
+        World.AddLaw(new Law($"nationalisation-{building.Id}", $"Nationalisation : {building.Name}", communeId, [NationalizationPole]));
+        return NationalizationOutcome.Done;
     }
 
     /// <summary>
@@ -151,7 +196,7 @@ public sealed class Simulation(World world, GameClock clock)
 
         World.Workers = Employment.Assign(World.Structures, World.Classes);
         World.PollutionByCommune = Pollution.PerResidentByCommune(World.Structures, World.Workers, World.Classes);
-        WorkDay.Run(World.Structures, World.Workers, World.Classes, World.Laws, World.Treasury, World.StateStockOf, World.MarketOf, World.CommuneFundOf);
+        WorkDay.Run(World.Structures, World.Workers, World.Classes, World.Laws, World.Treasury, World.StateStockOf, World.MarketOf, World.CommuneFundOf, World.Wages);
         Trade.RunDaily(communeIds, World.Classes, World.Products, World.MarketOf,
             (communeId, productId) => World.StorageOf(communeId).FreeFor(productId));
         Housing.RunDaily(World.Structures, World.Classes, World.Treasury);

@@ -46,6 +46,11 @@ public sealed class World
 
     public void AddLaw(Law law) => _laws.Add(law);
 
+    public void RemoveLaw(string lawId) => _laws.RemoveAll(l => l.Id == lawId);
+
+    /// <summary>Salaires dus et versés par chaque bâtiment sur les derniers jours.</summary>
+    public WageLedger Wages { get; } = new();
+
     /// <summary>Ressource « légitimité » du joueur, un stock par pôle.</summary>
     public LegitimacyPool Legitimacy { get; } = new();
 

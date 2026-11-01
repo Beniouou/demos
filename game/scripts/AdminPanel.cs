@@ -50,6 +50,9 @@ public partial class AdminPanel : PanelContainer
     private Button _sell = null!;
     private Label _saleMessage = null!;
     private readonly List<string> _buyerIds = [];
+    private Button _buyout = null!;
+    private Button _expropriate = null!;
+    private Label _nationalizationMessage = null!;
 
     public void Init(Simulation simulation)
     {
@@ -124,6 +127,8 @@ public partial class AdminPanel : PanelContainer
 
         lines.Add($"Postes de personnages : 0 occupé sur {building.Posts} (recrutement : menu à venir)");
 
+        if (world.Wages.PaidShare(building.Id) is { } paidShare)
+            lines.Add($"Salaires versés sur 30 jours : {paidShare:P0}{(_simulation.IsStruggling(building) ? " — EN DIFFICULTÉ" : "")}");
         var profit = _simulation.DailyProfitOf(building);
         lines.Add($"Bénéfice attendu : {profit:N0} par jour, prix accepté au plus {Privatization.MaximumPriceOf(profit):N0}");
 
@@ -153,7 +158,10 @@ public partial class AdminPanel : PanelContainer
         columns.AddChild(_list);
 
         var form = new VBoxContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill };
-        columns.AddChild(form);
+        // Le formulaire est plus haut que la fenêtre : il défile.
+        var scroll = new ScrollContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill, SizeFlagsVertical = SizeFlags.ExpandFill, HorizontalScrollMode = ScrollContainer.ScrollMode.Disabled };
+        scroll.AddChild(form);
+        columns.AddChild(scroll);
 
         form.AddChild(new Label { Text = "ADMINISTRATION (touche A)" });
         _title = new Label();
@@ -204,6 +212,19 @@ public partial class AdminPanel : PanelContainer
         form.AddChild(_sell);
         _saleMessage = new Label { AutowrapMode = TextServer.AutowrapMode.WordSmart };
         form.AddChild(_saleMessage);
+
+        form.AddChild(new HSeparator());
+        form.AddChild(new Label { Text = "NATIONALISATION (bâtiment privé ou coopératif)" });
+        var nationalizationRow = new HBoxContainer();
+        _buyout = new Button { Text = "Racheter", SizeFlagsHorizontal = SizeFlags.ExpandFill };
+        _buyout.Pressed += () => Nationalize(NationalizationMode.Buyout);
+        _expropriate = new Button { Text = "Exproprier", SizeFlagsHorizontal = SizeFlags.ExpandFill };
+        _expropriate.Pressed += () => Nationalize(NationalizationMode.Expropriation);
+        nationalizationRow.AddChild(_buyout);
+        nationalizationRow.AddChild(_expropriate);
+        form.AddChild(nationalizationRow);
+        _nationalizationMessage = new Label { AutowrapMode = TextServer.AutowrapMode.WordSmart };
+        form.AddChild(_nationalizationMessage);
 
         _info = new Label { AutowrapMode = TextServer.AutowrapMode.WordSmart };
         form.AddChild(_info);
@@ -268,6 +289,7 @@ public partial class AdminPanel : PanelContainer
         _stateTax.Value = _simulation.World.StateTaxRate * 100;
         _communeTax.Value = _simulation.World.CommuneOf(building) is { } taxedCommune ? _simulation.World.CommuneTaxRateOf(taxedCommune) * 100 : 0;
         ShowSale(building);
+        ShowNationalization(building);
 
         var production = building.Production;
         _perWorker.Editable = _price.Editable = production is not null;
@@ -332,6 +354,41 @@ public partial class AdminPanel : PanelContainer
         _saleMessage.Text = isPublic
             ? $"Coûte {Simulation.SaleLegitimacyCost} de légitimité LI (disponible : {world.Legitimacy[Simulation.SalePole]:F1})."
             : "Ce bâtiment n'est pas public.";
+    }
+
+    private void ShowNationalization(Structure building)
+    {
+        var isPrivate = building.Ownership != Ownership.Public;
+        _buyout.Disabled = _expropriate.Disabled = !isPrivate;
+        if (!isPrivate)
+        {
+            _nationalizationMessage.Text = "Ce bâtiment est déjà public.";
+            return;
+        }
+
+        var state = _simulation.IsStruggling(building) ? "en difficulté" : "qui paie ses salaires";
+        _nationalizationMessage.Text =
+            $"Entreprise {state}. Rachat : {_simulation.NationalizationPriceOf(building, NationalizationMode.Buyout):N0} " +
+            $"et {_simulation.NationalizationLegitimacyCostOf(building, NationalizationMode.Buyout)} PR. " +
+            $"Expropriation : {_simulation.NationalizationLegitimacyCostOf(building, NationalizationMode.Expropriation)} PR. " +
+            $"(PR disponible : {_simulation.World.Legitimacy[Simulation.NationalizationPole]:F1}, trésor : {_simulation.World.Treasury.Balance:N0})";
+    }
+
+    private void Nationalize(NationalizationMode mode)
+    {
+        if (SelectedBuilding() is not { } building)
+            return;
+
+        var outcome = _simulation.TryNationalize(building.Id, mode);
+        var message = outcome switch
+        {
+            NationalizationOutcome.Done => mode == NationalizationMode.Buyout ? "Racheté par l'État." : "Exproprié par l'État.",
+            NationalizationOutcome.NotPrivate => "Ce bâtiment est déjà public.",
+            NationalizationOutcome.TreasuryTooPoor => "Le trésor n'a pas assez d'argent.",
+            _ => "Pas assez de légitimité PR.",
+        };
+        ShowBuilding(_buildingIds.IndexOf(building.Id));
+        _nationalizationMessage.Text = message;
     }
 
     private void Sell()

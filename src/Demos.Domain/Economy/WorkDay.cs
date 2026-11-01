@@ -20,7 +20,8 @@ public static class WorkDay
         Treasury treasury,
         Func<string, Inventory> stateStockOf,
         Func<string, Market> marketOf,
-        Func<string, Treasury>? communeFundOf = null)
+        Func<string, Treasury>? communeFundOf = null,
+        WageLedger? wageLedger = null)
     {
         foreach (var workplace in structures.Values.Where(s => s.Jobs > 0))
         {
@@ -33,6 +34,7 @@ public static class WorkDay
                 .Where(d => d.Due > 0)
                 .ToList();
             var totalDue = dues.Sum(d => d.Due);
+            var initialDue = totalDue;
 
             var produced = workplace.Production is { } production
                 ? production.QuantityPerWorker * productionWorkers.GetValueOrDefault(workplace.Id)
@@ -56,7 +58,8 @@ public static class WorkDay
                 totalDue *= 1 - settled;
             }
 
-            PayInMoney(workplace, dues, totalDue, classes, treasury, communeFundOf?.Invoke(communeId));
+            var paidInMoney = PayInMoney(workplace, dues, totalDue, classes, treasury, communeFundOf?.Invoke(communeId));
+            wageLedger?.Record(workplace.Id, initialDue, initialDue - totalDue + paidInMoney);
 
             if (produced > 0 && workplace.Production is { } delivered)
             {
@@ -71,7 +74,8 @@ public static class WorkDay
     private static bool IsPaidInKind(Structure workplace, IReadOnlyDictionary<string, Structure> structures, IReadOnlyList<Law> laws) =>
         laws.Any(law => law.Has(LawRule.PaymentInKind) && StructureTree.IsWithin(workplace, law.StructureId, structures));
 
-    private static void PayInMoney(
+    /// <summary>Verse les salaires en argent ; renvoie ce qui a été versé.</summary>
+    private static double PayInMoney(
         Structure workplace,
         List<(SocialClass Class, double Due)> dues,
         double totalDue,
@@ -80,7 +84,7 @@ public static class WorkDay
         Treasury? communeFund)
     {
         if (totalDue <= 0)
-            return;
+            return 0;
 
         double paid;
         if (workplace.Ownership == Ownership.Public)
@@ -99,10 +103,12 @@ public static class WorkDay
         }
         else
         {
-            return;
+            return 0;
         }
 
         foreach (var (socialClass, due) in dues)
             socialClass.ReceiveIncome(paid * due / totalDue);
+
+        return paid;
     }
 }
