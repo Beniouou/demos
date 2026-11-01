@@ -108,13 +108,13 @@ public sealed class World
         Storage.Allocate(communeId, _structures, Products, Storage.HeldIn(MarketOf(communeId), StateStockOf(communeId)));
 
     /// <summary>
-    /// Impôt d'État : part de sa richesse que chaque groupe verse chaque jour au trésor. À l'essai : 0,2 %, soit avec
-    /// l'impôt communal 0,3 % en tout. Les lois peuvent le plafonner ou l'augmenter.
+    /// Impôt d'État : part de sa richesse que chaque groupe verse chaque jour au trésor. À l'essai : 0,3 %, soit avec
+    /// l'impôt communal 0,5 % en tout. Les lois peuvent le plafonner ou l'augmenter.
     /// </summary>
-    public double StateTaxRate { get; set; } = 0.002;
+    public double StateTaxRate { get; set; } = 0.003;
 
-    /// <summary>Impôt communal de départ de chaque commune (0,1 % par jour, à l'essai), versé à sa caisse.</summary>
-    public double DefaultCommuneTaxRate { get; set; } = 0.001;
+    /// <summary>Impôt communal de départ de chaque commune (0,2 % par jour, à l'essai), versé à sa caisse.</summary>
+    public double DefaultCommuneTaxRate { get; set; } = 0.002;
 
     private readonly Dictionary<string, double> _communeTaxRates = [];
 
