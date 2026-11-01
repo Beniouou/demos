@@ -12,10 +12,8 @@ namespace Demos.Application;
 /// </summary>
 public sealed class Simulation(World world, GameClock clock)
 {
-    /// <summary>Un camp de base offre ces postes, payés par le trésor, et des places gratuites pour attirer les premiers habitants.</summary>
-    public const int BaseCampJobs = 300;
-    public const double BaseCampDailyWage = 1.5;
-    public const int BaseCampHousingPlaces = 300;
+    /// <summary>Type du catalogue qui fonde une commune : ses postes et ses places attirent les premiers habitants.</summary>
+    public const string BaseCampTypeId = "camp-de-base";
 
     public World World { get; } = world;
     public GameClock Clock { get; } = clock;
@@ -51,6 +49,12 @@ public sealed class Simulation(World world, GameClock clock)
     }
 
     /// <summary>
+    /// Outil d'administration : remplace les paramètres d'un bâtiment (propriétaire, postes, salaire, production,
+    /// places, loyer). Les effets se voient dès le jour suivant.
+    /// </summary>
+    public void UpdateBuilding(Structure building) => World.UpdateStructure(building);
+
+    /// <summary>
     /// Action du joueur : bâtir un camp de base, qui fonde une nouvelle commune rattachée à l'État.
     /// Il coûte des ressources et de la légitimité (dans le pôle choisi par le joueur).
     /// Renvoie la nouvelle commune, ou null, sans rien dépenser, si c'est impossible.
@@ -65,8 +69,8 @@ public sealed class Simulation(World world, GameClock clock)
         var state = World.Structures.Values.Single(s => s.IsNational);
         var number = World.Communes.Count() + 1;
         var commune = new Structure($"commune-{number}", name, StructureKind.PoliticalEntity, state.Id);
-        var camp = new Structure($"camp-de-base-{number}", $"Camp de base ({name})", StructureKind.Building, commune.Id,
-            Jobs: BaseCampJobs, DailyWage: BaseCampDailyWage, HousingPlaces: BaseCampHousingPlaces);
+        var campType = World.BuildingTypes[BaseCampTypeId];
+        var camp = campType.Build($"camp-de-base-{number}", commune.Id, name: $"{campType.Name} ({name})");
 
         if (World.Structures.ContainsKey(commune.Id)
             || World.Legitimacy[legitimacyPole] < legitimacyCost

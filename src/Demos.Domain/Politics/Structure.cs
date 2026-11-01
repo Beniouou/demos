@@ -35,6 +35,7 @@ public readonly record struct Production(string ProductId, double QuantityPerWor
 /// <param name="DailyWage">Salaire de base versé par poste et par jour.</param>
 /// <param name="HousingPlaces">Places de logement offertes dans la commune.</param>
 /// <param name="DailyRent">Loyer d'une place par jour, versé au propriétaire.</param>
+/// <param name="TypeId">Type de bâtiment du catalogue dont il est issu, s'il y en a un.</param>
 public sealed record Structure(
     string Id,
     string Name,
@@ -46,7 +47,8 @@ public sealed record Structure(
     int Jobs = 0,
     double DailyWage = 0,
     int HousingPlaces = 0,
-    double DailyRent = 0)
+    double DailyRent = 0,
+    string? TypeId = null)
 {
     public bool IsNational => ParentId is null;
 }

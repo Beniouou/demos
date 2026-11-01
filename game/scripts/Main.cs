@@ -29,6 +29,7 @@ public partial class Main : Node
 
     private Simulation _simulation = null!;
     private Label _status = null!;
+    private AdminPanel _admin = null!;
     private bool _paused = true;
     private int _speedIndex;
     private double _pendingDays;
@@ -40,6 +41,10 @@ public partial class Main : Node
         _status = GetNode<Label>("Status");
         var content = new JsonContentSource(fileName => FileAccess.GetFileAsString($"res://data/{fileName}"));
         _simulation = PrototypeScenario.Create(content);
+
+        _admin = new AdminPanel { Visible = false };
+        AddChild(_admin);
+        _admin.Init(_simulation);
     }
 
     public override void _Process(double delta)
@@ -55,6 +60,8 @@ public partial class Main : Node
         }
 
         _status.Text = Describe();
+        if (_admin.Visible)
+            _admin.UpdateInfo();
     }
 
     public override void _UnhandledInput(InputEvent @event)
@@ -71,14 +78,15 @@ public partial class Main : Node
             case Key.Key4: _speedIndex = 3; break;
             case Key.B: BuildHousing(); break;
             case Key.C: FoundCommune(); break;
+            case Key.A: ToggleAdmin(); break;
         }
     }
 
     private void BuildHousing()
     {
         var id = $"logements-etat-{_housingBuilt + 1}";
-        var housing = new Structure(id, $"Logements d'État {_housingBuilt + 1}", StructureKind.Building, PrototypeScenario.FirstCommuneId,
-            HousingPlaces: 500, DailyRent: 0.2);
+        var housing = _simulation.World.BuildingTypes["logements"]
+            .Build(id, PrototypeScenario.FirstCommuneId, name: $"Logements d'État {_housingBuilt + 1}");
 
         if (_simulation.TryBuild(housing, HousingCost, PaymentMode.StockFirst))
         {
@@ -89,6 +97,13 @@ public partial class Main : Node
         {
             _lastMessage = "Construction impossible : ni le stock, ni le trésor, ni le marché ne suffisent.";
         }
+    }
+
+    private void ToggleAdmin()
+    {
+        _admin.Visible = !_admin.Visible;
+        if (_admin.Visible)
+            _admin.Refresh();
     }
 
     private void FoundCommune()
@@ -110,7 +125,7 @@ public partial class Main : Node
         text.AppendLine(
             $"{_simulation.Clock.Today:dd/MM/yyyy}   {SeasonName(_simulation.Clock.Season)}   " +
             $"{(_paused ? "EN PAUSE" : SpeedLabels[_speedIndex])}");
-        text.AppendLine("Espace : pause   1 à 4 : vitesse   B : 500 places de logement (200 pierre, 100 bois)   C : camp de base");
+        text.AppendLine("Espace : pause   1 à 4 : vitesse   B : 500 places de logement (200 pierre, 100 bois)   C : camp de base   A : administration");
         text.AppendLine();
 
         foreach (var socialClass in world.Classes)
@@ -147,7 +162,9 @@ public partial class Main : Node
         text.AppendLine($"Marché : {DescribeQuantities(world.Market.Contents)}");
         text.AppendLine();
         text.AppendLine($"Logements construits : {_housingBuilt}   {_lastMessage}");
-        return text.ToString();
+
+        // Sous Windows, AppendLine écrit « \r\n », que Godot affiche comme deux retours à la ligne.
+        return text.ToString().Replace("\r\n", "\n");
     }
 
     private static string DescribeQuantities(IReadOnlyDictionary<string, double> quantities) =>

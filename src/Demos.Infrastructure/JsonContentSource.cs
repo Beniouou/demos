@@ -2,6 +2,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using Demos.Application.Ports;
 using Demos.Domain.Economy;
+using Demos.Domain.Politics;
 
 namespace Demos.Infrastructure;
 
@@ -18,6 +19,10 @@ public sealed class JsonContentSource(Func<string, string> readText) : IContentS
         Converters = { new JsonStringEnumConverter() },
     };
 
-    public IReadOnlyList<ProductDefinition> LoadProducts() =>
-        JsonSerializer.Deserialize<List<ProductDefinition>>(readText("products.json"), Options) ?? [];
+    public IReadOnlyList<ProductDefinition> LoadProducts() => Load<ProductDefinition>("products.json");
+
+    public IReadOnlyList<BuildingType> LoadBuildingTypes() => Load<BuildingType>("buildings.json");
+
+    private List<T> Load<T>(string fileName) =>
+        JsonSerializer.Deserialize<List<T>>(readText(fileName), Options) ?? [];
 }

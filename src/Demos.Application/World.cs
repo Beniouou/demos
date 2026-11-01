@@ -14,11 +14,13 @@ public sealed class World
 
     public World(
         IReadOnlyList<ProductDefinition> products,
+        IReadOnlyList<BuildingType> buildingTypes,
         IReadOnlyList<Structure> structures,
         IReadOnlyList<SocialClass> classes,
         IReadOnlyList<Law> laws)
     {
         Products = products;
+        BuildingTypes = buildingTypes.ToDictionary(t => t.Id);
         _structures = structures.ToDictionary(s => s.Id);
         Classes = classes;
         ClassesById = classes.ToDictionary(c => c.Id);
@@ -27,6 +29,10 @@ public sealed class World
     }
 
     public IReadOnlyList<ProductDefinition> Products { get; }
+
+    /// <summary>Catalogue des types de bâtiments, par identifiant.</summary>
+    public IReadOnlyDictionary<string, BuildingType> BuildingTypes { get; }
+
     public IReadOnlyDictionary<string, Structure> Structures => _structures;
     public IReadOnlyList<SocialClass> Classes { get; }
     public IReadOnlyDictionary<string, SocialClass> ClassesById { get; }
@@ -61,4 +67,12 @@ public sealed class World
     public bool IsGhostTown(string communeId) => Residents(communeId) < 1;
 
     public void AddStructure(Structure structure) => _structures.Add(structure.Id, structure);
+
+    /// <summary>Remplace une structure existante par sa version modifiée (même identifiant).</summary>
+    public void UpdateStructure(Structure structure)
+    {
+        if (!_structures.ContainsKey(structure.Id))
+            throw new KeyNotFoundException($"Structure inconnue : {structure.Id}");
+        _structures[structure.Id] = structure;
+    }
 }

@@ -8,17 +8,7 @@ namespace Demos.Tests.Application;
 
 public class SimulationTests
 {
-    private const string ProductsJson = """
-        [
-          { "id": "pain", "name": "Pain", "need": "Food", "basePrice": 1 },
-          { "id": "vetements", "name": "Vêtements", "need": "Clothing", "basePrice": 8 },
-          { "id": "pierre", "name": "Pierre", "basePrice": 3 },
-          { "id": "bois", "name": "Bois", "basePrice": 2 }
-        ]
-        """;
-
-    private static Simulation CreatePrototype() =>
-        PrototypeScenario.Create(new JsonContentSource(_ => ProductsJson));
+    private static Simulation CreatePrototype() => PrototypeScenario.Create(GameData.Content());
 
     private static void AdvanceDays(Simulation simulation, int days)
     {
@@ -98,7 +88,7 @@ public class SimulationTests
 
         Assert.NotNull(commune);
         Assert.True(simulation.World.IsGhostTown(commune.Id));
-        Assert.Equal(Simulation.BaseCampHousingPlaces, simulation.World.HousingPlaces(commune.Id));
+        Assert.Equal(simulation.World.BuildingTypes[Simulation.BaseCampTypeId].HousingPlaces, simulation.World.HousingPlaces(commune.Id));
 
         // Au changement de saison (1er mars), des sans-emploi rejoignent la nouvelle commune.
         AdvanceDays(simulation, 50);
@@ -133,6 +123,22 @@ public class SimulationTests
         Assert.True(built);
         Assert.Contains("logements", simulation.World.Structures.Keys);
         Assert.Equal(50, simulation.World.StateStock.QuantityOf("bois"));
+    }
+
+    [Fact]
+    public void Le_menu_d_administration_peut_changer_le_proprietaire_et_le_prix()
+    {
+        var simulation = CreatePrototype();
+        var farm = simulation.World.Structures["ferme"];
+
+        simulation.UpdateBuilding(farm with { Ownership = Ownership.Public, OwnerClassId = null });
+        simulation.World.Market.SetPrice("pain", 2);
+        simulation.AdvanceDay();
+
+        // Ferme publique : son pain va au stock de l'État, plus sur le marché.
+        Assert.True(simulation.World.StateStock.QuantityOf("pain") > 0);
+        Assert.Equal(0, simulation.World.Market.QuantityOf("pain"));
+        Assert.Equal(2, simulation.World.Market.PriceOf("pain"));
     }
 
     [Fact]

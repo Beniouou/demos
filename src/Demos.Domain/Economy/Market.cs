@@ -17,6 +17,9 @@ public sealed class Market(IEnumerable<ProductDefinition> products)
 
     public double PriceOf(string productId) => _prices.GetValueOrDefault(productId);
 
+    /// <summary>Fixe le prix d'un produit à la main, en attendant la formation automatique des prix.</summary>
+    public void SetPrice(string productId, double price) => _prices[productId] = Math.Max(0, price);
+
     public double CostOf(string productId, double quantity) => quantity * PriceOf(productId);
 
     public double QuantityOf(string productId) =>
