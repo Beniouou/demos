@@ -112,7 +112,8 @@ public partial class Main : Node
         var pole = Orientation.All.MaxBy(p => _simulation.World.Legitimacy[p]);
         var name = $"Commune {_simulation.World.Communes.Count() + 1}";
 
-        var commune = _simulation.TryFoundCommune(name, BaseCampCost, PaymentMode.StockFirst, pole, BaseCampLegitimacyCost);
+        var commune = _simulation.TryFoundCommune(
+            name, PrototypeScenario.FirstCommuneId, BaseCampCost, PaymentMode.StockFirst, pole, BaseCampLegitimacyCost);
         _lastMessage = commune is null
             ? $"Camp de base impossible : il faut 100 pierre, 100 bois et {BaseCampLegitimacyCost} de légitimité."
             : $"{commune.Name} fondée (légitimité {pole.Code} dépensée).";
@@ -128,10 +129,12 @@ public partial class Main : Node
         text.AppendLine("Espace : pause   1 à 4 : vitesse   B : 500 places de logement (200 pierre, 100 bois)   C : camp de base   A : administration");
         text.AppendLine();
 
-        foreach (var socialClass in world.Classes)
+        // Un groupe local par ligne : la classe et sa commune.
+        foreach (var socialClass in world.Classes.Where(c => c.Population > 0))
         {
+            var communeName = socialClass.CommuneId is { } communeId && world.Structures.TryGetValue(communeId, out var home) ? home.Name : "?";
             text.AppendLine(
-                $"{socialClass.Name,-40} population {socialClass.Population,7:N0}   " +
+                $"{socialClass.Name,-40} {communeName,-17} population {socialClass.Population,7:N0}   " +
                 $"richesse {socialClass.Wealth,10:N0}   besoins couverts {socialClass.NeedsSatisfaction,4:P0} " +
                 $"(logés {socialClass.HousingCoverage,4:P0})   " +
                 $"adhésion {socialClass.Adhesion,4:P0}   éducation {socialClass.EducationPoints,8:N0} " +
@@ -152,6 +155,12 @@ public partial class Main : Node
                 $"logements {world.HousingPlaces(commune.Id):N0} places   " +
                 $"pollution {world.PollutionByCommune.GetValueOrDefault(commune.Id):F3} par habitant " +
                 $"(seuil {Demos.Domain.Economy.Pollution.PollutedThreshold}){state}");
+
+            var market = world.MarketOf(commune.Id);
+            var stock = world.StateStockOf(commune.Id);
+            text.AppendLine(
+                $"    stockage {Storage.HeldIn(market, stock):N0} / {world.StorageCapacity(commune.Id):N0}   " +
+                $"stock de l'État : {DescribeQuantities(stock.Contents)}   marché : {DescribeQuantities(market.Contents)}");
         }
 
         text.AppendLine();
@@ -161,8 +170,6 @@ public partial class Main : Node
         text.AppendLine();
         text.AppendLine();
         text.AppendLine($"Trésor : {world.Treasury.Balance:N0}");
-        text.AppendLine($"Stock de l'État : {DescribeQuantities(world.StateStock.Contents)}");
-        text.AppendLine($"Marché : {DescribeQuantities(world.Market.Contents)}");
         text.AppendLine();
         text.AppendLine($"Logements construits : {_housingBuilt}   {_lastMessage}");
 

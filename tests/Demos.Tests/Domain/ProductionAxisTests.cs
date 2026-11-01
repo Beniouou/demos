@@ -59,11 +59,12 @@ public class ProductionAxisTests
         var ecologists = SpreadOverTwoCommunes(Phalansterian);
         ecologists.RecordSupplyShortage(0.3);
 
-        var positivists = Assert.Single(ClassTransitions.RunSeasonal([ecologists], TestTown.Structures, TestTown.NoPollution));
+        var positivists = ClassTransitions.RunSeasonal([ecologists], TestTown.Structures, TestTown.NoPollution);
 
-        // 5 % des membres de chaque commune : 30 + 20.
-        Assert.Equal(Communist, positivists.Ideology);
-        Assert.Equal(50, positivists.Population);
+        // 5 % des membres de chaque commune, chacun dans le groupe local de sa commune : 30 + 20.
+        Assert.All(positivists, group => Assert.Equal(Communist, group.Ideology));
+        Assert.Equal(30, positivists.Single(g => g.CommuneId == "commune").Population);
+        Assert.Equal(20, positivists.Single(g => g.CommuneId == "commune-2").Population);
     }
 
     [Fact]

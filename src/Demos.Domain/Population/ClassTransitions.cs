@@ -49,7 +49,7 @@ public static class ClassTransitions
     /// <summary>Calcul annuel : les promotions par l'éducation. Renvoie les classes nées de ces passages.</summary>
     public static List<SocialClass> RunYearly(IReadOnlyList<SocialClass> classes)
     {
-        var destinations = new Destinations(classes);
+        var destinations = new ClassFinder(classes);
 
         foreach (var promotion in Promotions)
         {
@@ -60,7 +60,7 @@ public static class ClassTransitions
                     continue;
 
                 promotion.Spend(source, count * EducationPointsPerPromotion);
-                source.TransferMembersTo(destinations.Get(promotion.To, source.Ideology), count);
+                source.TransferMembersTo(destinations.Get(promotion.To, source.Ideology, source.CommuneId), count);
             }
         }
 
@@ -100,7 +100,7 @@ public static class ClassTransitions
         IReadOnlyDictionary<string, Structure> structures,
         IReadOnlyDictionary<string, double> pollutionByCommune)
     {
-        var destinations = new Destinations(classes);
+        var destinations = new ClassFinder(classes);
         var workplacesByCommune = Communes.All(structures).ToDictionary(
             commune => commune.Id,
             commune => structures.Values.Where(s => s.Jobs > 0 && Communes.CommuneOf(s, structures) == commune.Id).ToList());
@@ -122,7 +122,7 @@ public static class ClassTransitions
         }
 
         foreach (var move in moves)
-            move.Source.TransferMembersTo(destinations.Get(move.Rank, move.Ideology), (long)move.Members, move.CommuneId);
+            move.Source.TransferMembersTo(destinations.Get(move.Rank, move.Ideology, move.CommuneId), (long)move.Members, move.CommuneId);
 
         foreach (var socialClass in destinations.All)
         {
@@ -180,34 +180,19 @@ public static class ClassTransitions
             yield return Switch(IdeologicalAxis.Production, Pole.A, ProductionShareAffected);
     }
 
-    /// <summary>Trouve la classe d'arrivée d'un passage, ou la crée si elle n'existe pas encore.</summary>
-    private sealed class Destinations(IReadOnlyList<SocialClass> classes)
-    {
-        public List<SocialClass> All { get; } = classes.ToList();
-        public List<SocialClass> Created { get; } = [];
-
-        public SocialClass Get(Rank rank, Ideology ideology)
-        {
-            var target = All.FirstOrDefault(c => c.Rank == rank && c.Ideology == ideology);
-            if (target is not null)
-                return target;
-
-            target = Create(rank, ideology);
-            All.Add(target);
-            Created.Add(target);
-            return target;
-        }
-    }
-
     /// <summary>
-    /// Crée une classe vide ; son nom se forme à partir du rang et de l'idéologie
-    /// (« Professions intermédiaires communistes »).
+    /// Crée un groupe local vide dans une commune ; son nom se forme à partir du rang et de l'idéologie
+    /// (« Professions intermédiaires communistes »), le même dans toutes les communes.
     /// </summary>
-    public static SocialClass Create(Rank rank, Ideology ideology)
+    public static SocialClass Create(Rank rank, Ideology ideology, string? communeId)
     {
         var ideologyName = ideology.Name.ToLowerInvariant();
         var plural = ideologyName.EndsWith('s') ? ideologyName : ideologyName + "s";
-        return new SocialClass($"{RankSlug(rank)}-{ideologyName}", $"{RankName(rank)} {plural}", rank, ideology, 0);
+        var socialClass = new SocialClass(
+            $"{RankSlug(rank)}-{ideologyName}-{communeId ?? "nulle-part"}", $"{RankName(rank)} {plural}", rank, ideology, 0);
+        if (communeId is not null)
+            socialClass.SetResidence(communeId, 1);
+        return socialClass;
     }
 
     public static string RankName(Rank rank) => rank switch

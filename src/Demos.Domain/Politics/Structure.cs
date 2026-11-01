@@ -45,6 +45,7 @@ public readonly record struct Production(string ProductId, double QuantityPerWor
 /// <param name="SchoolLevel">Éducation produite : de base (école, lycée) ou avancée (université).</param>
 /// <param name="PointsPerPupil">Points d'éducation rapportés par élève et par jour (un lycée en rapporte plus qu'une école).</param>
 /// <param name="PollutionPerWorker">Pollution produite par travailleur de production et par jour.</param>
+/// <param name="StorageCapacity">Quantité de produits que le bâtiment peut stocker pour sa commune.</param>
 public sealed record Structure(
     string Id,
     string Name,
@@ -63,7 +64,8 @@ public sealed record Structure(
     double DailyTuition = 0,
     EducationLevel SchoolLevel = EducationLevel.Basic,
     double PointsPerPupil = 1,
-    double PollutionPerWorker = 0)
+    double PollutionPerWorker = 0,
+    int StorageCapacity = 0)
 {
     public bool IsNational => ParentId is null;
 }

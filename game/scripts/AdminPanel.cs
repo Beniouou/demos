@@ -34,6 +34,7 @@ public partial class AdminPanel : PanelContainer
     private OptionButton _schoolLevel = null!;
     private SpinBox _pointsPerPupil = null!;
     private SpinBox _pollution = null!;
+    private SpinBox _storage = null!;
 
     public void Init(Simulation simulation)
     {
@@ -52,7 +53,7 @@ public partial class AdminPanel : PanelContainer
         // De nouvelles classes ont pu naître : la liste des propriétaires possibles est reconstruite.
         _owner.Clear();
         foreach (var socialClass in _simulation.World.Classes)
-            _owner.AddItem(socialClass.Name);
+            _owner.AddItem($"{socialClass.Name} ({socialClass.CommuneId})");
 
         var selected = SelectedBuilding()?.Id;
         _buildingIds.Clear();
@@ -90,7 +91,7 @@ public partial class AdminPanel : PanelContainer
         if (building.Production is { } production)
         {
             var perDay = production.QuantityPerWorker * workers;
-            lines.Add($"Production : {perDay:N1} {production.ProductId} par jour, valeur {perDay * world.Market.PriceOf(production.ProductId):N0}");
+            lines.Add($"Production : {perDay:N1} {production.ProductId} par jour, valeur {perDay * world.PriceOf(production.ProductId):N0}");
         }
 
         var wages = world.Classes.Sum(c => c.MembersWorkingIn(building.Id) * building.DailyWage * Demos.Domain.Economy.Staffing.WageMultiplier(c.Rank));
@@ -143,6 +144,7 @@ public partial class AdminPanel : PanelContainer
         _wage = AddSpin(form, "Salaire de base par jour", 0, 1_000, 0.1);
         _perWorker = AddSpin(form, "Production par travailleur", 0, 100, 0.01);
         _pollution = AddSpin(form, "Pollution par travailleur", 0, 100, 0.01);
+        _storage = AddSpin(form, "Capacité de stockage", 0, 1_000_000, 100);
         _places = AddSpin(form, "Places de logement", 0, 100_000, 10);
         _rent = AddSpin(form, "Loyer par place et par jour", 0, 1_000, 0.05);
         _schoolPlaces = AddSpin(form, "Places d'élèves", 0, 100_000, 10);
@@ -208,6 +210,7 @@ public partial class AdminPanel : PanelContainer
         _places.Value = building.HousingPlaces;
         _rent.Value = building.DailyRent;
         _pollution.Value = building.PollutionPerWorker;
+        _storage.Value = building.StorageCapacity;
         _schoolPlaces.Value = building.SchoolPlaces;
         _tuition.Value = building.DailyTuition;
         _schoolLevel.Select((int)building.SchoolLevel);
@@ -217,7 +220,7 @@ public partial class AdminPanel : PanelContainer
         var production = building.Production;
         _perWorker.Editable = _price.Editable = production is not null;
         _perWorker.Value = production?.QuantityPerWorker ?? 0;
-        _price.Value = production is { } p ? _simulation.World.Market.PriceOf(p.ProductId) : 0;
+        _price.Value = production is { } p ? _simulation.World.PriceOf(p.ProductId) : 0;
 
         UpdateInfo();
     }
@@ -238,6 +241,7 @@ public partial class AdminPanel : PanelContainer
             HousingPlaces = (int)_places.Value,
             DailyRent = _rent.Value,
             PollutionPerWorker = _pollution.Value,
+            StorageCapacity = (int)_storage.Value,
             SchoolPlaces = (int)_schoolPlaces.Value,
             DailyTuition = _tuition.Value,
             SchoolLevel = (Demos.Domain.Economy.EducationLevel)_schoolLevel.Selected,
@@ -247,7 +251,7 @@ public partial class AdminPanel : PanelContainer
 
         _simulation.UpdateBuilding(updated);
         if (updated.Production is { } changed)
-            _simulation.World.Market.SetPrice(changed.ProductId, _price.Value);
+            _simulation.World.SetPrice(changed.ProductId, _price.Value);
 
         UpdateInfo();
     }

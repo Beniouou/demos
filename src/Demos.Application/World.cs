@@ -13,6 +13,9 @@ public sealed class World
     private readonly Dictionary<string, Structure> _structures;
     private readonly List<SocialClass> _classes;
     private readonly Dictionary<string, SocialClass> _classesById;
+    private readonly Dictionary<string, Market> _markets = [];
+    private readonly Dictionary<string, Inventory> _stateStocks = [];
+    private readonly Dictionary<string, double> _priceOverrides = [];
 
     public World(
         IReadOnlyList<ProductDefinition> products,
@@ -27,7 +30,6 @@ public sealed class World
         _classes = classes.ToList();
         _classesById = _classes.ToDictionary(c => c.Id);
         Laws = laws;
-        Market = new Market(products);
     }
 
     public IReadOnlyList<ProductDefinition> Products { get; }
@@ -46,10 +48,47 @@ public sealed class World
     /// <summary>Ressources financières du joueur.</summary>
     public Treasury Treasury { get; } = new();
 
-    /// <summary>Ressources matérielles du joueur, produites par les structures publiques.</summary>
-    public Inventory StateStock { get; } = new();
+    /// <summary>
+    /// Ressources matérielles du joueur dans une commune : produites par ses structures publiques, elles restent
+    /// là où elles ont été produites.
+    /// </summary>
+    public Inventory StateStockOf(string communeId)
+    {
+        if (!_stateStocks.TryGetValue(communeId, out var stock))
+            _stateStocks[communeId] = stock = new Inventory();
+        return stock;
+    }
 
-    public Market Market { get; }
+    /// <summary>Marché d'une commune : on vend et on achète là où l'on est.</summary>
+    public Market MarketOf(string communeId)
+    {
+        if (_markets.TryGetValue(communeId, out var market))
+            return market;
+
+        market = new Market(Products);
+        foreach (var (productId, price) in _priceOverrides)
+            market.SetPrice(productId, price);
+        return _markets[communeId] = market;
+    }
+
+    public IReadOnlyDictionary<string, Market> Markets => _markets;
+
+    /// <summary>Fixe le prix d'un produit à la main, dans toutes les communes (en attendant la formation des prix).</summary>
+    public void SetPrice(string productId, double price)
+    {
+        _priceOverrides[productId] = price;
+        foreach (var market in _markets.Values)
+            market.SetPrice(productId, price);
+    }
+
+    public double PriceOf(string productId) =>
+        _priceOverrides.TryGetValue(productId, out var price) ? price : Products.FirstOrDefault(p => p.Id == productId)?.BasePrice ?? 0;
+
+    /// <summary>Commune où se trouve une structure (la sienne si c'est une commune).</summary>
+    public string? CommuneOf(Structure structure) => Domain.Politics.Communes.CommuneOf(structure, _structures);
+
+    /// <summary>Capacité de stockage d'une commune : la somme de ses bâtiments de stockage.</summary>
+    public int StorageCapacity(string communeId) => Storage.CapacityOf(communeId, _structures);
 
     /// <summary>Part de sa richesse que chaque classe verse chaque jour. Plus tard : fixée par les lois.</summary>
     public double DailyTaxRate { get; set; } = 0.001;

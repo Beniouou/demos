@@ -20,15 +20,16 @@ public sealed record BuildingType(
     double DailyTuition = 0,
     Economy.EducationLevel SchoolLevel = Economy.EducationLevel.Basic,
     double PointsPerPupil = 1,
-    double PollutionPerWorker = 0)
+    double PollutionPerWorker = 0,
+    int StorageCapacity = 0)
 {
-    /// <summary>Un bâtiment est fonctionnel quand il a un effet dans la simulation : des emplois ou des places.</summary>
-    public bool IsFunctional => Jobs > 0 || HousingPlaces > 0 || SchoolPlaces > 0;
+    /// <summary>Un bâtiment est fonctionnel quand il a un effet dans la simulation : des emplois, des places ou du stockage.</summary>
+    public bool IsFunctional => Jobs > 0 || HousingPlaces > 0 || SchoolPlaces > 0 || StorageCapacity > 0;
 
     /// <summary>Crée un bâtiment de ce type dans une structure, avec les paramètres par défaut.</summary>
     public Structure Build(string id, string parentId, Ownership ownership = Ownership.Public, string? ownerClassId = null, string? name = null) =>
         new(id, name ?? Name, StructureKind.Building, parentId, ownership, ownerClassId,
             Production, Jobs, DailyWage, HousingPlaces, DailyRent, TypeId: Id, Posts: Posts,
             SchoolPlaces: SchoolPlaces, DailyTuition: DailyTuition, SchoolLevel: SchoolLevel, PointsPerPupil: PointsPerPupil,
-            PollutionPerWorker: PollutionPerWorker);
+            PollutionPerWorker: PollutionPerWorker, StorageCapacity: StorageCapacity);
 }

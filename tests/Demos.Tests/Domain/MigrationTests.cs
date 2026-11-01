@@ -20,12 +20,19 @@ public class MigrationTests
         var workers = new SocialClass("ouvriers", "Ouvriers", Rank.Workers, new Ideology(Pole.A, Pole.A, Pole.A), 1_100);
         workers.SetResidence("ancienne", 1);
         workers.SetEmployment("ferme", 100);
+        workers.Wealth = 1_100;
+        workers.EducationPoints = 110;
 
-        Migration.RunSeasonal(Structures, [workers]);
+        var arrived = Assert.Single(Migration.RunSeasonal(Structures, [workers]));
 
-        // 1 000 sans-emploi × 5 % = 50 partent vers la nouvelle commune.
-        Assert.Equal(50, workers.MembersLivingIn("nouvelle"), precision: 6);
+        // 1 000 sans-emploi × 5 % = 50 partent : ils forment le groupe des mêmes ouvriers dans la nouvelle commune,
+        // avec leur part de richesse et de points d'éducation.
+        Assert.Equal("nouvelle", arrived.CommuneId);
+        Assert.Equal(workers.Ideology, arrived.Ideology);
+        Assert.Equal(50, arrived.MembersLivingIn("nouvelle"), precision: 6);
         Assert.Equal(1_050, workers.MembersLivingIn("ancienne"), precision: 6);
+        Assert.Equal(50, arrived.Wealth, precision: 6);
+        Assert.Equal(5, arrived.EducationPoints, precision: 6);
     }
 
     [Fact]

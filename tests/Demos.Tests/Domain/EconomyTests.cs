@@ -39,7 +39,7 @@ public class EconomyTests
         Inventory stock, Market market, params Law[] laws)
     {
         var workers = Employment.Assign(structures, classes);
-        WorkDay.Run(structures, workers, classes, laws, treasury, stock, market);
+        WorkDay.Run(structures, workers, classes, laws, treasury, _ => stock, _ => market);
     }
 
     [Fact]

@@ -4,7 +4,9 @@ using Demos.Domain.Politics;
 namespace Demos.Domain.Population;
 
 /// <summary>
-/// Groupe d'individus partageant un rang, une idéologie et les mêmes besoins.
+/// Groupe d'individus partageant un rang, une idéologie et les mêmes besoins. Dans le jeu, c'est un groupe local :
+/// la partie d'une classe qui vit dans une commune, avec sa propre richesse, ses produits, ses points d'éducation
+/// et son bilan de saison. La classe nationale regroupe les groupes locaux de même nom.
 /// </summary>
 public sealed class SocialClass(string id, string name, Rank rank, Ideology ideology, long population)
 {
@@ -107,6 +109,12 @@ public sealed class SocialClass(string id, string name, Rank rank, Ideology ideo
 
     public IReadOnlyDictionary<string, double> Residence => _residence;
 
+    /// <summary>
+    /// Commune du groupe local : la première où il a des membres, ou sa commune d'origine s'il s'est vidé ;
+    /// null s'il n'a jamais eu de commune.
+    /// </summary>
+    public string? CommuneId => _residence.FirstOrDefault(r => r.Value > 0).Key ?? _residence.Keys.FirstOrDefault();
+
     public void SetResidence(string communeId, double share) => _residence[communeId] = Math.Clamp(share, 0, 1);
 
     public double MembersLivingIn(string communeId) => Population * _residence.GetValueOrDefault(communeId);
@@ -175,22 +183,35 @@ public sealed class SocialClass(string id, string name, Rank rank, Ideology ideo
 
     /// <summary>
     /// Fait passer dans une autre classe des membres qui vivent dans une commune précise (là où la condition du
-    /// passage est vraie). Ils emportent leur part de richesse et restent dans cette commune.
+    /// passage est vraie). Ils emportent leur part de richesse et restent dans cette commune, sauf si une commune
+    /// d'arrivée est donnée (migration) : ils y emportent alors aussi leur part de points d'éducation.
     /// </summary>
-    public void TransferMembersTo(SocialClass target, long count, string fromCommuneId)
+    public void TransferMembersTo(SocialClass target, long count, string fromCommuneId, string? toCommuneId = null)
     {
         count = Math.Min(count, (long)MembersLivingIn(fromCommuneId));
         if (count <= 0)
             return;
 
-        var wealth = Wealth * count / Population;
+        var share = (double)count / Population;
+        var wealth = Wealth * share;
         Wealth -= wealth;
         target.Wealth += wealth;
 
+        if (toCommuneId is not null)
+        {
+            var education = EducationPoints * share;
+            var advanced = AdvancedEducationPoints * share;
+            EducationPoints -= education;
+            AdvancedEducationPoints -= advanced;
+            target.EducationPoints += education;
+            target.AdvancedEducationPoints += advanced;
+        }
+
+        var arrival = toCommuneId ?? fromCommuneId;
         var residents = _residence.ToDictionary(r => r.Key, r => r.Value * Population);
         residents[fromCommuneId] -= count;
         var targetResidents = target._residence.ToDictionary(r => r.Key, r => r.Value * target.Population);
-        targetResidents[fromCommuneId] = targetResidents.GetValueOrDefault(fromCommuneId) + count;
+        targetResidents[arrival] = targetResidents.GetValueOrDefault(arrival) + count;
 
         Population -= count;
         target.Population += count;

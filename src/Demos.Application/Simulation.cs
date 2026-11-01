@@ -8,7 +8,8 @@ namespace Demos.Application;
 /// <summary>
 /// Point d'entrée du moteur : il appelle AdvanceDay au rythme choisi par le joueur.
 /// La simulation calcule l'économie chaque jour, les variables lentes chaque saison
-/// et les bilans chaque année.
+/// et les bilans chaque année. Chaque commune est une petite économie : son marché, son stock d'État,
+/// son stockage, et des échanges avec les autres communes.
 /// </summary>
 public sealed class Simulation(World world, GameClock clock)
 {
@@ -35,13 +36,17 @@ public sealed class Simulation(World world, GameClock clock)
     }
 
     /// <summary>
-    /// Action du joueur : construire une structure en payant ses matériaux avec le stock de l'État,
-    /// l'argent du trésor, ou les deux. Renvoie false, sans rien construire ni dépenser, si c'est impossible.
+    /// Action du joueur : construire une structure en payant ses matériaux avec le stock de l'État et le marché
+    /// de sa commune, l'argent du trésor, ou les deux. Renvoie false, sans rien construire ni dépenser, si c'est
+    /// impossible.
     /// </summary>
     public bool TryBuild(Structure structure, IReadOnlyList<MaterialCost> cost, PaymentMode mode)
     {
         if (World.Structures.ContainsKey(structure.Id)
-            || !Construction.TryPay(cost, mode, World.StateStock, World.Treasury, World.Market))
+            || structure.ParentId is not { } parentId
+            || !World.Structures.TryGetValue(parentId, out var parent)
+            || World.CommuneOf(parent) is not { } communeId
+            || !Construction.TryPay(cost, mode, World.StateStockOf(communeId), World.Treasury, World.MarketOf(communeId)))
             return false;
 
         World.AddStructure(structure);
@@ -56,11 +61,12 @@ public sealed class Simulation(World world, GameClock clock)
 
     /// <summary>
     /// Action du joueur : bâtir un camp de base, qui fonde une nouvelle commune rattachée à l'État.
-    /// Il coûte des ressources et de la légitimité (dans le pôle choisi par le joueur).
+    /// Il coûte des ressources, prises dans la commune qui l'envoie, et de la légitimité (dans le pôle choisi).
     /// Renvoie la nouvelle commune, ou null, sans rien dépenser, si c'est impossible.
     /// </summary>
     public Structure? TryFoundCommune(
         string name,
+        string payingCommuneId,
         IReadOnlyList<MaterialCost> cost,
         PaymentMode mode,
         Orientation legitimacyPole,
@@ -74,7 +80,7 @@ public sealed class Simulation(World world, GameClock clock)
 
         if (World.Structures.ContainsKey(commune.Id)
             || World.Legitimacy[legitimacyPole] < legitimacyCost
-            || !Construction.TryPay(cost, mode, World.StateStock, World.Treasury, World.Market))
+            || !Construction.TryPay(cost, mode, World.StateStockOf(payingCommuneId), World.Treasury, World.MarketOf(payingCommuneId)))
             return null;
 
         World.Legitimacy.TrySpend(legitimacyPole, legitimacyCost);
@@ -83,27 +89,39 @@ public sealed class Simulation(World world, GameClock clock)
         return commune;
     }
 
-    // Ordre du document de règles : emplois, production et salaires, logement, école, consommation, ventes,
-    // impôts, légitimité. Les décisions du joueur et les événements restent à écrire.
+    // Ordre du document de règles : emplois, production et salaires, échanges entre communes, logement, école,
+    // consommation, ventes, impôts, légitimité, puis perte de ce qui déborde du stockage.
+    // Les décisions du joueur et les événements restent à écrire.
     private void RunDailyCalculations()
     {
+        var communeIds = World.Communes.Select(c => c.Id).ToList();
+
         World.Workers = Employment.Assign(World.Structures, World.Classes);
         World.PollutionByCommune = Pollution.PerResidentByCommune(World.Structures, World.Workers, World.Classes);
-        WorkDay.Run(World.Structures, World.Workers, World.Classes, World.Laws, World.Treasury, World.StateStock, World.Market);
+        WorkDay.Run(World.Structures, World.Workers, World.Classes, World.Laws, World.Treasury, World.StateStockOf, World.MarketOf);
+        Trade.RunDaily(communeIds, World.Classes, World.Products, World.MarketOf,
+            communeId => Storage.FreeSpace(communeId, World.Structures, World.MarketOf(communeId), World.StateStockOf(communeId)));
         Housing.RunDaily(World.Structures, World.Classes, World.Treasury);
         Education.RunDaily(World.Structures, World.Classes, World.Treasury);
-        Consumption.RunDaily(World.Classes, World.Products, World.Market);
+
+        foreach (var communeId in communeIds)
+            Consumption.RunDaily(World.Classes.Where(c => c.CommuneId == communeId).ToList(), World.Products, World.MarketOf(communeId));
+
         PaySellers();
         Taxation.CollectDaily(World.Classes, World.DailyTaxRate, World.Treasury);
         LawEffects.ApplyDaily(World.Classes, World.Laws, World.Structures, World.Legitimacy);
+        Storage.ApplyDaily(communeIds, World.Structures, World.MarketOf, World.StateStockOf);
     }
 
     private void PaySellers()
     {
-        foreach (var (sellerId, amount) in World.Market.CollectEarnings())
+        foreach (var market in World.Markets.Values)
         {
-            if (World.ClassesById.TryGetValue(sellerId, out var seller))
-                seller.ReceiveIncome(amount);
+            foreach (var (sellerId, amount) in market.CollectEarnings())
+            {
+                if (World.ClassesById.TryGetValue(sellerId, out var seller))
+                    seller.ReceiveIncome(amount);
+            }
         }
     }
 
@@ -116,7 +134,7 @@ public sealed class Simulation(World world, GameClock clock)
         YearPassed?.Invoke();
     }
 
-    // Passages entre classes, commune par commune. Prévu : climat, revendications, recherche.
+    // Passages entre classes, commune par commune, puis migration. Prévu : climat, revendications, recherche.
     private void RunSeasonalCalculations()
     {
         foreach (var socialClass in World.Classes)
@@ -125,7 +143,8 @@ public sealed class Simulation(World world, GameClock clock)
         foreach (var created in ClassTransitions.RunSeasonal(World.Classes, World.Structures, World.PollutionByCommune))
             World.AddClass(created);
 
-        Migration.RunSeasonal(World.Structures, World.Classes);
+        foreach (var created in Migration.RunSeasonal(World.Structures, World.Classes))
+            World.AddClass(created);
 
         SeasonPassed?.Invoke();
     }

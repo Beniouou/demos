@@ -11,6 +11,13 @@ public sealed class Inventory
 
     public void Add(string productId, double quantity) => _quantities[productId] = QuantityOf(productId) + quantity;
 
+    /// <summary>Ne garde qu'une part de chaque produit (le reste est perdu, par exemple faute de place pour stocker).</summary>
+    public void Keep(double share)
+    {
+        foreach (var productId in _quantities.Keys.ToList())
+            _quantities[productId] *= share;
+    }
+
     /// <summary>Retire une quantité. Renvoie false, sans rien retirer, si le stock est insuffisant.</summary>
     public bool TryRemove(string productId, double quantity)
     {

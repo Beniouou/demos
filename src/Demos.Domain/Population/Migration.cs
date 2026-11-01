@@ -6,17 +6,20 @@ namespace Demos.Domain.Population;
 /// <summary>
 /// Règle de départ, en attendant les lois et décisions du joueur qui modifieront les migrations :
 /// chaque saison, une part des sans-emploi de chaque rang part vers la commune qui offre
-/// le plus d'emplois libres de ce rang.
+/// le plus d'emplois libres de ce rang. Les migrants quittent leur groupe local pour celui de même rang et de même
+/// idéologie dans la commune d'arrivée (créé si besoin), en emportant leur richesse et leurs points d'éducation.
 /// </summary>
 public static class Migration
 {
     public const double SeasonalShareOfUnemployed = 0.05;
 
-    public static void RunSeasonal(IReadOnlyDictionary<string, Structure> structures, IReadOnlyList<SocialClass> classes)
+    /// <summary>Calcul saisonnier. Renvoie les groupes locaux nés dans les communes d'arrivée.</summary>
+    public static List<SocialClass> RunSeasonal(IReadOnlyDictionary<string, Structure> structures, IReadOnlyList<SocialClass> classes)
     {
+        var finder = new ClassFinder(classes);
         var communes = Communes.All(structures).ToList();
         if (communes.Count < 2)
-            return;
+            return finder.Created;
 
         var workplacesByCommune = communes.ToDictionary(
             commune => commune.Id,
@@ -52,7 +55,12 @@ public static class Migration
 
             var scale = Math.Min(1, freeJobs / total);
             foreach (var (socialClass, from, members) in movers)
-                socialClass.MoveResidents(from, target, members * scale / socialClass.Population);
+            {
+                var arrival = finder.Get(socialClass.Rank, socialClass.Ideology, target);
+                socialClass.TransferMembersTo(arrival, (long)(members * scale), from, target);
+            }
         }
+
+        return finder.Created;
     }
 }

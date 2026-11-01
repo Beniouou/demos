@@ -18,11 +18,15 @@ public static class WorkDay
         IReadOnlyList<SocialClass> classes,
         IReadOnlyList<Law> laws,
         Treasury treasury,
-        Inventory stateStock,
-        Market market)
+        Func<string, Inventory> stateStockOf,
+        Func<string, Market> marketOf)
     {
         foreach (var workplace in structures.Values.Where(s => s.Jobs > 0))
         {
+            // Chaque bâtiment livre au stock et au marché de sa propre commune.
+            var communeId = Communes.CommuneOf(workplace, structures) ?? "";
+            var market = marketOf(communeId);
+
             var dues = classes
                 .Select(c => (Class: c, Due: c.MembersWorkingIn(workplace.Id) * workplace.DailyWage * Staffing.WageMultiplier(c.Rank)))
                 .Where(d => d.Due > 0)
@@ -56,7 +60,7 @@ public static class WorkDay
             if (produced > 0 && workplace.Production is { } delivered)
             {
                 if (workplace.Ownership == Ownership.Public)
-                    stateStock.Add(delivered.ProductId, produced);
+                    stateStockOf(communeId).Add(delivered.ProductId, produced);
                 else
                     market.Offer(delivered.ProductId, produced, workplace.OwnerClassId ?? "");
             }

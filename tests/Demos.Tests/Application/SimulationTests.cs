@@ -84,7 +84,7 @@ public class SimulationTests
         AdvanceDays(simulation, 10);
         var pole = new Orientation(IdeologicalAxis.Property, Pole.B);
 
-        var commune = simulation.TryFoundCommune("Nouvelle commune", [new MaterialCost("bois", 100)], PaymentMode.StockFirst, pole, 2);
+        var commune = simulation.TryFoundCommune("Nouvelle commune", "commune-1", [new MaterialCost("bois", 100)], PaymentMode.StockFirst, pole, 2);
 
         Assert.NotNull(commune);
         Assert.True(simulation.World.IsGhostTown(commune.Id));
@@ -100,14 +100,14 @@ public class SimulationTests
     {
         var simulation = CreatePrototype();
         AdvanceDays(simulation, 10);
-        var stockBefore = simulation.World.StateStock.QuantityOf("bois");
+        var stockBefore = simulation.World.StateStockOf("commune-1").QuantityOf("bois");
 
         var commune = simulation.TryFoundCommune(
-            "Nouvelle commune", [new MaterialCost("bois", 100)], PaymentMode.StockFirst,
+            "Nouvelle commune", "commune-1", [new MaterialCost("bois", 100)], PaymentMode.StockFirst,
             new Orientation(IdeologicalAxis.Hierarchy, Pole.B), 1_000);
 
         Assert.Null(commune);
-        Assert.Equal(stockBefore, simulation.World.StateStock.QuantityOf("bois"));
+        Assert.Equal(stockBefore, simulation.World.StateStockOf("commune-1").QuantityOf("bois"));
     }
 
     [Fact]
@@ -122,7 +122,7 @@ public class SimulationTests
 
         Assert.True(built);
         Assert.Contains("logements", simulation.World.Structures.Keys);
-        Assert.Equal(50, simulation.World.StateStock.QuantityOf("bois"));
+        Assert.Equal(50, simulation.World.StateStockOf("commune-1").QuantityOf("bois"));
     }
 
     [Fact]
@@ -133,13 +133,13 @@ public class SimulationTests
         Assert.Equal(1, farm.Posts);
 
         simulation.UpdateBuilding(farm with { Ownership = Ownership.Public, OwnerClassId = null, Posts = 3 });
-        simulation.World.Market.SetPrice("pain", 2);
+        simulation.World.SetPrice("pain", 2);
         simulation.AdvanceDay();
 
         // Ferme publique : son pain va au stock de l'État, plus sur le marché.
-        Assert.True(simulation.World.StateStock.QuantityOf("pain") > 0);
-        Assert.Equal(0, simulation.World.Market.QuantityOf("pain"));
-        Assert.Equal(2, simulation.World.Market.PriceOf("pain"));
+        Assert.True(simulation.World.StateStockOf("commune-1").QuantityOf("pain") > 0);
+        Assert.Equal(0, simulation.World.MarketOf("commune-1").QuantityOf("pain"));
+        Assert.Equal(2, simulation.World.PriceOf("pain"));
         Assert.Equal(3, simulation.World.Structures["ferme"].Posts);
     }
 

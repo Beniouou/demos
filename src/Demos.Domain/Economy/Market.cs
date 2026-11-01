@@ -59,6 +59,38 @@ public sealed class Market(IEnumerable<ProductDefinition> products)
         return true;
     }
 
+    /// <summary>
+    /// Retire des produits du marché sans les payer, pris chez les vendeurs au prorata de leur offre (pour les
+    /// envoyer dans une autre commune). Renvoie la quantité retirée à chaque vendeur.
+    /// </summary>
+    public Dictionary<string, double> Take(string productId, double quantity)
+    {
+        var taken = new Dictionary<string, double>();
+        var available = QuantityOf(productId);
+        if (quantity <= 0 || available <= 0)
+            return taken;
+
+        var share = Math.Min(1, quantity / available);
+        var offers = _offers[productId];
+        foreach (var sellerId in offers.Keys.ToList())
+        {
+            taken[sellerId] = offers[sellerId] * share;
+            offers[sellerId] -= taken[sellerId];
+        }
+
+        return taken;
+    }
+
+    /// <summary>Ne garde qu'une part de chaque offre (le reste est perdu, par exemple faute de place pour stocker).</summary>
+    public void Keep(double share)
+    {
+        foreach (var offers in _offers.Values)
+        {
+            foreach (var sellerId in offers.Keys.ToList())
+                offers[sellerId] *= share;
+        }
+    }
+
     /// <summary>Renvoie l'argent gagné par chaque vendeur depuis le dernier versement, puis le remet à zéro.</summary>
     public IReadOnlyDictionary<string, double> CollectEarnings()
     {
