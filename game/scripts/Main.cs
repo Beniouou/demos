@@ -1,9 +1,13 @@
+using System.Linq;
 using System.Text;
 using Demos.Application;
+using Demos.Domain.Economy;
 using Demos.Domain.Shared;
 using Demos.Infrastructure;
 using Godot;
 using Orientation = Demos.Domain.Politics.Orientation;
+using Structure = Demos.Domain.Politics.Structure;
+using StructureKind = Demos.Domain.Politics.StructureKind;
 
 namespace Demos.Game;
 
@@ -17,11 +21,16 @@ public partial class Main : Node
     private static readonly double[] SecondsPerDay = [5, 2, 0.5, 0.1];
     private static readonly string[] SpeedLabels = ["×1", "×2", "×3", "×4"];
 
+    // Construction de démonstration (touche B) : des logements d'État dans la commune 1.
+    private static readonly MaterialCost[] HousingCost = [new("pierre", 200), new("bois", 100)];
+
     private Simulation _simulation = null!;
     private Label _status = null!;
     private bool _paused = true;
     private int _speedIndex;
     private double _pendingDays;
+    private int _housingBuilt;
+    private string _lastMessage = "";
 
     public override void _Ready()
     {
@@ -57,6 +66,23 @@ public partial class Main : Node
             case Key.Key2: _speedIndex = 1; break;
             case Key.Key3: _speedIndex = 2; break;
             case Key.Key4: _speedIndex = 3; break;
+            case Key.B: BuildHousing(); break;
+        }
+    }
+
+    private void BuildHousing()
+    {
+        var id = $"logements-etat-{_housingBuilt + 1}";
+        var housing = new Structure(id, $"Logements d'État {_housingBuilt + 1}", StructureKind.Building, "commune-1");
+
+        if (_simulation.TryBuild(housing, HousingCost, PaymentMode.StockFirst))
+        {
+            _housingBuilt++;
+            _lastMessage = $"{housing.Name} construits.";
+        }
+        else
+        {
+            _lastMessage = "Construction impossible : ni le stock, ni le trésor, ni le marché ne suffisent.";
         }
     }
 
@@ -66,7 +92,7 @@ public partial class Main : Node
         text.AppendLine(
             $"{_simulation.Clock.Today:dd/MM/yyyy}   {SeasonName(_simulation.Clock.Season)}   " +
             $"{(_paused ? "EN PAUSE" : SpeedLabels[_speedIndex])}");
-        text.AppendLine("Espace : pause   1 à 4 : vitesse");
+        text.AppendLine("Espace : pause   1 à 4 : vitesse   B : construire des logements (200 pierre, 100 bois)");
         text.AppendLine();
 
         foreach (var socialClass in _simulation.World.Classes)
@@ -81,10 +107,18 @@ public partial class Main : Node
         foreach (var pole in Orientation.All)
             text.Append($"   {pole.Code} {_simulation.World.Legitimacy[pole],8:F1}");
         text.AppendLine();
+        text.AppendLine($"Trésor : {_simulation.World.Treasury.Balance:N0}");
+        text.AppendLine($"Stock de l'État : {DescribeInventory(_simulation.World.StateStock)}");
+        text.AppendLine($"Marché : {DescribeInventory(_simulation.World.Market.Stock)}");
         text.AppendLine();
-        text.AppendLine($"Produits chargés : {_simulation.World.Products.Count}");
+        text.AppendLine($"Logements construits : {_housingBuilt}   {_lastMessage}");
         return text.ToString();
     }
+
+    private static string DescribeInventory(Inventory inventory) =>
+        inventory.Contents.Count == 0
+            ? "vide"
+            : string.Join("   ", inventory.Contents.Select(item => $"{item.Key} {item.Value:N0}"));
 
     private static string SeasonName(Season season) => season switch
     {

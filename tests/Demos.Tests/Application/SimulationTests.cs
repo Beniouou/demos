@@ -1,4 +1,5 @@
 using Demos.Application;
+using Demos.Domain.Economy;
 using Demos.Domain.Politics;
 using Demos.Domain.Population;
 using Demos.Infrastructure;
@@ -56,6 +57,32 @@ public class SimulationTests
         // Cadres et dirigeants (LI) acceptent la liberté d'entreprendre, loi de l'État : 170 000 × 0,0001 par jour.
         Assert.Equal(17, afterOneDay, precision: 6);
         Assert.Equal(34, simulation.World.Legitimacy[libertarian], precision: 6);
+    }
+
+    [Fact]
+    public void Construire_avec_le_stock_de_l_Etat_ajoute_la_structure()
+    {
+        var simulation = CreatePrototype();
+        for (var day = 0; day < 5; day++)
+            simulation.AdvanceDay();
+
+        // La scierie d'État produit 40 bois par jour : 200 en 5 jours.
+        var housing = new Structure("logements", "Logements", StructureKind.Building, "commune-1");
+        var built = simulation.TryBuild(housing, [new MaterialCost("bois", 150)], PaymentMode.StockFirst);
+
+        Assert.True(built);
+        Assert.Contains("logements", simulation.World.Structures.Keys);
+        Assert.Equal(50, simulation.World.StateStock.QuantityOf("bois"));
+    }
+
+    [Fact]
+    public void Les_impots_remplissent_le_tresor_chaque_jour()
+    {
+        var simulation = CreatePrototype();
+
+        simulation.AdvanceDay();
+
+        Assert.True(simulation.World.Treasury.Balance > 0);
     }
 
     [Fact]

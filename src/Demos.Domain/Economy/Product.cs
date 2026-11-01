@@ -10,5 +10,6 @@ public enum NeedCategory
     Energy,
 }
 
-/// <summary>Bien ou service consommé par les classes pour couvrir un besoin.</summary>
-public sealed record ProductDefinition(string Id, string Name, NeedCategory Need);
+/// <summary>Bien, service ou matière. Une matière (pierre, bois…) ne couvre aucun besoin.</summary>
+/// <param name="BasePrice">Prix de départ sur le marché ; la formation des prix reste à définir.</param>
+public sealed record ProductDefinition(string Id, string Name, NeedCategory? Need, double BasePrice);
