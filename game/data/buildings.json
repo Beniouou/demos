@@ -32,9 +32,9 @@
   { "id": "dispensaire", "name": "Dispensaire", "category": "Services", "level": 1, "description": "Santé" },
   { "id": "clinique", "name": "Clinique", "category": "Services", "level": 2, "description": "Santé" },
   { "id": "hopital", "name": "Hôpital", "category": "Services", "level": 3, "description": "Santé" },
-  { "id": "ecole", "name": "École", "category": "Services", "level": 1, "description": "Éducation : places d'élèves qui rapportent des points d'éducation", "jobs": 25, "dailyWage": 2, "schoolPlaces": 500, "dailyTuition": 0, "posts": 1 },
-  { "id": "lycee", "name": "Lycée", "category": "Services", "level": 2, "description": "Éducation" },
-  { "id": "universite", "name": "Université", "category": "Services", "level": 3, "description": "Éducation" },
+  { "id": "ecole", "name": "École", "category": "Services", "level": 1, "description": "Éducation de base : forme les ouvriers aux professions intermédiaires", "jobs": 25, "dailyWage": 2, "schoolPlaces": 500, "dailyTuition": 0, "schoolLevel": "Basic", "pointsPerPupil": 1, "posts": 1 },
+  { "id": "lycee", "name": "Lycée", "category": "Services", "level": 2, "description": "Éducation de base renforcée : rapporte 2 points par élève", "jobs": 30, "dailyWage": 2.5, "schoolPlaces": 500, "dailyTuition": 0, "schoolLevel": "Basic", "pointsPerPupil": 2, "posts": 1 },
+  { "id": "universite", "name": "Université", "category": "Services", "level": 3, "description": "Éducation avancée : forme les professions intermédiaires aux postes de cadre", "jobs": 40, "dailyWage": 3, "schoolPlaces": 100, "dailyTuition": 0, "schoolLevel": "Advanced", "pointsPerPupil": 1, "posts": 1 },
   { "id": "caserne-pompiers", "name": "Caserne de pompiers", "category": "Services", "level": 1, "description": "Sécurité" },
   { "id": "poste-police", "name": "Poste de police", "category": "Services", "level": 2, "description": "Sécurité" },
 

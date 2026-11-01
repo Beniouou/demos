@@ -7,7 +7,7 @@ namespace Demos.Application;
 
 /// <summary>
 /// Partie de départ du prototype : un État et une seule commune, née du premier camp de base, où vivent
-/// 5 000 habitants, avec une école d'État. Les bâtiments viennent du catalogue (buildings.json) ; leurs propriétaires sont
+/// 5 000 habitants, avec une école et une université d'État. Les bâtiments viennent du catalogue (buildings.json) ; leurs propriétaires sont
 /// arbitraires, pour tester les trois circuits d'argent, et se changent dans le menu d'administration.
 /// </summary>
 public static class PrototypeScenario
@@ -31,6 +31,7 @@ public static class PrototypeScenario
             types["logements"].Build("logements-prives", FirstCommuneId, Ownership.Private, "cadres", "Logements privés")
                 with { HousingPlaces = 2_200, DailyRent = 0.5 },
             types["ecole"].Build("ecole", FirstCommuneId, name: "École d'État"),
+            types["universite"].Build("universite", FirstCommuneId, name: "Université d'État"),
         };
 
         SocialClass[] classes =

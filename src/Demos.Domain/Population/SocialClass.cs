@@ -33,8 +33,11 @@ public sealed class SocialClass(string id, string name, Rank rank, Ideology ideo
     /// <summary>Part des lois qui s'appliquent à la classe qu'elle accepte, de 0 à 1.</summary>
     public double Adhesion { get; set; } = 1;
 
-    /// <summary>Points d'éducation accumulés à l'école, dépensés pour que des membres changent de rang.</summary>
+    /// <summary>Points d'éducation de base (école, lycée), dépensés pour passer d'ouvrier à profession intermédiaire.</summary>
     public double EducationPoints { get; set; }
+
+    /// <summary>Points d'éducation avancée (université), dépensés pour passer de profession intermédiaire à cadre.</summary>
+    public double AdvancedEducationPoints { get; set; }
 
     public IReadOnlyDictionary<string, double> Residence => _residence;
 

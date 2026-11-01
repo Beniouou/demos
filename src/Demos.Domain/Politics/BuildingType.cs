@@ -17,7 +17,9 @@ public sealed record BuildingType(
     double DailyRent = 0,
     int Posts = 0,
     int SchoolPlaces = 0,
-    double DailyTuition = 0)
+    double DailyTuition = 0,
+    Economy.EducationLevel SchoolLevel = Economy.EducationLevel.Basic,
+    double PointsPerPupil = 1)
 {
     /// <summary>Un bâtiment est fonctionnel quand il a un effet dans la simulation : des emplois ou des places.</summary>
     public bool IsFunctional => Jobs > 0 || HousingPlaces > 0 || SchoolPlaces > 0;
@@ -26,5 +28,5 @@ public sealed record BuildingType(
     public Structure Build(string id, string parentId, Ownership ownership = Ownership.Public, string? ownerClassId = null, string? name = null) =>
         new(id, name ?? Name, StructureKind.Building, parentId, ownership, ownerClassId,
             Production, Jobs, DailyWage, HousingPlaces, DailyRent, TypeId: Id, Posts: Posts,
-            SchoolPlaces: SchoolPlaces, DailyTuition: DailyTuition);
+            SchoolPlaces: SchoolPlaces, DailyTuition: DailyTuition, SchoolLevel: SchoolLevel, PointsPerPupil: PointsPerPupil);
 }

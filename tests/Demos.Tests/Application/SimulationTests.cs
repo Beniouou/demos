@@ -156,6 +156,10 @@ public class SimulationTests
         var intermediates = Assert.Single(simulation.World.Classes, c => c.Name == "Professions intermédiaires communistes");
         Assert.True(intermediates.Population > 0);
         Assert.Same(intermediates, simulation.World.ClassesById[intermediates.Id]);
+
+        // L'université forme, elle, des cadres parmi les professions intermédiaires libertaires.
+        var executives = Assert.Single(simulation.World.Classes, c => c.Name == "Cadres libertaires");
+        Assert.True(executives.Population > 0);
     }
 
     [Fact]

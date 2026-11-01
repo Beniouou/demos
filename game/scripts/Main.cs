@@ -134,7 +134,8 @@ public partial class Main : Node
                 $"{socialClass.Name,-40} population {socialClass.Population,7:N0}   " +
                 $"richesse {socialClass.Wealth,10:N0}   besoins couverts {socialClass.NeedsSatisfaction,4:P0} " +
                 $"(logés {socialClass.HousingCoverage,4:P0})   " +
-                $"adhésion {socialClass.Adhesion,4:P0}   éducation {socialClass.EducationPoints,8:N0}");
+                $"adhésion {socialClass.Adhesion,4:P0}   éducation {socialClass.EducationPoints,8:N0} " +
+                $"(avancée {socialClass.AdvancedEducationPoints,7:N0})");
         }
 
         text.AppendLine();

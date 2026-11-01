@@ -86,6 +86,51 @@ public class EducationTests
     }
 
     [Fact]
+    public void L_ecole_n_accueille_que_les_ouvriers_et_le_lycee_rapporte_deux_points()
+    {
+        var structures = Town(new Structure("lycee", "Lycée", StructureKind.Building, "commune", SchoolPlaces: 100, PointsPerPupil: 2));
+        var workers = Workers(100);
+        var intermediates = new SocialClass("intermediaires", "Professions intermédiaires communistes", Rank.Intermediate, Communist, 100);
+        intermediates.SetResidence("commune", 1);
+
+        Education.RunDaily(structures, [workers, intermediates], new Treasury());
+
+        // Les 100 places vont toutes aux ouvriers, à 2 points chacune.
+        Assert.Equal(200, workers.EducationPoints, precision: 6);
+        Assert.Equal(0, intermediates.EducationPoints, precision: 6);
+    }
+
+    [Fact]
+    public void L_universite_n_accueille_que_les_professions_intermediaires_et_produit_de_l_education_avancee()
+    {
+        var structures = Town(new Structure("universite", "Université", StructureKind.Building, "commune",
+            SchoolPlaces: 30, SchoolLevel: EducationLevel.Advanced));
+        var workers = Workers(100);
+        var intermediates = new SocialClass("intermediaires", "Professions intermédiaires communistes", Rank.Intermediate, Communist, 50);
+        intermediates.SetResidence("commune", 1);
+
+        Education.RunDaily(structures, [workers, intermediates], new Treasury());
+
+        Assert.Equal(30, intermediates.AdvancedEducationPoints, precision: 6);
+        Assert.Equal(0, workers.EducationPoints + workers.AdvancedEducationPoints, precision: 6);
+    }
+
+    [Fact]
+    public void L_education_avancee_fait_naitre_des_cadres_de_meme_ideologie()
+    {
+        var intermediates = new SocialClass("intermediaires", "Professions intermédiaires communistes", Rank.Intermediate, Communist, 1_000);
+        intermediates.SetResidence("commune", 1);
+        intermediates.AdvancedEducationPoints = 365 * 4;
+
+        var executives = Assert.Single(ClassTransitions.RunSeasonal([intermediates]));
+
+        Assert.Equal(Rank.Executives, executives.Rank);
+        Assert.Equal("Cadres communistes", executives.Name);
+        Assert.Equal(4, executives.Population);
+        Assert.Equal(996, intermediates.Population);
+    }
+
+    [Fact]
     public void Au_plus_deux_pourcent_de_la_classe_change_de_rang_par_saison()
     {
         var workers = Workers(1_000);

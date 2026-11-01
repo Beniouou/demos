@@ -31,6 +31,8 @@ public partial class AdminPanel : PanelContainer
     private SpinBox _posts = null!;
     private SpinBox _schoolPlaces = null!;
     private SpinBox _tuition = null!;
+    private OptionButton _schoolLevel = null!;
+    private SpinBox _pointsPerPupil = null!;
 
     public void Init(Simulation simulation)
     {
@@ -96,7 +98,9 @@ public partial class AdminPanel : PanelContainer
         if (building.HousingPlaces > 0)
             lines.Add($"Loyers possibles : {building.HousingPlaces * building.DailyRent:N0} par jour");
         if (building.SchoolPlaces > 0)
-            lines.Add($"École : jusqu'à {building.SchoolPlaces:N0} points d'éducation par jour, frais possibles {building.SchoolPlaces * building.DailyTuition:N0}");
+            lines.Add(
+                $"Enseignement {(building.SchoolLevel == Demos.Domain.Economy.EducationLevel.Basic ? "de base" : "avancé")} : " +
+                $"jusqu'à {building.SchoolPlaces * building.PointsPerPupil:N0} points par jour, frais possibles {building.SchoolPlaces * building.DailyTuition:N0}");
 
         lines.Add($"Postes de personnages : 0 occupé sur {building.Posts} (recrutement : menu à venir)");
 
@@ -141,6 +145,8 @@ public partial class AdminPanel : PanelContainer
         _rent = AddSpin(form, "Loyer par place et par jour", 0, 1_000, 0.05);
         _schoolPlaces = AddSpin(form, "Places d'élèves", 0, 100_000, 10);
         _tuition = AddSpin(form, "Frais de scolarité par jour", 0, 1_000, 0.05);
+        _schoolLevel = AddOption(form, "Niveau d'éducation", ["De base (ouvriers)", "Avancée (prof. intermédiaires)"]);
+        _pointsPerPupil = AddSpin(form, "Points par élève et par jour", 0, 100, 0.1);
         _price = AddSpin(form, "Prix du produit au marché", 0, 10_000, 0.1);
         _posts = AddSpin(form, "Postes de personnages", 0, 20, 1);
 
@@ -201,6 +207,8 @@ public partial class AdminPanel : PanelContainer
         _rent.Value = building.DailyRent;
         _schoolPlaces.Value = building.SchoolPlaces;
         _tuition.Value = building.DailyTuition;
+        _schoolLevel.Select((int)building.SchoolLevel);
+        _pointsPerPupil.Value = building.PointsPerPupil;
         _posts.Value = building.Posts;
 
         var production = building.Production;
@@ -228,6 +236,8 @@ public partial class AdminPanel : PanelContainer
             DailyRent = _rent.Value,
             SchoolPlaces = (int)_schoolPlaces.Value,
             DailyTuition = _tuition.Value,
+            SchoolLevel = (Demos.Domain.Economy.EducationLevel)_schoolLevel.Selected,
+            PointsPerPupil = _pointsPerPupil.Value,
             Posts = (int)_posts.Value,
         };
 
