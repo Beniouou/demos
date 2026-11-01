@@ -6,7 +6,9 @@ namespace Demos.Domain.Economy;
 /// <summary>
 /// La pollution vient de l'activité des bâtiments : chacun en produit selon ses travailleurs de production.
 /// Elle pèse pleinement sur la commune où se trouve le bâtiment, et peu sur les autres communes
-/// (en attendant la carte, « loin » veut dire « dans une autre commune »).
+/// (en attendant la carte, « loin » veut dire « dans une autre commune »). Une grande ville pollue ainsi les petites
+/// communes autour, mais la pollution venue d'une commune ne dépasse jamais, par habitant, celle de la commune où
+/// elle est produite.
 /// </summary>
 public static class Pollution
 {
@@ -31,13 +33,26 @@ public static class Pollution
                 produced[communeId] += structure.PollutionPerWorker * productionWorkers.GetValueOrDefault(structure.Id);
         }
 
-        var total = produced.Values.Sum();
+        var residents = communes.ToDictionary(c => c.Id, c => classes.Sum(s => s.MembersLivingIn(c.Id)));
+        var local = communes.ToDictionary(c => c.Id, c => residents[c.Id] > 0 ? produced[c.Id] / residents[c.Id] : 0);
         var result = new Dictionary<string, double>();
         foreach (var commune in communes)
         {
-            var residents = classes.Sum(c => c.MembersLivingIn(commune.Id));
-            var received = produced[commune.Id] + DistantShare * (total - produced[commune.Id]);
-            result[commune.Id] = residents > 0 ? received / residents : 0;
+            if (residents[commune.Id] <= 0)
+            {
+                result[commune.Id] = 0;
+                continue;
+            }
+
+            // Ce qui vient de chaque autre commune, plafonné à la pollution par habitant de cette commune.
+            var distant = communes
+                .Where(o => o.Id != commune.Id && produced[o.Id] > 0)
+                .Sum(o =>
+                {
+                    var perResident = DistantShare * produced[o.Id] / residents[commune.Id];
+                    return residents[o.Id] > 0 ? Math.Min(perResident, local[o.Id]) : perResident;
+                });
+            result[commune.Id] = local[commune.Id] + distant;
         }
 
         return result;

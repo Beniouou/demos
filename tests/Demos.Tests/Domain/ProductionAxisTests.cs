@@ -38,6 +38,25 @@ public class ProductionAxisTests
     }
 
     [Fact]
+    public void La_pollution_venue_de_loin_ne_depasse_pas_celle_de_la_commune_ou_elle_est_produite()
+    {
+        var structures = new Dictionary<string, Structure>(TestTown.Structures)
+        {
+            ["carriere"] = new("carriere", "Carrière", StructureKind.Building, "commune", PollutionPerWorker: 1),
+        };
+        var residents = new SocialClass("classe", "classe", Rank.Workers, Communist, 10_010);
+        residents.SetResidence("commune", 10_000 / 10_010.0);
+        residents.SetResidence("commune-2", 10 / 10_010.0);
+
+        var pollution = Pollution.PerResidentByCommune(structures, new Dictionary<string, double> { ["carriere"] = 1_000 }, [residents]);
+
+        // La grande ville : 1 000 pour 10 000 habitants, soit 0,1. Le village de 10 habitants en recevrait
+        // 100, soit 10 par habitant : il n'en garde que 0,1, comme la grande ville.
+        Assert.Equal(0.1, pollution["commune"], precision: 6);
+        Assert.Equal(0.1, pollution["commune-2"], precision: 6);
+    }
+
+    [Fact]
     public void Seuls_les_habitants_de_la_commune_polluee_deviennent_ecologistes()
     {
         var workers = SpreadOverTwoCommunes(Communist);
