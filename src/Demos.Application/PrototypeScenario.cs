@@ -1,4 +1,5 @@
 using Demos.Application.Ports;
+using Demos.Domain.Economy;
 using Demos.Domain.Politics;
 using Demos.Domain.Population;
 using Demos.Domain.Shared;
@@ -25,7 +26,8 @@ public static class PrototypeScenario
             new("etat", "État", StructureKind.PoliticalEntity, null),
             new(FirstCommuneId, "Première commune", StructureKind.PoliticalEntity, "etat"),
             types["camp-de-base"].Build("camp-de-base-1", FirstCommuneId),
-            types["ferme"].Build("ferme", FirstCommuneId, Ownership.Cooperative, "ouvriers", "Ferme coopérative"),
+            // 1 700 emplois × 3 pains : à peu près ce que mangent les habitants (la ferme du catalogue en a 2 200).
+            types["ferme"].Build("ferme", FirstCommuneId, Ownership.Cooperative, "ouvriers", "Ferme coopérative") with { Jobs = 1_700 },
             types["atelier"].Build("atelier", FirstCommuneId, Ownership.Private, "cadres", "Atelier de couture"),
             types["menuiserie"].Build("menuiserie", FirstCommuneId, name: "Menuiserie d'État"),
             types["carriere"].Build("carriere", FirstCommuneId, Ownership.Cooperative, "ouvriers", "Carrière coopérative"),
@@ -58,7 +60,9 @@ public static class PrototypeScenario
                 [new Orientation(IdeologicalAxis.Production, Pole.B)]),
         };
 
-        var world = new World(content.LoadProducts(), types.Values.ToList(), structures, classes, laws);
+        // Prix de départ : 30 % de bénéfice pour le bâtiment de référence de chaque produit, à plein régime.
+        var catalogue = types.Values.ToList();
+        var world = new World(Pricing.WithReferencePrices(content.LoadProducts(), catalogue), catalogue, structures, classes, laws);
 
         // Trésor de départ gonflé à la main (50 000), en attendant de régler les recettes de l'État : il permet de
         // payer la dotation d'une première nouvelle commune.

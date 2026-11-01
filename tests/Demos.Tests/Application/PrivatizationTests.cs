@@ -87,9 +87,9 @@ public class PrivatizationTests
             simulation.AdvanceDay();
         simulation.World.Legitimacy.Add(Simulation.SalePole, 100);
 
-        // Tel quel, le camp forestier produit 80 de bois par jour pour près de 500 de salaires.
-        Assert.True(simulation.DailyProfitOf(simulation.World.Structures["camp-forestier"]) < 0);
-        Assert.Equal(SaleOutcome.PriceAboveProfit, simulation.TrySellBuilding("camp-forestier", "cadres", 0));
+        // L'école d'État est gratuite : elle ne rapporte rien et paie ses salaires.
+        Assert.True(simulation.DailyProfitOf(simulation.World.Structures["ecole"]) < 0);
+        Assert.Equal(SaleOutcome.PriceAboveProfit, simulation.TrySellBuilding("ecole", "cadres", 0));
     }
 
     [Fact]
