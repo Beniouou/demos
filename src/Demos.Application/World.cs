@@ -70,6 +70,29 @@ public sealed class World
     private readonly Dictionary<string, Treasury> _communeFunds = [];
 
     /// <summary>
+    /// Caisse d'une entreprise privée ou coopérative, distincte de la richesse de sa classe propriétaire : ventes,
+    /// loyers et frais y arrivent, salaires et bénéfices versés aux propriétaires en sortent.
+    /// </summary>
+    public Treasury CompanyFundOf(Structure building) => CompanyFundOf(building.Id);
+
+    public Treasury CompanyFundOf(string buildingId)
+    {
+        if (!_companyFunds.TryGetValue(buildingId, out var fund))
+            _companyFunds[buildingId] = fund = new Treasury();
+        return fund;
+    }
+
+    /// <summary>Ferme la caisse d'une entreprise (quand elle devient publique) et renvoie ce qu'il y restait.</summary>
+    public double CloseCompanyFund(string buildingId)
+    {
+        var balance = _companyFunds.TryGetValue(buildingId, out var fund) ? fund.Balance : 0;
+        _companyFunds.Remove(buildingId);
+        return balance;
+    }
+
+    private readonly Dictionary<string, Treasury> _companyFunds = [];
+
+    /// <summary>
     /// Ressources matérielles du joueur dans une commune : ce que ses structures publiques ont produit, rangé dans le
     /// stockage de la commune et en vente au nom de l'État. Les habitants peuvent l'acheter ; l'État peut le reprendre.
     /// </summary>

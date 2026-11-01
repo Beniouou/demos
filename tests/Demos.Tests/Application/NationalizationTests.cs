@@ -47,13 +47,15 @@ public class NationalizationTests
         var atelier = simulation.World.Structures["atelier"];
         var expected = Math.Max(Nationalization.MinimumPrice, simulation.DailyProfitOf(atelier) * Nationalization.StrugglingProfitDays);
         var cadresBefore = simulation.World.ClassesById["cadres"].Wealth;
+        var fundBefore = simulation.World.CompanyFundOf("atelier").Balance;
         var legitimacyBefore = simulation.World.Legitimacy[Simulation.NationalizationPole];
 
         Assert.Equal(NationalizationOutcome.Done, simulation.TryNationalize("atelier", NationalizationMode.Buyout));
 
         Assert.Equal(Ownership.Public, simulation.World.Structures["atelier"].Ownership);
         Assert.Null(simulation.World.Structures["atelier"].OwnerClassId);
-        Assert.Equal(cadresBefore + expected, simulation.World.ClassesById["cadres"].Wealth, precision: 6);
+        // Les cadres touchent le prix, plus ce qui restait dans la caisse de l'atelier.
+        Assert.Equal(cadresBefore + expected + fundBefore, simulation.World.ClassesById["cadres"].Wealth, precision: 6);
         Assert.Equal(legitimacyBefore - Nationalization.StrugglingLegitimacyCost, simulation.World.Legitimacy[Simulation.NationalizationPole], precision: 6);
         var law = Assert.Single(simulation.World.Laws, l => l.Id == "nationalisation-atelier");
         Assert.Equal([Simulation.NationalizationPole], law.Orientations);
@@ -79,6 +81,8 @@ public class NationalizationTests
     {
         var simulation = Prototype();
         var treasuryBefore = simulation.World.Treasury.Balance;
+        var fundBefore = simulation.World.CompanyFundOf("atelier").Balance;
+        var communeFundBefore = simulation.World.CommuneFundOf("commune-1").Balance;
         var cadresBefore = simulation.World.ClassesById["cadres"].Wealth;
         var legitimacyBefore = simulation.World.Legitimacy[Simulation.NationalizationPole];
 
@@ -87,6 +91,10 @@ public class NationalizationTests
         Assert.Equal(treasuryBefore, simulation.World.Treasury.Balance, precision: 6);
         Assert.Equal(cadresBefore, simulation.World.ClassesById["cadres"].Wealth, precision: 6);
         Assert.Equal(legitimacyBefore - Nationalization.ExpropriationLegitimacyCost, simulation.World.Legitimacy[Simulation.NationalizationPole], precision: 6);
+
+        // La caisse de l'atelier va à la commune, pas aux cadres.
+        Assert.True(fundBefore > 0);
+        Assert.Equal(communeFundBefore + fundBefore, simulation.World.CommuneFundOf("commune-1").Balance, precision: 6);
     }
 
     [Fact]

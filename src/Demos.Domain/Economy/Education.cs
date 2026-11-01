@@ -27,7 +27,8 @@ public static class Education
     public static void RunDaily(
         IReadOnlyDictionary<string, Structure> structures,
         IReadOnlyList<SocialClass> classes,
-        Treasury treasury)
+        Treasury treasury,
+        Func<Structure, Treasury>? companyFundOf = null)
     {
         foreach (var level in Enum.GetValues<EducationLevel>())
         {
@@ -38,7 +39,8 @@ public static class Education
                 s => s.SchoolLevel == level ? s.SchoolPlaces : 0,
                 s => s.DailyTuition,
                 c => c.Rank == StudentsOf(level),
-                s => s.PointsPerPupil);
+                s => s.PointsPerPupil,
+                companyFundOf);
 
             foreach (var (socialClass, served) in pupils)
             {

@@ -12,9 +12,10 @@ public static class Housing
     public static void RunDaily(
         IReadOnlyDictionary<string, Structure> structures,
         IReadOnlyList<SocialClass> classes,
-        Treasury treasury)
+        Treasury treasury,
+        Func<Structure, Treasury>? companyFundOf = null)
     {
-        var housed = PlaceAllocation.Allocate(structures, classes, treasury, s => s.HousingPlaces, s => s.DailyRent);
+        var housed = PlaceAllocation.Allocate(structures, classes, treasury, s => s.HousingPlaces, s => s.DailyRent, companyFundOf: companyFundOf);
 
         foreach (var (socialClass, served) in housed)
         {

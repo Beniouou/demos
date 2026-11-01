@@ -6,8 +6,8 @@ namespace Demos.Domain.Economy;
 /// <summary>
 /// Règle commune aux services qui sont des capacités (logement, école) : des bâtiments offrent des places
 /// dans leur commune, à certaines classes. Quand il en manque, chaque classe admise est servie au prorata de ses
-/// habitants. Chaque place occupée coûte des frais quotidiens au propriétaire (le trésor pour un bâtiment public,
-/// la classe propriétaire sinon) ; une classe qui ne peut pas payer n'est servie qu'à hauteur de ce qu'elle paie.
+/// habitants. Chaque place occupée coûte des frais quotidiens versés au propriétaire (le trésor pour un bâtiment public,
+/// la caisse de l'entreprise sinon, ou la classe propriétaire quand il n'y a pas de caisse) ; une classe qui ne peut pas payer n'est servie qu'à hauteur de ce qu'elle paie.
 /// </summary>
 public static class PlaceAllocation
 {
@@ -24,7 +24,8 @@ public static class PlaceAllocation
         Func<Structure, int> placesOf,
         Func<Structure, double> dailyFeeOf,
         Func<SocialClass, bool>? admits = null,
-        Func<Structure, double>? valuePerPlaceOf = null)
+        Func<Structure, double>? valuePerPlaceOf = null,
+        Func<Structure, Treasury>? companyFundOf = null)
     {
         admits ??= _ => true;
         valuePerPlaceOf ??= _ => 1;
@@ -65,20 +66,23 @@ public static class PlaceAllocation
                 var paid = fee * paidShare;
                 socialClass.Wealth -= paid;
                 foreach (var provider in providers)
-                    PayOwner(provider, paid * placesOf(provider) * dailyFeeOf(provider) / totalFees, classes, treasury);
+                    PayOwner(provider, paid * placesOf(provider) * dailyFeeOf(provider) / totalFees, classes, treasury, companyFundOf);
             }
         }
 
         return served;
     }
 
-    private static void PayOwner(Structure provider, double amount, IReadOnlyList<SocialClass> classes, Treasury treasury)
+    private static void PayOwner(
+        Structure provider, double amount, IReadOnlyList<SocialClass> classes, Treasury treasury, Func<Structure, Treasury>? companyFundOf)
     {
         if (amount <= 0)
             return;
 
         if (provider.Ownership == Ownership.Public)
             treasury.Deposit(amount);
+        else if (companyFundOf is not null)
+            companyFundOf(provider).Deposit(amount);
         else if (classes.FirstOrDefault(c => c.Id == provider.OwnerClassId) is { } owner)
             owner.ReceiveIncome(amount);
     }

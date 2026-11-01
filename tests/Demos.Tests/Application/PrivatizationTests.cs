@@ -55,7 +55,7 @@ public class PrivatizationTests
         simulation.AdvanceDay();
 
         Assert.True(simulation.World.StateQuantityOf("commune-1", "bois") <= stockBefore);
-        Assert.True(simulation.World.MarketOf("commune-1").QuantityOf("bois", "cadres") > 0);
+        Assert.True(simulation.World.MarketOf("commune-1").QuantityOf("bois", Market.CompanySellerId("camp-forestier")) > 0);
     }
 
     [Fact]

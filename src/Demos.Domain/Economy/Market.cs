@@ -20,6 +20,12 @@ public sealed class Market(IEnumerable<ProductDefinition> products)
     /// <summary>Nom de vendeur de l'État dans une commune : ses ventes vont à la caisse de cette commune.</summary>
     public static string StateSellerId(string communeId) => $"etat:{communeId}";
 
+    /// <summary>Nom de vendeur d'une entreprise privée ou coopérative : ses ventes vont à la caisse de l'entreprise.</summary>
+    public static string CompanySellerId(string buildingId) => $"entreprise:{buildingId}";
+
+    /// <summary>Le bâtiment dont l'entreprise est ce vendeur, ou null si le vendeur n'est pas une entreprise.</summary>
+    public static string? BuildingOfCompanySeller(string sellerId) => sellerId.StartsWith("entreprise:") ? sellerId["entreprise:".Length..] : null;
+
     /// <summary>La commune dont l'État est ce vendeur, ou null si le vendeur n'est pas l'État.</summary>
     public static string? CommuneOfStateSeller(string sellerId) => sellerId.StartsWith("etat:") ? sellerId["etat:".Length..] : null;
 

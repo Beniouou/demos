@@ -67,6 +67,18 @@ public static class PrototypeScenario
         // Trésor de départ gonflé à la main (50 000), en attendant de régler les recettes de l'État : il permet de
         // payer la dotation d'une première nouvelle commune.
         world.Treasury.Deposit(StartingTreasury);
+
+        // Chaque entreprise privée ou coopérative part avec sa réserve (30 jours de salaires), prise à ses propriétaires.
+        foreach (var building in world.Structures.Values.Where(Companies.HasCompanyFund))
+        {
+            if (building.OwnerClassId is not { } ownerId || !world.ClassesById.TryGetValue(ownerId, out var owner))
+                continue;
+
+            var reserve = Math.Min(Companies.ReserveOf(building), Math.Max(0, owner.Wealth));
+            owner.Wealth -= reserve;
+            world.CompanyFundOf(building).Deposit(reserve);
+        }
+
         return new Simulation(world, new GameClock(new DateOnly(1900, 1, 1)));
     }
 }

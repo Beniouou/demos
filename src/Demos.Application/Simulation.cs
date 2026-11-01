@@ -77,9 +77,10 @@ public sealed class Simulation(World world, GameClock clock)
 
     /// <summary>
     /// Action du joueur : vendre un bâtiment public à une classe de sa commune, au prix choisi. L'argent va au trésor,
-    /// la classe devient propriétaire (privé ou coopérative) et paie désormais les salaires. La vente coûte de la
-    /// légitimité LI, et reste dans la commune comme une loi libérale : les habitants libéraux l'acceptent, les
-    /// protectionnistes la rejettent. Ne change rien si la vente est impossible.
+    /// la classe devient propriétaire (privé ou coopérative), et l'entreprise ouvre sa propre caisse, vide au départ :
+    /// ses ventes la remplissent et elle paie désormais les salaires. La vente coûte de la légitimité LI, et reste dans
+    /// la commune comme une loi libérale : les habitants libéraux l'acceptent, les protectionnistes la rejettent.
+    /// Ne change rien si la vente est impossible.
     /// </summary>
     public SaleOutcome TrySellBuilding(string buildingId, string buyerClassId, double price)
     {
@@ -118,7 +119,8 @@ public sealed class Simulation(World world, GameClock clock)
     /// Action du joueur : reprendre un bâtiment privé ou coopératif, par rachat (le trésor paie le propriétaire) ou
     /// par expropriation (sans payer). Le propriétaire ne peut pas refuser. Le bâtiment redevient public, et la
     /// nationalisation reste dans la commune comme une loi protectionniste ; la loi de privatisation, s'il y en avait
-    /// une, disparaît. Ne change rien si c'est impossible.
+    /// une, disparaît. La caisse de l'entreprise ferme : en cas de rachat, ce qu'il y restait revient aux
+    /// propriétaires ; en cas d'expropriation, à la caisse de la commune. Ne change rien si c'est impossible.
     /// </summary>
     public NationalizationOutcome TryNationalize(string buildingId, NationalizationMode mode)
     {
@@ -134,8 +136,16 @@ public sealed class Simulation(World world, GameClock clock)
             return NationalizationOutcome.NotEnoughLegitimacy;
 
         World.Treasury.TrySpend(price);
-        if (building.OwnerClassId is { } ownerId && World.ClassesById.TryGetValue(ownerId, out var owner))
+        var owner = building.OwnerClassId is { } ownerId ? World.ClassesById.GetValueOrDefault(ownerId) : null;
+        if (owner is not null)
             owner.Wealth += price;
+
+        // La caisse de l'entreprise ferme : rachetée, son argent revient aux propriétaires ; expropriée, à la commune.
+        var remaining = World.CloseCompanyFund(building.Id);
+        if (mode == NationalizationMode.Buyout && owner is not null)
+            owner.Wealth += remaining;
+        else
+            World.CommuneFundOf(communeId).Deposit(remaining);
 
         World.UpdateStructure(building with { Ownership = Ownership.Public, OwnerClassId = null });
         World.Wages.Forget(building.Id);
@@ -188,7 +198,8 @@ public sealed class Simulation(World world, GameClock clock)
     public static double FoundingGrantOf(BuildingType camp) => FoundingGrantDays * camp.Jobs * camp.DailyWage;
 
     // Ordre du document de règles : emplois, production et salaires, échanges entre communes, logement, école,
-    // consommation, ventes, impôts, légitimité, puis perte de ce qui déborde du stockage.
+    // consommation, ventes, bénéfices des entreprises versés aux propriétaires, impôts, légitimité, puis perte de ce
+    // qui déborde du stockage.
     // Les décisions du joueur et les événements restent à écrire.
     private void RunDailyCalculations()
     {
@@ -196,16 +207,17 @@ public sealed class Simulation(World world, GameClock clock)
 
         World.Workers = Employment.Assign(World.Structures, World.Classes);
         World.PollutionByCommune = Pollution.PerResidentByCommune(World.Structures, World.Workers, World.Classes);
-        WorkDay.Run(World.Structures, World.Workers, World.Classes, World.Laws, World.Treasury, World.MarketOf, World.CommuneFundOf, World.Wages);
+        WorkDay.Run(World.Structures, World.Workers, World.Classes, World.Laws, World.Treasury, World.MarketOf, World.CommuneFundOf, World.Wages, World.CompanyFundOf);
         Trade.RunDaily(communeIds, World.Classes, World.Products, World.MarketOf,
             (communeId, productId) => World.StorageOf(communeId).FreeFor(productId));
-        Housing.RunDaily(World.Structures, World.Classes, World.Treasury);
-        Education.RunDaily(World.Structures, World.Classes, World.Treasury);
+        Housing.RunDaily(World.Structures, World.Classes, World.Treasury, World.CompanyFundOf);
+        Education.RunDaily(World.Structures, World.Classes, World.Treasury, World.CompanyFundOf);
 
         foreach (var communeId in communeIds)
             Consumption.RunDaily(World.Classes.Where(c => c.CommuneId == communeId).ToList(), World.Products, World.MarketOf(communeId));
 
         PaySellers();
+        Companies.PayDividends(World.Structures, World.ClassesById, World.CompanyFundOf);
         Taxation.CollectDaily(World.Classes, World.StateTaxRate, World.CommuneTaxRateOf, World.Treasury, World.CommuneFundOf, World.Laws, World.Structures);
         LawEffects.ApplyDaily(World.Classes, World.Laws, World.Structures, World.Legitimacy);
         Storage.ApplyDaily(communeIds, World.Structures, World.Products, World.MarketOf);
@@ -220,6 +232,15 @@ public sealed class Simulation(World world, GameClock clock)
                 // Ce que l'État a produit et vendu dans une commune revient à la caisse de cette commune.
                 if (Market.CommuneOfStateSeller(sellerId) is { } communeId)
                     World.CommuneFundOf(communeId).Deposit(amount);
+                // Une entreprise touche ses ventes dans sa caisse ; si elle est devenue publique entre-temps, elles
+                // vont à la caisse de sa commune.
+                else if (Market.BuildingOfCompanySeller(sellerId) is { } buildingId && World.Structures.TryGetValue(buildingId, out var building))
+                {
+                    if (Companies.HasCompanyFund(building))
+                        World.CompanyFundOf(building).Deposit(amount);
+                    else if (World.CommuneOf(building) is { } buildingCommune)
+                        World.CommuneFundOf(buildingCommune).Deposit(amount);
+                }
                 else if (World.ClassesById.TryGetValue(sellerId, out var seller))
                     seller.ReceiveIncome(amount);
             }

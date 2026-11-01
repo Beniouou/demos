@@ -131,10 +131,12 @@ public partial class AdminPanel : PanelContainer
             lines.Add($"Salaires versés sur 30 jours : {paidShare:P0}{(_simulation.IsStruggling(building) ? " — EN DIFFICULTÉ" : "")}");
         var profit = _simulation.DailyProfitOf(building);
         lines.Add($"Bénéfice attendu : {profit:N0} par jour, prix accepté au plus {Privatization.MaximumPriceOf(profit):N0}");
+        if (Companies.HasCompanyFund(building))
+            lines.Add($"Caisse de l'entreprise : {world.CompanyFundOf(building).Balance:N0} (réserve gardée : {Companies.ReserveOf(building):N0}, le reste va aux propriétaires)");
 
         lines.Add(building.Ownership == Ownership.Public
-            ? $"Payé par le trésor ({world.Treasury.Balance:N0})"
-            : $"Payé par {OwnerName(building.OwnerClassId)}");
+            ? $"Payé par la caisse de la commune puis le trésor ({world.Treasury.Balance:N0})"
+            : $"Payé par la caisse de l'entreprise ; propriétaire : {OwnerName(building.OwnerClassId)}");
 
         _info.Text = string.Join("\n", lines);
     }

@@ -7,10 +7,11 @@ public static class WorkDay
 {
     /// <summary>
     /// Pour chaque lieu de travail : il produit selon ses travailleurs de production, paie ses emplois, puis livre
-    /// le reste au stockage de sa commune, en vente au nom de l'État s'il est public, de sa classe propriétaire sinon.
+    /// le reste au stockage de sa commune, en vente au nom de l'État s'il est public, de l'entreprise sinon.
     /// Le travail est payé en salaire, sauf si une loi qui couvre le bâtiment impose le paiement en nature :
     /// les travailleurs reçoivent alors des produits du bâtiment, au prix du marché.
-    /// Le salaire en argent vient de la caisse de la commune puis du trésor (public), ou du propriétaire, et est versé en partie si l'argent manque.
+    /// Le salaire en argent vient de la caisse de la commune puis du trésor (public), ou de la caisse de l'entreprise
+    /// (privé, coopératif), et est versé en partie si l'argent manque.
     /// </summary>
     public static void Run(
         IReadOnlyDictionary<string, Structure> structures,
@@ -20,7 +21,8 @@ public static class WorkDay
         Treasury treasury,
         Func<string, Market> marketOf,
         Func<string, Treasury>? communeFundOf = null,
-        WageLedger? wageLedger = null)
+        WageLedger? wageLedger = null,
+        Func<Structure, Treasury>? companyFundOf = null)
     {
         foreach (var workplace in structures.Values.Where(s => s.Jobs > 0))
         {
@@ -57,12 +59,14 @@ public static class WorkDay
                 totalDue *= 1 - settled;
             }
 
-            var paidInMoney = PayInMoney(workplace, dues, totalDue, classes, treasury, communeFundOf?.Invoke(communeId));
+            var paidInMoney = PayInMoney(workplace, dues, totalDue, classes, treasury, communeFundOf?.Invoke(communeId), companyFundOf);
             wageLedger?.Record(workplace.Id, initialDue, initialDue - totalDue + paidInMoney);
 
             if (produced > 0 && workplace.Production is { } delivered)
             {
-                var sellerId = workplace.Ownership == Ownership.Public ? Market.StateSellerId(communeId) : workplace.OwnerClassId ?? "";
+                var sellerId = workplace.Ownership == Ownership.Public ? Market.StateSellerId(communeId)
+                    : companyFundOf is not null ? Market.CompanySellerId(workplace.Id)
+                    : workplace.OwnerClassId ?? "";
                 market.Offer(delivered.ProductId, produced, sellerId);
             }
         }
@@ -78,7 +82,8 @@ public static class WorkDay
         double totalDue,
         IReadOnlyList<SocialClass> classes,
         Treasury treasury,
-        Treasury? communeFund)
+        Treasury? communeFund,
+        Func<Structure, Treasury>? companyFundOf)
     {
         if (totalDue <= 0)
             return 0;
@@ -92,6 +97,11 @@ public static class WorkDay
             var fromTreasury = Math.Min(totalDue - fromFund, treasury.Balance);
             treasury.TrySpend(fromTreasury);
             paid = fromFund + fromTreasury;
+        }
+        else if (companyFundOf?.Invoke(workplace) is { } companyFund)
+        {
+            paid = Math.Min(totalDue, companyFund.Balance);
+            companyFund.TrySpend(paid);
         }
         else if (classes.FirstOrDefault(c => c.Id == workplace.OwnerClassId) is { } owner)
         {
