@@ -81,14 +81,14 @@ public sealed class Market(IEnumerable<ProductDefinition> products)
         return taken;
     }
 
-    /// <summary>Ne garde qu'une part de chaque offre (le reste est perdu, par exemple faute de place pour stocker).</summary>
-    public void Keep(double share)
+    /// <summary>Ne garde qu'une part des offres d'un produit (le reste est perdu, par exemple faute de place pour stocker).</summary>
+    public void Keep(string productId, double share)
     {
-        foreach (var offers in _offers.Values)
-        {
-            foreach (var sellerId in offers.Keys.ToList())
-                offers[sellerId] *= share;
-        }
+        if (!_offers.TryGetValue(productId, out var offers))
+            return;
+
+        foreach (var sellerId in offers.Keys.ToList())
+            offers[sellerId] *= share;
     }
 
     /// <summary>Renvoie l'argent gagné par chaque vendeur depuis le dernier versement, puis le remet à zéro.</summary>

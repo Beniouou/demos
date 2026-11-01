@@ -159,7 +159,7 @@ public partial class Main : Node
             var market = world.MarketOf(commune.Id);
             var stock = world.StateStockOf(commune.Id);
             text.AppendLine(
-                $"    stockage {Storage.HeldIn(market, stock):N0} / {world.StorageCapacity(commune.Id):N0}   " +
+                $"    stockage {world.StorageOf(commune.Id).Stored.Values.Sum():N0} / {world.StorageCapacity(commune.Id):N0}   " +
                 $"stock de l'État : {DescribeQuantities(stock.Contents)}   marché : {DescribeQuantities(market.Contents)}");
         }
 

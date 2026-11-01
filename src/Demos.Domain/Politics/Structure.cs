@@ -46,6 +46,9 @@ public readonly record struct Production(string ProductId, double QuantityPerWor
 /// <param name="PointsPerPupil">Points d'éducation rapportés par élève et par jour (un lycée en rapporte plus qu'une école).</param>
 /// <param name="PollutionPerWorker">Pollution produite par travailleur de production et par jour.</param>
 /// <param name="StorageCapacity">Quantité de produits que le bâtiment peut stocker pour sa commune.</param>
+/// <param name="StorageKind">Ce que le stockage accepte : tout, l'alimentaire, le non alimentaire, ou un seul produit.</param>
+/// <param name="StorageProductId">Le produit accepté par un stockage spécifique.</param>
+/// <param name="StorageLimits">Quantité maximale de certains produits dans ce stockage ; un produit absent n'est pas limité.</param>
 public sealed record Structure(
     string Id,
     string Name,
@@ -65,7 +68,10 @@ public sealed record Structure(
     EducationLevel SchoolLevel = EducationLevel.Basic,
     double PointsPerPupil = 1,
     double PollutionPerWorker = 0,
-    int StorageCapacity = 0)
+    int StorageCapacity = 0,
+    StorageKind StorageKind = StorageKind.General,
+    string? StorageProductId = null,
+    IReadOnlyDictionary<string, double>? StorageLimits = null)
 {
     public bool IsNational => ParentId is null;
 }

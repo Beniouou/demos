@@ -5,8 +5,8 @@ namespace Demos.Domain.Economy;
 /// <summary>
 /// Échanges entre communes, en attendant la logistique : chaque jour, pour chaque produit de base, les surplus des
 /// communes partent vers les communes qui en manquent. 20 % se perdent en route, et une commune ne reçoit que dans
-/// la limite de sa place de stockage libre. Les produits gardent leur vendeur, payé quand ils sont achetés à
-/// l'arrivée.
+/// la limite de sa place de stockage libre pour ce produit. Les produits gardent leur vendeur, payé quand ils sont
+/// achetés à l'arrivée.
 /// </summary>
 public static class Trade
 {
@@ -18,14 +18,15 @@ public static class Trade
         IReadOnlyList<SocialClass> classes,
         IReadOnlyList<ProductDefinition> products,
         Func<string, Market> marketOf,
-        Func<string, double> freeStorageOf)
+        Func<string, string, double> freeStorageOf)
     {
-        var freeStorage = communeIds.ToDictionary(c => c, freeStorageOf);
-
         foreach (var product in products)
         {
             if (product.Need is not { } need || !Consumption.BaseNeedsPerPerson.TryGetValue(need, out var perPerson))
                 continue;
+
+            // Place libre pour ce produit dans chaque commune, selon les sortes de stockage et les limites.
+            var freeStorage = communeIds.ToDictionary(c => c, c => freeStorageOf(c, product.Id));
 
             var balance = communeIds.ToDictionary(
                 communeId => communeId,

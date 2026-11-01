@@ -33,6 +33,7 @@ public static class PrototypeScenario
             types["ecole"].Build("ecole", FirstCommuneId, name: "École d'État"),
             types["universite"].Build("universite", FirstCommuneId, name: "Université d'État"),
             types["entrepot"].Build("entrepot", FirstCommuneId, name: "Entrepôt d'État"),
+            types["grenier"].Build("grenier", FirstCommuneId, name: "Grenier d'État"),
         };
 
         SocialClass[] classes =

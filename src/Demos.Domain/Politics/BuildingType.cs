@@ -21,7 +21,9 @@ public sealed record BuildingType(
     Economy.EducationLevel SchoolLevel = Economy.EducationLevel.Basic,
     double PointsPerPupil = 1,
     double PollutionPerWorker = 0,
-    int StorageCapacity = 0)
+    int StorageCapacity = 0,
+    Economy.StorageKind StorageKind = Economy.StorageKind.General,
+    string? StorageProductId = null)
 {
     /// <summary>Un bâtiment est fonctionnel quand il a un effet dans la simulation : des emplois, des places ou du stockage.</summary>
     public bool IsFunctional => Jobs > 0 || HousingPlaces > 0 || SchoolPlaces > 0 || StorageCapacity > 0;
@@ -31,5 +33,6 @@ public sealed record BuildingType(
         new(id, name ?? Name, StructureKind.Building, parentId, ownership, ownerClassId,
             Production, Jobs, DailyWage, HousingPlaces, DailyRent, TypeId: Id, Posts: Posts,
             SchoolPlaces: SchoolPlaces, DailyTuition: DailyTuition, SchoolLevel: SchoolLevel, PointsPerPupil: PointsPerPupil,
-            PollutionPerWorker: PollutionPerWorker, StorageCapacity: StorageCapacity);
+            PollutionPerWorker: PollutionPerWorker, StorageCapacity: StorageCapacity,
+            StorageKind: StorageKind, StorageProductId: StorageProductId);
 }

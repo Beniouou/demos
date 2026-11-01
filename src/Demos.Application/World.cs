@@ -90,6 +90,10 @@ public sealed class World
     /// <summary>Capacité de stockage d'une commune : la somme de ses bâtiments de stockage.</summary>
     public int StorageCapacity(string communeId) => Storage.CapacityOf(communeId, _structures);
 
+    /// <summary>Rangement actuel des produits de la commune dans ses bâtiments de stockage.</summary>
+    public StorageAllocation StorageOf(string communeId) =>
+        Storage.Allocate(communeId, _structures, Products, Storage.HeldIn(MarketOf(communeId), StateStockOf(communeId)));
+
     /// <summary>Part de sa richesse que chaque classe verse chaque jour. Plus tard : fixée par les lois.</summary>
     public double DailyTaxRate { get; set; } = 0.001;
 

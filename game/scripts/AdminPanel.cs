@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using Demos.Application;
+using Demos.Domain.Economy;
 using Demos.Domain.Politics;
 using Godot;
 
@@ -9,11 +10,13 @@ namespace Demos.Game;
 /// <summary>
 /// Menu d'administration (outil de test, pas encore l'interface du joueur) : liste les bâtiments de la partie
 /// et permet de régler leur propriétaire, leurs emplois, leur salaire, leur production, leurs places,
-/// leur loyer et le prix de vente de leur produit.
+/// leur loyer, le prix de vente de leur produit, et la gestion des stockages : ce que chacun accepte et la
+/// quantité maximale de chaque produit.
 /// </summary>
 public partial class AdminPanel : PanelContainer
 {
     private static readonly Ownership[] Ownerships = [Ownership.Public, Ownership.Private, Ownership.Cooperative];
+    private static readonly StorageKind[] StorageKinds = [StorageKind.General, StorageKind.Food, StorageKind.NonFood, StorageKind.Specific];
 
     private Simulation _simulation = null!;
     private readonly List<string> _buildingIds = [];
@@ -35,6 +38,11 @@ public partial class AdminPanel : PanelContainer
     private SpinBox _pointsPerPupil = null!;
     private SpinBox _pollution = null!;
     private SpinBox _storage = null!;
+    private OptionButton _storageKind = null!;
+    private OptionButton _storageProduct = null!;
+    private OptionButton _limitProduct = null!;
+    private CheckBox _limited = null!;
+    private SpinBox _limit = null!;
 
     public void Init(Simulation simulation)
     {
@@ -104,6 +112,9 @@ public partial class AdminPanel : PanelContainer
                 $"Enseignement {(building.SchoolLevel == Demos.Domain.Economy.EducationLevel.Basic ? "de base" : "avancé")} : " +
                 $"jusqu'à {building.SchoolPlaces * building.PointsPerPupil:N0} points par jour, frais possibles {building.SchoolPlaces * building.DailyTuition:N0}");
 
+        if (building.StorageCapacity > 0)
+            lines.Add(DescribeStorage(building));
+
         lines.Add($"Postes de personnages : 0 occupé sur {building.Posts} (recrutement : menu à venir)");
 
         lines.Add(building.Ownership == Ownership.Public
@@ -145,6 +156,15 @@ public partial class AdminPanel : PanelContainer
         _perWorker = AddSpin(form, "Production par travailleur", 0, 100, 0.01);
         _pollution = AddSpin(form, "Pollution par travailleur", 0, 100, 0.01);
         _storage = AddSpin(form, "Capacité de stockage", 0, 1_000_000, 100);
+        _storageKind = AddOption(form, "Le stockage accepte", ["Tous les produits", "L'alimentaire", "Le non alimentaire", "Un seul produit"]);
+        _storageProduct = AddOption(form, "Produit accepté (un seul)", ProductIds);
+        _limitProduct = AddOption(form, "Limite pour le produit", ProductIds);
+        _limited = new CheckBox { Text = "Limiter ce produit à" };
+        _limit = new SpinBox { MinValue = 0, MaxValue = 1_000_000, Step = 100, SizeFlagsHorizontal = SizeFlags.ExpandFill };
+        var limitRow = new HBoxContainer();
+        limitRow.AddChild(_limited);
+        limitRow.AddChild(_limit);
+        form.AddChild(limitRow);
         _places = AddSpin(form, "Places de logement", 0, 100_000, 10);
         _rent = AddSpin(form, "Loyer par place et par jour", 0, 1_000, 0.05);
         _schoolPlaces = AddSpin(form, "Places d'élèves", 0, 100_000, 10);
@@ -155,6 +175,9 @@ public partial class AdminPanel : PanelContainer
         _posts = AddSpin(form, "Postes de personnages", 0, 20, 1);
 
         _ownership.ItemSelected += _ => _owner.Disabled = _ownership.Selected == 0;
+        _storageKind.ItemSelected += _ => _storageProduct.Disabled = StorageKinds[_storageKind.Selected] != StorageKind.Specific;
+        _limitProduct.ItemSelected += _ => ShowLimit(SelectedBuilding());
+        _limited.Toggled += on => _limit.Editable = on;
 
         var apply = new Button { Text = "Appliquer" };
         apply.Pressed += Apply;
@@ -211,6 +234,10 @@ public partial class AdminPanel : PanelContainer
         _rent.Value = building.DailyRent;
         _pollution.Value = building.PollutionPerWorker;
         _storage.Value = building.StorageCapacity;
+        _storageKind.Select(System.Array.IndexOf(StorageKinds, building.StorageKind));
+        _storageProduct.Select(System.Math.Max(0, System.Array.IndexOf(ProductIds, building.StorageProductId)));
+        _storageProduct.Disabled = building.StorageKind != StorageKind.Specific;
+        ShowLimit(building);
         _schoolPlaces.Value = building.SchoolPlaces;
         _tuition.Value = building.DailyTuition;
         _schoolLevel.Select((int)building.SchoolLevel);
@@ -242,6 +269,9 @@ public partial class AdminPanel : PanelContainer
             DailyRent = _rent.Value,
             PollutionPerWorker = _pollution.Value,
             StorageCapacity = (int)_storage.Value,
+            StorageKind = StorageKinds[_storageKind.Selected],
+            StorageProductId = StorageKinds[_storageKind.Selected] == StorageKind.Specific ? ProductIds[_storageProduct.Selected] : null,
+            StorageLimits = UpdatedLimits(building),
             SchoolPlaces = (int)_schoolPlaces.Value,
             DailyTuition = _tuition.Value,
             SchoolLevel = (Demos.Domain.Economy.EducationLevel)_schoolLevel.Selected,
@@ -254,6 +284,47 @@ public partial class AdminPanel : PanelContainer
             _simulation.World.SetPrice(changed.ProductId, _price.Value);
 
         UpdateInfo();
+    }
+
+    private string[] ProductIds => _simulation.World.Products.Select(p => p.Id).ToArray();
+
+    private void ShowLimit(Structure? building)
+    {
+        var productId = ProductIds[System.Math.Max(0, _limitProduct.Selected)];
+        var limit = building?.StorageLimits?.GetValueOrDefault(productId, -1) ?? -1;
+        _limited.ButtonPressed = limit >= 0;
+        _limit.Editable = limit >= 0;
+        _limit.Value = System.Math.Max(0, limit);
+    }
+
+    /// <summary>Limites du bâtiment, avec celle du produit choisi mise à jour (ou retirée : sans limite).</summary>
+    private IReadOnlyDictionary<string, double>? UpdatedLimits(Structure building)
+    {
+        var limits = new Dictionary<string, double>(building.StorageLimits ?? new Dictionary<string, double>());
+        var productId = ProductIds[System.Math.Max(0, _limitProduct.Selected)];
+        if (_limited.ButtonPressed)
+            limits[productId] = _limit.Value;
+        else
+            limits.Remove(productId);
+        return limits.Count > 0 ? limits : null;
+    }
+
+    private string DescribeStorage(Structure building)
+    {
+        var world = _simulation.World;
+        var accepts = building.StorageKind switch
+        {
+            StorageKind.Food => "l'alimentaire",
+            StorageKind.NonFood => "le non alimentaire",
+            StorageKind.Specific => building.StorageProductId ?? "aucun produit choisi",
+            _ => "tous les produits",
+        };
+        var contents = world.CommuneOf(building) is { } communeId ? world.StorageOf(communeId).In(building.Id) : new Dictionary<string, double>();
+        var held = contents.Values.Sum();
+        var detail = contents.Where(c => c.Value >= 0.5).Select(c => $"{c.Key} {c.Value:N0}");
+        var limits = building.StorageLimits?.Select(l => $"{l.Key} {l.Value:N0}") ?? [];
+        return $"Stockage ({accepts}) : {held:N0} / {building.StorageCapacity:N0}  [{string.Join(", ", detail)}]" +
+            (limits.Any() ? $"\nLimites : {string.Join(", ", limits)} (les autres produits sans limite)" : "");
     }
 
     private string OwnerName(string? classId) =>

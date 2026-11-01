@@ -100,7 +100,7 @@ public sealed class Simulation(World world, GameClock clock)
         World.PollutionByCommune = Pollution.PerResidentByCommune(World.Structures, World.Workers, World.Classes);
         WorkDay.Run(World.Structures, World.Workers, World.Classes, World.Laws, World.Treasury, World.StateStockOf, World.MarketOf);
         Trade.RunDaily(communeIds, World.Classes, World.Products, World.MarketOf,
-            communeId => Storage.FreeSpace(communeId, World.Structures, World.MarketOf(communeId), World.StateStockOf(communeId)));
+            (communeId, productId) => World.StorageOf(communeId).FreeFor(productId));
         Housing.RunDaily(World.Structures, World.Classes, World.Treasury);
         Education.RunDaily(World.Structures, World.Classes, World.Treasury);
 
@@ -110,7 +110,7 @@ public sealed class Simulation(World world, GameClock clock)
         PaySellers();
         Taxation.CollectDaily(World.Classes, World.DailyTaxRate, World.Treasury);
         LawEffects.ApplyDaily(World.Classes, World.Laws, World.Structures, World.Legitimacy);
-        Storage.ApplyDaily(communeIds, World.Structures, World.MarketOf, World.StateStockOf);
+        Storage.ApplyDaily(communeIds, World.Structures, World.Products, World.MarketOf, World.StateStockOf);
     }
 
     private void PaySellers()
