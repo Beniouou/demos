@@ -31,8 +31,8 @@ public readonly record struct Production(string ProductId, double QuantityPerWor
 /// </summary>
 /// <param name="ParentId">Structure qui la contient ; null pour l'État, qui couvre toute la nation.</param>
 /// <param name="OwnerClassId">Classe propriétaire d'une structure privée ou coopérative.</param>
-/// <param name="Jobs">Nombre de postes de production ; les postes d'encadrement et de direction en découlent.</param>
-/// <param name="DailyWage">Salaire de base versé par poste et par jour.</param>
+/// <param name="Jobs">Nombre d'emplois de production ; les emplois d'encadrement et de direction en découlent.</param>
+/// <param name="DailyWage">Salaire de base versé par emploi et par jour.</param>
 /// <param name="HousingPlaces">Places de logement offertes dans la commune.</param>
 /// <param name="DailyRent">Loyer d'une place par jour, versé au propriétaire.</param>
 /// <param name="TypeId">Type de bâtiment du catalogue dont il est issu, s'il y en a un.</param>

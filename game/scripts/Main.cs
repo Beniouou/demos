@@ -147,7 +147,7 @@ public partial class Main : Node
             var state = world.IsGhostTown(commune.Id) ? "   VILLE FANTÔME (bâtiments en ruine)" : "";
             text.AppendLine(
                 $"{commune.Name,-18} habitants {world.Residents(commune.Id),7:N0}   " +
-                $"postes de production pourvus {filled,6:N0} / {jobs.Sum(s => s.Jobs):N0}   " +
+                $"emplois de production pourvus {filled,6:N0} / {jobs.Sum(s => s.Jobs):N0}   " +
                 $"logements {world.HousingPlaces(commune.Id):N0} places{state}");
         }
 

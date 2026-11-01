@@ -16,7 +16,7 @@ public sealed record BuildingType(
     int HousingPlaces = 0,
     double DailyRent = 0)
 {
-    /// <summary>Un bâtiment est fonctionnel quand il a un effet dans la simulation : des postes ou des places.</summary>
+    /// <summary>Un bâtiment est fonctionnel quand il a un effet dans la simulation : des emplois ou des places.</summary>
     public bool IsFunctional => Jobs > 0 || HousingPlaces > 0;
 
     /// <summary>Crée un bâtiment de ce type dans une structure, avec les paramètres par défaut.</summary>

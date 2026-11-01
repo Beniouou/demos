@@ -6,7 +6,7 @@ namespace Demos.Domain.Economy;
 public static class WorkDay
 {
     /// <summary>
-    /// Pour chaque lieu de travail : il produit selon ses travailleurs de production, paie ses postes, puis livre
+    /// Pour chaque lieu de travail : il produit selon ses travailleurs de production, paie ses emplois, puis livre
     /// le reste (au stock de l'État s'il est public, sinon en vente sur le marché pour sa classe propriétaire).
     /// Le travail est payé en salaire, sauf si une loi qui couvre le bâtiment impose le paiement en nature :
     /// les travailleurs reçoivent alors des produits du bâtiment, au prix du marché.

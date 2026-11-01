@@ -12,7 +12,7 @@ namespace Demos.Application;
 /// </summary>
 public sealed class Simulation(World world, GameClock clock)
 {
-    /// <summary>Type du catalogue qui fonde une commune : ses postes et ses places attirent les premiers habitants.</summary>
+    /// <summary>Type du catalogue qui fonde une commune : ses emplois et ses places attirent les premiers habitants.</summary>
     public const string BaseCampTypeId = "camp-de-base";
 
     public World World { get; } = world;
@@ -49,7 +49,7 @@ public sealed class Simulation(World world, GameClock clock)
     }
 
     /// <summary>
-    /// Outil d'administration : remplace les paramètres d'un bâtiment (propriétaire, postes, salaire, production,
+    /// Outil d'administration : remplace les paramètres d'un bâtiment (propriétaire, emplois, salaire, production,
     /// places, loyer). Les effets se voient dès le jour suivant.
     /// </summary>
     public void UpdateBuilding(Structure building) => World.UpdateStructure(building);

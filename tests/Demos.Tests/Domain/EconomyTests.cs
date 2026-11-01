@@ -43,7 +43,7 @@ public class EconomyTests
     }
 
     [Fact]
-    public void Chaque_rang_occupe_les_postes_de_son_rang()
+    public void Chaque_rang_occupe_les_emplois_de_son_rang()
     {
         var structures = Town(new Structure("ferme", "Ferme", StructureKind.Building, "commune", Jobs: 100));
         var workers = Workers(60);
@@ -52,7 +52,7 @@ public class EconomyTests
 
         var production = Employment.Assign(structures, [workers, executives, leaders]);
 
-        // 100 postes de production, 10 d'encadrement, 1 de direction.
+        // 100 emplois de production, 10 d'encadrement, 1 de direction.
         Assert.Equal(60, production["ferme"], precision: 6);
         Assert.Equal(60, workers.MembersWorkingIn("ferme"), precision: 6);
         Assert.Equal(10, executives.MembersWorkingIn("ferme"), precision: 6);

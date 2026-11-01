@@ -15,7 +15,7 @@ public class MigrationTests
     }.ToDictionary(s => s.Id);
 
     [Fact]
-    public void Une_part_des_sans_emploi_part_vers_la_commune_qui_a_le_plus_de_postes_libres()
+    public void Une_part_des_sans_emploi_part_vers_la_commune_qui_a_le_plus_d_emplois_libres()
     {
         var workers = new SocialClass("ouvriers", "Ouvriers", Rank.Workers, new Ideology(Pole.A, Pole.A, Pole.A), 1_100);
         workers.SetResidence("ancienne", 1);

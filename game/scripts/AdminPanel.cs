@@ -8,7 +8,7 @@ namespace Demos.Game;
 
 /// <summary>
 /// Menu d'administration (outil de test, pas encore l'interface du joueur) : liste les bâtiments de la partie
-/// et permet de régler leur propriétaire, leurs postes, leur salaire, leur production, leurs places,
+/// et permet de régler leur propriétaire, leurs emplois, leur salaire, leur production, leurs places,
 /// leur loyer et le prix de vente de leur produit.
 /// </summary>
 public partial class AdminPanel : PanelContainer
@@ -122,7 +122,7 @@ public partial class AdminPanel : PanelContainer
 
         _ownership = AddOption(form, "Propriétaire", ["État (public)", "Privé", "Coopérative"]);
         _owner = AddOption(form, "Classe propriétaire", _simulation.World.Classes.Select(c => c.Name));
-        _jobs = AddSpin(form, "Postes de production", 0, 100_000, 10);
+        _jobs = AddSpin(form, "Emplois de production", 0, 100_000, 10);
         _wage = AddSpin(form, "Salaire de base par jour", 0, 1_000, 0.1);
         _perWorker = AddSpin(form, "Production par travailleur", 0, 100, 0.01);
         _places = AddSpin(form, "Places de logement", 0, 100_000, 10);

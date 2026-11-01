@@ -6,7 +6,7 @@ namespace Demos.Domain.Population;
 /// <summary>
 /// Règle de départ, en attendant les lois et décisions du joueur qui modifieront les migrations :
 /// chaque saison, une part des sans-emploi de chaque rang part vers la commune qui offre
-/// le plus de postes libres de ce rang.
+/// le plus d'emplois libres de ce rang.
 /// </summary>
 public static class Migration
 {
@@ -26,12 +26,12 @@ public static class Migration
         {
             var rankClasses = classes.Where(c => c.Rank == rank && c.Population > 0).ToList();
 
-            double FreePosts(string communeId) => workplacesByCommune[communeId].Sum(s =>
-                Staffing.PostsOf(s, rank) - rankClasses.Sum(c => c.MembersWorkingIn(s.Id)));
+            double FreeJobs(string communeId) => workplacesByCommune[communeId].Sum(s =>
+                Staffing.JobsOf(s, rank) - rankClasses.Sum(c => c.MembersWorkingIn(s.Id)));
 
-            var target = communes.MaxBy(commune => FreePosts(commune.Id))!.Id;
-            var freePosts = FreePosts(target);
-            if (freePosts <= 0)
+            var target = communes.MaxBy(commune => FreeJobs(commune.Id))!.Id;
+            var freeJobs = FreeJobs(target);
+            if (freeJobs <= 0)
                 continue;
 
             var movers = new List<(SocialClass Class, string From, double Members)>();
@@ -50,7 +50,7 @@ public static class Migration
             if (total <= 0)
                 continue;
 
-            var scale = Math.Min(1, freePosts / total);
+            var scale = Math.Min(1, freeJobs / total);
             foreach (var (socialClass, from, members) in movers)
                 socialClass.MoveResidents(from, target, members * scale / socialClass.Population);
         }

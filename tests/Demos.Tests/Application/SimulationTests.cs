@@ -116,7 +116,7 @@ public class SimulationTests
         var simulation = CreatePrototype();
         AdvanceDays(simulation, 5);
 
-        // La scierie d'État (200 postes pourvus × 0,2) produit 40 bois par jour : 200 en 5 jours.
+        // La scierie d'État (200 emplois pourvus × 0,2) produit 40 bois par jour : 200 en 5 jours.
         var housing = new Structure("logements", "Logements", StructureKind.Building, "commune-1");
         var built = simulation.TryBuild(housing, [new MaterialCost("bois", 150)], PaymentMode.StockFirst);
 
