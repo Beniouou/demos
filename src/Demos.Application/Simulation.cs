@@ -8,8 +8,8 @@ namespace Demos.Application;
 /// <summary>
 /// Point d'entrée du moteur : il appelle AdvanceDay au rythme choisi par le joueur.
 /// La simulation calcule l'économie chaque jour, les variables lentes chaque saison
-/// et les bilans chaque année. Chaque commune est une petite économie : son marché, son stock d'État,
-/// son stockage, et des échanges avec les autres communes.
+/// et les bilans chaque année. Chaque commune est une petite économie : son marché et son stockage, où
+/// arrive aussi la production de l'État, sa caisse, et des échanges avec les autres communes.
 /// </summary>
 public sealed class Simulation(World world, GameClock clock)
 {
@@ -42,8 +42,8 @@ public sealed class Simulation(World world, GameClock clock)
     }
 
     /// <summary>
-    /// Action du joueur : construire une structure en payant ses matériaux avec le stock de l'État et le marché
-    /// de sa commune, l'argent du trésor, ou les deux. Renvoie false, sans rien construire ni dépenser, si c'est
+    /// Action du joueur : construire une structure en payant ses matériaux avec ce que l'État a produit dans le
+    /// stockage de sa commune, en les achetant avec l'argent du trésor, ou les deux. Renvoie false, sans rien construire ni dépenser, si c'est
     /// impossible.
     /// </summary>
     public bool TryBuild(Structure structure, IReadOnlyList<MaterialCost> cost, PaymentMode mode)
@@ -52,7 +52,7 @@ public sealed class Simulation(World world, GameClock clock)
             || structure.ParentId is not { } parentId
             || !World.Structures.TryGetValue(parentId, out var parent)
             || World.CommuneOf(parent) is not { } communeId
-            || !Construction.TryPay(cost, mode, World.StateStockOf(communeId), World.Treasury, World.MarketOf(communeId)))
+            || !Construction.TryPay(cost, mode, Market.StateSellerId(communeId), World.Treasury, World.MarketOf(communeId)))
             return false;
 
         World.AddStructure(structure);
@@ -171,7 +171,7 @@ public sealed class Simulation(World world, GameClock clock)
             || !World.Treasury.TrySpend(grant))
             return null;
 
-        if (!Construction.TryPay(cost, mode, World.StateStockOf(payingCommuneId), World.Treasury, World.MarketOf(payingCommuneId)))
+        if (!Construction.TryPay(cost, mode, Market.StateSellerId(payingCommuneId), World.Treasury, World.MarketOf(payingCommuneId)))
         {
             World.Treasury.Deposit(grant);
             return null;
@@ -196,7 +196,7 @@ public sealed class Simulation(World world, GameClock clock)
 
         World.Workers = Employment.Assign(World.Structures, World.Classes);
         World.PollutionByCommune = Pollution.PerResidentByCommune(World.Structures, World.Workers, World.Classes);
-        WorkDay.Run(World.Structures, World.Workers, World.Classes, World.Laws, World.Treasury, World.StateStockOf, World.MarketOf, World.CommuneFundOf, World.Wages);
+        WorkDay.Run(World.Structures, World.Workers, World.Classes, World.Laws, World.Treasury, World.MarketOf, World.CommuneFundOf, World.Wages);
         Trade.RunDaily(communeIds, World.Classes, World.Products, World.MarketOf,
             (communeId, productId) => World.StorageOf(communeId).FreeFor(productId));
         Housing.RunDaily(World.Structures, World.Classes, World.Treasury);
@@ -208,7 +208,7 @@ public sealed class Simulation(World world, GameClock clock)
         PaySellers();
         Taxation.CollectDaily(World.Classes, World.StateTaxRate, World.CommuneTaxRateOf, World.Treasury, World.CommuneFundOf, World.Laws, World.Structures);
         LawEffects.ApplyDaily(World.Classes, World.Laws, World.Structures, World.Legitimacy);
-        Storage.ApplyDaily(communeIds, World.Structures, World.Products, World.MarketOf, World.StateStockOf);
+        Storage.ApplyDaily(communeIds, World.Structures, World.Products, World.MarketOf);
     }
 
     private void PaySellers()
@@ -217,7 +217,10 @@ public sealed class Simulation(World world, GameClock clock)
         {
             foreach (var (sellerId, amount) in market.CollectEarnings())
             {
-                if (World.ClassesById.TryGetValue(sellerId, out var seller))
+                // Ce que l'État a produit et vendu dans une commune revient à la caisse de cette commune.
+                if (Market.CommuneOfStateSeller(sellerId) is { } communeId)
+                    World.CommuneFundOf(communeId).Deposit(amount);
+                else if (World.ClassesById.TryGetValue(sellerId, out var seller))
                     seller.ReceiveIncome(amount);
             }
         }

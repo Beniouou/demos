@@ -69,14 +69,13 @@ public class TradeTests
         };
         var market = new Market(Products);
         market.Offer("pain", 400, "ferme");
-        var stock = new Inventory();
-        stock.Add("bois", 200);
+        market.Offer("bois", 200, Market.StateSellerId("commune"));
 
-        Storage.ApplyDaily(["commune"], structures, Products, _ => market, _ => stock);
+        Storage.ApplyDaily(["commune"], structures, Products, _ => market);
 
         // 600 produits pour 300 places : chacun garde la moitié.
         Assert.Equal(200, market.QuantityOf("pain"), precision: 6);
-        Assert.Equal(100, stock.QuantityOf("bois"), precision: 6);
+        Assert.Equal(100, market.QuantityOf("bois", Market.StateSellerId("commune")), precision: 6);
     }
 
     private static Dictionary<string, Structure> TownWith(params Structure[] storages)
@@ -97,7 +96,7 @@ public class TradeTests
         market.Offer("pain", 1_000, "ferme");
         market.Offer("pierre", 200, "carriere");
 
-        Storage.ApplyDaily(["commune"], structures, Products, _ => market, _ => new Inventory());
+        Storage.ApplyDaily(["commune"], structures, Products, _ => market);
 
         // Le pain n'a que les 100 places du grenier ; la pierre tient dans l'entrepôt.
         Assert.Equal(100, market.QuantityOf("pain"), precision: 6);
@@ -114,7 +113,7 @@ public class TradeTests
         market.Offer("pierre", 100, "carriere");
         market.Offer("bois", 100, "foret");
 
-        Storage.ApplyDaily(["commune"], structures, Products, _ => market, _ => new Inventory());
+        Storage.ApplyDaily(["commune"], structures, Products, _ => market);
 
         // La pierre remplit le silo, le stockage général reste au bois.
         Assert.Equal(100, market.QuantityOf("pierre"), precision: 6);
@@ -130,7 +129,7 @@ public class TradeTests
         market.Offer("bois", 400, "foret");
         market.Offer("pierre", 250, "carriere");
 
-        Storage.ApplyDaily(["commune"], structures, Products, _ => market, _ => new Inventory());
+        Storage.ApplyDaily(["commune"], structures, Products, _ => market);
 
         Assert.Equal(50, market.QuantityOf("bois"), precision: 6);
         Assert.Equal(250, market.QuantityOf("pierre"), precision: 6);

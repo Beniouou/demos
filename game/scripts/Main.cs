@@ -158,11 +158,10 @@ public partial class Main : Node
                 $"(seuil {Demos.Domain.Economy.Pollution.PollutedThreshold}){state}");
 
             var market = world.MarketOf(commune.Id);
-            var stock = world.StateStockOf(commune.Id);
             text.AppendLine(
                 $"    caisse {world.CommuneFundOf(commune.Id).Balance:N0} (impôt communal {world.CommuneTaxRateOf(commune.Id):P2})   " +
                 $"    stockage {world.StorageOf(commune.Id).Stored.Values.Sum():N0} / {world.StorageCapacity(commune.Id):N0}   " +
-                $"stock de l'État : {DescribeQuantities(stock.Contents)}   marché : {DescribeQuantities(market.Contents)}");
+                $"stockage : {DescribeQuantities(market.Contents)}   dont l'État : {DescribeQuantities(world.StateHoldingsOf(commune.Id))}");
         }
 
         text.AppendLine();

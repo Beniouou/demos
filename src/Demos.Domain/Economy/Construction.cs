@@ -2,10 +2,13 @@ namespace Demos.Domain.Economy;
 
 public enum PaymentMode
 {
-    /// <summary>Tout est acheté sur le marché avec l'argent de l'État.</summary>
+    /// <summary>Tout est acheté aux autres vendeurs de la commune avec l'argent de l'État.</summary>
     MoneyOnly,
 
-    /// <summary>Le stock de l'État d'abord ; le reste est acheté sur le marché.</summary>
+    /// <summary>
+    /// L'État reprend d'abord, dans le stockage de la commune, ce qu'il a lui-même produit ; le reste est acheté aux
+    /// autres vendeurs.
+    /// </summary>
     StockFirst,
 }
 
@@ -15,40 +18,40 @@ public readonly record struct MaterialCost(string ProductId, double Quantity);
 public static class Construction
 {
     /// <summary>
-    /// Paie une construction en matériaux du stock, en argent, ou en mélangeant les deux.
-    /// Tout ou rien : si le marché ou le trésor ne suffit pas, rien n'est dépensé.
+    /// Paie une construction avec les produits de l'État dans le stockage de la commune, en argent, ou en mélangeant
+    /// les deux. Tout ou rien : si le stockage ou le trésor ne suffit pas, rien n'est dépensé.
     /// </summary>
     public static bool TryPay(
         IReadOnlyList<MaterialCost> cost,
         PaymentMode mode,
-        Inventory stateStock,
+        string stateSellerId,
         Treasury treasury,
         Market market)
     {
-        var plan = new List<(string ProductId, double FromStock, double FromMarket)>();
+        var plan = new List<(string ProductId, double FromState, double Bought)>();
         double money = 0;
 
         foreach (var item in cost)
         {
-            var fromStock = mode == PaymentMode.StockFirst
-                ? Math.Min(stateStock.QuantityOf(item.ProductId), item.Quantity)
+            var fromState = mode == PaymentMode.StockFirst
+                ? Math.Min(market.QuantityOf(item.ProductId, stateSellerId), item.Quantity)
                 : 0;
-            var fromMarket = item.Quantity - fromStock;
+            var bought = item.Quantity - fromState;
 
-            if (market.QuantityOf(item.ProductId) < fromMarket)
+            if (market.QuantityOfOthers(item.ProductId, stateSellerId) < bought)
                 return false;
 
-            money += market.CostOf(item.ProductId, fromMarket);
-            plan.Add((item.ProductId, fromStock, fromMarket));
+            money += market.CostOf(item.ProductId, bought);
+            plan.Add((item.ProductId, fromState, bought));
         }
 
         if (!treasury.TrySpend(money))
             return false;
 
-        foreach (var (productId, fromStock, fromMarket) in plan)
+        foreach (var (productId, fromState, bought) in plan)
         {
-            stateStock.TryRemove(productId, fromStock);
-            market.TryBuy(productId, fromMarket);
+            market.TryWithdraw(productId, fromState, stateSellerId);
+            market.TryBuy(productId, bought, exceptSellerId: stateSellerId);
         }
 
         return true;

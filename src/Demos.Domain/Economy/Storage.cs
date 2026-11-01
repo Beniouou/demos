@@ -61,8 +61,8 @@ public sealed class StorageAllocation
 }
 
 /// <summary>
-/// Une commune ne garde que ce que ses bâtiments de stockage contiennent : produits en vente sur son marché et
-/// stock de l'État confondus. Chaque bâtiment n'accepte que sa sorte de produits (général, alimentaire, non
+/// Une commune ne garde que ce que ses bâtiments de stockage contiennent : tous les produits de son marché, ceux
+/// des classes comme ceux de l'État. Chaque bâtiment n'accepte que sa sorte de produits (général, alimentaire, non
 /// alimentaire, ou un produit précis), et peut limiter la quantité de chaque produit (sans limite par défaut).
 /// Les produits sont rangés d'abord dans les stockages spécifiques, puis alimentaires et non alimentaires, puis
 /// généraux. En fin de journée, ce qui n'a pas trouvé de place est perdu. Les produits déjà chez les habitants
@@ -83,15 +83,6 @@ public static class Storage
 
     public static double LimitOf(Structure building, string productId) =>
         building.StorageLimits is { } limits && limits.TryGetValue(productId, out var limit) ? limit : double.PositiveInfinity;
-
-    /// <summary>Quantité de chaque produit présente dans une commune : en vente sur son marché et dans le stock de l'État.</summary>
-    public static Dictionary<string, double> HeldIn(Market market, Inventory stateStock)
-    {
-        var held = new Dictionary<string, double>(market.Contents);
-        foreach (var (productId, quantity) in stateStock.Contents)
-            held[productId] = held.GetValueOrDefault(productId) + quantity;
-        return held;
-    }
 
     /// <summary>Range les produits présents dans les bâtiments de stockage de la commune.</summary>
     public static StorageAllocation Allocate(
@@ -143,15 +134,13 @@ public static class Storage
         IEnumerable<string> communeIds,
         IReadOnlyDictionary<string, Structure> structures,
         IReadOnlyList<ProductDefinition> products,
-        Func<string, Market> marketOf,
-        Func<string, Inventory> stateStockOf)
+        Func<string, Market> marketOf)
     {
         var result = new Dictionary<string, StorageAllocation>();
         foreach (var communeId in communeIds)
         {
             var market = marketOf(communeId);
-            var stock = stateStockOf(communeId);
-            var held = HeldIn(market, stock);
+            var held = new Dictionary<string, double>(market.Contents);
             var allocation = Allocate(communeId, structures, products, held);
 
             foreach (var (productId, quantity) in held)
@@ -161,7 +150,6 @@ public static class Storage
                     continue;
 
                 market.Keep(productId, kept);
-                stock.Keep(productId, kept);
             }
 
             result[communeId] = allocation;

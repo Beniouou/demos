@@ -90,6 +90,21 @@ public class NationalizationTests
     }
 
     [Fact]
+    public void Les_habitants_achetent_le_pain_d_une_ferme_nationalisee()
+    {
+        var simulation = Prototype();
+        Assert.Equal(NationalizationOutcome.Done, simulation.TryNationalize("ferme", NationalizationMode.Expropriation));
+        var farm = simulation.World.Structures["ferme"];
+
+        simulation.AdvanceDay();
+
+        // Le pain du jour est au nom de l'État ; les habitants en ont acheté une partie.
+        var produced = simulation.World.Workers["ferme"] * farm.Production!.Value.QuantityPerWorker;
+        Assert.True(simulation.World.StateQuantityOf("commune-1", "pain") < produced);
+        Assert.True(simulation.World.ClassesById["ouvriers"].NeedsSatisfaction > 0.5);
+    }
+
+    [Fact]
     public void Nationaliser_un_batiment_vendu_retire_la_loi_de_privatisation()
     {
         var simulation = Prototype();

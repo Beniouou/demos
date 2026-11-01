@@ -46,16 +46,16 @@ public class PrivatizationTests
     }
 
     [Fact]
-    public void Apres_la_vente_le_bois_part_au_marche_au_lieu_du_stock_de_l_Etat()
+    public void Apres_la_vente_le_bois_est_en_vente_au_nom_du_proprietaire()
     {
         var simulation = PrototypeWithProfitableForestCamp();
         simulation.TrySellBuilding("camp-forestier", "cadres", 10_000);
-        var stockBefore = simulation.World.StateStockOf("commune-1").QuantityOf("bois");
+        var stockBefore = simulation.World.StateQuantityOf("commune-1", "bois");
 
         simulation.AdvanceDay();
 
-        Assert.True(simulation.World.StateStockOf("commune-1").QuantityOf("bois") <= stockBefore);
-        Assert.True(simulation.World.MarketOf("commune-1").QuantityOf("bois") > 0);
+        Assert.True(simulation.World.StateQuantityOf("commune-1", "bois") <= stockBefore);
+        Assert.True(simulation.World.MarketOf("commune-1").QuantityOf("bois", "cadres") > 0);
     }
 
     [Fact]

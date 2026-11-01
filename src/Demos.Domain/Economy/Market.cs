@@ -1,8 +1,10 @@
 namespace Demos.Domain.Economy;
 
 /// <summary>
-/// Marché national unique. Les structures privées et coopératives y mettent leur production en vente ;
-/// l'État et les classes y achètent. Le vendeur est payé quand son produit est acheté.
+/// Marché et stockage d'une commune. Toute la production de la commune y arrive : celle des structures privées et
+/// coopératives, au nom de leur classe propriétaire, et celle des structures publiques, au nom de l'État de la commune.
+/// Les habitants y achètent tout, y compris ce que l'État a produit ; le vendeur est payé quand son produit est
+/// acheté. L'État peut aussi y reprendre gratuitement ce qu'il a produit (pour construire) et acheter le reste.
 /// Pour l'instant, les prix restent les prix de départ.
 /// </summary>
 public sealed class Market(IEnumerable<ProductDefinition> products)
@@ -15,6 +17,12 @@ public sealed class Market(IEnumerable<ProductDefinition> products)
     // Vendeur → argent gagné depuis le dernier versement.
     private readonly Dictionary<string, double> _earnings = [];
 
+    /// <summary>Nom de vendeur de l'État dans une commune : ses ventes vont à la caisse de cette commune.</summary>
+    public static string StateSellerId(string communeId) => $"etat:{communeId}";
+
+    /// <summary>La commune dont l'État est ce vendeur, ou null si le vendeur n'est pas l'État.</summary>
+    public static string? CommuneOfStateSeller(string sellerId) => sellerId.StartsWith("etat:") ? sellerId["etat:".Length..] : null;
+
     public double PriceOf(string productId) => _prices.GetValueOrDefault(productId);
 
     /// <summary>Fixe le prix d'un produit à la main, en attendant la formation automatique des prix.</summary>
@@ -24,6 +32,17 @@ public sealed class Market(IEnumerable<ProductDefinition> products)
 
     public double QuantityOf(string productId) =>
         _offers.TryGetValue(productId, out var offers) ? offers.Values.Sum() : 0;
+
+    /// <summary>Quantité d'un produit en vente chez un vendeur.</summary>
+    public double QuantityOf(string productId, string sellerId) =>
+        _offers.TryGetValue(productId, out var offers) ? offers.GetValueOrDefault(sellerId) : 0;
+
+    /// <summary>Quantité d'un produit en vente chez les autres vendeurs.</summary>
+    public double QuantityOfOthers(string productId, string sellerId) => QuantityOf(productId) - QuantityOf(productId, sellerId);
+
+    /// <summary>Quantités d'un vendeur, par produit.</summary>
+    public IReadOnlyDictionary<string, double> ContentsOf(string sellerId) =>
+        _offers.Where(o => o.Value.GetValueOrDefault(sellerId) > 0).ToDictionary(o => o.Key, o => o.Value[sellerId]);
 
     /// <summary>Quantités en vente, par produit.</summary>
     public IReadOnlyDictionary<string, double> Contents =>
@@ -40,16 +59,16 @@ public sealed class Market(IEnumerable<ProductDefinition> products)
     /// Achète une quantité, prise chez les vendeurs au prorata de leur offre. Le paiement de l'acheteur
     /// est à la charge de l'appelant. Renvoie false, sans rien acheter, si l'offre est insuffisante.
     /// </summary>
-    public bool TryBuy(string productId, double quantity)
+    public bool TryBuy(string productId, double quantity, string? exceptSellerId = null)
     {
-        var available = QuantityOf(productId);
+        var available = exceptSellerId is null ? QuantityOf(productId) : QuantityOfOthers(productId, exceptSellerId);
         if (quantity <= 0)
             return true;
         if (available < quantity)
             return false;
 
         var offers = _offers[productId];
-        foreach (var sellerId in offers.Keys.ToList())
+        foreach (var sellerId in offers.Keys.Where(s => s != exceptSellerId).ToList())
         {
             var taken = quantity * offers[sellerId] / available;
             offers[sellerId] -= taken;
@@ -79,6 +98,18 @@ public sealed class Market(IEnumerable<ProductDefinition> products)
         }
 
         return taken;
+    }
+
+    /// <summary>Un vendeur reprend une partie de ses propres produits, sans paiement. Renvoie false si ce n'est pas possible.</summary>
+    public bool TryWithdraw(string productId, double quantity, string sellerId)
+    {
+        if (quantity <= 0)
+            return true;
+        if (QuantityOf(productId, sellerId) < quantity)
+            return false;
+
+        _offers[productId][sellerId] -= quantity;
+        return true;
     }
 
     /// <summary>Ne garde qu'une part des offres d'un produit (le reste est perdu, par exemple faute de place pour stocker).</summary>

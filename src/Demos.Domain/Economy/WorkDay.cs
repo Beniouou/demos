@@ -7,7 +7,7 @@ public static class WorkDay
 {
     /// <summary>
     /// Pour chaque lieu de travail : il produit selon ses travailleurs de production, paie ses emplois, puis livre
-    /// le reste (au stock de l'État s'il est public, sinon en vente sur le marché pour sa classe propriétaire).
+    /// le reste au stockage de sa commune, en vente au nom de l'État s'il est public, de sa classe propriétaire sinon.
     /// Le travail est payé en salaire, sauf si une loi qui couvre le bâtiment impose le paiement en nature :
     /// les travailleurs reçoivent alors des produits du bâtiment, au prix du marché.
     /// Le salaire en argent vient de la caisse de la commune puis du trésor (public), ou du propriétaire, et est versé en partie si l'argent manque.
@@ -18,7 +18,6 @@ public static class WorkDay
         IReadOnlyList<SocialClass> classes,
         IReadOnlyList<Law> laws,
         Treasury treasury,
-        Func<string, Inventory> stateStockOf,
         Func<string, Market> marketOf,
         Func<string, Treasury>? communeFundOf = null,
         WageLedger? wageLedger = null)
@@ -63,10 +62,8 @@ public static class WorkDay
 
             if (produced > 0 && workplace.Production is { } delivered)
             {
-                if (workplace.Ownership == Ownership.Public)
-                    stateStockOf(communeId).Add(delivered.ProductId, produced);
-                else
-                    market.Offer(delivered.ProductId, produced, workplace.OwnerClassId ?? "");
+                var sellerId = workplace.Ownership == Ownership.Public ? Market.StateSellerId(communeId) : workplace.OwnerClassId ?? "";
+                market.Offer(delivered.ProductId, produced, sellerId);
             }
         }
     }

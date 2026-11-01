@@ -36,10 +36,10 @@ public class EconomyTests
     private static SocialClass Workers(long population, double wealth = 0) => Resident("ouvriers", Rank.Workers, population, wealth);
 
     private static void RunWorkDay(Dictionary<string, Structure> structures, SocialClass[] classes, Treasury treasury,
-        Inventory stock, Market market, params Law[] laws)
+        Market market, params Law[] laws)
     {
         var workers = Employment.Assign(structures, classes);
-        WorkDay.Run(structures, workers, classes, laws, treasury, _ => stock, _ => market);
+        WorkDay.Run(structures, workers, classes, laws, treasury, _ => market);
     }
 
     [Fact]
@@ -60,15 +60,16 @@ public class EconomyTests
     }
 
     [Fact]
-    public void La_production_depend_du_nombre_de_travailleurs()
+    public void La_production_publique_arrive_dans_le_stockage_de_la_commune_au_nom_de_l_Etat()
     {
-        var stock = new Inventory();
+        var market = new Market(Products);
         var structures = Town(new Structure("scierie", "Scierie", StructureKind.Building, "commune",
             Production: new Production("bois", 0.5), Jobs: 100));
 
-        RunWorkDay(structures, [Workers(40)], new Treasury(), stock, new Market(Products));
+        RunWorkDay(structures, [Workers(40)], new Treasury(), market);
 
-        Assert.Equal(20, stock.QuantityOf("bois"), precision: 6);
+        // 40 travailleurs × 0,5 : 20 bois, en vente au nom de l'État de la commune.
+        Assert.Equal(20, market.QuantityOf("bois", Market.StateSellerId("commune")), precision: 6);
     }
 
     [Fact]
@@ -78,7 +79,7 @@ public class EconomyTests
         var structures = Town(new Structure("carriere", "Carrière", StructureKind.Building, "commune",
             Ownership.Private, "cadres", new Production("pierre", 1), Jobs: 60));
 
-        RunWorkDay(structures, [Workers(60)], new Treasury(), new Inventory(), market);
+        RunWorkDay(structures, [Workers(60)], new Treasury(), market);
 
         Assert.Equal(60, market.QuantityOf("pierre"), precision: 6);
         Assert.Empty(market.CollectEarnings());
@@ -96,7 +97,7 @@ public class EconomyTests
         var treasury = new Treasury();
         treasury.Deposit(100);
 
-        RunWorkDay(structures, [workers, intermediates], treasury, new Inventory(), new Market(Products));
+        RunWorkDay(structures, [workers, intermediates], treasury, new Market(Products));
 
         // 10 ouvriers × 2 + 1 profession intermédiaire × 4 = 24.
         Assert.Equal(76, treasury.Balance, precision: 6);
@@ -114,7 +115,7 @@ public class EconomyTests
         var treasury = new Treasury();
         treasury.Deposit(100);
 
-        WorkDay.Run(structures, Employment.Assign(structures, classes), classes, [], treasury, _ => new Inventory(), _ => new Market(Products), _ => fund);
+        WorkDay.Run(structures, Employment.Assign(structures, classes), classes, [], treasury, _ => new Market(Products), _ => fund);
 
         // 20 de salaires : 15 de la caisse, 5 du trésor.
         Assert.Equal(0, fund.Balance, precision: 6);
@@ -130,7 +131,7 @@ public class EconomyTests
         var treasury = new Treasury();
         treasury.Deposit(5);
 
-        RunWorkDay(structures, [workers], treasury, new Inventory(), new Market(Products));
+        RunWorkDay(structures, [workers], treasury, new Market(Products));
 
         Assert.Equal(0, treasury.Balance, precision: 6);
         Assert.Equal(5, workers.Wealth, precision: 6);
@@ -145,7 +146,7 @@ public class EconomyTests
         var workers = Workers(10, wealth: 100);
         var law = new Law("rations", "Rations", "commune", [], [LawRule.PaymentInKind]);
 
-        RunWorkDay(structures, [workers], new Treasury(), new Inventory(), market, law);
+        RunWorkDay(structures, [workers], new Treasury(), market, law);
 
         // 30 pains produits ; 20 de salaire au prix de 1 → 20 pains donnés, 10 mis en vente, aucun argent versé.
         Assert.Equal(20, workers.Goods.QuantityOf("pain"), precision: 6);
@@ -304,64 +305,68 @@ public class EconomyTests
     [Fact]
     public void Construire_avec_le_stock_ne_coute_pas_d_argent()
     {
-        var (stock, treasury, market) = Setup(stockPierre: 100, stockBois: 50, money: 0, marketPierre: 0, marketBois: 0);
+        var (treasury, market) = Setup(stockPierre: 100, stockBois: 50, money: 0, marketPierre: 0, marketBois: 0);
 
-        Assert.True(Construction.TryPay(Cost, PaymentMode.StockFirst, stock, treasury, market));
-        Assert.Equal(0, stock.QuantityOf("pierre"));
-        Assert.Equal(0, stock.QuantityOf("bois"));
+        Assert.True(Construction.TryPay(Cost, PaymentMode.StockFirst, State, treasury, market));
+        Assert.Equal(0, market.QuantityOf("pierre", State));
+        Assert.Equal(0, market.QuantityOf("bois", State));
     }
 
     [Fact]
     public void Un_stock_insuffisant_est_complete_par_un_achat_sur_le_marche()
     {
-        var (stock, treasury, market) = Setup(stockPierre: 40, stockBois: 50, money: 1_000, marketPierre: 100, marketBois: 0);
+        var (treasury, market) = Setup(stockPierre: 40, stockBois: 50, money: 1_000, marketPierre: 100, marketBois: 0);
 
-        Assert.True(Construction.TryPay(Cost, PaymentMode.StockFirst, stock, treasury, market));
+        Assert.True(Construction.TryPay(Cost, PaymentMode.StockFirst, State, treasury, market));
 
         // 60 pierres achetées à 3 : 180 dépensés, et payés au vendeur.
         Assert.Equal(820, treasury.Balance, precision: 6);
-        Assert.Equal(40, market.QuantityOf("pierre"), precision: 6);
+        Assert.Equal(40, market.QuantityOfOthers("pierre", State), precision: 6);
+        Assert.Equal(0, market.QuantityOf("pierre", State), precision: 6);
         Assert.Equal(180, market.CollectEarnings()["vendeur"], precision: 6);
     }
 
     [Fact]
     public void Payer_en_argent_laisse_le_stock_intact()
     {
-        var (stock, treasury, market) = Setup(stockPierre: 100, stockBois: 50, money: 1_000, marketPierre: 100, marketBois: 50);
+        var (treasury, market) = Setup(stockPierre: 100, stockBois: 50, money: 1_000, marketPierre: 100, marketBois: 50);
 
-        Assert.True(Construction.TryPay(Cost, PaymentMode.MoneyOnly, stock, treasury, market));
+        Assert.True(Construction.TryPay(Cost, PaymentMode.MoneyOnly, State, treasury, market));
 
         // 100 × 3 + 50 × 2 = 400.
         Assert.Equal(600, treasury.Balance, precision: 6);
-        Assert.Equal(100, stock.QuantityOf("pierre"));
+        Assert.Equal(100, market.QuantityOf("pierre", State));
+        Assert.Equal(0, market.QuantityOfOthers("pierre", State));
     }
 
     [Fact]
     public void Si_le_tresor_ne_suffit_pas_rien_n_est_depense()
     {
-        var (stock, treasury, market) = Setup(stockPierre: 40, stockBois: 50, money: 10, marketPierre: 100, marketBois: 0);
+        var (treasury, market) = Setup(stockPierre: 40, stockBois: 50, money: 10, marketPierre: 100, marketBois: 0);
 
-        Assert.False(Construction.TryPay(Cost, PaymentMode.StockFirst, stock, treasury, market));
+        Assert.False(Construction.TryPay(Cost, PaymentMode.StockFirst, State, treasury, market));
         Assert.Equal(10, treasury.Balance);
-        Assert.Equal(40, stock.QuantityOf("pierre"));
-        Assert.Equal(50, stock.QuantityOf("bois"));
-        Assert.Equal(100, market.QuantityOf("pierre"));
+        Assert.Equal(40, market.QuantityOf("pierre", State));
+        Assert.Equal(50, market.QuantityOf("bois", State));
+        Assert.Equal(100, market.QuantityOfOthers("pierre", State));
     }
 
-    private static (Inventory Stock, Treasury Treasury, Market Market) Setup(
+    private static readonly string State = Market.StateSellerId("commune");
+
+    /// <summary>Le stockage de la commune : des produits de l'État et des produits d'un autre vendeur.</summary>
+    private static (Treasury Treasury, Market Market) Setup(
         double stockPierre, double stockBois, double money, double marketPierre, double marketBois)
     {
-        var stock = new Inventory();
-        stock.Add("pierre", stockPierre);
-        stock.Add("bois", stockBois);
 
         var treasury = new Treasury();
         treasury.Deposit(money);
 
         var market = new Market(Products);
+        market.Offer("pierre", stockPierre, State);
+        market.Offer("bois", stockBois, State);
         market.Offer("pierre", marketPierre, "vendeur");
         market.Offer("bois", marketBois, "vendeur");
 
-        return (stock, treasury, market);
+        return (treasury, market);
     }
 }

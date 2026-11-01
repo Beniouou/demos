@@ -14,7 +14,6 @@ public sealed class World
     private readonly List<SocialClass> _classes;
     private readonly Dictionary<string, SocialClass> _classesById;
     private readonly Dictionary<string, Market> _markets = [];
-    private readonly Dictionary<string, Inventory> _stateStocks = [];
     private readonly Dictionary<string, double> _priceOverrides = [];
 
     public World(
@@ -71,15 +70,12 @@ public sealed class World
     private readonly Dictionary<string, Treasury> _communeFunds = [];
 
     /// <summary>
-    /// Ressources matérielles du joueur dans une commune : produites par ses structures publiques, elles restent
-    /// là où elles ont été produites.
+    /// Ressources matérielles du joueur dans une commune : ce que ses structures publiques ont produit, rangé dans le
+    /// stockage de la commune et en vente au nom de l'État. Les habitants peuvent l'acheter ; l'État peut le reprendre.
     /// </summary>
-    public Inventory StateStockOf(string communeId)
-    {
-        if (!_stateStocks.TryGetValue(communeId, out var stock))
-            _stateStocks[communeId] = stock = new Inventory();
-        return stock;
-    }
+    public IReadOnlyDictionary<string, double> StateHoldingsOf(string communeId) => MarketOf(communeId).ContentsOf(Market.StateSellerId(communeId));
+
+    public double StateQuantityOf(string communeId, string productId) => MarketOf(communeId).QuantityOf(productId, Market.StateSellerId(communeId));
 
     /// <summary>Marché d'une commune : on vend et on achète là où l'on est.</summary>
     public Market MarketOf(string communeId)
@@ -114,7 +110,7 @@ public sealed class World
 
     /// <summary>Rangement actuel des produits de la commune dans ses bâtiments de stockage.</summary>
     public StorageAllocation StorageOf(string communeId) =>
-        Storage.Allocate(communeId, _structures, Products, Storage.HeldIn(MarketOf(communeId), StateStockOf(communeId)));
+        Storage.Allocate(communeId, _structures, Products, MarketOf(communeId).Contents);
 
     /// <summary>
     /// Impôt d'État : part de sa richesse que chaque groupe verse chaque jour au trésor. À l'essai : 0,3 %, soit avec
