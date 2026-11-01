@@ -21,7 +21,7 @@ public class MigrationTests
         workers.SetResidence("ancienne", 1);
         workers.SetEmployment("ferme", 100);
 
-        Migration.RunSeasonal(Structures, [workers], new Dictionary<string, double> { ["ferme"] = 100 });
+        Migration.RunSeasonal(Structures, [workers]);
 
         // 1 000 sans-emploi × 5 % = 50 partent vers la nouvelle commune.
         Assert.Equal(50, workers.MembersLivingIn("nouvelle"), precision: 6);
@@ -35,7 +35,7 @@ public class MigrationTests
         var workers = new SocialClass("ouvriers", "Ouvriers", Rank.Workers, new Ideology(Pole.A, Pole.A, Pole.A), 1_100);
         workers.SetResidence("ancienne", 1);
 
-        Migration.RunSeasonal(oneCommune, [workers], new Dictionary<string, double>());
+        Migration.RunSeasonal(oneCommune, [workers]);
 
         Assert.Equal(1_100, workers.MembersLivingIn("ancienne"), precision: 6);
     }

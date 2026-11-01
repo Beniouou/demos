@@ -1,3 +1,4 @@
+using Demos.Domain.Economy;
 using Demos.Domain.Politics;
 
 namespace Demos.Domain.Population;
@@ -20,14 +21,17 @@ public sealed class SocialClass(string id, string name, Rank rank, Ideology ideo
     public long Population { get; private set; } = population;
     public double Wealth { get; set; }
 
-    /// <summary>Les dirigeants ne prennent pas les postes des bâtiments.</summary>
-    public bool TakesJobs => Rank != Rank.Leaders;
+    /// <summary>Produits reçus en paiement en nature, consommés avant d'acheter sur le marché.</summary>
+    public Inventory Goods { get; } = new();
+
+    /// <summary>Part des besoins de base couverte, de 0 à 1 : moyenne de se nourrir, s'habiller et se loger.</summary>
+    public double NeedsSatisfaction { get; set; } = 0.5;
+
+    /// <summary>Part des membres logés au dernier jour, de 0 à 1.</summary>
+    public double HousingCoverage { get; set; } = 1;
 
     /// <summary>Part des lois qui s'appliquent à la classe qu'elle accepte, de 0 à 1.</summary>
     public double Adhesion { get; set; } = 1;
-
-    /// <summary>Part des besoins couverte au dernier achat, de 0 à 1. Fixée par la consommation.</summary>
-    public double NeedsSatisfaction { get; set; } = 0.5;
 
     public IReadOnlyDictionary<string, double> Residence => _residence;
 

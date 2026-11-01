@@ -46,12 +46,16 @@ public sealed class World
     /// <summary>Part de sa richesse que chaque classe verse chaque jour. Plus tard : fixée par les lois.</summary>
     public double DailyTaxRate { get; set; } = 0.001;
 
-    /// <summary>Nombre de travailleurs de chaque structure, recalculé chaque jour.</summary>
+    /// <summary>Nombre de travailleurs de production de chaque structure, recalculé chaque jour.</summary>
     public IReadOnlyDictionary<string, double> Workers { get; set; } = new Dictionary<string, double>();
 
     public IEnumerable<Structure> Communes => Domain.Politics.Communes.All(_structures);
 
     public double Residents(string communeId) => Classes.Sum(c => c.MembersLivingIn(communeId));
+
+    public int HousingPlaces(string communeId) => _structures.Values
+        .Where(s => s.HousingPlaces > 0 && Domain.Politics.Communes.CommuneOf(s, _structures) == communeId)
+        .Sum(s => s.HousingPlaces);
 
     /// <summary>Une commune sans habitants est une ville fantôme ; ses bâtiments sont des ruines.</summary>
     public bool IsGhostTown(string communeId) => Residents(communeId) < 1;

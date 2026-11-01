@@ -77,7 +77,8 @@ public partial class Main : Node
     private void BuildHousing()
     {
         var id = $"logements-etat-{_housingBuilt + 1}";
-        var housing = new Structure(id, $"Logements d'État {_housingBuilt + 1}", StructureKind.Building, PrototypeScenario.FirstCommuneId);
+        var housing = new Structure(id, $"Logements d'État {_housingBuilt + 1}", StructureKind.Building, PrototypeScenario.FirstCommuneId,
+            HousingPlaces: 500, DailyRent: 0.2);
 
         if (_simulation.TryBuild(housing, HousingCost, PaymentMode.StockFirst))
         {
@@ -109,14 +110,15 @@ public partial class Main : Node
         text.AppendLine(
             $"{_simulation.Clock.Today:dd/MM/yyyy}   {SeasonName(_simulation.Clock.Season)}   " +
             $"{(_paused ? "EN PAUSE" : SpeedLabels[_speedIndex])}");
-        text.AppendLine("Espace : pause   1 à 4 : vitesse   B : logements (200 pierre, 100 bois)   C : camp de base");
+        text.AppendLine("Espace : pause   1 à 4 : vitesse   B : 500 places de logement (200 pierre, 100 bois)   C : camp de base");
         text.AppendLine();
 
         foreach (var socialClass in world.Classes)
         {
             text.AppendLine(
                 $"{socialClass.Name,-12} {socialClass.Ideology.Name,-16} population {socialClass.Population,7:N0}   " +
-                $"richesse {socialClass.Wealth,10:N0}   besoins couverts {socialClass.NeedsSatisfaction,4:P0}   " +
+                $"richesse {socialClass.Wealth,10:N0}   besoins couverts {socialClass.NeedsSatisfaction,4:P0} " +
+                $"(logés {socialClass.HousingCoverage,4:P0})   " +
                 $"adhésion {socialClass.Adhesion,4:P0}");
         }
 
@@ -130,7 +132,8 @@ public partial class Main : Node
             var state = world.IsGhostTown(commune.Id) ? "   VILLE FANTÔME (bâtiments en ruine)" : "";
             text.AppendLine(
                 $"{commune.Name,-18} habitants {world.Residents(commune.Id),7:N0}   " +
-                $"postes pourvus {filled,6:N0} / {jobs.Sum(s => s.Jobs):N0}{state}");
+                $"postes de production pourvus {filled,6:N0} / {jobs.Sum(s => s.Jobs):N0}   " +
+                $"logements {world.HousingPlaces(commune.Id):N0} places{state}");
         }
 
         text.AppendLine();

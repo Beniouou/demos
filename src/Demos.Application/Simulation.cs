@@ -12,9 +12,10 @@ namespace Demos.Application;
 /// </summary>
 public sealed class Simulation(World world, GameClock clock)
 {
-    /// <summary>Un camp de base offre ces postes, payés par le trésor, pour attirer les premiers habitants.</summary>
+    /// <summary>Un camp de base offre ces postes, payés par le trésor, et des places gratuites pour attirer les premiers habitants.</summary>
     public const int BaseCampJobs = 300;
     public const double BaseCampDailyWage = 1.5;
+    public const int BaseCampHousingPlaces = 300;
 
     public World World { get; } = world;
     public GameClock Clock { get; } = clock;
@@ -65,7 +66,7 @@ public sealed class Simulation(World world, GameClock clock)
         var number = World.Communes.Count() + 1;
         var commune = new Structure($"commune-{number}", name, StructureKind.PoliticalEntity, state.Id);
         var camp = new Structure($"camp-de-base-{number}", $"Camp de base ({name})", StructureKind.Building, commune.Id,
-            Jobs: BaseCampJobs, DailyWage: BaseCampDailyWage);
+            Jobs: BaseCampJobs, DailyWage: BaseCampDailyWage, HousingPlaces: BaseCampHousingPlaces);
 
         if (World.Structures.ContainsKey(commune.Id)
             || World.Legitimacy[legitimacyPole] < legitimacyCost
@@ -78,13 +79,13 @@ public sealed class Simulation(World world, GameClock clock)
         return commune;
     }
 
-    // Ordre du document de règles : emplois, production, salaires, consommation, ventes, impôts, légitimité.
-    // Les décisions du joueur et les événements restent à écrire.
+    // Ordre du document de règles : emplois, production et salaires, logement, consommation, ventes,
+    // impôts, légitimité. Les décisions du joueur et les événements restent à écrire.
     private void RunDailyCalculations()
     {
         World.Workers = Employment.Assign(World.Structures, World.Classes);
-        DailyProduction.Run(World.Structures, World.Workers, World.StateStock, World.Market);
-        Wages.PayDaily(World.Structures, World.Workers, World.ClassesById, World.Treasury);
+        WorkDay.Run(World.Structures, World.Workers, World.Classes, World.Laws, World.Treasury, World.StateStock, World.Market);
+        Housing.RunDaily(World.Structures, World.Classes, World.Treasury);
         Consumption.RunDaily(World.Classes, World.Products, World.Market);
         PaySellers();
         Taxation.CollectDaily(World.Classes, World.DailyTaxRate, World.Treasury);
@@ -106,7 +107,7 @@ public sealed class Simulation(World world, GameClock clock)
         foreach (var socialClass in World.Classes)
             socialClass.Grow();
 
-        Migration.RunSeasonal(World.Structures, World.Classes, World.Workers);
+        Migration.RunSeasonal(World.Structures, World.Classes);
 
         SeasonPassed?.Invoke();
     }

@@ -9,7 +9,7 @@ public class EconomyTests
     private static readonly ProductDefinition[] Products =
     [
         new("pain", "Pain", NeedCategory.Food, 1),
-        new("meubles", "Meubles", NeedCategory.Furniture, 20),
+        new("vetements", "Vêtements", NeedCategory.Clothing, 8),
         new("pierre", "Pierre", null, 3),
         new("bois", "Bois", null, 2),
     ];
@@ -26,35 +26,37 @@ public class EconomyTests
         return political.Concat(buildings).ToDictionary(s => s.Id);
     }
 
-    private static SocialClass Workers(long population, double wealth = 0)
+    private static SocialClass Resident(string id, Rank rank, long population, double wealth = 0)
     {
-        var workers = new SocialClass("ouvriers", "Ouvriers", Rank.Workers, new Ideology(Pole.A, Pole.A, Pole.A), population) { Wealth = wealth };
-        workers.SetResidence("commune", 1);
-        return workers;
+        var socialClass = new SocialClass(id, id, rank, new Ideology(Pole.A, Pole.A, Pole.A), population) { Wealth = wealth };
+        socialClass.SetResidence("commune", 1);
+        return socialClass;
+    }
+
+    private static SocialClass Workers(long population, double wealth = 0) => Resident("ouvriers", Rank.Workers, population, wealth);
+
+    private static void RunWorkDay(Dictionary<string, Structure> structures, SocialClass[] classes, Treasury treasury,
+        Inventory stock, Market market, params Law[] laws)
+    {
+        var workers = Employment.Assign(structures, classes);
+        WorkDay.Run(structures, workers, classes, laws, treasury, stock, market);
     }
 
     [Fact]
-    public void Les_postes_sont_pourvus_par_les_habitants_de_la_commune()
+    public void Chaque_rang_occupe_les_postes_de_son_rang()
     {
         var structures = Town(new Structure("ferme", "Ferme", StructureKind.Building, "commune", Jobs: 100));
         var workers = Workers(60);
+        var executives = Resident("cadres", Rank.Executives, 30);
+        var leaders = Resident("dirigeants", Rank.Leaders, 5);
 
-        var filled = Employment.Assign(structures, [workers]);
+        var production = Employment.Assign(structures, [workers, executives, leaders]);
 
-        Assert.Equal(60, filled["ferme"], precision: 6);
+        // 100 postes de production, 10 d'encadrement, 1 de direction.
+        Assert.Equal(60, production["ferme"], precision: 6);
         Assert.Equal(60, workers.MembersWorkingIn("ferme"), precision: 6);
-    }
-
-    [Fact]
-    public void Les_dirigeants_ne_prennent_pas_les_postes()
-    {
-        var structures = Town(new Structure("ferme", "Ferme", StructureKind.Building, "commune", Jobs: 100));
-        var leaders = new SocialClass("dirigeants", "Dirigeants", Rank.Leaders, new Ideology(Pole.B, Pole.A, Pole.B), 50);
-        leaders.SetResidence("commune", 1);
-
-        var filled = Employment.Assign(structures, [leaders]);
-
-        Assert.False(filled.ContainsKey("ferme"));
+        Assert.Equal(10, executives.MembersWorkingIn("ferme"), precision: 6);
+        Assert.Equal(1, leaders.MembersWorkingIn("ferme"), precision: 6);
     }
 
     [Fact]
@@ -64,7 +66,7 @@ public class EconomyTests
         var structures = Town(new Structure("scierie", "Scierie", StructureKind.Building, "commune",
             Production: new Production("bois", 0.5), Jobs: 100));
 
-        DailyProduction.Run(structures, new Dictionary<string, double> { ["scierie"] = 40 }, stock, new Market(Products));
+        RunWorkDay(structures, [Workers(40)], new Treasury(), stock, new Market(Products));
 
         Assert.Equal(20, stock.QuantityOf("bois"), precision: 6);
     }
@@ -76,9 +78,9 @@ public class EconomyTests
         var structures = Town(new Structure("carriere", "Carrière", StructureKind.Building, "commune",
             Ownership.Private, "dirigeants", new Production("pierre", 1), Jobs: 60));
 
-        DailyProduction.Run(structures, new Dictionary<string, double> { ["carriere"] = 60 }, new Inventory(), market);
+        RunWorkDay(structures, [Workers(60)], new Treasury(), new Inventory(), market);
 
-        Assert.Equal(60, market.QuantityOf("pierre"));
+        Assert.Equal(60, market.QuantityOf("pierre"), precision: 6);
         Assert.Empty(market.CollectEarnings());
 
         Assert.True(market.TryBuy("pierre", 10));
@@ -86,18 +88,20 @@ public class EconomyTests
     }
 
     [Fact]
-    public void Le_tresor_paie_les_salaires_d_un_batiment_public()
+    public void Le_tresor_paie_les_salaires_d_un_batiment_public_et_les_cadres_gagnent_le_double()
     {
         var structures = Town(new Structure("scierie", "Scierie", StructureKind.Building, "commune", Jobs: 10, DailyWage: 2));
         var workers = Workers(10);
-        var filled = Employment.Assign(structures, [workers]);
+        var executives = Resident("cadres", Rank.Executives, 1);
         var treasury = new Treasury();
         treasury.Deposit(100);
 
-        Wages.PayDaily(structures, filled, new Dictionary<string, SocialClass> { ["ouvriers"] = workers }, treasury);
+        RunWorkDay(structures, [workers, executives], treasury, new Inventory(), new Market(Products));
 
-        Assert.Equal(80, treasury.Balance, precision: 6);
+        // 10 ouvriers × 2 + 1 cadre × 4 = 24.
+        Assert.Equal(76, treasury.Balance, precision: 6);
         Assert.Equal(20, workers.Wealth, precision: 6);
+        Assert.Equal(4, executives.Wealth, precision: 6);
     }
 
     [Fact]
@@ -105,30 +109,88 @@ public class EconomyTests
     {
         var structures = Town(new Structure("scierie", "Scierie", StructureKind.Building, "commune", Jobs: 10, DailyWage: 2));
         var workers = Workers(10);
-        var filled = Employment.Assign(structures, [workers]);
         var treasury = new Treasury();
         treasury.Deposit(5);
 
-        Wages.PayDaily(structures, filled, new Dictionary<string, SocialClass> { ["ouvriers"] = workers }, treasury);
+        RunWorkDay(structures, [workers], treasury, new Inventory(), new Market(Products));
 
         Assert.Equal(0, treasury.Balance, precision: 6);
         Assert.Equal(5, workers.Wealth, precision: 6);
     }
 
     [Fact]
-    public void Les_classes_achetent_leurs_besoins_et_en_tirent_leur_satisfaction()
+    public void Une_loi_de_paiement_en_nature_paie_les_travailleurs_en_produits()
+    {
+        var market = new Market(Products);
+        var structures = Town(new Structure("ferme", "Ferme", StructureKind.Building, "commune",
+            Ownership.Cooperative, "ouvriers", new Production("pain", 3), Jobs: 10, DailyWage: 2));
+        var workers = Workers(10, wealth: 100);
+        var law = new Law("rations", "Rations", "commune", [], [LawRule.PaymentInKind]);
+
+        RunWorkDay(structures, [workers], new Treasury(), new Inventory(), market, law);
+
+        // 30 pains produits ; 20 de salaire au prix de 1 → 20 pains donnés, 10 mis en vente, aucun argent versé.
+        Assert.Equal(20, workers.Goods.QuantityOf("pain"), precision: 6);
+        Assert.Equal(10, market.QuantityOf("pain"), precision: 6);
+        Assert.Equal(100, workers.Wealth, precision: 6);
+    }
+
+    [Fact]
+    public void Quand_il_manque_des_places_chaque_classe_est_logee_au_prorata_et_paie_son_loyer()
+    {
+        var structures = Town(new Structure("logements", "Logements", StructureKind.Building, "commune",
+            HousingPlaces: 50, DailyRent: 1));
+        var workers = Workers(100, wealth: 1_000);
+        var treasury = new Treasury();
+
+        Housing.RunDaily(structures, [workers], treasury);
+
+        Assert.Equal(0.5, workers.HousingCoverage, precision: 6);
+        Assert.Equal(950, workers.Wealth, precision: 6);
+        Assert.Equal(50, treasury.Balance, precision: 6);
+    }
+
+    [Fact]
+    public void Une_classe_qui_ne_peut_pas_payer_n_est_logee_qu_a_hauteur_de_ce_qu_elle_paie()
+    {
+        var structures = Town(new Structure("logements", "Logements", StructureKind.Building, "commune",
+            HousingPlaces: 100, DailyRent: 1));
+        var workers = Workers(100, wealth: 10);
+
+        Housing.RunDaily(structures, [workers], new Treasury());
+
+        Assert.Equal(0.1, workers.HousingCoverage, precision: 6);
+        Assert.Equal(0, workers.Wealth, precision: 6);
+    }
+
+    [Fact]
+    public void Les_classes_achetent_leurs_besoins_de_base_et_en_tirent_leur_satisfaction()
     {
         var market = new Market(Products);
         market.Offer("pain", 100, "vendeur");
-        market.Offer("meubles", 1, "vendeur");
+        market.Offer("vetements", 1, "vendeur");
         var workers = Workers(100, wealth: 1_000);
+        workers.HousingCoverage = 1;
 
         Consumption.RunDaily([workers], Products, market);
 
-        // 100 pains (100 × 1) et 1 meuble (100 × 0,01) : tout est couvert pour 100 + 20.
+        // 100 pains (100 × 1) et 1 vêtement (100 × 0,01) : 100 + 8 dépensés, tout est couvert.
         Assert.Equal(1, workers.NeedsSatisfaction, precision: 6);
-        Assert.Equal(880, workers.Wealth, precision: 6);
-        Assert.Equal(0, market.QuantityOf("pain"), precision: 6);
+        Assert.Equal(892, workers.Wealth, precision: 6);
+    }
+
+    [Fact]
+    public void Les_produits_recus_en_nature_sont_consommes_avant_d_acheter()
+    {
+        var market = new Market(Products);
+        market.Offer("pain", 100, "vendeur");
+        var workers = Workers(100, wealth: 1_000);
+        workers.Goods.Add("pain", 100);
+
+        Consumption.RunDaily([workers], Products, market);
+
+        Assert.Equal(0, workers.Goods.QuantityOf("pain"), precision: 6);
+        Assert.Equal(100, market.QuantityOf("pain"), precision: 6);
     }
 
     [Fact]
@@ -137,21 +199,22 @@ public class EconomyTests
         var market = new Market(Products);
         market.Offer("pain", 100, "vendeur");
         var workers = Workers(100, wealth: 10_000);
-        var executives = new SocialClass("cadres", "Cadres", Rank.Executives, new Ideology(Pole.A, Pole.A, Pole.B), 100) { Wealth = 10_000 };
+        var executives = Resident("cadres", Rank.Executives, 100, wealth: 10_000);
 
         Consumption.RunDaily([workers, executives], Products, market);
 
-        // Demande : 100 + 150 pains pour 100 en vente → 40 % de chaque demande est servi.
-        Assert.Equal(9_960, workers.Wealth, precision: 6);
-        Assert.Equal(9_940, executives.Wealth, precision: 6);
+        // Demande : 100 + 100 pains pour 100 en vente → la moitié de chaque demande est servie.
+        Assert.Equal(9_950, workers.Wealth, precision: 6);
+        Assert.Equal(9_950, executives.Wealth, precision: 6);
     }
 
     [Fact]
-    public void Une_classe_sans_argent_ne_couvre_pas_ses_besoins()
+    public void Sans_argent_ni_logement_aucun_besoin_n_est_couvert()
     {
         var market = new Market(Products);
         market.Offer("pain", 100, "vendeur");
         var workers = Workers(100, wealth: 0);
+        workers.HousingCoverage = 0;
 
         Consumption.RunDaily([workers], Products, market);
 

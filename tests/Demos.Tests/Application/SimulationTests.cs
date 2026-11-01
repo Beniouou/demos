@@ -11,7 +11,7 @@ public class SimulationTests
     private const string ProductsJson = """
         [
           { "id": "pain", "name": "Pain", "need": "Food", "basePrice": 1 },
-          { "id": "meubles", "name": "Meubles", "need": "Furniture", "basePrice": 20 },
+          { "id": "vetements", "name": "Vêtements", "need": "Clothing", "basePrice": 8 },
           { "id": "pierre", "name": "Pierre", "basePrice": 3 },
           { "id": "bois", "name": "Bois", "basePrice": 2 }
         ]
@@ -69,22 +69,22 @@ public class SimulationTests
         var afterOneDay = simulation.World.Legitimacy[libertarian];
         simulation.AdvanceDay();
 
-        // Cadres et dirigeants (LI) acceptent la liberté d'entreprendre, loi de l'État : 1 700 × 0,001 par jour.
-        Assert.Equal(1.7, afterOneDay, precision: 6);
-        Assert.Equal(3.4, simulation.World.Legitimacy[libertarian], precision: 6);
+        // Cadres et dirigeants (LI) acceptent la liberté d'entreprendre, loi de l'État : 500 × 0,001 par jour.
+        Assert.Equal(0.5, afterOneDay, precision: 6);
+        Assert.Equal(1, simulation.World.Legitimacy[libertarian], precision: 6);
     }
 
     [Fact]
-    public void La_boucle_economique_nourrit_les_classes_et_paie_les_vendeurs()
+    public void La_boucle_economique_nourrit_habille_et_loge_les_classes()
     {
         var simulation = CreatePrototype();
         var workers = simulation.World.Classes.Single(c => c.Id == "ouvriers");
 
         simulation.AdvanceDay();
 
-        // La ferme coopérative produit 9 000 pains pour une demande de 10 650 : les besoins sont en partie couverts.
-        Assert.InRange(workers.NeedsSatisfaction, 0.1, 0.99);
-        Assert.Equal(0, simulation.World.Market.QuantityOf("pain"), precision: 6);
+        // 5 500 places pour 5 000 habitants, 6 600 pains pour 5 000 et 52 vêtements pour 50 par jour.
+        Assert.Equal(1, workers.HousingCoverage, precision: 6);
+        Assert.Equal(1, workers.NeedsSatisfaction, precision: 6);
     }
 
     [Fact]
@@ -94,11 +94,11 @@ public class SimulationTests
         AdvanceDays(simulation, 10);
         var pole = new Orientation(IdeologicalAxis.Property, Pole.B);
 
-        var commune = simulation.TryFoundCommune("Nouvelle commune", [new MaterialCost("bois", 100)], PaymentMode.StockFirst, pole, 10);
+        var commune = simulation.TryFoundCommune("Nouvelle commune", [new MaterialCost("bois", 100)], PaymentMode.StockFirst, pole, 2);
 
         Assert.NotNull(commune);
         Assert.True(simulation.World.IsGhostTown(commune.Id));
-        Assert.Contains(simulation.World.Structures.Values, s => s.ParentId == commune.Id && s.Jobs == Simulation.BaseCampJobs);
+        Assert.Equal(Simulation.BaseCampHousingPlaces, simulation.World.HousingPlaces(commune.Id));
 
         // Au changement de saison (1er mars), des sans-emploi rejoignent la nouvelle commune.
         AdvanceDays(simulation, 50);
