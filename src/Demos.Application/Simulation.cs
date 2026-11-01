@@ -88,6 +88,7 @@ public sealed class Simulation(World world, GameClock clock)
     private void RunDailyCalculations()
     {
         World.Workers = Employment.Assign(World.Structures, World.Classes);
+        World.PollutionByCommune = Pollution.PerResidentByCommune(World.Structures, World.Workers, World.Classes);
         WorkDay.Run(World.Structures, World.Workers, World.Classes, World.Laws, World.Treasury, World.StateStock, World.Market);
         Housing.RunDaily(World.Structures, World.Classes, World.Treasury);
         Education.RunDaily(World.Structures, World.Classes, World.Treasury);
@@ -115,13 +116,13 @@ public sealed class Simulation(World world, GameClock clock)
         YearPassed?.Invoke();
     }
 
-    // Chômage et plein emploi. Prévu : climat, revendications, recherche.
+    // Passages entre classes, commune par commune. Prévu : climat, revendications, recherche.
     private void RunSeasonalCalculations()
     {
         foreach (var socialClass in World.Classes)
             socialClass.Grow();
 
-        foreach (var created in ClassTransitions.RunSeasonal(World.Classes))
+        foreach (var created in ClassTransitions.RunSeasonal(World.Classes, World.Structures, World.PollutionByCommune))
             World.AddClass(created);
 
         Migration.RunSeasonal(World.Structures, World.Classes);

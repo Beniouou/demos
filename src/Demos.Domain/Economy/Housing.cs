@@ -17,6 +17,9 @@ public static class Housing
         var housed = PlaceAllocation.Allocate(structures, classes, treasury, s => s.HousingPlaces, s => s.DailyRent);
 
         foreach (var (socialClass, served) in housed)
+        {
             socialClass.HousingCoverage = socialClass.Population > 0 ? Math.Min(1, served.Members / socialClass.Population) : 1;
+            socialClass.HousingPlaceShortage = socialClass.Population > 0 ? Math.Min(1, served.LackingPlaces / socialClass.Population) : 0;
+        }
     }
 }

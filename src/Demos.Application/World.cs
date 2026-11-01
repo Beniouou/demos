@@ -57,6 +57,9 @@ public sealed class World
     /// <summary>Nombre de travailleurs de production de chaque structure, recalculé chaque jour.</summary>
     public IReadOnlyDictionary<string, double> Workers { get; set; } = new Dictionary<string, double>();
 
+    /// <summary>Pollution de chaque commune par habitant et par jour, recalculée chaque jour.</summary>
+    public IReadOnlyDictionary<string, double> PollutionByCommune { get; set; } = new Dictionary<string, double>();
+
     public IEnumerable<Structure> Communes => Domain.Politics.Communes.All(_structures);
 
     public double Residents(string communeId) => Classes.Sum(c => c.MembersLivingIn(communeId));

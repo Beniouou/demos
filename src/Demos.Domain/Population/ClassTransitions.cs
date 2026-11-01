@@ -1,3 +1,5 @@
+using Demos.Domain.Politics;
+
 namespace Demos.Domain.Population;
 
 /// <summary>
@@ -10,7 +12,10 @@ namespace Demos.Domain.Population;
 ///   deviennent ségrégationnistes s'ils étaient égalitaristes ;
 /// - chaque saison, par le plein emploi : des membres d'une classe ségrégationniste redeviennent égalitaristes ;
 /// - chaque saison, sur l'axe propriété : une classe qui travaille sans pouvoir couvrir ses besoins devient
-///   protectionniste, une classe comblée mais fortement prélevée devient libérale.
+///   protectionniste, une classe comblée mais fortement prélevée devient libérale ;
+/// - chaque saison, sur l'axe production : vivre dans une commune polluée rend écologiste, manquer de
+///   produits ou de places rend positiviste.
+/// Les passages saisonniers se jugent commune par commune (voir <see cref="RunSeasonal"/>).
 /// </summary>
 public static class ClassTransitions
 {
@@ -74,41 +79,50 @@ public static class ClassTransitions
     /// <summary>Proposition : chaque saison, 5 % des membres d'une classe concernée basculent sur l'axe propriété.</summary>
     public const double PropertyShareAffected = 0.05;
 
+    /// <summary>Proposition : une classe manque de produits quand 20 % de ses besoins restent non couverts faute de produits ou de places.</summary>
+    public const double SupplyShortageThreshold = 0.2;
+
+    /// <summary>Proposition : chaque saison, 5 % des membres concernés basculent sur l'axe production.</summary>
+    public const double ProductionShareAffected = 0.05;
+
+    /// <summary>Un départ prévu : des membres d'une classe, pris dans une commune, vers une autre classe.</summary>
+    private sealed record Move(SocialClass Source, string CommuneId, Rank Rank, Ideology Ideology, double Members);
+
     /// <summary>
-    /// Calcul saisonnier : le chômage et le plein emploi (axe hiérarchie), la pauvreté au travail et les forts
-    /// prélèvements (axe propriété). Renvoie les classes nées de ces passages.
+    /// Calcul saisonnier, commune par commune : là où vivent des membres d'une classe, on juge leur situation
+    /// et seuls les membres de cette commune changent de classe. Chômage et plein emploi (axe hiérarchie) et
+    /// pollution se mesurent dans la commune ; manque d'argent, prélèvements et pénurie de produits, qui
+    /// dépendent du marché national et de la richesse de la classe, se mesurent pour toute la classe.
+    /// Renvoie les classes nées de ces passages.
     /// </summary>
-    public static List<SocialClass> RunSeasonal(IReadOnlyList<SocialClass> classes)
+    public static List<SocialClass> RunSeasonal(
+        IReadOnlyList<SocialClass> classes,
+        IReadOnlyDictionary<string, Structure> structures,
+        IReadOnlyDictionary<string, double> pollutionByCommune)
     {
         var destinations = new Destinations(classes);
-        var sources = destinations.All.Where(c => c.Population > 0).ToList();
+        var workplacesByCommune = Communes.All(structures).ToDictionary(
+            commune => commune.Id,
+            commune => structures.Values.Where(s => s.Jobs > 0 && Communes.CommuneOf(s, structures) == commune.Id).ToList());
 
-        foreach (var source in sources)
+        // Toutes les mesures sont prises avant le moindre départ, pour que chaque axe juge la même situation.
+        var moves = new List<Move>();
+        foreach (var source in destinations.All.Where(c => c.Population > 0))
         {
-            // Mesures relevées avant tout départ, pour que les deux axes jugent la même classe.
-            var population = source.Population;
-            var unemploymentRate = source.UnemployedMembers / population;
-            var poorWhileWorking = unemploymentRate <= UnemploymentThreshold && source.SeasonMoneyShortfall >= MoneyShortfallThreshold;
-            var comfortableButTaxed = source.NeedsSatisfaction >= FullySatisfiedThreshold && source.SeasonTaxRate >= HeavyTaxRateThreshold;
-
-            if (unemploymentRate > UnemploymentThreshold
-                && source.WealthPerMemberLastSeason is { } previous
-                && source.WealthPerMember <= previous)
+            foreach (var (communeId, workplaces) in workplacesByCommune)
             {
-                ApplyUnemployment(source, destinations);
-            }
-            else if (unemploymentRate < FullEmploymentThreshold && source.Ideology[IdeologicalAxis.Hierarchy] == Pole.B)
-            {
-                Switch(source, IdeologicalAxis.Hierarchy, Pole.A, population * FullEmploymentShareAffected, destinations);
-            }
+                var living = source.MembersLivingIn(communeId);
+                if (living < 1)
+                    continue;
 
-            // Une classe qui travaille sans pouvoir couvrir ses besoins devient protectionniste ;
-            // une classe comblée mais fortement prélevée devient libérale.
-            if (poorWhileWorking && source.Ideology[IdeologicalAxis.Property] == Pole.B)
-                Switch(source, IdeologicalAxis.Property, Pole.A, population * PropertyShareAffected, destinations);
-            else if (comfortableButTaxed && source.Ideology[IdeologicalAxis.Property] == Pole.A)
-                Switch(source, IdeologicalAxis.Property, Pole.B, population * PropertyShareAffected, destinations);
+                var employed = workplaces.Sum(s => source.MembersWorkingIn(s.Id));
+                var unemployed = Math.Max(0, living - employed);
+                moves.AddRange(PlanMoves(source, communeId, living, unemployed / living, unemployed, pollutionByCommune.GetValueOrDefault(communeId)));
+            }
         }
+
+        foreach (var move in moves)
+            move.Source.TransferMembersTo(destinations.Get(move.Rank, move.Ideology), (long)move.Members, move.CommuneId);
 
         foreach (var socialClass in destinations.All)
         {
@@ -119,30 +133,51 @@ public static class ClassTransitions
         return destinations.Created;
     }
 
-    /// <summary>Fait passer des membres au pôle donné sur un axe, sans changer de rang.</summary>
-    private static void Switch(SocialClass source, IdeologicalAxis axis, Pole pole, double members, Destinations destinations)
+    private static IEnumerable<Move> PlanMoves(
+        SocialClass source, string communeId, double living, double unemploymentRate, double unemployed, double pollution)
     {
-        var count = (long)members;
-        if (count > 0)
-            source.TransferMembersTo(destinations.Get(source.Rank, source.Ideology.With(axis, pole)), count);
-    }
+        var ideology = source.Ideology;
+        Move Switch(IdeologicalAxis axis, Pole pole, double share) =>
+            new(source, communeId, source.Rank, ideology.With(axis, pole), living * share);
 
-    /// <summary>
-    /// Chômage : une classe dont plus de 20 % des membres sont au chômage et dont la richesse par membre n'a pas
-    /// augmenté depuis la saison précédente (elle a baissé, ou elle est déjà épuisée) voit 10 % de ses chômeurs
-    /// descendre d'un rang (s'ils le peuvent) et devenir ségrégationnistes s'ils étaient égalitaristes.
-    /// Des ouvriers ségrégationnistes ne changent pas.
-    /// </summary>
-    private static void ApplyUnemployment(SocialClass source, Destinations destinations)
-    {
-        var rank = source.Rank == Rank.Workers ? Rank.Workers : source.Rank - 1;
-        var ideology = source.Ideology.With(IdeologicalAxis.Hierarchy, Pole.B);
-        if (rank == source.Rank && ideology == source.Ideology)
-            return;
+        // Axe hiérarchie. Chômage : si plus de 20 % de chômeurs et une richesse par membre qui n'augmente plus,
+        // 10 % des chômeurs descendent d'un rang (s'ils le peuvent) et deviennent ségrégationnistes.
+        // Plein emploi : moins de 5 % de chômeurs ramène 5 % des ségrégationnistes vers l'égalitarisme.
+        if (unemploymentRate > UnemploymentThreshold
+            && source.WealthPerMemberLastSeason is { } previous
+            && source.WealthPerMember <= previous)
+        {
+            var rank = source.Rank == Rank.Workers ? Rank.Workers : source.Rank - 1;
+            var segregationist = ideology.With(IdeologicalAxis.Hierarchy, Pole.B);
+            if (rank != source.Rank || segregationist != ideology)
+                yield return new Move(source, communeId, rank, segregationist, unemployed * UnemployedShareAffected);
+        }
+        else if (unemploymentRate < FullEmploymentThreshold && ideology[IdeologicalAxis.Hierarchy] == Pole.B)
+        {
+            yield return Switch(IdeologicalAxis.Hierarchy, Pole.A, FullEmploymentShareAffected);
+        }
 
-        var count = (long)(source.UnemployedMembers * UnemployedShareAffected);
-        if (count > 0)
-            source.TransferMembersTo(destinations.Get(rank, ideology), count);
+        // Axe propriété. Travailler sans pouvoir couvrir ses besoins rend protectionniste ;
+        // être comblé mais fortement prélevé rend libéral.
+        if (unemploymentRate <= UnemploymentThreshold
+            && source.SeasonMoneyShortfall >= MoneyShortfallThreshold
+            && ideology[IdeologicalAxis.Property] == Pole.B)
+        {
+            yield return Switch(IdeologicalAxis.Property, Pole.A, PropertyShareAffected);
+        }
+        else if (source.NeedsSatisfaction >= FullySatisfiedThreshold
+            && source.SeasonTaxRate >= HeavyTaxRateThreshold
+            && ideology[IdeologicalAxis.Property] == Pole.A)
+        {
+            yield return Switch(IdeologicalAxis.Property, Pole.B, PropertyShareAffected);
+        }
+
+        // Axe production. Vivre dans une commune polluée rend écologiste ;
+        // manquer de produits ou de places (et non d'argent) rend positiviste.
+        if (pollution >= Economy.Pollution.PollutedThreshold && ideology[IdeologicalAxis.Production] == Pole.A)
+            yield return Switch(IdeologicalAxis.Production, Pole.B, ProductionShareAffected);
+        else if (source.SeasonSupplyShortage >= SupplyShortageThreshold && ideology[IdeologicalAxis.Production] == Pole.B)
+            yield return Switch(IdeologicalAxis.Production, Pole.A, ProductionShareAffected);
     }
 
     /// <summary>Trouve la classe d'arrivée d'un passage, ou la crée si elle n'existe pas encore.</summary>

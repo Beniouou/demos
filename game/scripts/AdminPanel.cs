@@ -33,6 +33,7 @@ public partial class AdminPanel : PanelContainer
     private SpinBox _tuition = null!;
     private OptionButton _schoolLevel = null!;
     private SpinBox _pointsPerPupil = null!;
+    private SpinBox _pollution = null!;
 
     public void Init(Simulation simulation)
     {
@@ -141,6 +142,7 @@ public partial class AdminPanel : PanelContainer
         _jobs = AddSpin(form, "Emplois de production", 0, 100_000, 10);
         _wage = AddSpin(form, "Salaire de base par jour", 0, 1_000, 0.1);
         _perWorker = AddSpin(form, "Production par travailleur", 0, 100, 0.01);
+        _pollution = AddSpin(form, "Pollution par travailleur", 0, 100, 0.01);
         _places = AddSpin(form, "Places de logement", 0, 100_000, 10);
         _rent = AddSpin(form, "Loyer par place et par jour", 0, 1_000, 0.05);
         _schoolPlaces = AddSpin(form, "Places d'élèves", 0, 100_000, 10);
@@ -205,6 +207,7 @@ public partial class AdminPanel : PanelContainer
         _wage.Value = building.DailyWage;
         _places.Value = building.HousingPlaces;
         _rent.Value = building.DailyRent;
+        _pollution.Value = building.PollutionPerWorker;
         _schoolPlaces.Value = building.SchoolPlaces;
         _tuition.Value = building.DailyTuition;
         _schoolLevel.Select((int)building.SchoolLevel);
@@ -234,6 +237,7 @@ public partial class AdminPanel : PanelContainer
             Production = building.Production is { } production ? production with { QuantityPerWorker = _perWorker.Value } : null,
             HousingPlaces = (int)_places.Value,
             DailyRent = _rent.Value,
+            PollutionPerWorker = _pollution.Value,
             SchoolPlaces = (int)_schoolPlaces.Value,
             DailyTuition = _tuition.Value,
             SchoolLevel = (Demos.Domain.Economy.EducationLevel)_schoolLevel.Selected,

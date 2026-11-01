@@ -24,7 +24,7 @@ public class PropertyAxisTests
         var workers = Working(Libertarian);
         workers.RecordMoneyShortfall(0.3);
 
-        var created = Assert.Single(ClassTransitions.RunSeasonal([workers]));
+        var created = Assert.Single(ClassTransitions.RunSeasonal([workers], TestTown.Structures, TestTown.NoPollution));
 
         // 5 % des membres basculent, sans changer de rang.
         Assert.Equal(Communist, created.Ideology);
@@ -40,7 +40,7 @@ public class PropertyAxisTests
         workers.ReceiveIncome(1_000);
         workers.PayTax(400);
 
-        var created = Assert.Single(ClassTransitions.RunSeasonal([workers]));
+        var created = Assert.Single(ClassTransitions.RunSeasonal([workers], TestTown.Structures, TestTown.NoPollution));
 
         Assert.Equal(Libertarian, created.Ideology);
         Assert.Equal(50, created.Population);
@@ -54,7 +54,7 @@ public class PropertyAxisTests
         workers.ReceiveIncome(1_000);
         workers.PayTax(100);
 
-        Assert.Empty(ClassTransitions.RunSeasonal([workers]));
+        Assert.Empty(ClassTransitions.RunSeasonal([workers], TestTown.Structures, TestTown.NoPollution));
     }
 
     [Fact]
@@ -65,7 +65,7 @@ public class PropertyAxisTests
         workers.WealthPerMemberLastSeason = 100;
         workers.RecordMoneyShortfall(0.5);
 
-        var created = ClassTransitions.RunSeasonal([workers]);
+        var created = ClassTransitions.RunSeasonal([workers], TestTown.Structures, TestTown.NoPollution);
 
         // Seul le chômage joue : bascule vers le ségrégationnisme, pas vers le protectionnisme.
         Assert.All(created, c => Assert.Equal(Pole.B, c.Ideology[IdeologicalAxis.Property]));
@@ -79,7 +79,7 @@ public class PropertyAxisTests
         workers.PayTax(100);
         workers.RecordMoneyShortfall(0.1);
 
-        ClassTransitions.RunSeasonal([workers]);
+        ClassTransitions.RunSeasonal([workers], TestTown.Structures, TestTown.NoPollution);
 
         Assert.Equal(0, workers.SeasonIncome);
         Assert.Equal(0, workers.SeasonTaxes);

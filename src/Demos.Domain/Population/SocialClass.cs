@@ -30,6 +30,9 @@ public sealed class SocialClass(string id, string name, Rank rank, Ideology ideo
     /// <summary>Part des membres logés au dernier jour, de 0 à 1.</summary>
     public double HousingCoverage { get; set; } = 1;
 
+    /// <summary>Part des membres restés sans logement au dernier jour faute de places (et non faute d'argent).</summary>
+    public double HousingPlaceShortage { get; set; }
+
     /// <summary>Part des lois qui s'appliquent à la classe qu'elle accepte, de 0 à 1.</summary>
     public double Adhesion { get; set; } = 1;
 
@@ -47,6 +50,8 @@ public sealed class SocialClass(string id, string name, Rank rank, Ideology ideo
     // Bilan de la saison en cours, remis à zéro à chaque changement de saison.
     private double _seasonShortfallSum;
     private int _seasonShortfallDays;
+    private double _seasonSupplyShortageSum;
+    private int _seasonSupplyShortageDays;
 
     /// <summary>Revenus reçus depuis le début de la saison : salaires (en argent ou en nature), ventes, loyers et frais perçus.</summary>
     public double SeasonIncome { get; private set; }
@@ -75,10 +80,19 @@ public sealed class SocialClass(string id, string name, Rank rank, Ideology ideo
         SeasonTaxes += amount;
     }
 
+    /// <summary>Part moyenne des besoins non couverte faute de produits ou de places depuis le début de la saison, de 0 à 1.</summary>
+    public double SeasonSupplyShortage => _seasonSupplyShortageDays > 0 ? _seasonSupplyShortageSum / _seasonSupplyShortageDays : 0;
+
     public void RecordMoneyShortfall(double share)
     {
         _seasonShortfallSum += share;
         _seasonShortfallDays++;
+    }
+
+    public void RecordSupplyShortage(double share)
+    {
+        _seasonSupplyShortageSum += share;
+        _seasonSupplyShortageDays++;
     }
 
     public void StartNewSeason()
@@ -87,6 +101,8 @@ public sealed class SocialClass(string id, string name, Rank rank, Ideology ideo
         SeasonTaxes = 0;
         _seasonShortfallSum = 0;
         _seasonShortfallDays = 0;
+        _seasonSupplyShortageSum = 0;
+        _seasonSupplyShortageDays = 0;
     }
 
     public IReadOnlyDictionary<string, double> Residence => _residence;
@@ -155,6 +171,33 @@ public sealed class SocialClass(string id, string name, Rank rank, Ideology ideo
         target.Population += count;
         foreach (var (communeId, residents) in targetResidents)
             target._residence[communeId] = residents / target.Population;
+    }
+
+    /// <summary>
+    /// Fait passer dans une autre classe des membres qui vivent dans une commune précise (là où la condition du
+    /// passage est vraie). Ils emportent leur part de richesse et restent dans cette commune.
+    /// </summary>
+    public void TransferMembersTo(SocialClass target, long count, string fromCommuneId)
+    {
+        count = Math.Min(count, (long)MembersLivingIn(fromCommuneId));
+        if (count <= 0)
+            return;
+
+        var wealth = Wealth * count / Population;
+        Wealth -= wealth;
+        target.Wealth += wealth;
+
+        var residents = _residence.ToDictionary(r => r.Key, r => r.Value * Population);
+        residents[fromCommuneId] -= count;
+        var targetResidents = target._residence.ToDictionary(r => r.Key, r => r.Value * target.Population);
+        targetResidents[fromCommuneId] = targetResidents.GetValueOrDefault(fromCommuneId) + count;
+
+        Population -= count;
+        target.Population += count;
+        foreach (var (communeId, members) in residents)
+            _residence[communeId] = Population > 0 ? members / Population : 0;
+        foreach (var (communeId, members) in targetResidents)
+            target._residence[communeId] = members / target.Population;
     }
 
     /// <summary>Poids politique = population × modificateur (multiplicateur de rang, ajusté par les lois).</summary>

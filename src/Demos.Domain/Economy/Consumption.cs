@@ -26,6 +26,9 @@ public static class Consumption
         // Part de chaque besoin que la classe ne peut pas acheter faute d'argent (et non faute de produits).
         var moneyShortfall = classes.ToDictionary(c => c, _ => new List<double>());
 
+        // Part de chaque besoin non couverte faute de produits sur le marché, ou de places de logement.
+        var supplyShortage = classes.ToDictionary(c => c, c => new List<double> { c.HousingPlaceShortage });
+
         foreach (var (category, perPerson) in BaseNeedsPerPerson)
         {
             if (products.FirstOrDefault(p => p.Need == category) is not { } product)
@@ -61,6 +64,7 @@ public static class Consumption
 
                 coverage[socialClass].Add((fromGoods + bought) / needed);
                 moneyShortfall[socialClass].Add((needed - fromGoods - wanted) / needed);
+                supplyShortage[socialClass].Add((wanted - bought) / needed);
             }
         }
 
@@ -72,6 +76,7 @@ public static class Consumption
             socialClass.NeedsSatisfaction = parts.Average();
             if (moneyShortfall[socialClass].Count > 0)
                 socialClass.RecordMoneyShortfall(moneyShortfall[socialClass].Average());
+            socialClass.RecordSupplyShortage(supplyShortage[socialClass].Average());
         }
     }
 }

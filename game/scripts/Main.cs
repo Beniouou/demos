@@ -149,7 +149,9 @@ public partial class Main : Node
             text.AppendLine(
                 $"{commune.Name,-18} habitants {world.Residents(commune.Id),7:N0}   " +
                 $"emplois de production pourvus {filled,6:N0} / {jobs.Sum(s => s.Jobs):N0}   " +
-                $"logements {world.HousingPlaces(commune.Id):N0} places{state}");
+                $"logements {world.HousingPlaces(commune.Id):N0} places   " +
+                $"pollution {world.PollutionByCommune.GetValueOrDefault(commune.Id):F3} par habitant " +
+                $"(seuil {Demos.Domain.Economy.Pollution.PollutedThreshold}){state}");
         }
 
         text.AppendLine();

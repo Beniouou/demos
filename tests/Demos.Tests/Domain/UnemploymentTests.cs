@@ -22,7 +22,7 @@ public class UnemploymentTests
     {
         var intermediates = HardHit(Rank.Intermediate, Communist);
 
-        var created = Assert.Single(ClassTransitions.RunSeasonal([intermediates]));
+        var created = Assert.Single(ClassTransitions.RunSeasonal([intermediates], TestTown.Structures, TestTown.NoPollution));
 
         // 800 chômeurs × 10 % = 80 membres.
         Assert.Equal(Rank.Workers, created.Rank);
@@ -37,7 +37,7 @@ public class UnemploymentTests
     {
         var executives = HardHit(Rank.Executives, Feudalist);
 
-        var created = Assert.Single(ClassTransitions.RunSeasonal([executives]));
+        var created = Assert.Single(ClassTransitions.RunSeasonal([executives], TestTown.Structures, TestTown.NoPollution));
 
         Assert.Equal(Rank.Intermediate, created.Rank);
         Assert.Equal(Feudalist, created.Ideology);
@@ -48,7 +48,7 @@ public class UnemploymentTests
     {
         var workers = HardHit(Rank.Workers, Communist);
 
-        var created = Assert.Single(ClassTransitions.RunSeasonal([workers]));
+        var created = Assert.Single(ClassTransitions.RunSeasonal([workers], TestTown.Structures, TestTown.NoPollution));
 
         Assert.Equal(Rank.Workers, created.Rank);
         Assert.Equal("Ouvriers féodalistes", created.Name);
@@ -59,7 +59,7 @@ public class UnemploymentTests
     {
         var workers = HardHit(Rank.Workers, Feudalist);
 
-        Assert.Empty(ClassTransitions.RunSeasonal([workers]));
+        Assert.Empty(ClassTransitions.RunSeasonal([workers], TestTown.Structures, TestTown.NoPollution));
         Assert.Equal(1_000, workers.Population);
     }
 
@@ -69,7 +69,7 @@ public class UnemploymentTests
         var workers = HardHit(Rank.Workers, Communist);
         workers.WealthPerMemberLastSeason = 4;
 
-        Assert.Empty(ClassTransitions.RunSeasonal([workers]));
+        Assert.Empty(ClassTransitions.RunSeasonal([workers], TestTown.Structures, TestTown.NoPollution));
     }
 
     [Fact]
@@ -79,7 +79,7 @@ public class UnemploymentTests
         workers.Wealth = 0;
         workers.WealthPerMemberLastSeason = 0;
 
-        Assert.Single(ClassTransitions.RunSeasonal([workers]));
+        Assert.Single(ClassTransitions.RunSeasonal([workers], TestTown.Structures, TestTown.NoPollution));
     }
 
     [Fact]
@@ -88,7 +88,7 @@ public class UnemploymentTests
         var workers = HardHit(Rank.Workers, Communist);
         workers.WealthPerMemberLastSeason = null;
 
-        Assert.Empty(ClassTransitions.RunSeasonal([workers]));
+        Assert.Empty(ClassTransitions.RunSeasonal([workers], TestTown.Structures, TestTown.NoPollution));
         Assert.Equal(5, workers.WealthPerMemberLastSeason);
     }
 
@@ -98,7 +98,7 @@ public class UnemploymentTests
         var workers = HardHit(Rank.Workers, Feudalist);
         workers.SetEmployment("ferme", 980);
 
-        var created = Assert.Single(ClassTransitions.RunSeasonal([workers]));
+        var created = Assert.Single(ClassTransitions.RunSeasonal([workers], TestTown.Structures, TestTown.NoPollution));
 
         // 2 % de chômeurs : plein emploi ; 5 % des 1 000 membres redeviennent égalitaristes, sans changer de rang.
         Assert.Equal(Rank.Workers, created.Rank);
@@ -112,7 +112,7 @@ public class UnemploymentTests
         var workers = HardHit(Rank.Workers, Communist);
         workers.SetEmployment("ferme", 1_000);
 
-        Assert.Empty(ClassTransitions.RunSeasonal([workers]));
+        Assert.Empty(ClassTransitions.RunSeasonal([workers], TestTown.Structures, TestTown.NoPollution));
     }
 
     [Fact]
@@ -121,6 +121,6 @@ public class UnemploymentTests
         var workers = HardHit(Rank.Workers, Communist);
         workers.SetEmployment("ferme", 850);
 
-        Assert.Empty(ClassTransitions.RunSeasonal([workers]));
+        Assert.Empty(ClassTransitions.RunSeasonal([workers], TestTown.Structures, TestTown.NoPollution));
     }
 }

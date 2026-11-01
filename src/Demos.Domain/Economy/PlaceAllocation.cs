@@ -11,8 +11,11 @@ namespace Demos.Domain.Economy;
 /// </summary>
 public static class PlaceAllocation
 {
-    /// <summary>Membres d'une classe qui ont une place, et ce que ces places leur rapportent (par exemple des points).</summary>
-    public readonly record struct Served(double Members, double Value);
+    /// <summary>
+    /// Membres d'une classe qui ont une place, ce que ces places leur rapportent (par exemple des points),
+    /// et membres restés sans place parce qu'il n'y en avait pas assez (et non faute d'argent).
+    /// </summary>
+    public readonly record struct Served(double Members, double Value, double LackingPlaces = 0);
 
     public static Dictionary<SocialClass, Served> Allocate(
         IReadOnlyDictionary<string, Structure> structures,
@@ -35,22 +38,26 @@ public static class PlaceAllocation
                 .ToList();
             double places = providers.Sum(placesOf);
             var residents = admitted.Sum(c => c.MembersLivingIn(commune.Id));
-            if (places <= 0 || residents <= 0)
+            if (residents <= 0)
                 continue;
 
-            var fillRate = Math.Min(1, places / residents);
+            var fillRate = places > 0 ? Math.Min(1, places / residents) : 0;
             var totalFees = providers.Sum(s => placesOf(s) * dailyFeeOf(s));
-            var averageFee = totalFees / places;
-            var averageValue = providers.Sum(s => placesOf(s) * valuePerPlaceOf(s)) / places;
+            var averageFee = places > 0 ? totalFees / places : 0;
+            var averageValue = places > 0 ? providers.Sum(s => placesOf(s) * valuePerPlaceOf(s)) / places : 0;
 
             foreach (var socialClass in admitted)
             {
-                var wanted = socialClass.MembersLivingIn(commune.Id) * fillRate;
+                var living = socialClass.MembersLivingIn(commune.Id);
+                var wanted = living * fillRate;
                 var fee = wanted * averageFee;
                 var paidShare = fee > 0 ? Math.Min(1, Math.Max(0, socialClass.Wealth) / fee) : 1;
                 var members = wanted * paidShare;
                 var previous = served[socialClass];
-                served[socialClass] = new Served(previous.Members + members, previous.Value + members * averageValue);
+                served[socialClass] = new Served(
+                    previous.Members + members,
+                    previous.Value + members * averageValue,
+                    previous.LackingPlaces + living - wanted);
 
                 if (fee <= 0)
                     continue;
