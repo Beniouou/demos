@@ -3,8 +3,11 @@ namespace Demos.Domain.Population;
 /// <summary>
 /// Passages entre classes : chaque passage a son propre mécanisme. Une classe est définie par son rang et son
 /// idéologie ; quand des membres changent de rang, ils gardent leur idéologie et rejoignent la classe d'arrivée,
-/// qui naît si elle n'existe pas encore. Pour l'instant, deux passages vers le haut, par l'éducation :
-/// ouvrier → profession intermédiaire (éducation de base) et profession intermédiaire → cadre (éducation avancée).
+/// qui naît si elle n'existe pas encore. Pour l'instant :
+/// - vers le haut, par l'éducation : ouvrier → profession intermédiaire (éducation de base),
+///   profession intermédiaire → cadre (éducation avancée) ;
+/// - vers le bas, par le chômage : des chômeurs descendent d'un rang (sauf les ouvriers) et deviennent
+///   ségrégationnistes s'ils étaient égalitaristes.
 /// </summary>
 public static class ClassTransitions
 {
@@ -23,12 +26,68 @@ public static class ClassTransitions
         new(Rank.Intermediate, Rank.Executives, c => c.AdvancedEducationPoints, (c, spent) => c.AdvancedEducationPoints -= spent),
     ];
 
+    /// <summary>Proposition : le chômage pèse au-delà de 20 % de chômeurs dans la classe.</summary>
+    public const double UnemploymentThreshold = 0.2;
+
+    /// <summary>Proposition : chaque saison, 10 % des chômeurs d'une classe touchée descendent ou basculent.</summary>
+    public const double UnemployedShareAffected = 0.1;
+
     /// <summary>Calcul saisonnier. Renvoie les classes nées de ces passages, à ajouter à la partie.</summary>
     public static List<SocialClass> RunSeasonal(IReadOnlyList<SocialClass> classes)
     {
         var all = classes.ToList();
         var created = new List<SocialClass>();
 
+        SocialClass Destination(Rank rank, Ideology ideology)
+        {
+            var target = all.FirstOrDefault(c => c.Rank == rank && c.Ideology == ideology);
+            if (target is not null)
+                return target;
+
+            target = Create(rank, ideology);
+            all.Add(target);
+            created.Add(target);
+            return target;
+        }
+
+        RunUnemployment(all, Destination);
+        RunPromotions(all, Destination);
+
+        foreach (var socialClass in all)
+            socialClass.WealthPerMemberLastSeason = socialClass.WealthPerMember;
+
+        return created;
+    }
+
+    /// <summary>
+    /// Une classe dont plus de 20 % des membres sont au chômage et dont la richesse par membre n'a pas augmenté
+    /// depuis la saison précédente (elle a baissé, ou elle est déjà épuisée) voit 10 % de ses chômeurs descendre
+    /// d'un rang (s'ils le peuvent) et devenir ségrégationnistes s'ils étaient égalitaristes.
+    /// Des ouvriers ségrégationnistes ne changent pas.
+    /// </summary>
+    private static void RunUnemployment(List<SocialClass> all, Func<Rank, Ideology, SocialClass> destination)
+    {
+        foreach (var source in all.Where(c => c.Population > 0).ToList())
+        {
+            var hit = source.UnemployedMembers / source.Population > UnemploymentThreshold
+                && source.WealthPerMemberLastSeason is { } previous
+                && source.WealthPerMember <= previous;
+            if (!hit)
+                continue;
+
+            var rank = source.Rank == Rank.Workers ? Rank.Workers : source.Rank - 1;
+            var ideology = source.Ideology.With(IdeologicalAxis.Hierarchy, Pole.B);
+            if (rank == source.Rank && ideology == source.Ideology)
+                continue;
+
+            var count = (long)(source.UnemployedMembers * UnemployedShareAffected);
+            if (count > 0)
+                source.TransferMembersTo(destination(rank, ideology), count);
+        }
+    }
+
+    private static void RunPromotions(List<SocialClass> all, Func<Rank, Ideology, SocialClass> destination)
+    {
         foreach (var promotion in Promotions)
         {
             foreach (var source in all.Where(c => c.Rank == promotion.From && c.Population > 0).ToList())
@@ -37,20 +96,10 @@ public static class ClassTransitions
                 if (count <= 0)
                     continue;
 
-                var target = all.FirstOrDefault(c => c.Rank == promotion.To && c.Ideology == source.Ideology);
-                if (target is null)
-                {
-                    target = Create(promotion.To, source.Ideology);
-                    all.Add(target);
-                    created.Add(target);
-                }
-
                 promotion.Spend(source, count * EducationPointsPerPromotion);
-                source.TransferMembersTo(target, count);
+                source.TransferMembersTo(destination(promotion.To, source.Ideology), count);
             }
         }
-
-        return created;
     }
 
     /// <summary>

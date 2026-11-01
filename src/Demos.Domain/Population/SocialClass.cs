@@ -39,6 +39,11 @@ public sealed class SocialClass(string id, string name, Rank rank, Ideology ideo
     /// <summary>Points d'éducation avancée (université), dépensés pour passer de profession intermédiaire à cadre.</summary>
     public double AdvancedEducationPoints { get; set; }
 
+    /// <summary>Richesse par membre relevée à la saison précédente ; null avant la première saison.</summary>
+    public double? WealthPerMemberLastSeason { get; set; }
+
+    public double WealthPerMember => Population > 0 ? Wealth / Population : 0;
+
     public IReadOnlyDictionary<string, double> Residence => _residence;
 
     public void SetResidence(string communeId, double share) => _residence[communeId] = Math.Clamp(share, 0, 1);
@@ -59,6 +64,9 @@ public sealed class SocialClass(string id, string name, Rank rank, Ideology ideo
         _employment[structureId] = Population > 0 ? Math.Clamp(members / Population, 0, 1) : 0;
 
     public double MembersWorkingIn(string structureId) => Population * _employment.GetValueOrDefault(structureId);
+
+    /// <summary>Membres sans emploi, d'après la dernière répartition des emplois.</summary>
+    public double UnemployedMembers => Math.Max(0, Population * (1 - _employment.Values.Sum()));
 
     /// <summary>
     /// Part des membres soumis aux lois d'une structure : toute la classe pour l'État,
