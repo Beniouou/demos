@@ -31,7 +31,7 @@ public sealed class Simulation(World world, GameClock clock)
             RunSeasonalCalculations();
 
         if (change.HasFlag(CalendarChange.NewYear))
-            YearPassed?.Invoke();
+            RunYearlyCalculations();
     }
 
     /// <summary>
@@ -106,7 +106,16 @@ public sealed class Simulation(World world, GameClock clock)
         }
     }
 
-    // Prévu : climat, autres passages entre classes, revendications, recherche.
+    // Promotions par l'éducation, puis bilan fiscal et statistique (à écrire).
+    private void RunYearlyCalculations()
+    {
+        foreach (var created in ClassTransitions.RunYearly(World.Classes))
+            World.AddClass(created);
+
+        YearPassed?.Invoke();
+    }
+
+    // Chômage et plein emploi. Prévu : climat, revendications, recherche.
     private void RunSeasonalCalculations()
     {
         foreach (var socialClass in World.Classes)

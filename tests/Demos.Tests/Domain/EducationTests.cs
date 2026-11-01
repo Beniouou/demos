@@ -56,7 +56,7 @@ public class EducationTests
         var workers = Workers(1_000, wealth: 10_000);
         workers.EducationPoints = 365 * 5;
 
-        var created = ClassTransitions.RunSeasonal([workers]);
+        var created = ClassTransitions.RunYearly([workers]);
 
         var intermediates = Assert.Single(created);
         Assert.Equal(Rank.Intermediate, intermediates.Rank);
@@ -79,7 +79,7 @@ public class EducationTests
         var intermediates = new SocialClass("intermediaires", "Professions intermédiaires communistes", Rank.Intermediate, Communist, 10);
         intermediates.SetResidence("commune", 1);
 
-        var created = ClassTransitions.RunSeasonal([workers, intermediates]);
+        var created = ClassTransitions.RunYearly([workers, intermediates]);
 
         Assert.Empty(created);
         Assert.Equal(13, intermediates.Population);
@@ -122,7 +122,7 @@ public class EducationTests
         intermediates.SetResidence("commune", 1);
         intermediates.AdvancedEducationPoints = 365 * 4;
 
-        var executives = Assert.Single(ClassTransitions.RunSeasonal([intermediates]));
+        var executives = Assert.Single(ClassTransitions.RunYearly([intermediates]));
 
         Assert.Equal(Rank.Executives, executives.Rank);
         Assert.Equal("Cadres communistes", executives.Name);
@@ -131,12 +131,12 @@ public class EducationTests
     }
 
     [Fact]
-    public void Au_plus_deux_pourcent_de_la_classe_change_de_rang_par_saison()
+    public void Au_plus_deux_pourcent_de_la_classe_monte_de_rang_par_an()
     {
         var workers = Workers(1_000);
         workers.EducationPoints = 365 * 100;
 
-        var intermediates = Assert.Single(ClassTransitions.RunSeasonal([workers]));
+        var intermediates = Assert.Single(ClassTransitions.RunYearly([workers]));
 
         Assert.Equal(20, intermediates.Population);
         Assert.Equal(365 * 80, workers.EducationPoints, precision: 6);

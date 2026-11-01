@@ -144,14 +144,15 @@ public class SimulationTests
     }
 
     [Fact]
-    public void L_ecole_fait_naitre_des_professions_intermediaires_communistes_au_changement_de_saison()
+    public void L_ecole_fait_naitre_des_professions_intermediaires_communistes_le_1er_janvier()
     {
         var simulation = CreatePrototype();
 
-        AdvanceDays(simulation, 58);
+        // Du 1er janvier au 31 décembre 1900 : les points s'accumulent, personne ne monte encore.
+        AdvanceDays(simulation, 364);
         Assert.DoesNotContain(simulation.World.Classes, c => c.Name == "Professions intermédiaires communistes");
 
-        // 1er mars : les points d'éducation des ouvriers communistes en font monter certains au rang de profession intermédiaire.
+        // 1er janvier 1901 : les points d'éducation des ouvriers communistes en font monter certains au rang supérieur.
         simulation.AdvanceDay();
         var intermediates = Assert.Single(simulation.World.Classes, c => c.Name == "Professions intermédiaires communistes");
         Assert.True(intermediates.Population > 0);

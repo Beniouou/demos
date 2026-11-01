@@ -93,6 +93,29 @@ public class UnemploymentTests
     }
 
     [Fact]
+    public void Le_plein_emploi_ramene_des_segregationnistes_vers_l_egalitarisme()
+    {
+        var workers = HardHit(Rank.Workers, Feudalist);
+        workers.SetEmployment("ferme", 980);
+
+        var created = Assert.Single(ClassTransitions.RunSeasonal([workers]));
+
+        // 2 % de chômeurs : plein emploi ; 5 % des 1 000 membres redeviennent égalitaristes, sans changer de rang.
+        Assert.Equal(Rank.Workers, created.Rank);
+        Assert.Equal(Communist, created.Ideology);
+        Assert.Equal(50, created.Population);
+    }
+
+    [Fact]
+    public void Le_plein_emploi_ne_change_rien_pour_une_classe_deja_egalitariste()
+    {
+        var workers = HardHit(Rank.Workers, Communist);
+        workers.SetEmployment("ferme", 1_000);
+
+        Assert.Empty(ClassTransitions.RunSeasonal([workers]));
+    }
+
+    [Fact]
     public void Sous_le_seuil_de_chomage_rien_ne_change()
     {
         var workers = HardHit(Rank.Workers, Communist);
