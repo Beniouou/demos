@@ -45,6 +45,11 @@ public partial class AdminPanel : PanelContainer
     private SpinBox _limit = null!;
     private SpinBox _stateTax = null!;
     private SpinBox _communeTax = null!;
+    private OptionButton _buyer = null!;
+    private SpinBox _salePrice = null!;
+    private Button _sell = null!;
+    private Label _saleMessage = null!;
+    private readonly List<string> _buyerIds = [];
 
     public void Init(Simulation simulation)
     {
@@ -119,6 +124,9 @@ public partial class AdminPanel : PanelContainer
 
         lines.Add($"Postes de personnages : 0 occupé sur {building.Posts} (recrutement : menu à venir)");
 
+        var profit = _simulation.DailyProfitOf(building);
+        lines.Add($"Bénéfice attendu : {profit:N0} par jour, prix accepté au plus {Privatization.MaximumPriceOf(profit):N0}");
+
         lines.Add(building.Ownership == Ownership.Public
             ? $"Payé par le trésor ({world.Treasury.Balance:N0})"
             : $"Payé par {OwnerName(building.OwnerClassId)}");
@@ -187,6 +195,16 @@ public partial class AdminPanel : PanelContainer
         apply.Pressed += Apply;
         form.AddChild(apply);
 
+        form.AddChild(new HSeparator());
+        form.AddChild(new Label { Text = "VENTE AU PRIVÉ (bâtiment public)" });
+        _buyer = AddOption(form, "Acheteur (classe de la commune)", []);
+        _salePrice = AddSpin(form, "Prix de vente", 0, 100_000_000, 100);
+        _sell = new Button { Text = "Vendre" };
+        _sell.Pressed += Sell;
+        form.AddChild(_sell);
+        _saleMessage = new Label { AutowrapMode = TextServer.AutowrapMode.WordSmart };
+        form.AddChild(_saleMessage);
+
         _info = new Label { AutowrapMode = TextServer.AutowrapMode.WordSmart };
         form.AddChild(_info);
     }
@@ -249,6 +267,7 @@ public partial class AdminPanel : PanelContainer
         _posts.Value = building.Posts;
         _stateTax.Value = _simulation.World.StateTaxRate * 100;
         _communeTax.Value = _simulation.World.CommuneOf(building) is { } taxedCommune ? _simulation.World.CommuneTaxRateOf(taxedCommune) * 100 : 0;
+        ShowSale(building);
 
         var production = building.Production;
         _perWorker.Editable = _price.Editable = production is not null;
@@ -293,6 +312,45 @@ public partial class AdminPanel : PanelContainer
             _simulation.World.SetPrice(changed.ProductId, _price.Value);
 
         UpdateInfo();
+    }
+
+    private void ShowSale(Structure building)
+    {
+        var world = _simulation.World;
+        var communeId = world.CommuneOf(building);
+        _buyer.Clear();
+        _buyerIds.Clear();
+        foreach (var socialClass in world.Classes.Where(c => c.CommuneId == communeId && c.Population > 0))
+        {
+            _buyerIds.Add(socialClass.Id);
+            _buyer.AddItem($"{socialClass.Name} ({socialClass.Wealth:N0})");
+        }
+
+        var isPublic = building.Ownership == Ownership.Public;
+        _sell.Disabled = !isPublic || _buyerIds.Count == 0;
+        _salePrice.Value = Privatization.MaximumPriceOf(_simulation.DailyProfitOf(building));
+        _saleMessage.Text = isPublic
+            ? $"Coûte {Simulation.SaleLegitimacyCost} de légitimité LI (disponible : {world.Legitimacy[Simulation.SalePole]:F1})."
+            : "Ce bâtiment n'est pas public.";
+    }
+
+    private void Sell()
+    {
+        if (SelectedBuilding() is not { } building || _buyer.Selected < 0 || _buyer.Selected >= _buyerIds.Count)
+            return;
+
+        var outcome = _simulation.TrySellBuilding(building.Id, _buyerIds[_buyer.Selected], _salePrice.Value);
+        var message = outcome switch
+        {
+            SaleOutcome.Sold => $"Vendu pour {_salePrice.Value:N0}.",
+            SaleOutcome.NotPublic => "Ce bâtiment n'est pas public.",
+            SaleOutcome.BuyerNotInCommune => "L'acheteur ne vit pas dans la commune du bâtiment.",
+            SaleOutcome.BuyerTooPoor => "L'acheteur n'a pas assez d'argent.",
+            SaleOutcome.PriceAboveProfit => "Trop cher : le prix dépasse un an de bénéfice attendu.",
+            _ => $"Pas assez de légitimité LI (il en faut {Simulation.SaleLegitimacyCost}).",
+        };
+        ShowBuilding(_buildingIds.IndexOf(building.Id));
+        _saleMessage.Text = message;
     }
 
     private string[] ProductIds => _simulation.World.Products.Select(p => p.Id).ToArray();

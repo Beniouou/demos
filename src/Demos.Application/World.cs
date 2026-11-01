@@ -29,7 +29,7 @@ public sealed class World
         _structures = structures.ToDictionary(s => s.Id);
         _classes = classes.ToList();
         _classesById = _classes.ToDictionary(c => c.Id);
-        Laws = laws;
+        _laws = laws.ToList();
     }
 
     public IReadOnlyList<ProductDefinition> Products { get; }
@@ -40,7 +40,11 @@ public sealed class World
     public IReadOnlyDictionary<string, Structure> Structures => _structures;
     public IReadOnlyList<SocialClass> Classes => _classes;
     public IReadOnlyDictionary<string, SocialClass> ClassesById => _classesById;
-    public IReadOnlyList<Law> Laws { get; }
+    public IReadOnlyList<Law> Laws => _laws;
+
+    private readonly List<Law> _laws;
+
+    public void AddLaw(Law law) => _laws.Add(law);
 
     /// <summary>Ressource « légitimité » du joueur, un stock par pôle.</summary>
     public LegitimacyPool Legitimacy { get; } = new();

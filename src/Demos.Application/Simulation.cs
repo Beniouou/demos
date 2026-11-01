@@ -65,6 +65,41 @@ public sealed class Simulation(World world, GameClock clock)
     /// </summary>
     public void UpdateBuilding(Structure building) => World.UpdateStructure(building);
 
+    /// <summary>Proposition : vendre un bâtiment public coûte 10 de légitimité libérale (LI).</summary>
+    public const double SaleLegitimacyCost = 10;
+
+    /// <summary>Pôle d'une vente au privé : libéral (LI).</summary>
+    public static readonly Orientation SalePole = new(IdeologicalAxis.Property, Pole.B);
+
+    /// <summary>Bénéfice attendu par jour d'un bâtiment, avec son personnel actuel.</summary>
+    public double DailyProfitOf(Structure building) =>
+        Privatization.DailyProfitOf(building, World.Workers.GetValueOrDefault(building.Id), World.Classes, World.PriceOf);
+
+    /// <summary>
+    /// Action du joueur : vendre un bâtiment public à une classe de sa commune, au prix choisi. L'argent va au trésor,
+    /// la classe devient propriétaire (privé ou coopérative) et paie désormais les salaires. La vente coûte de la
+    /// légitimité LI, et reste dans la commune comme une loi libérale : les habitants libéraux l'acceptent, les
+    /// protectionnistes la rejettent. Ne change rien si la vente est impossible.
+    /// </summary>
+    public SaleOutcome TrySellBuilding(string buildingId, string buyerClassId, double price)
+    {
+        var building = World.Structures[buildingId];
+        var buyer = World.ClassesById[buyerClassId];
+        var communeId = World.CommuneOf(building);
+
+        var outcome = Privatization.Check(building, communeId, buyer, price, DailyProfitOf(building));
+        if (outcome != SaleOutcome.Sold)
+            return outcome;
+        if (!World.Legitimacy.TrySpend(SalePole, SaleLegitimacyCost))
+            return SaleOutcome.NotEnoughLegitimacy;
+
+        buyer.Wealth -= price;
+        World.Treasury.Deposit(price);
+        World.UpdateStructure(building with { Ownership = Privatization.OwnershipFor(buyer), OwnerClassId = buyer.Id });
+        World.AddLaw(new Law($"privatisation-{building.Id}", $"Privatisation : {building.Name}", communeId!, [SalePole]));
+        return SaleOutcome.Sold;
+    }
+
     /// <summary>
     /// Action du joueur : bâtir un camp de base, qui fonde une nouvelle commune rattachée à l'État.
     /// Il coûte des ressources, prises dans la commune qui l'envoie, de la légitimité (dans le pôle choisi), et la
