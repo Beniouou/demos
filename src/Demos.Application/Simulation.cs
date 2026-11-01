@@ -16,6 +16,12 @@ public sealed class Simulation(World world, GameClock clock)
     /// <summary>Type du catalogue qui fonde une commune : ses emplois et ses places attirent les premiers habitants.</summary>
     public const string BaseCampTypeId = "camp-de-base";
 
+    /// <summary>
+    /// Proposition : la dotation d'une nouvelle commune couvre 60 jours de salaires de son camp de base, le temps
+    /// que ses premiers bâtiments de production produisent.
+    /// </summary>
+    public const int FoundingGrantDays = 60;
+
     public World World { get; } = world;
     public GameClock Clock { get; } = clock;
 
@@ -61,7 +67,8 @@ public sealed class Simulation(World world, GameClock clock)
 
     /// <summary>
     /// Action du joueur : bâtir un camp de base, qui fonde une nouvelle commune rattachée à l'État.
-    /// Il coûte des ressources, prises dans la commune qui l'envoie, et de la légitimité (dans le pôle choisi).
+    /// Il coûte des ressources, prises dans la commune qui l'envoie, de la légitimité (dans le pôle choisi), et la
+    /// dotation que l'État verse du trésor à la caisse de la nouvelle commune.
     /// Renvoie la nouvelle commune, ou null, sans rien dépenser, si c'est impossible.
     /// </summary>
     public Structure? TryFoundCommune(
@@ -77,17 +84,28 @@ public sealed class Simulation(World world, GameClock clock)
         var commune = new Structure($"commune-{number}", name, StructureKind.PoliticalEntity, state.Id);
         var campType = World.BuildingTypes[BaseCampTypeId];
         var camp = campType.Build($"camp-de-base-{number}", commune.Id, name: $"{campType.Name} ({name})");
+        var grant = FoundingGrantOf(campType);
 
         if (World.Structures.ContainsKey(commune.Id)
             || World.Legitimacy[legitimacyPole] < legitimacyCost
-            || !Construction.TryPay(cost, mode, World.StateStockOf(payingCommuneId), World.Treasury, World.MarketOf(payingCommuneId)))
+            || !World.Treasury.TrySpend(grant))
             return null;
 
+        if (!Construction.TryPay(cost, mode, World.StateStockOf(payingCommuneId), World.Treasury, World.MarketOf(payingCommuneId)))
+        {
+            World.Treasury.Deposit(grant);
+            return null;
+        }
+
         World.Legitimacy.TrySpend(legitimacyPole, legitimacyCost);
+        World.CommuneFundOf(commune.Id).Deposit(grant);
         World.AddStructure(commune);
         World.AddStructure(camp);
         return commune;
     }
+
+    /// <summary>Dotation versée à la fondation : 60 jours de salaires de production du camp de base.</summary>
+    public static double FoundingGrantOf(BuildingType camp) => FoundingGrantDays * camp.Jobs * camp.DailyWage;
 
     // Ordre du document de règles : emplois, production et salaires, échanges entre communes, logement, école,
     // consommation, ventes, impôts, légitimité, puis perte de ce qui déborde du stockage.
@@ -98,7 +116,7 @@ public sealed class Simulation(World world, GameClock clock)
 
         World.Workers = Employment.Assign(World.Structures, World.Classes);
         World.PollutionByCommune = Pollution.PerResidentByCommune(World.Structures, World.Workers, World.Classes);
-        WorkDay.Run(World.Structures, World.Workers, World.Classes, World.Laws, World.Treasury, World.StateStockOf, World.MarketOf);
+        WorkDay.Run(World.Structures, World.Workers, World.Classes, World.Laws, World.Treasury, World.StateStockOf, World.MarketOf, World.CommuneFundOf);
         Trade.RunDaily(communeIds, World.Classes, World.Products, World.MarketOf,
             (communeId, productId) => World.StorageOf(communeId).FreeFor(productId));
         Housing.RunDaily(World.Structures, World.Classes, World.Treasury);
@@ -108,7 +126,7 @@ public sealed class Simulation(World world, GameClock clock)
             Consumption.RunDaily(World.Classes.Where(c => c.CommuneId == communeId).ToList(), World.Products, World.MarketOf(communeId));
 
         PaySellers();
-        Taxation.CollectDaily(World.Classes, World.DailyTaxRate, World.Treasury);
+        Taxation.CollectDaily(World.Classes, World.StateTaxRate, World.CommuneTaxRateOf, World.Treasury, World.CommuneFundOf, World.Laws, World.Structures);
         LawEffects.ApplyDaily(World.Classes, World.Laws, World.Structures, World.Legitimacy);
         Storage.ApplyDaily(communeIds, World.Structures, World.Products, World.MarketOf, World.StateStockOf);
     }

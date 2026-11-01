@@ -31,14 +31,16 @@ public enum LawRule
 /// <summary>
 /// Loi créée dans une structure. Les classes au pôle de son orientation l'acceptent
 /// et produisent de la légitimité ; les autres la rejettent. Ses règles s'appliquent
-/// à la structure et à tout ce qu'elle contient.
+/// à la structure et à tout ce qu'elle contient. Elle peut aussi plafonner ou augmenter l'impôt d'État ou l'impôt
+/// communal des habitants qu'elle couvre.
 /// </summary>
 public sealed record Law(
     string Id,
     string Name,
     string StructureId,
     IReadOnlyList<Orientation> Orientations,
-    IReadOnlyList<LawRule>? Rules = null)
+    IReadOnlyList<LawRule>? Rules = null,
+    IReadOnlyList<Economy.TaxAdjustment>? TaxAdjustments = null)
 {
     public bool Has(LawRule rule) => Rules?.Contains(rule) == true;
 }

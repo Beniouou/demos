@@ -49,6 +49,19 @@ public sealed class World
     public Treasury Treasury { get; } = new();
 
     /// <summary>
+    /// Caisse d'une commune : la dotation versée par l'État à sa fondation. Elle paie d'abord les salaires des
+    /// bâtiments publics de la commune ; plus tard, elle pourra devenir un budget communal.
+    /// </summary>
+    public Treasury CommuneFundOf(string communeId)
+    {
+        if (!_communeFunds.TryGetValue(communeId, out var fund))
+            _communeFunds[communeId] = fund = new Treasury();
+        return fund;
+    }
+
+    private readonly Dictionary<string, Treasury> _communeFunds = [];
+
+    /// <summary>
     /// Ressources matérielles du joueur dans une commune : produites par ses structures publiques, elles restent
     /// là où elles ont été produites.
     /// </summary>
@@ -94,8 +107,21 @@ public sealed class World
     public StorageAllocation StorageOf(string communeId) =>
         Storage.Allocate(communeId, _structures, Products, Storage.HeldIn(MarketOf(communeId), StateStockOf(communeId)));
 
-    /// <summary>Part de sa richesse que chaque classe verse chaque jour. Plus tard : fixée par les lois.</summary>
-    public double DailyTaxRate { get; set; } = 0.001;
+    /// <summary>
+    /// Impôt d'État : part de sa richesse que chaque groupe verse chaque jour au trésor. À l'essai : 0,2 %, soit avec
+    /// l'impôt communal 0,3 % en tout. Les lois peuvent le plafonner ou l'augmenter.
+    /// </summary>
+    public double StateTaxRate { get; set; } = 0.002;
+
+    /// <summary>Impôt communal de départ de chaque commune (0,1 % par jour, à l'essai), versé à sa caisse.</summary>
+    public double DefaultCommuneTaxRate { get; set; } = 0.001;
+
+    private readonly Dictionary<string, double> _communeTaxRates = [];
+
+    /// <summary>Impôt communal d'une commune, réglé commune par commune.</summary>
+    public double CommuneTaxRateOf(string communeId) => _communeTaxRates.GetValueOrDefault(communeId, DefaultCommuneTaxRate);
+
+    public void SetCommuneTaxRate(string communeId, double rate) => _communeTaxRates[communeId] = rate;
 
     /// <summary>Nombre de travailleurs de production de chaque structure, recalculé chaque jour.</summary>
     public IReadOnlyDictionary<string, double> Workers { get; set; } = new Dictionary<string, double>();

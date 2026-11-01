@@ -10,7 +10,7 @@ public static class WorkDay
     /// le reste (au stock de l'État s'il est public, sinon en vente sur le marché pour sa classe propriétaire).
     /// Le travail est payé en salaire, sauf si une loi qui couvre le bâtiment impose le paiement en nature :
     /// les travailleurs reçoivent alors des produits du bâtiment, au prix du marché.
-    /// Le salaire en argent vient du trésor (public) ou du propriétaire, et est versé en partie si l'argent manque.
+    /// Le salaire en argent vient de la caisse de la commune puis du trésor (public), ou du propriétaire, et est versé en partie si l'argent manque.
     /// </summary>
     public static void Run(
         IReadOnlyDictionary<string, Structure> structures,
@@ -19,7 +19,8 @@ public static class WorkDay
         IReadOnlyList<Law> laws,
         Treasury treasury,
         Func<string, Inventory> stateStockOf,
-        Func<string, Market> marketOf)
+        Func<string, Market> marketOf,
+        Func<string, Treasury>? communeFundOf = null)
     {
         foreach (var workplace in structures.Values.Where(s => s.Jobs > 0))
         {
@@ -55,7 +56,7 @@ public static class WorkDay
                 totalDue *= 1 - settled;
             }
 
-            PayInMoney(workplace, dues, totalDue, classes, treasury);
+            PayInMoney(workplace, dues, totalDue, classes, treasury, communeFundOf?.Invoke(communeId));
 
             if (produced > 0 && workplace.Production is { } delivered)
             {
@@ -75,7 +76,8 @@ public static class WorkDay
         List<(SocialClass Class, double Due)> dues,
         double totalDue,
         IReadOnlyList<SocialClass> classes,
-        Treasury treasury)
+        Treasury treasury,
+        Treasury? communeFund)
     {
         if (totalDue <= 0)
             return;
@@ -83,8 +85,12 @@ public static class WorkDay
         double paid;
         if (workplace.Ownership == Ownership.Public)
         {
-            paid = Math.Min(totalDue, treasury.Balance);
-            treasury.TrySpend(paid);
+            // La caisse de la commune paie d'abord ; le trésor national prend le relais quand elle est vide.
+            var fromFund = Math.Min(totalDue, communeFund?.Balance ?? 0);
+            communeFund?.TrySpend(fromFund);
+            var fromTreasury = Math.Min(totalDue - fromFund, treasury.Balance);
+            treasury.TrySpend(fromTreasury);
+            paid = fromFund + fromTreasury;
         }
         else if (classes.FirstOrDefault(c => c.Id == workplace.OwnerClassId) is { } owner)
         {

@@ -11,7 +11,7 @@ namespace Demos.Game;
 /// Menu d'administration (outil de test, pas encore l'interface du joueur) : liste les bâtiments de la partie
 /// et permet de régler leur propriétaire, leurs emplois, leur salaire, leur production, leurs places,
 /// leur loyer, le prix de vente de leur produit, et la gestion des stockages : ce que chacun accepte et la
-/// quantité maximale de chaque produit.
+/// quantité maximale de chaque produit. On y règle aussi l'impôt d'État et l'impôt de la commune du bâtiment.
 /// </summary>
 public partial class AdminPanel : PanelContainer
 {
@@ -43,6 +43,8 @@ public partial class AdminPanel : PanelContainer
     private OptionButton _limitProduct = null!;
     private CheckBox _limited = null!;
     private SpinBox _limit = null!;
+    private SpinBox _stateTax = null!;
+    private SpinBox _communeTax = null!;
 
     public void Init(Simulation simulation)
     {
@@ -173,6 +175,8 @@ public partial class AdminPanel : PanelContainer
         _pointsPerPupil = AddSpin(form, "Points par élève et par jour", 0, 100, 0.1);
         _price = AddSpin(form, "Prix du produit au marché", 0, 10_000, 0.1);
         _posts = AddSpin(form, "Postes de personnages", 0, 20, 1);
+        _stateTax = AddSpin(form, "Impôt d'État (% par jour)", 0, 100, 0.01);
+        _communeTax = AddSpin(form, "Impôt de la commune (% par jour)", 0, 100, 0.01);
 
         _ownership.ItemSelected += _ => _owner.Disabled = _ownership.Selected == 0;
         _storageKind.ItemSelected += _ => _storageProduct.Disabled = StorageKinds[_storageKind.Selected] != StorageKind.Specific;
@@ -243,6 +247,8 @@ public partial class AdminPanel : PanelContainer
         _schoolLevel.Select((int)building.SchoolLevel);
         _pointsPerPupil.Value = building.PointsPerPupil;
         _posts.Value = building.Posts;
+        _stateTax.Value = _simulation.World.StateTaxRate * 100;
+        _communeTax.Value = _simulation.World.CommuneOf(building) is { } taxedCommune ? _simulation.World.CommuneTaxRateOf(taxedCommune) * 100 : 0;
 
         var production = building.Production;
         _perWorker.Editable = _price.Editable = production is not null;
@@ -280,6 +286,9 @@ public partial class AdminPanel : PanelContainer
         };
 
         _simulation.UpdateBuilding(updated);
+        _simulation.World.StateTaxRate = _stateTax.Value / 100;
+        if (_simulation.World.CommuneOf(updated) is { } communeId)
+            _simulation.World.SetCommuneTaxRate(communeId, _communeTax.Value / 100);
         if (updated.Production is { } changed)
             _simulation.World.SetPrice(changed.ProductId, _price.Value);
 

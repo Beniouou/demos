@@ -96,6 +96,42 @@ public class SimulationTests
     }
 
     [Fact]
+    public void Fonder_une_commune_verse_sa_dotation_du_tresor_a_sa_caisse()
+    {
+        var simulation = CreatePrototype();
+        AdvanceDays(simulation, 10);
+        var grant = Simulation.FoundingGrantOf(simulation.World.BuildingTypes[Simulation.BaseCampTypeId]);
+        var treasuryBefore = simulation.World.Treasury.Balance;
+
+        var commune = simulation.TryFoundCommune(
+            "Nouvelle commune", "commune-1", [new MaterialCost("bois", 100)], PaymentMode.StockFirst,
+            new Orientation(IdeologicalAxis.Property, Pole.B), 2);
+
+        // 60 jours × 300 emplois × 1,5 = 27 000.
+        Assert.NotNull(commune);
+        Assert.Equal(27_000, grant, precision: 6);
+        Assert.Equal(grant, simulation.World.CommuneFundOf(commune.Id).Balance, precision: 6);
+        Assert.Equal(treasuryBefore - grant, simulation.World.Treasury.Balance, precision: 6);
+    }
+
+    [Fact]
+    public void Sans_assez_d_argent_pour_la_dotation_aucune_commune_n_est_fondee()
+    {
+        var simulation = CreatePrototype();
+        AdvanceDays(simulation, 10);
+        simulation.World.Treasury.TrySpend(simulation.World.Treasury.Balance - 100);
+        var stockBefore = simulation.World.StateStockOf("commune-1").QuantityOf("bois");
+
+        var commune = simulation.TryFoundCommune(
+            "Nouvelle commune", "commune-1", [new MaterialCost("bois", 100)], PaymentMode.StockFirst,
+            new Orientation(IdeologicalAxis.Property, Pole.B), 2);
+
+        Assert.Null(commune);
+        Assert.Equal(100, simulation.World.Treasury.Balance, precision: 6);
+        Assert.Equal(stockBefore, simulation.World.StateStockOf("commune-1").QuantityOf("bois"));
+    }
+
+    [Fact]
     public void Sans_legitimite_suffisante_aucune_commune_n_est_fondee()
     {
         var simulation = CreatePrototype();

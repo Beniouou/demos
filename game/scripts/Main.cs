@@ -115,8 +115,9 @@ public partial class Main : Node
         var commune = _simulation.TryFoundCommune(
             name, PrototypeScenario.FirstCommuneId, BaseCampCost, PaymentMode.StockFirst, pole, BaseCampLegitimacyCost);
         _lastMessage = commune is null
-            ? $"Camp de base impossible : il faut 100 pierre, 100 bois et {BaseCampLegitimacyCost} de légitimité."
-            : $"{commune.Name} fondée (légitimité {pole.Code} dépensée).";
+            ? $"Camp de base impossible : il faut 100 pierre, 100 bois, {BaseCampLegitimacyCost} de légitimité " +
+              $"et {Simulation.FoundingGrantOf(_simulation.World.BuildingTypes[Simulation.BaseCampTypeId]):N0} de dotation au trésor."
+            : $"{commune.Name} fondée (légitimité {pole.Code} dépensée, caisse de {_simulation.World.CommuneFundOf(commune.Id).Balance:N0}).";
     }
 
     private string Describe()
@@ -159,6 +160,7 @@ public partial class Main : Node
             var market = world.MarketOf(commune.Id);
             var stock = world.StateStockOf(commune.Id);
             text.AppendLine(
+                $"    caisse {world.CommuneFundOf(commune.Id).Balance:N0} (impôt communal {world.CommuneTaxRateOf(commune.Id):P2})   " +
                 $"    stockage {world.StorageOf(commune.Id).Stored.Values.Sum():N0} / {world.StorageCapacity(commune.Id):N0}   " +
                 $"stock de l'État : {DescribeQuantities(stock.Contents)}   marché : {DescribeQuantities(market.Contents)}");
         }
@@ -169,7 +171,7 @@ public partial class Main : Node
             text.Append($"   {pole.Code} {world.Legitimacy[pole],7:F1}");
         text.AppendLine();
         text.AppendLine();
-        text.AppendLine($"Trésor : {world.Treasury.Balance:N0}");
+        text.AppendLine($"Trésor : {world.Treasury.Balance:N0}   impôt d'État {world.StateTaxRate:P2} par jour");
         text.AppendLine();
         text.AppendLine($"Logements construits : {_housingBuilt}   {_lastMessage}");
 

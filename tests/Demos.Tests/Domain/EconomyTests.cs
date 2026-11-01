@@ -105,6 +105,24 @@ public class EconomyTests
     }
 
     [Fact]
+    public void La_caisse_de_la_commune_paie_d_abord_puis_le_tresor_prend_le_relais()
+    {
+        var structures = Town(new Structure("scierie", "Scierie", StructureKind.Building, "commune", Jobs: 10, DailyWage: 2));
+        SocialClass[] classes = [Workers(10)];
+        var fund = new Treasury();
+        fund.Deposit(15);
+        var treasury = new Treasury();
+        treasury.Deposit(100);
+
+        WorkDay.Run(structures, Employment.Assign(structures, classes), classes, [], treasury, _ => new Inventory(), _ => new Market(Products), _ => fund);
+
+        // 20 de salaires : 15 de la caisse, 5 du trésor.
+        Assert.Equal(0, fund.Balance, precision: 6);
+        Assert.Equal(95, treasury.Balance, precision: 6);
+        Assert.Equal(20, classes[0].Wealth, precision: 6);
+    }
+
+    [Fact]
     public void Sans_argent_le_salaire_est_verse_en_partie()
     {
         var structures = Town(new Structure("scierie", "Scierie", StructureKind.Building, "commune", Jobs: 10, DailyWage: 2));
@@ -223,15 +241,64 @@ public class EconomyTests
     }
 
     [Fact]
-    public void Les_impots_passent_chaque_jour_de_la_richesse_des_classes_au_tresor()
+    public void L_impot_d_Etat_va_au_tresor_et_l_impot_communal_a_la_caisse_de_la_commune()
     {
-        var treasury = new Treasury();
-        var workers = Workers(100, wealth: 10_000);
+        var (treasury, fund, workers) = CollectTaxes();
 
-        Taxation.CollectDaily([workers], 0.001, treasury);
+        // 0,2 % de 10 000 pour l'État, 0,1 % pour la commune.
+        Assert.Equal(20, treasury.Balance, precision: 6);
+        Assert.Equal(10, fund.Balance, precision: 6);
+        Assert.Equal(9_970, workers.Wealth, precision: 6);
+    }
+
+    [Fact]
+    public void Une_loi_peut_augmenter_l_impot_communal()
+    {
+        var law = new Law("taxe", "Taxe communale", "commune", [], TaxAdjustments: [new(TaxLevel.Commune, TaxAdjustmentKind.Surcharge, 0.002)]);
+
+        var (treasury, fund, _) = CollectTaxes(law);
+
+        Assert.Equal(20, treasury.Balance, precision: 6);
+        Assert.Equal(30, fund.Balance, precision: 6);
+    }
+
+    [Fact]
+    public void Une_loi_d_Etat_peut_plafonner_l_impot_d_Etat_meme_avec_un_supplement()
+    {
+        var surcharge = new Law("hausse", "Hausse", "commune", [], TaxAdjustments: [new(TaxLevel.State, TaxAdjustmentKind.Surcharge, 0.005)]);
+        var maximum = new Law("plafond", "Plafond", "etat", [], TaxAdjustments: [new(TaxLevel.State, TaxAdjustmentKind.Maximum, 0.001)]);
+
+        var (treasury, fund, _) = CollectTaxes(surcharge, maximum);
 
         Assert.Equal(10, treasury.Balance, precision: 6);
-        Assert.Equal(9_990, workers.Wealth, precision: 6);
+        Assert.Equal(10, fund.Balance, precision: 6);
+    }
+
+    [Fact]
+    public void Une_loi_d_une_autre_commune_ne_change_pas_l_impot()
+    {
+        var structures = new Dictionary<string, Structure>(Town())
+        {
+            ["commune-2"] = new("commune-2", "Commune 2", StructureKind.PoliticalEntity, "etat"),
+        };
+        var law = new Law("taxe", "Taxe", "commune-2", [], TaxAdjustments: [new(TaxLevel.Commune, TaxAdjustmentKind.Surcharge, 0.01)]);
+
+        var (_, fund, _) = CollectTaxes(structures, law);
+
+        Assert.Equal(10, fund.Balance, precision: 6);
+    }
+
+    private static (Treasury Treasury, Treasury Fund, SocialClass Workers) CollectTaxes(params Law[] laws) => CollectTaxes(Town(), laws);
+
+    private static (Treasury Treasury, Treasury Fund, SocialClass Workers) CollectTaxes(Dictionary<string, Structure> structures, params Law[] laws)
+    {
+        var treasury = new Treasury();
+        var fund = new Treasury();
+        var workers = Workers(100, wealth: 10_000);
+
+        Taxation.CollectDaily([workers], 0.002, _ => 0.001, treasury, _ => fund, laws, structures);
+
+        return (treasury, fund, workers);
     }
 
     [Fact]

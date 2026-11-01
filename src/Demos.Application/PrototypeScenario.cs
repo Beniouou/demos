@@ -12,6 +12,8 @@ namespace Demos.Application;
 /// </summary>
 public static class PrototypeScenario
 {
+    public const double StartingTreasury = 50_000;
+
     public const string FirstCommuneId = "commune-1";
 
     public static Simulation Create(IContentSource content)
@@ -56,6 +58,10 @@ public static class PrototypeScenario
         };
 
         var world = new World(content.LoadProducts(), types.Values.ToList(), structures, classes, laws);
+
+        // Trésor de départ gonflé à la main (50 000), en attendant de régler les recettes de l'État : il permet de
+        // payer la dotation d'une première nouvelle commune.
+        world.Treasury.Deposit(StartingTreasury);
         return new Simulation(world, new GameClock(new DateOnly(1900, 1, 1)));
     }
 }
