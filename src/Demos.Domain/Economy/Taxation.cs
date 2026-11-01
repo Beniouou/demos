@@ -10,7 +10,7 @@ public static class Taxation
         foreach (var socialClass in classes)
         {
             var tax = socialClass.Wealth * dailyRate;
-            socialClass.Wealth -= tax;
+            socialClass.PayTax(tax);
             treasury.Deposit(tax);
         }
     }

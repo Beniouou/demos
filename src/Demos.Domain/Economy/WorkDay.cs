@@ -40,7 +40,10 @@ public static class WorkDay
                 var inKind = price > 0 ? Math.Min(produced, totalDue / price) : produced;
 
                 foreach (var (socialClass, due) in dues)
+                {
                     socialClass.Goods.Add(productId, inKind * due / totalDue);
+                    socialClass.ReceiveIncomeInKind(inKind * price * due / totalDue);
+                }
 
                 produced -= inKind;
                 var settled = price > 0 ? inKind * price / totalDue : 1;
@@ -90,6 +93,6 @@ public static class WorkDay
         }
 
         foreach (var (socialClass, due) in dues)
-            socialClass.Wealth += paid * due / totalDue;
+            socialClass.ReceiveIncome(paid * due / totalDue);
     }
 }

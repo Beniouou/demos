@@ -73,6 +73,6 @@ public static class PlaceAllocation
         if (provider.Ownership == Ownership.Public)
             treasury.Deposit(amount);
         else if (classes.FirstOrDefault(c => c.Id == provider.OwnerClassId) is { } owner)
-            owner.Wealth += amount;
+            owner.ReceiveIncome(amount);
     }
 }

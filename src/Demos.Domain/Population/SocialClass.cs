@@ -44,6 +44,51 @@ public sealed class SocialClass(string id, string name, Rank rank, Ideology ideo
 
     public double WealthPerMember => Population > 0 ? Wealth / Population : 0;
 
+    // Bilan de la saison en cours, remis à zéro à chaque changement de saison.
+    private double _seasonShortfallSum;
+    private int _seasonShortfallDays;
+
+    /// <summary>Revenus reçus depuis le début de la saison : salaires (en argent ou en nature), ventes, loyers et frais perçus.</summary>
+    public double SeasonIncome { get; private set; }
+
+    /// <summary>Impôts payés depuis le début de la saison.</summary>
+    public double SeasonTaxes { get; private set; }
+
+    /// <summary>Part des revenus de la saison prélevée par l'impôt.</summary>
+    public double SeasonTaxRate => SeasonIncome > 0 ? SeasonTaxes / SeasonIncome : 0;
+
+    /// <summary>Part moyenne des besoins non couverte faute d'argent depuis le début de la saison, de 0 à 1.</summary>
+    public double SeasonMoneyShortfall => _seasonShortfallDays > 0 ? _seasonShortfallSum / _seasonShortfallDays : 0;
+
+    public void ReceiveIncome(double amount)
+    {
+        Wealth += amount;
+        SeasonIncome += amount;
+    }
+
+    /// <summary>Un salaire payé en produits compte dans les revenus, sans changer la richesse en argent.</summary>
+    public void ReceiveIncomeInKind(double value) => SeasonIncome += value;
+
+    public void PayTax(double amount)
+    {
+        Wealth -= amount;
+        SeasonTaxes += amount;
+    }
+
+    public void RecordMoneyShortfall(double share)
+    {
+        _seasonShortfallSum += share;
+        _seasonShortfallDays++;
+    }
+
+    public void StartNewSeason()
+    {
+        SeasonIncome = 0;
+        SeasonTaxes = 0;
+        _seasonShortfallSum = 0;
+        _seasonShortfallDays = 0;
+    }
+
     public IReadOnlyDictionary<string, double> Residence => _residence;
 
     public void SetResidence(string communeId, double share) => _residence[communeId] = Math.Clamp(share, 0, 1);

@@ -8,7 +8,9 @@ namespace Demos.Domain.Population;
 ///   profession intermédiaire → cadre (éducation avancée), en gardant leur idéologie ;
 /// - chaque saison, vers le bas, par le chômage : des chômeurs descendent d'un rang (sauf les ouvriers) et
 ///   deviennent ségrégationnistes s'ils étaient égalitaristes ;
-/// - chaque saison, par le plein emploi : des membres d'une classe ségrégationniste redeviennent égalitaristes.
+/// - chaque saison, par le plein emploi : des membres d'une classe ségrégationniste redeviennent égalitaristes ;
+/// - chaque saison, sur l'axe propriété : une classe qui travaille sans pouvoir couvrir ses besoins devient
+///   protectionniste, une classe comblée mais fortement prélevée devient libérale.
 /// </summary>
 public static class ClassTransitions
 {
@@ -60,7 +62,22 @@ public static class ClassTransitions
         return destinations.Created;
     }
 
-    /// <summary>Calcul saisonnier : le chômage et le plein emploi. Renvoie les classes nées de ces passages.</summary>
+    /// <summary>Proposition : une classe qui travaille manque d'argent quand 20 % de ses besoins restent non couverts faute d'argent.</summary>
+    public const double MoneyShortfallThreshold = 0.2;
+
+    /// <summary>Proposition : un prélèvement est important au-delà de 30 % des revenus de la saison.</summary>
+    public const double HeavyTaxRateThreshold = 0.3;
+
+    /// <summary>Proposition : une classe a ses besoins complètement satisfaits au-delà de 99 %.</summary>
+    public const double FullySatisfiedThreshold = 0.99;
+
+    /// <summary>Proposition : chaque saison, 5 % des membres d'une classe concernée basculent sur l'axe propriété.</summary>
+    public const double PropertyShareAffected = 0.05;
+
+    /// <summary>
+    /// Calcul saisonnier : le chômage et le plein emploi (axe hiérarchie), la pauvreté au travail et les forts
+    /// prélèvements (axe propriété). Renvoie les classes nées de ces passages.
+    /// </summary>
     public static List<SocialClass> RunSeasonal(IReadOnlyList<SocialClass> classes)
     {
         var destinations = new Destinations(classes);
@@ -68,7 +85,11 @@ public static class ClassTransitions
 
         foreach (var source in sources)
         {
-            var unemploymentRate = source.UnemployedMembers / source.Population;
+            // Mesures relevées avant tout départ, pour que les deux axes jugent la même classe.
+            var population = source.Population;
+            var unemploymentRate = source.UnemployedMembers / population;
+            var poorWhileWorking = unemploymentRate <= UnemploymentThreshold && source.SeasonMoneyShortfall >= MoneyShortfallThreshold;
+            var comfortableButTaxed = source.NeedsSatisfaction >= FullySatisfiedThreshold && source.SeasonTaxRate >= HeavyTaxRateThreshold;
 
             if (unemploymentRate > UnemploymentThreshold
                 && source.WealthPerMemberLastSeason is { } previous
@@ -76,19 +97,34 @@ public static class ClassTransitions
             {
                 ApplyUnemployment(source, destinations);
             }
-            else if (unemploymentRate < FullEmploymentThreshold
-                && source.Ideology[IdeologicalAxis.Hierarchy] == Pole.B)
+            else if (unemploymentRate < FullEmploymentThreshold && source.Ideology[IdeologicalAxis.Hierarchy] == Pole.B)
             {
-                var count = (long)(source.Population * FullEmploymentShareAffected);
-                if (count > 0)
-                    source.TransferMembersTo(destinations.Get(source.Rank, source.Ideology.With(IdeologicalAxis.Hierarchy, Pole.A)), count);
+                Switch(source, IdeologicalAxis.Hierarchy, Pole.A, population * FullEmploymentShareAffected, destinations);
             }
+
+            // Une classe qui travaille sans pouvoir couvrir ses besoins devient protectionniste ;
+            // une classe comblée mais fortement prélevée devient libérale.
+            if (poorWhileWorking && source.Ideology[IdeologicalAxis.Property] == Pole.B)
+                Switch(source, IdeologicalAxis.Property, Pole.A, population * PropertyShareAffected, destinations);
+            else if (comfortableButTaxed && source.Ideology[IdeologicalAxis.Property] == Pole.A)
+                Switch(source, IdeologicalAxis.Property, Pole.B, population * PropertyShareAffected, destinations);
         }
 
         foreach (var socialClass in destinations.All)
+        {
             socialClass.WealthPerMemberLastSeason = socialClass.WealthPerMember;
+            socialClass.StartNewSeason();
+        }
 
         return destinations.Created;
+    }
+
+    /// <summary>Fait passer des membres au pôle donné sur un axe, sans changer de rang.</summary>
+    private static void Switch(SocialClass source, IdeologicalAxis axis, Pole pole, double members, Destinations destinations)
+    {
+        var count = (long)members;
+        if (count > 0)
+            source.TransferMembersTo(destinations.Get(source.Rank, source.Ideology.With(axis, pole)), count);
     }
 
     /// <summary>

@@ -102,7 +102,7 @@ public sealed class Simulation(World world, GameClock clock)
         foreach (var (sellerId, amount) in World.Market.CollectEarnings())
         {
             if (World.ClassesById.TryGetValue(sellerId, out var seller))
-                seller.Wealth += amount;
+                seller.ReceiveIncome(amount);
         }
     }
 
