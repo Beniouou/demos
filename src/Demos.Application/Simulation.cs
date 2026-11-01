@@ -1,5 +1,6 @@
 using Demos.Domain.Economy;
 using Demos.Domain.Politics;
+using Demos.Domain.Population;
 using Demos.Domain.Shared;
 
 namespace Demos.Application;
@@ -11,6 +12,10 @@ namespace Demos.Application;
 /// </summary>
 public sealed class Simulation(World world, GameClock clock)
 {
+    /// <summary>Un camp de base offre ces postes, payés par le trésor, pour attirer les premiers habitants.</summary>
+    public const int BaseCampJobs = 300;
+    public const double BaseCampDailyWage = 1.5;
+
     public World World { get; } = world;
     public GameClock Clock { get; } = clock;
 
@@ -44,21 +49,64 @@ public sealed class Simulation(World world, GameClock clock)
         return true;
     }
 
-    // Ordre prévu par le document de règles : décisions, production, consommation,
-    // fiscalité, légitimité, événements. La consommation et les événements restent à écrire.
+    /// <summary>
+    /// Action du joueur : bâtir un camp de base, qui fonde une nouvelle commune rattachée à l'État.
+    /// Il coûte des ressources et de la légitimité (dans le pôle choisi par le joueur).
+    /// Renvoie la nouvelle commune, ou null, sans rien dépenser, si c'est impossible.
+    /// </summary>
+    public Structure? TryFoundCommune(
+        string name,
+        IReadOnlyList<MaterialCost> cost,
+        PaymentMode mode,
+        Orientation legitimacyPole,
+        double legitimacyCost)
+    {
+        var state = World.Structures.Values.Single(s => s.IsNational);
+        var number = World.Communes.Count() + 1;
+        var commune = new Structure($"commune-{number}", name, StructureKind.PoliticalEntity, state.Id);
+        var camp = new Structure($"camp-de-base-{number}", $"Camp de base ({name})", StructureKind.Building, commune.Id,
+            Jobs: BaseCampJobs, DailyWage: BaseCampDailyWage);
+
+        if (World.Structures.ContainsKey(commune.Id)
+            || World.Legitimacy[legitimacyPole] < legitimacyCost
+            || !Construction.TryPay(cost, mode, World.StateStock, World.Treasury, World.Market))
+            return null;
+
+        World.Legitimacy.TrySpend(legitimacyPole, legitimacyCost);
+        World.AddStructure(commune);
+        World.AddStructure(camp);
+        return commune;
+    }
+
+    // Ordre du document de règles : emplois, production, salaires, consommation, ventes, impôts, légitimité.
+    // Les décisions du joueur et les événements restent à écrire.
     private void RunDailyCalculations()
     {
-        DailyProduction.Run(World.Structures.Values, World.ClassesById, World.StateStock, World.Market);
+        World.Workers = Employment.Assign(World.Structures, World.Classes);
+        DailyProduction.Run(World.Structures, World.Workers, World.StateStock, World.Market);
+        Wages.PayDaily(World.Structures, World.Workers, World.ClassesById, World.Treasury);
+        Consumption.RunDaily(World.Classes, World.Products, World.Market);
+        PaySellers();
         Taxation.CollectDaily(World.Classes, World.DailyTaxRate, World.Treasury);
         LawEffects.ApplyDaily(World.Classes, World.Laws, World.Structures, World.Legitimacy);
     }
 
-    // Prévu : climat, démographie, transferts de classe, revendications, recherche.
-    // Seule la démographie existe pour l'instant.
+    private void PaySellers()
+    {
+        foreach (var (sellerId, amount) in World.Market.CollectEarnings())
+        {
+            if (World.ClassesById.TryGetValue(sellerId, out var seller))
+                seller.Wealth += amount;
+        }
+    }
+
+    // Prévu : climat, transferts de classe, revendications, recherche.
     private void RunSeasonalCalculations()
     {
         foreach (var socialClass in World.Classes)
             socialClass.Grow();
+
+        Migration.RunSeasonal(World.Structures, World.Classes, World.Workers);
 
         SeasonPassed?.Invoke();
     }

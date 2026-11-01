@@ -32,4 +32,4 @@ dotnet test
 ## Lancer le jeu
 
 Ouvrir `game/project.godot` dans Godot .NET, puis F5.
-Espace met en pause ou relance le temps ; 1 à 4 changent la vitesse (un jour dure 5 s en ×1) ; B construit des logements d'État avec le stock, complété par le trésor.
+Espace met en pause ou relance le temps ; 1 à 4 changent la vitesse (un jour dure 5 s en ×1) ; B construit des logements d'État avec le stock, complété par le trésor ; C bâtit un camp de base qui fonde une nouvelle commune.

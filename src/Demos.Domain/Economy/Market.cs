@@ -1,24 +1,66 @@
 namespace Demos.Domain.Economy;
 
 /// <summary>
-/// Marché national unique. Les structures privées et coopératives y vendent leur production ;
-/// l'État et les classes y achètent. Pour l'instant, les prix restent les prix de départ.
+/// Marché national unique. Les structures privées et coopératives y mettent leur production en vente ;
+/// l'État et les classes y achètent. Le vendeur est payé quand son produit est acheté.
+/// Pour l'instant, les prix restent les prix de départ.
 /// </summary>
 public sealed class Market(IEnumerable<ProductDefinition> products)
 {
     private readonly Dictionary<string, double> _prices = products.ToDictionary(p => p.Id, p => p.BasePrice);
 
-    /// <summary>Produits disponibles à l'achat.</summary>
-    public Inventory Stock { get; } = new();
+    // Produit → vendeur → quantité en vente.
+    private readonly Dictionary<string, Dictionary<string, double>> _offers = [];
+
+    // Vendeur → argent gagné depuis le dernier versement.
+    private readonly Dictionary<string, double> _earnings = [];
 
     public double PriceOf(string productId) => _prices.GetValueOrDefault(productId);
 
     public double CostOf(string productId, double quantity) => quantity * PriceOf(productId);
 
-    /// <summary>Met des produits en vente et renvoie ce que le vendeur touche au prix du jour.</summary>
-    public double Sell(string productId, double quantity)
+    public double QuantityOf(string productId) =>
+        _offers.TryGetValue(productId, out var offers) ? offers.Values.Sum() : 0;
+
+    /// <summary>Quantités en vente, par produit.</summary>
+    public IReadOnlyDictionary<string, double> Contents =>
+        _offers.ToDictionary(offers => offers.Key, offers => offers.Value.Values.Sum());
+
+    public void Offer(string productId, double quantity, string sellerId)
     {
-        Stock.Add(productId, quantity);
-        return CostOf(productId, quantity);
+        if (!_offers.TryGetValue(productId, out var offers))
+            _offers[productId] = offers = [];
+        offers[sellerId] = offers.GetValueOrDefault(sellerId) + quantity;
+    }
+
+    /// <summary>
+    /// Achète une quantité, prise chez les vendeurs au prorata de leur offre. Le paiement de l'acheteur
+    /// est à la charge de l'appelant. Renvoie false, sans rien acheter, si l'offre est insuffisante.
+    /// </summary>
+    public bool TryBuy(string productId, double quantity)
+    {
+        var available = QuantityOf(productId);
+        if (quantity <= 0)
+            return true;
+        if (available < quantity)
+            return false;
+
+        var offers = _offers[productId];
+        foreach (var sellerId in offers.Keys.ToList())
+        {
+            var taken = quantity * offers[sellerId] / available;
+            offers[sellerId] -= taken;
+            _earnings[sellerId] = _earnings.GetValueOrDefault(sellerId) + CostOf(productId, taken);
+        }
+
+        return true;
+    }
+
+    /// <summary>Renvoie l'argent gagné par chaque vendeur depuis le dernier versement, puis le remet à zéro.</summary>
+    public IReadOnlyDictionary<string, double> CollectEarnings()
+    {
+        var earnings = new Dictionary<string, double>(_earnings);
+        _earnings.Clear();
+        return earnings;
     }
 }

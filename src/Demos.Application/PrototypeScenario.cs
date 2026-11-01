@@ -6,54 +6,51 @@ using Demos.Domain.Shared;
 namespace Demos.Application;
 
 /// <summary>
-/// Partie de départ du prototype : un État, deux communes, quatre bâtiments (deux publics, un privé,
-/// un coopératif), trois classes et trois lois, une à chaque niveau comme sur le schéma Canva.
+/// Partie de départ du prototype : un État et une seule commune, née du premier camp de base, où vit toute
+/// la population. Quatre bâtiments (un public, un privé, deux coopératifs), trois classes et trois lois.
 /// </summary>
 public static class PrototypeScenario
 {
+    public const string FirstCommuneId = "commune-1";
+
     public static Simulation Create(IContentSource content)
     {
         var structures = new List<Structure>
         {
             new("etat", "État", StructureKind.PoliticalEntity, null),
-            new("commune-1", "Commune 1", StructureKind.PoliticalEntity, "etat"),
-            new("commune-2", "Commune 2", StructureKind.PoliticalEntity, "etat"),
-            new("ferme-etat", "Ferme d'État", StructureKind.Building, "commune-1",
-                Production: new Production("pain", 500)),
-            new("scierie-etat", "Scierie d'État", StructureKind.Building, "commune-2",
-                Production: new Production("bois", 40)),
-            new("usine", "Usine", StructureKind.Building, "commune-1",
-                Ownership.Private, "dirigeants", new Production("meubles", 30)),
-            new("carriere", "Carrière coopérative", StructureKind.Building, "commune-2",
-                Ownership.Cooperative, "ouvriers", new Production("pierre", 60)),
+            new(FirstCommuneId, "Première commune", StructureKind.PoliticalEntity, "etat"),
+            new("camp-de-base-1", "Camp de base", StructureKind.Building, FirstCommuneId,
+                Jobs: Simulation.BaseCampJobs, DailyWage: Simulation.BaseCampDailyWage),
+            new("ferme", "Ferme coopérative", StructureKind.Building, FirstCommuneId,
+                Ownership.Cooperative, "ouvriers", new Production("pain", 3), Jobs: 3_000, DailyWage: 2),
+            new("usine", "Usine", StructureKind.Building, FirstCommuneId,
+                Ownership.Private, "dirigeants", new Production("meubles", 0.05), Jobs: 1_000, DailyWage: 3),
+            new("carriere", "Carrière coopérative", StructureKind.Building, FirstCommuneId,
+                Ownership.Cooperative, "ouvriers", new Production("pierre", 0.1), Jobs: 500, DailyWage: 2),
+            new("scierie-etat", "Scierie d'État", StructureKind.Building, FirstCommuneId,
+                Production: new Production("bois", 0.2), Jobs: 200, DailyWage: 2),
         };
 
-        var workers = new SocialClass("ouvriers", "Ouvriers", Rank.Workers, new Ideology(Pole.A, Pole.A, Pole.A), 800_000) { NeedsSatisfaction = 0.4, Wealth = 1_000_000 };
-        workers.SetShareSubjectTo("commune-1", 0.6);
-        workers.SetShareSubjectTo("commune-2", 0.4);
-        workers.SetShareSubjectTo("usine", 0.3);
-
-        var executives = new SocialClass("cadres", "Cadres", Rank.Executives, new Ideology(Pole.A, Pole.A, Pole.B), 150_000) { NeedsSatisfaction = 0.7, Wealth = 2_000_000 };
-        executives.SetShareSubjectTo("commune-1", 0.5);
-        executives.SetShareSubjectTo("commune-2", 0.5);
-        executives.SetShareSubjectTo("usine", 0.1);
-
-        var leaders = new SocialClass("dirigeants", "Dirigeants", Rank.Leaders, new Ideology(Pole.B, Pole.A, Pole.B), 20_000) { NeedsSatisfaction = 0.95, Wealth = 5_000_000 };
-        leaders.SetShareSubjectTo("commune-1", 0.3);
-        leaders.SetShareSubjectTo("commune-2", 0.7);
-        leaders.SetShareSubjectTo("usine", 0.05);
+        SocialClass[] classes =
+        [
+            new("ouvriers", "Ouvriers", Rank.Workers, new Ideology(Pole.A, Pole.A, Pole.A), 8_000) { Wealth = 400_000 },
+            new("cadres", "Cadres", Rank.Executives, new Ideology(Pole.A, Pole.A, Pole.B), 1_500) { Wealth = 300_000 },
+            new("dirigeants", "Dirigeants", Rank.Leaders, new Ideology(Pole.B, Pole.A, Pole.B), 200) { Wealth = 200_000 },
+        ];
+        foreach (var socialClass in classes)
+            socialClass.SetResidence(FirstCommuneId, 1);
 
         var laws = new List<Law>
         {
             new("liberte-entreprendre", "Liberté d'entreprendre", "etat",
                 [new Orientation(IdeologicalAxis.Property, Pole.B)]),
-            new("impot-progressif", "Impôt progressif", "commune-1",
+            new("impot-progressif", "Impôt progressif", FirstCommuneId,
                 [new Orientation(IdeologicalAxis.Hierarchy, Pole.A), new Orientation(IdeologicalAxis.Property, Pole.A)]),
             new("quotas-extraction", "Quotas d'extraction", "usine",
                 [new Orientation(IdeologicalAxis.Production, Pole.B)]),
         };
 
-        var world = new World(content.LoadProducts(), structures, [workers, executives, leaders], laws);
+        var world = new World(content.LoadProducts(), structures, classes, laws);
         return new Simulation(world, new GameClock(new DateOnly(1900, 1, 1)));
     }
 }

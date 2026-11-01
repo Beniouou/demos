@@ -18,8 +18,8 @@ public class LawEffectsTests
     private static SocialClass EgalitarianClass()
     {
         var socialClass = new SocialClass("c", "Classe", Rank.Workers, new Ideology(Pole.A, Pole.A, Pole.A), 200);
-        socialClass.SetShareSubjectTo("village-a", 0.25);
-        socialClass.SetShareSubjectTo("usine-b", 0.05);
+        socialClass.SetResidence("village-a", 0.25);
+        socialClass.SetEmployment("usine-b", 10);
         return socialClass;
     }
 
@@ -41,8 +41,8 @@ public class LawEffectsTests
 
         LawEffects.ApplyDaily([EgalitarianClass()], laws, Structures, pool);
 
-        // 200 membres × 25 % × 0,0001 = 0,005 point EG.
-        Assert.Equal(0.005, pool[Egalitarian], precision: 9);
+        // 200 membres × 25 % × 0,001 = 0,05 point EG.
+        Assert.Equal(0.05, pool[Egalitarian], precision: 9);
         Assert.Equal(0, pool[Segregationist]);
     }
 

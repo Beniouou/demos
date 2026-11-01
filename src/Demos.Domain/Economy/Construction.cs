@@ -35,7 +35,7 @@ public static class Construction
                 : 0;
             var fromMarket = item.Quantity - fromStock;
 
-            if (market.Stock.QuantityOf(item.ProductId) < fromMarket)
+            if (market.QuantityOf(item.ProductId) < fromMarket)
                 return false;
 
             money += market.CostOf(item.ProductId, fromMarket);
@@ -48,7 +48,7 @@ public static class Construction
         foreach (var (productId, fromStock, fromMarket) in plan)
         {
             stateStock.TryRemove(productId, fromStock);
-            market.Stock.TryRemove(productId, fromMarket);
+            market.TryBuy(productId, fromMarket);
         }
 
         return true;

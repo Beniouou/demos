@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using Demos.Application;
@@ -21,8 +22,10 @@ public partial class Main : Node
     private static readonly double[] SecondsPerDay = [5, 2, 0.5, 0.1];
     private static readonly string[] SpeedLabels = ["×1", "×2", "×3", "×4"];
 
-    // Construction de démonstration (touche B) : des logements d'État dans la commune 1.
+    // Constructions de démonstration : logements d'État (touche B) et camp de base (touche C).
     private static readonly MaterialCost[] HousingCost = [new("pierre", 200), new("bois", 100)];
+    private static readonly MaterialCost[] BaseCampCost = [new("pierre", 100), new("bois", 100)];
+    private const double BaseCampLegitimacyCost = 20;
 
     private Simulation _simulation = null!;
     private Label _status = null!;
@@ -67,13 +70,14 @@ public partial class Main : Node
             case Key.Key3: _speedIndex = 2; break;
             case Key.Key4: _speedIndex = 3; break;
             case Key.B: BuildHousing(); break;
+            case Key.C: FoundCommune(); break;
         }
     }
 
     private void BuildHousing()
     {
         var id = $"logements-etat-{_housingBuilt + 1}";
-        var housing = new Structure(id, $"Logements d'État {_housingBuilt + 1}", StructureKind.Building, "commune-1");
+        var housing = new Structure(id, $"Logements d'État {_housingBuilt + 1}", StructureKind.Building, PrototypeScenario.FirstCommuneId);
 
         if (_simulation.TryBuild(housing, HousingCost, PaymentMode.StockFirst))
         {
@@ -86,39 +90,67 @@ public partial class Main : Node
         }
     }
 
+    private void FoundCommune()
+    {
+        // En attendant un vrai choix, la légitimité est prise dans le pôle le mieux fourni.
+        var pole = Orientation.All.MaxBy(p => _simulation.World.Legitimacy[p]);
+        var name = $"Commune {_simulation.World.Communes.Count() + 1}";
+
+        var commune = _simulation.TryFoundCommune(name, BaseCampCost, PaymentMode.StockFirst, pole, BaseCampLegitimacyCost);
+        _lastMessage = commune is null
+            ? $"Camp de base impossible : il faut 100 pierre, 100 bois et {BaseCampLegitimacyCost} de légitimité."
+            : $"{commune.Name} fondée (légitimité {pole.Code} dépensée).";
+    }
+
     private string Describe()
     {
+        var world = _simulation.World;
         var text = new StringBuilder();
         text.AppendLine(
             $"{_simulation.Clock.Today:dd/MM/yyyy}   {SeasonName(_simulation.Clock.Season)}   " +
             $"{(_paused ? "EN PAUSE" : SpeedLabels[_speedIndex])}");
-        text.AppendLine("Espace : pause   1 à 4 : vitesse   B : construire des logements (200 pierre, 100 bois)");
+        text.AppendLine("Espace : pause   1 à 4 : vitesse   B : logements (200 pierre, 100 bois)   C : camp de base");
         text.AppendLine();
 
-        foreach (var socialClass in _simulation.World.Classes)
+        foreach (var socialClass in world.Classes)
         {
             text.AppendLine(
-                $"{socialClass.Name,-12} {socialClass.Ideology.Name,-16} " +
-                $"population {socialClass.Population,10:N0}   adhésion {socialClass.Adhesion,4:P0}");
+                $"{socialClass.Name,-12} {socialClass.Ideology.Name,-16} population {socialClass.Population,7:N0}   " +
+                $"richesse {socialClass.Wealth,10:N0}   besoins couverts {socialClass.NeedsSatisfaction,4:P0}   " +
+                $"adhésion {socialClass.Adhesion,4:P0}");
+        }
+
+        text.AppendLine();
+        foreach (var commune in world.Communes)
+        {
+            var jobs = world.Structures.Values
+                .Where(s => s.Jobs > 0 && Demos.Domain.Politics.Communes.CommuneOf(s, world.Structures) == commune.Id)
+                .ToList();
+            var filled = jobs.Sum(s => world.Workers.GetValueOrDefault(s.Id));
+            var state = world.IsGhostTown(commune.Id) ? "   VILLE FANTÔME (bâtiments en ruine)" : "";
+            text.AppendLine(
+                $"{commune.Name,-18} habitants {world.Residents(commune.Id),7:N0}   " +
+                $"postes pourvus {filled,6:N0} / {jobs.Sum(s => s.Jobs):N0}{state}");
         }
 
         text.AppendLine();
         text.Append("Légitimité :");
         foreach (var pole in Orientation.All)
-            text.Append($"   {pole.Code} {_simulation.World.Legitimacy[pole],8:F1}");
+            text.Append($"   {pole.Code} {world.Legitimacy[pole],7:F1}");
         text.AppendLine();
-        text.AppendLine($"Trésor : {_simulation.World.Treasury.Balance:N0}");
-        text.AppendLine($"Stock de l'État : {DescribeInventory(_simulation.World.StateStock)}");
-        text.AppendLine($"Marché : {DescribeInventory(_simulation.World.Market.Stock)}");
+        text.AppendLine();
+        text.AppendLine($"Trésor : {world.Treasury.Balance:N0}");
+        text.AppendLine($"Stock de l'État : {DescribeQuantities(world.StateStock.Contents)}");
+        text.AppendLine($"Marché : {DescribeQuantities(world.Market.Contents)}");
         text.AppendLine();
         text.AppendLine($"Logements construits : {_housingBuilt}   {_lastMessage}");
         return text.ToString();
     }
 
-    private static string DescribeInventory(Inventory inventory) =>
-        inventory.Contents.Count == 0
+    private static string DescribeQuantities(IReadOnlyDictionary<string, double> quantities) =>
+        quantities.Count == 0
             ? "vide"
-            : string.Join("   ", inventory.Contents.Select(item => $"{item.Key} {item.Value:N0}"));
+            : string.Join("   ", quantities.Select(item => $"{item.Key} {item.Value:N0}"));
 
     private static string SeasonName(Season season) => season switch
     {
