@@ -27,6 +27,7 @@ public static class PrototypeScenario
             types["camp-de-base"].Build("camp-de-base-1", FirstCommuneId),
             types["ferme"].Build("ferme", FirstCommuneId, Ownership.Cooperative, "ouvriers", "Ferme coopérative"),
             types["atelier"].Build("atelier", FirstCommuneId, Ownership.Private, "cadres", "Atelier de couture"),
+            types["menuiserie"].Build("menuiserie", FirstCommuneId, name: "Menuiserie d'État"),
             types["carriere"].Build("carriere", FirstCommuneId, Ownership.Cooperative, "ouvriers", "Carrière coopérative"),
             types["camp-forestier"].Build("camp-forestier", FirstCommuneId, name: "Camp forestier d'État"),
             types["logements"].Build("logements-etat", FirstCommuneId, name: "Logements d'État") with { HousingPlaces = 3_000 },

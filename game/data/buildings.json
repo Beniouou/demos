@@ -15,6 +15,7 @@
   { "id": "local-transformation", "name": "Local de transformation alimentaire", "category": "Production", "level": 1, "description": "Transformation agricole" },
   { "id": "usine-agroalimentaire", "name": "Usine agroalimentaire", "category": "Production", "level": 2, "description": "Transformation agricole" },
   { "id": "atelier", "name": "Atelier", "category": "Production", "level": 1, "description": "Production (pour l'instant : vêtements)", "jobs": 150, "dailyWage": 2, "production": { "productId": "vetements", "quantityPerWorker": 0.35 }, "posts": 1, "pollutionPerWorker": 0.1 },
+  { "id": "menuiserie", "name": "Menuiserie", "category": "Production", "level": 1, "description": "Production de meubles (plus tard : avec du bois)", "jobs": 150, "dailyWage": 2, "production": { "productId": "meubles", "quantityPerWorker": 0.1 }, "posts": 1, "pollutionPerWorker": 0.1 },
   { "id": "usine", "name": "Usine", "category": "Production", "level": 2, "description": "Production" },
   { "id": "forge", "name": "Forge", "category": "Production", "level": 1, "description": "Métallurgie" },
   { "id": "haut-fourneau", "name": "Haut fourneau", "category": "Production", "level": 2, "description": "Métallurgie" },

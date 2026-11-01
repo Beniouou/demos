@@ -4,9 +4,9 @@ namespace Demos.Domain.Economy;
 
 /// <summary>
 /// Échanges entre communes, en attendant la logistique : chaque jour, pour chaque produit de base, les surplus des
-/// communes partent vers les communes qui en manquent. 20 % se perdent en route, et une commune ne reçoit que dans
-/// la limite de sa place de stockage libre pour ce produit. Les produits gardent leur vendeur, payé quand ils sont
-/// achetés à l'arrivée.
+/// communes (ce qui dépasse les besoins de leurs habitants, selon leur rang) partent vers les communes qui en
+/// manquent. 20 % se perdent en route, et une commune ne reçoit que dans la limite de sa place de stockage libre pour
+/// ce produit. Les produits gardent leur vendeur, payé quand ils sont achetés à l'arrivée.
 /// </summary>
 public static class Trade
 {
@@ -22,7 +22,7 @@ public static class Trade
     {
         foreach (var product in products)
         {
-            if (product.Need is not { } need || !Consumption.BaseNeedsPerPerson.TryGetValue(need, out var perPerson))
+            if (product.Need is not { } need || !Consumption.AllNeeds.Contains(need))
                 continue;
 
             // Place libre pour ce produit dans chaque commune, selon les sortes de stockage et les limites.
@@ -30,7 +30,8 @@ public static class Trade
 
             var balance = communeIds.ToDictionary(
                 communeId => communeId,
-                communeId => marketOf(communeId).QuantityOf(product.Id) - classes.Sum(c => c.MembersLivingIn(communeId)) * perPerson);
+                communeId => marketOf(communeId).QuantityOf(product.Id)
+                    - classes.Sum(c => c.MembersLivingIn(communeId) * Consumption.NeedsOf(c.Rank).GetValueOrDefault(need)));
 
             var surplus = balance.Where(b => b.Value > 0).ToDictionary(b => b.Key, b => b.Value);
             var totalSurplus = surplus.Values.Sum();
