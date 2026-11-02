@@ -161,6 +161,16 @@ public sealed class World
 
     public double EnergyShareOf(Structure building) => EnergyShares.GetValueOrDefault(building.Id, 1);
 
+    /// <summary>Réserve de combustible de chaque bâtiment (voir <see cref="Energy.FuelReserveDays"/>).</summary>
+    public Inventory FuelStockOf(Structure building)
+    {
+        if (!_fuelStocks.TryGetValue(building.Id, out var stock))
+            _fuelStocks[building.Id] = stock = new Inventory();
+        return stock;
+    }
+
+    private readonly Dictionary<string, Inventory> _fuelStocks = [];
+
     /// <summary>Effet de son énergie sur un bâtiment : 1 s'il a tout, la moitié s'il n'a rien.</summary>
     public double EnergyEffectOf(Structure building) => Energy.EffectOf(EnergyShareOf(building));
 

@@ -30,6 +30,15 @@ public static class Energy
     /// <summary>Effet de l'énergie couverte sur un bâtiment : de la moitié (rien) à tout (tous ses besoins couverts).</summary>
     public static double EffectOf(double coveredShare) => OutputWithoutEnergy + (1 - OutputWithoutEnergy) * coveredShare;
 
+    /// <summary>
+    /// Proposition : chaque bâtiment garde une réserve de combustible pour 90 jours de chauffage normal. Il puise
+    /// dedans d'abord, et la remplit dès qu'il le peut, même en été : sa consommation d'hiver est lissée sur l'année.
+    /// </summary>
+    public const double FuelReserveDays = 90;
+
+    /// <summary>Taille de la réserve de combustible d'un bâtiment.</summary>
+    public static double FuelReserveOf(Structure building) => UnitsOf(building) * HeatingPerUnit * FuelReserveDays;
+
     public const string Water = "eau";
 
     public const string DefaultHeating = "bois";
@@ -77,20 +86,50 @@ public static class Energy
         Treasury treasury,
         Func<string, Treasury>? communeFundOf,
         Func<Structure, Treasury>? companyFundOf,
-        IReadOnlyDictionary<string, SocialClass> classesById)
+        IReadOnlyDictionary<string, SocialClass> classesById,
+        Func<Structure, Inventory>? fuelStockOf = null)
     {
         var shares = new Dictionary<string, double>();
         foreach (var building in structures.Values.Where(s => s.Kind == StructureKind.Building))
         {
             var units = UnitsOf(building);
-            var needs = NeedsOf(building, tierOf(building), season);
-            if (units <= 0 || needs.Count == 0)
+            var tier = tierOf(building);
+            if (units <= 0 || tier != 1)
                 continue;
 
+            var needs = NeedsOf(building, tier, season).ToList();
+
             var communeId = Communes.CommuneOf(building, structures) ?? "";
-            var asRecipe = new Production("", 1, needs);
-            shares[building.Id] = Supply.Acquire(
-                building, asRecipe, units, marketOf(communeId), communeId, treasury, communeFundOf?.Invoke(communeId), companyFundOf, classesById);
+            var market = marketOf(communeId);
+            var communeFund = communeFundOf?.Invoke(communeId);
+            var fuel = building.HeatingProductId ?? DefaultHeating;
+            var stock = fuelStockOf?.Invoke(building);
+
+            // Le chauffage du jour vient d'abord de la réserve du bâtiment.
+            if (stock is not null)
+            {
+                needs = needs.Select(need =>
+                {
+                    if (need.ProductId != fuel)
+                        return need;
+
+                    var fromStock = Math.Min(stock.QuantityOf(fuel), need.Quantity * units);
+                    stock.TryRemove(fuel, fromStock);
+                    return need with { Quantity = need.Quantity - fromStock / units };
+                }).ToList();
+            }
+
+            shares[building.Id] = needs.Count == 0 ? 1 : Supply.Acquire(
+                building, new Production("", 1, needs), units, market, communeId, treasury, communeFund, companyFundOf, classesById);
+
+            // Puis il remplit sa réserve, s'il trouve du combustible et l'argent pour l'acheter.
+            var missing = stock is null ? 0 : FuelReserveOf(building) - stock.QuantityOf(fuel);
+            if (stock is not null && missing > 0)
+            {
+                var refill = new Production("", 1, [new RecipeInput(fuel, missing)]);
+                var bought = Supply.Acquire(building, refill, 1, market, communeId, treasury, communeFund, companyFundOf, classesById);
+                stock.Add(fuel, missing * bought);
+            }
         }
 
         return shares;

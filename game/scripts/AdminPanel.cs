@@ -131,7 +131,11 @@ public partial class AdminPanel : PanelContainer
             lines.Add(DescribeStorage(building));
 
         if (world.TierOf(building) == 1 && Energy.UnitsOf(building) > 0)
-            lines.Add($"Énergie (chauffage au {building.HeatingProductId ?? Energy.DefaultHeating}, eau) : {world.EnergyShareOf(building):P0} des besoins couverts");
+        {
+            var fuel = building.HeatingProductId ?? Energy.DefaultHeating;
+            lines.Add($"Énergie (chauffage au {fuel}, eau) : {world.EnergyShareOf(building):P0} des besoins couverts ; réserve de " +
+                $"{fuel} {world.FuelStockOf(building).QuantityOf(fuel):N0} / {Energy.FuelReserveOf(building):N0}");
+        }
 
         lines.Add($"Postes de personnages : 0 occupé sur {building.Posts} (recrutement : menu à venir)");
 

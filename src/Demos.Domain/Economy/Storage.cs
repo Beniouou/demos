@@ -69,7 +69,9 @@ public sealed class StorageAllocation
 /// Les produits sont rangés d'abord dans les stockages spécifiques, puis alimentaires et non alimentaires, puis
 /// généraux. En fin de journée, ce qui n'a pas trouvé de place est perdu. Les produits périssables (pain, farine,
 /// alcool…) se perdent aussi peu à peu : chaque jour, un bâtiment en perd 1 ÷ leur durée de vie, durée qui est
-/// triplée dans un stockage spécifique et doublée dans un grenier. Les produits déjà chez les habitants ne comptent pas.
+/// triplée dans un stockage spécifique et doublée dans un grenier. Un produit qui ne se stocke pas d'ordinaire (l'eau)
+/// n'entre que dans un stockage fait pour lui (le château d'eau) ; sinon il est perdu le soir même. Les produits déjà
+/// chez les habitants ne comptent pas.
 /// </summary>
 public static class Storage
 {
@@ -78,6 +80,8 @@ public static class Storage
 
     public static bool Accepts(Structure building, ProductDefinition? product, string productId) => building.StorageKind switch
     {
+        // Ce qui ne se stocke pas d'ordinaire (l'eau) n'entre que dans un stockage fait pour lui (le château d'eau).
+        _ when product is { Stockable: false } => building.StorageKind == StorageKind.Specific && building.StorageProductId == productId,
         StorageKind.Food => IsFood(product),
         StorageKind.NonFood => !IsFood(product),
         StorageKind.Specific => building.StorageProductId == productId,
@@ -156,10 +160,6 @@ public static class Storage
         foreach (var communeId in communeIds)
         {
             var market = marketOf(communeId);
-            // Ce qui ne se stocke pas (l'eau) est perdu le soir même, sans prendre de place.
-            foreach (var product in products.Where(p => !p.Stockable))
-                market.Keep(product.Id, 0);
-
             var held = new Dictionary<string, double>(market.Contents);
             var allocation = Allocate(communeId, structures, products, held);
 

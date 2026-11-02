@@ -92,6 +92,50 @@ public class EnergyTests
     }
 
     [Fact]
+    public void Le_chauffage_vient_d_abord_de_la_reserve_et_la_reserve_se_remplit_meme_en_ete()
+    {
+        var market = new Market(Products);
+        market.Offer("bois", 2_000, "camp");
+        market.Offer("eau", 1_000, "puits");
+        var treasury = new Treasury();
+        treasury.Deposit(100_000);
+        var building = Housing();
+        var stock = new Inventory();
+        stock.Add("bois", 500);
+
+        // Hiver : 20 bois pris dans la réserve, rien acheté pour chauffer ; puis la réserve se remplit jusqu'à 900
+        // (1 000 places × 0,01 × 90 jours).
+        Energy.RunDaily(TownWith(building), s => s.Id == building.Id ? 1 : 0, Season.Winter, _ => market, treasury, null, null,
+            new Dictionary<string, SocialClass>(), _ => stock);
+        Assert.Equal(900, stock.QuantityOf("bois"), precision: 6);
+        Assert.Equal(2_000 - 420, market.QuantityOf("bois"), precision: 6);
+
+        // Été : pas de chauffage, la réserve reste pleine et rien n'est acheté.
+        Energy.RunDaily(TownWith(building), s => s.Id == building.Id ? 1 : 0, Season.Summer, _ => market, treasury, null, null,
+            new Dictionary<string, SocialClass>(), _ => stock);
+        Assert.Equal(900, stock.QuantityOf("bois"), precision: 6);
+        Assert.Equal(2_000 - 420, market.QuantityOf("bois"), precision: 6);
+    }
+
+    [Fact]
+    public void L_eau_se_garde_dans_un_chateau_d_eau()
+    {
+        var market = new Market(Products);
+        market.Offer("eau", 1_000, "puits");
+        var structures = new Dictionary<string, Structure>(TestTown.Structures)
+        {
+            ["camp"] = new("camp", "Camp", StructureKind.Building, "commune", StorageCapacity: 10_000),
+            ["chateau"] = new("chateau", "Château d'eau", StructureKind.Building, "commune", StorageCapacity: 300,
+                StorageKind: StorageKind.Specific, StorageProductId: "eau"),
+        };
+
+        Storage.ApplyDaily(["commune"], structures, Products, _ => market);
+
+        // Le château d'eau en garde 300 ; le reste est perdu, même avec de la place au camp.
+        Assert.Equal(300, market.QuantityOf("eau"), precision: 6);
+    }
+
+    [Fact]
     public void Un_batiment_de_la_liste_2_n_a_pas_encore_besoin_de_chauffage_ni_d_eau()
     {
         Assert.Empty(Energy.NeedsOf(Housing(), tier: 2, Season.Winter));

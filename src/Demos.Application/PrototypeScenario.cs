@@ -15,8 +15,6 @@ public static class PrototypeScenario
 {
     public const double StartingTreasury = 50_000;
 
-    public const double StartingCoal = 6_000;
-
     public const string FirstCommuneId = "commune-1";
 
     public static Simulation Create(IContentSource content)
@@ -95,9 +93,10 @@ public static class PrototypeScenario
         // payer la dotation d'une première nouvelle commune.
         world.Treasury.Deposit(StartingTreasury);
 
-        // Réserve de charbon de l'État pour passer le premier hiver : la partie commence le 1er janvier, et la mine ne
-        // fait que la moitié de ce qu'on brûle en hiver.
-        world.MarketOf(FirstCommuneId).Offer("charbon", StartingCoal, Market.StateSellerId(FirstCommuneId));
+        // Chaque bâtiment commence avec sa réserve de chauffage pleine (90 jours de chauffage normal) : la partie
+        // commence le 1er janvier, en plein hiver.
+        foreach (var building in world.Structures.Values.Where(s => s.Kind == StructureKind.Building && world.TierOf(s) == 1))
+            world.FuelStockOf(building).Add(building.HeatingProductId ?? Energy.DefaultHeating, Energy.FuelReserveOf(building));
 
         // Chaque entreprise privée ou coopérative part avec sa réserve (30 jours de salaires et d'énergie), prise à ses
         // propriétaires.

@@ -54,5 +54,6 @@
 
   { "id": "logements", "name": "Logements", "category": "Habitat", "level": 1, "description": "Loger les habitants", "housingPlaces": 500, "dailyRent": 0.2, "posts": 1, "tier": 1 },
   { "id": "puits", "name": "Puits", "category": "Eau", "level": 1, "description": "Production d'eau", "jobs": 20, "dailyWage": 2, "recipes": [ { "productId": "eau", "quantityPerWorker": 50 } ], "posts": 1, "tier": 1 },
-  { "id": "chateau-d-eau", "name": "Château d'eau", "category": "Eau", "level": 2, "description": "Production d'eau à grande échelle", "jobs": 20, "dailyWage": 2, "recipes": [ { "productId": "eau", "quantityPerWorker": 200 } ], "posts": 1, "tier": 2 }
+  { "id": "chateau-d-eau", "name": "Château d'eau", "category": "Eau", "level": 2, "description": "Stockage d'eau", "storageCapacity": 2000, "storageKind": "Specific", "storageProductId": "eau", "posts": 1, "tier": 2 },
+  { "id": "pompe-eau-souterraine", "name": "Pompe à eau souterraine", "category": "Eau", "level": 2, "description": "Production d'eau à grande échelle", "jobs": 20, "dailyWage": 2, "recipes": [ { "productId": "eau", "quantityPerWorker": 200 } ], "posts": 1, "tier": 2 }
 ]
