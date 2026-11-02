@@ -72,7 +72,7 @@ public class SimulationTests
 
         simulation.AdvanceDay();
 
-        // 5 500 places pour 5 000 habitants, 6 600 pains pour 5 000 et 52 vêtements pour 50 par jour.
+        // 5 600 places pour 5 600 places demandées, et des chaînes qui couvrent ce que consomment les habitants.
         Assert.Equal(1, workers.HousingCoverage, precision: 6);
         Assert.Equal(1, workers.NeedsSatisfaction, precision: 6);
     }

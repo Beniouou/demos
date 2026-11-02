@@ -6,8 +6,10 @@ namespace Demos.Domain.Economy;
 /// <summary>
 /// Règle commune aux services qui sont des capacités (logement, école) : des bâtiments offrent des places
 /// dans leur commune, à certaines classes. Quand il en manque, chaque classe admise est servie au prorata de ses
-/// habitants. Chaque place occupée coûte des frais quotidiens versés au propriétaire (le trésor pour un bâtiment public,
-/// la caisse de l'entreprise sinon, ou la classe propriétaire quand il n'y a pas de caisse) ; une classe qui ne peut pas payer n'est servie qu'à hauteur de ce qu'elle paie.
+/// habitants ; un membre peut occuper plusieurs places (les logements plus grands des rangs supérieurs). Chaque
+/// place occupée coûte des frais quotidiens versés au propriétaire (le trésor pour un bâtiment public, la caisse de
+/// l'entreprise sinon, ou la classe propriétaire quand il n'y a pas de caisse) ; une classe qui ne peut pas payer
+/// n'est servie qu'à hauteur de ce qu'elle paie.
 /// </summary>
 public static class PlaceAllocation
 {
@@ -25,9 +27,11 @@ public static class PlaceAllocation
         Func<Structure, double> dailyFeeOf,
         Func<SocialClass, bool>? admits = null,
         Func<Structure, double>? valuePerPlaceOf = null,
-        Func<Structure, Treasury>? companyFundOf = null)
+        Func<Structure, Treasury>? companyFundOf = null,
+        Func<SocialClass, double>? placesPerMemberOf = null)
     {
         admits ??= _ => true;
+        placesPerMemberOf ??= _ => 1;
         valuePerPlaceOf ??= _ => 1;
         var served = classes.ToDictionary(c => c, _ => new Served(0, 0));
         var admitted = classes.Where(admits).ToList();
@@ -38,7 +42,8 @@ public static class PlaceAllocation
                 .Where(s => placesOf(s) > 0 && Communes.CommuneOf(s, structures) == commune.Id)
                 .ToList();
             double places = providers.Sum(placesOf);
-            var residents = admitted.Sum(c => c.MembersLivingIn(commune.Id));
+            // Places demandées : un membre peut occuper plus d'une place (un logement plus grand).
+            var residents = admitted.Sum(c => c.MembersLivingIn(commune.Id) * placesPerMemberOf(c));
             if (residents <= 0)
                 continue;
 
@@ -51,7 +56,7 @@ public static class PlaceAllocation
             {
                 var living = socialClass.MembersLivingIn(commune.Id);
                 var wanted = living * fillRate;
-                var fee = wanted * averageFee;
+                var fee = wanted * placesPerMemberOf(socialClass) * averageFee;
                 var paidShare = fee > 0 ? Math.Min(1, Math.Max(0, socialClass.Wealth) / fee) : 1;
                 var members = wanted * paidShare;
                 var previous = served[socialClass];

@@ -5,10 +5,10 @@ namespace Demos.Domain.Economy;
 public static class Consumption
 {
     /// <summary>
-    /// Besoins consommés chaque jour par personne, selon le rang : tout le monde mange, s'habille et a besoin de
-    /// loisirs (propositions : 0,05 par jour pour les ouvriers, 0,1 pour les professions intermédiaires, 0,2 pour les
-    /// cadres) ; les professions intermédiaires et les cadres ont aussi besoin de meubles (0,02 et 0,1 par jour).
-    /// Se loger est aussi un besoin de base, mais c'est une capacité (voir <see cref="Housing"/>).
+    /// Besoins consommés chaque jour par personne. Tout le monde a les mêmes besoins ; seules les quantités changent avec
+    /// le rang (propositions : voir le tableau du document). Plus tard, elles varieront aussi selon l'idéologie. Se loger
+    /// est aussi un besoin, mais c'est une capacité : les rangs supérieurs occupent des logements plus grands (voir
+    /// <see cref="Housing"/>).
     /// </summary>
     public static IReadOnlyDictionary<NeedCategory, double> NeedsOf(Rank rank) => rank switch
     {
@@ -24,19 +24,31 @@ public static class Consumption
     {
         [NeedCategory.Food] = 1,
         [NeedCategory.Clothing] = 0.01,
+        [NeedCategory.Furniture] = 0.005,
         [NeedCategory.Leisure] = 0.05,
     };
 
-    private static readonly Dictionary<NeedCategory, double> IntermediateNeeds = new(WorkerNeeds) { [NeedCategory.Furniture] = 0.02, [NeedCategory.Leisure] = 0.1 };
+    private static readonly Dictionary<NeedCategory, double> IntermediateNeeds = new()
+    {
+        [NeedCategory.Food] = 1,
+        [NeedCategory.Clothing] = 0.02,
+        [NeedCategory.Furniture] = 0.02,
+        [NeedCategory.Leisure] = 0.1,
+    };
 
-    private static readonly Dictionary<NeedCategory, double> ExecutiveNeeds = new(WorkerNeeds) { [NeedCategory.Furniture] = 0.1, [NeedCategory.Leisure] = 0.2 };
+    private static readonly Dictionary<NeedCategory, double> ExecutiveNeeds = new()
+    {
+        [NeedCategory.Food] = 1,
+        [NeedCategory.Clothing] = 0.05,
+        [NeedCategory.Furniture] = 0.1,
+        [NeedCategory.Leisure] = 0.2,
+    };
 
     /// <summary>
     /// Chaque classe couvre ses besoins avec les produits reçus en nature, puis achète le reste sur le marché dans la
     /// limite de sa richesse, en commençant par le produit le moins cher quand plusieurs couvrent le même besoin. Quand
     /// un produit manque, chaque classe est servie au prorata de sa demande. La satisfaction est la moyenne de la part
-    /// couverte de chacun de ses besoins : se nourrir, s'habiller, se loger et se distraire, plus se meubler pour les
-    /// professions intermédiaires et les cadres.
+    /// couverte de chacun de ses besoins : se nourrir, s'habiller, se meubler, se distraire et se loger.
     /// </summary>
     public static void RunDaily(IReadOnlyList<SocialClass> classes, IReadOnlyList<ProductDefinition> products, Market market)
     {

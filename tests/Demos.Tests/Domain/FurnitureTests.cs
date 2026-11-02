@@ -34,7 +34,7 @@ public class FurnitureTests
     }
 
     [Fact]
-    public void Les_professions_intermediaires_et_les_cadres_achetent_des_meubles_mais_pas_les_ouvriers()
+    public void Chacun_achete_des_meubles_selon_son_rang()
     {
         var market = MarketWith(100);
         var workers = Resident(Rank.Workers, 1_000);
@@ -43,16 +43,16 @@ public class FurnitureTests
 
         Consumption.RunDaily([workers, intermediates, executives], Products, market);
 
-        // 500 × 0,02 + 100 × 0,1 = 20 meubles achetés, à 20 chacun.
-        Assert.Equal(80, market.QuantityOf("meubles"), precision: 6);
-        Assert.Equal(400, market.CollectEarnings()["menuiserie"], precision: 6);
+        // 1 000 × 0,005 + 500 × 0,02 + 100 × 0,1 = 25 meubles achetés, à 20 chacun.
+        Assert.Equal(75, market.QuantityOf("meubles"), precision: 6);
+        Assert.Equal(500, market.CollectEarnings()["menuiserie"], precision: 6);
         Assert.Equal(1, workers.NeedsSatisfaction, precision: 6);
         Assert.Equal(1, intermediates.NeedsSatisfaction, precision: 6);
         Assert.Equal(1, executives.NeedsSatisfaction, precision: 6);
     }
 
     [Fact]
-    public void Sans_meubles_les_rangs_superieurs_ne_couvrent_que_quatre_besoins_sur_cinq()
+    public void Sans_meubles_personne_ne_couvre_plus_de_quatre_besoins_sur_cinq()
     {
         var market = MarketWith(0);
         var workers = Resident(Rank.Workers, 1_000);
@@ -60,8 +60,8 @@ public class FurnitureTests
 
         Consumption.RunDaily([workers, executives], Products, market);
 
-        Assert.Equal(1, workers.NeedsSatisfaction, precision: 6);
-        // Se nourrir, s'habiller, se loger, se distraire, se meubler : il manque les meubles.
+        // Se nourrir, s'habiller, se loger, se distraire, se meubler : il manque les meubles, à tous les rangs.
+        Assert.Equal(0.8, workers.NeedsSatisfaction, precision: 6);
         Assert.Equal(0.8, executives.NeedsSatisfaction, precision: 6);
         Assert.Equal(0.2, executives.SeasonSupplyShortage, precision: 6);
     }
@@ -77,7 +77,7 @@ public class FurnitureTests
 
         Trade.RunDaily(["a", "b"], [workers, executives], Products, c => markets[c], (_, _) => 10_000);
 
-        // Les ouvriers de a n'ont pas besoin de meubles ; les 100 cadres de b en veulent 10.
+        // Les 1 000 ouvriers de a en gardent 5 ; les 100 cadres de b en veulent 10.
         Assert.Equal(10, markets["b"].QuantityOf("meubles"), precision: 6);
     }
 }
