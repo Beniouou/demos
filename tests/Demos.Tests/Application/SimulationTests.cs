@@ -88,6 +88,11 @@ public class SimulationTests
 
         Assert.NotNull(commune);
         Assert.True(simulation.World.IsGhostTown(commune.Id));
+
+        // Le pôle payé devient la charte de fondation de la commune.
+        var charter = Assert.Single(simulation.World.Laws, l => l.StructureId == commune.Id);
+        Assert.True(charter.Has(LawRule.FoundingCharter));
+        Assert.Equal([pole], charter.Orientations);
         Assert.Equal(simulation.World.BuildingTypes[Simulation.BaseCampTypeId].HousingPlaces, simulation.World.HousingPlaces(commune.Id));
 
         // Au changement de saison (1er mars), des sans-emploi rejoignent la nouvelle commune.

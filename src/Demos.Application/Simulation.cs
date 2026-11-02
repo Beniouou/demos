@@ -158,7 +158,8 @@ public sealed class Simulation(World world, GameClock clock)
     /// <summary>
     /// Action du joueur : bâtir un camp de base, qui fonde une nouvelle commune rattachée à l'État.
     /// Il coûte des ressources, prises dans la commune qui l'envoie, de la légitimité (dans le pôle choisi), et la
-    /// dotation que l'État verse du trésor à la caisse de la nouvelle commune.
+    /// dotation que l'État verse du trésor à la caisse de la nouvelle commune. Le pôle choisi devient la charte de
+    /// fondation de la commune : une loi de ce pôle, qui attire les classes du même pôle et repousse celles du pôle opposé.
     /// Renvoie la nouvelle commune, ou null, sans rien dépenser, si c'est impossible.
     /// </summary>
     public Structure? TryFoundCommune(
@@ -191,6 +192,7 @@ public sealed class Simulation(World world, GameClock clock)
         World.CommuneFundOf(commune.Id).Deposit(grant);
         World.AddStructure(commune);
         World.AddStructure(camp);
+        World.AddLaw(new Law($"charte-{commune.Id}", $"Charte de fondation : {name}", commune.Id, [legitimacyPole], [LawRule.FoundingCharter]));
         return commune;
     }
 
@@ -265,7 +267,7 @@ public sealed class Simulation(World world, GameClock clock)
         foreach (var created in ClassTransitions.RunSeasonal(World.Classes, World.Structures, World.PollutionByCommune))
             World.AddClass(created);
 
-        foreach (var created in Migration.RunSeasonal(World.Structures, World.Classes))
+        foreach (var created in Migration.RunSeasonal(World.Structures, World.Classes, World.Laws))
             World.AddClass(created);
 
         SeasonPassed?.Invoke();

@@ -26,6 +26,12 @@ public enum LawRule
 {
     /// <summary>Le travail est payé avec les produits du bâtiment au lieu d'un salaire.</summary>
     PaymentInKind,
+
+    /// <summary>
+    /// Charte de fondation d'une commune : le pôle payé pour la fonder. La commune attire les classes de ce pôle et
+    /// repousse celles du pôle opposé.
+    /// </summary>
+    FoundingCharter,
 }
 
 /// <summary>

@@ -30,6 +30,7 @@ public partial class Main : Node
     private Simulation _simulation = null!;
     private Label _status = null!;
     private AdminPanel _admin = null!;
+    private PopupMenu _polePicker = null!;
     private bool _paused = true;
     private int _speedIndex;
     private double _pendingDays;
@@ -45,6 +46,11 @@ public partial class Main : Node
         _admin = new AdminPanel { Visible = false };
         AddChild(_admin);
         _admin.Init(_simulation);
+
+        // Choix du pôle de légitimité à la fondation d'une commune : il devient sa charte de fondation.
+        _polePicker = new PopupMenu { Title = "Charte de fondation : quel pôle payer ?" };
+        _polePicker.IdPressed += id => FoundCommune(Orientation.All.ElementAt((int)id));
+        AddChild(_polePicker);
     }
 
     public override void _Process(double delta)
@@ -77,7 +83,7 @@ public partial class Main : Node
             case Key.Key3: _speedIndex = 2; break;
             case Key.Key4: _speedIndex = 3; break;
             case Key.B: BuildHousing(); break;
-            case Key.C: FoundCommune(); break;
+            case Key.C: ChoosePole(); break;
             case Key.A: ToggleAdmin(); break;
         }
     }
@@ -106,10 +112,34 @@ public partial class Main : Node
             _admin.Refresh();
     }
 
-    private void FoundCommune()
+    /// <summary>Ouvre le choix du pôle : ceux où la légitimité ne suffit pas sont grisés.</summary>
+    private void ChoosePole()
     {
-        // En attendant un vrai choix, la légitimité est prise dans le pôle le mieux fourni.
-        var pole = Orientation.All.MaxBy(p => _simulation.World.Legitimacy[p]);
+        _polePicker.Clear();
+        var index = 0;
+        foreach (var pole in Orientation.All)
+        {
+            var available = _simulation.World.Legitimacy[pole];
+            _polePicker.AddItem($"{pole.Code} — {PoleName(pole)} (légitimité {available:F0})", index);
+            _polePicker.SetItemDisabled(index, available < BaseCampLegitimacyCost);
+            index++;
+        }
+
+        _polePicker.PopupCentered();
+    }
+
+    private static string PoleName(Orientation pole) => pole.Code switch
+    {
+        "EG" => "égalitariste",
+        "SE" => "ségrégationniste",
+        "PO" => "positiviste",
+        "EC" => "écologiste",
+        "PR" => "protectionniste",
+        _ => "libéral",
+    };
+
+    private void FoundCommune(Orientation pole)
+    {
         var name = $"Commune {_simulation.World.Communes.Count() + 1}";
 
         var commune = _simulation.TryFoundCommune(
@@ -117,7 +147,7 @@ public partial class Main : Node
         _lastMessage = commune is null
             ? $"Camp de base impossible : il faut 100 pierre, 100 bois, {BaseCampLegitimacyCost} de légitimité " +
               $"et {Simulation.FoundingGrantOf(_simulation.World.BuildingTypes[Simulation.BaseCampTypeId]):N0} de dotation au trésor."
-            : $"{commune.Name} fondée (légitimité {pole.Code} dépensée, caisse de {_simulation.World.CommuneFundOf(commune.Id).Balance:N0}).";
+            : $"{commune.Name} fondée, charte {PoleName(pole)} ({pole.Code}), caisse de {_simulation.World.CommuneFundOf(commune.Id).Balance:N0}.";
     }
 
     private string Describe()
