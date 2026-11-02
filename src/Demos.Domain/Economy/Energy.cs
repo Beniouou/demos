@@ -31,10 +31,10 @@ public static class Energy
     public static double EffectOf(double coveredShare) => OutputWithoutEnergy + (1 - OutputWithoutEnergy) * coveredShare;
 
     /// <summary>
-    /// Proposition : chaque bâtiment garde une réserve de combustible pour 90 jours de chauffage normal. Il puise
+    /// Proposition : chaque bâtiment garde une réserve de combustible pour 120 jours de chauffage normal. Il puise
     /// dedans d'abord, et la remplit dès qu'il le peut, même en été : sa consommation d'hiver est lissée sur l'année.
     /// </summary>
-    public const double FuelReserveDays = 90;
+    public const double FuelReserveDays = 120;
 
     /// <summary>Taille de la réserve de combustible d'un bâtiment.</summary>
     public static double FuelReserveOf(Structure building) => UnitsOf(building) * HeatingPerUnit * FuelReserveDays;
@@ -46,11 +46,11 @@ public static class Energy
     /// <summary>Les combustibles possibles pour le chauffage, au début de la partie.</summary>
     public static readonly IReadOnlyList<string> HeatingFuels = ["bois", "charbon"];
 
-    /// <summary>Le chauffage double en hiver et s'arrête en été (proposition).</summary>
+    /// <summary>Le chauffage double en hiver et diminue de moitié en été (propositions).</summary>
     public static double HeatingFactor(Season season) => season switch
     {
         Season.Winter => 2,
-        Season.Summer => 0,
+        Season.Summer => 0.5,
         _ => 1,
     };
 

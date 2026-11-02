@@ -93,7 +93,7 @@ public static class PrototypeScenario
         // payer la dotation d'une première nouvelle commune.
         world.Treasury.Deposit(StartingTreasury);
 
-        // Chaque bâtiment commence avec sa réserve de chauffage pleine (90 jours de chauffage normal) : la partie
+        // Chaque bâtiment commence avec sa réserve de chauffage pleine (120 jours de chauffage normal) : la partie
         // commence le 1er janvier, en plein hiver.
         foreach (var building in world.Structures.Values.Where(s => s.Kind == StructureKind.Building && world.TierOf(s) == 1))
             world.FuelStockOf(building).Add(building.HeatingProductId ?? Energy.DefaultHeating, Energy.FuelReserveOf(building));

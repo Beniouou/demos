@@ -41,7 +41,7 @@ public class EnergyTests
     }
 
     [Fact]
-    public void En_ete_on_ne_chauffe_pas_et_le_charbon_peut_remplacer_le_bois()
+    public void En_ete_on_chauffe_moitie_moins_et_le_charbon_peut_remplacer_le_bois()
     {
         var market = new Market(Products);
         market.Offer("charbon", 100, "mine");
@@ -49,11 +49,12 @@ public class EnergyTests
         var treasury = new Treasury();
         treasury.Deposit(1_000);
 
+        // 1 000 places : 5 charbons en été (0,01 × 0,5), puis 10 au printemps.
         Run(Housing("charbon"), market, Season.Summer, treasury);
-        Assert.Equal(100, market.QuantityOf("charbon"), precision: 6);
+        Assert.Equal(95, market.QuantityOf("charbon"), precision: 6);
 
         Run(Housing("charbon"), market, Season.Spring, treasury);
-        Assert.Equal(90, market.QuantityOf("charbon"), precision: 6);
+        Assert.Equal(85, market.QuantityOf("charbon"), precision: 6);
     }
 
     [Fact]
@@ -92,7 +93,7 @@ public class EnergyTests
     }
 
     [Fact]
-    public void Le_chauffage_vient_d_abord_de_la_reserve_et_la_reserve_se_remplit_meme_en_ete()
+    public void Le_chauffage_vient_d_abord_de_la_reserve_puis_la_reserve_se_remplit()
     {
         var market = new Market(Products);
         market.Offer("bois", 2_000, "camp");
@@ -103,18 +104,18 @@ public class EnergyTests
         var stock = new Inventory();
         stock.Add("bois", 500);
 
-        // Hiver : 20 bois pris dans la réserve, rien acheté pour chauffer ; puis la réserve se remplit jusqu'à 900
-        // (1 000 places × 0,01 × 90 jours).
+        // Hiver : 20 bois pris dans la réserve, rien acheté pour chauffer ; puis la réserve se remplit jusqu'à 1 200
+        // (1 000 places × 0,01 × 120 jours) : 720 bois achetés.
         Energy.RunDaily(TownWith(building), s => s.Id == building.Id ? 1 : 0, Season.Winter, _ => market, treasury, null, null,
             new Dictionary<string, SocialClass>(), _ => stock);
-        Assert.Equal(900, stock.QuantityOf("bois"), precision: 6);
-        Assert.Equal(2_000 - 420, market.QuantityOf("bois"), precision: 6);
+        Assert.Equal(1_200, stock.QuantityOf("bois"), precision: 6);
+        Assert.Equal(2_000 - 720, market.QuantityOf("bois"), precision: 6);
 
-        // Été : pas de chauffage, la réserve reste pleine et rien n'est acheté.
+        // Été : 5 bois pris dans la réserve, puis rachetés pour la remplir.
         Energy.RunDaily(TownWith(building), s => s.Id == building.Id ? 1 : 0, Season.Summer, _ => market, treasury, null, null,
             new Dictionary<string, SocialClass>(), _ => stock);
-        Assert.Equal(900, stock.QuantityOf("bois"), precision: 6);
-        Assert.Equal(2_000 - 420, market.QuantityOf("bois"), precision: 6);
+        Assert.Equal(1_200, stock.QuantityOf("bois"), precision: 6);
+        Assert.Equal(2_000 - 725, market.QuantityOf("bois"), precision: 6);
     }
 
     [Fact]
