@@ -41,14 +41,14 @@ public static class Pricing
 
     /// <summary>
     /// Énergie d'un emploi de production sur l'année, pour un bâtiment de la liste 1 : son chauffage au bois (en moyenne
-    /// sur les quatre saisons) et son eau.
+    /// sur les quatre saisons, ou constant pour une forge) et son eau.
     /// </summary>
     public static double EnergyCostPerJob(BuildingType reference, Production recipe, Func<string, double>? priceOf)
     {
         if (reference.Tier != 1 || priceOf is null)
             return 0;
 
-        var averageFactor = Enum.GetValues<Shared.Season>().Average(Energy.HeatingFactor);
+        var averageFactor = reference.ConstantHeating ? 1 : Enum.GetValues<Shared.Season>().Average(Energy.HeatingFactor);
         var heating = Energy.HeatingPerUnit * averageFactor * priceOf(Energy.DefaultHeating);
         var water = recipe.ProductId == Energy.Water ? 0 : Energy.WaterPerUnit * priceOf(Energy.Water);
         return heating + water;

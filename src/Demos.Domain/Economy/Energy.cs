@@ -58,13 +58,14 @@ public static class Energy
     public static double UnitsOf(Structure building) => building.Jobs + building.HousingPlaces + building.SchoolPlaces;
 
     /// <summary>L'énergie dont un bâtiment a besoin par emploi ou par place, un jour de cette saison.</summary>
-    public static IReadOnlyList<RecipeInput> NeedsOf(Structure building, int tier, Season season)
+    /// <remarks>Un bâtiment à chauffage constant (la forge) chauffe autant toute l'année, quelle que soit la saison.</remarks>
+    public static IReadOnlyList<RecipeInput> NeedsOf(Structure building, int tier, Season season, bool constantHeating = false)
     {
         if (tier != 1)
             return [];
 
         var needs = new List<RecipeInput>();
-        var heating = HeatingPerUnit * HeatingFactor(season);
+        var heating = HeatingPerUnit * (constantHeating ? 1 : HeatingFactor(season));
         if (heating > 0)
             needs.Add(new RecipeInput(building.HeatingProductId ?? DefaultHeating, heating));
 
@@ -87,7 +88,8 @@ public static class Energy
         Func<string, Treasury>? communeFundOf,
         Func<Structure, Treasury>? companyFundOf,
         IReadOnlyDictionary<string, SocialClass> classesById,
-        Func<Structure, Inventory>? fuelStockOf = null)
+        Func<Structure, Inventory>? fuelStockOf = null,
+        Func<Structure, bool>? constantHeatingOf = null)
     {
         var shares = new Dictionary<string, double>();
         foreach (var building in structures.Values.Where(s => s.Kind == StructureKind.Building))
@@ -97,7 +99,7 @@ public static class Energy
             if (units <= 0 || tier != 1)
                 continue;
 
-            var needs = NeedsOf(building, tier, season).ToList();
+            var needs = NeedsOf(building, tier, season, constantHeatingOf?.Invoke(building) ?? false).ToList();
 
             var communeId = Communes.CommuneOf(building, structures) ?? "";
             var market = marketOf(communeId);

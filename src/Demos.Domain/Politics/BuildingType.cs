@@ -6,7 +6,8 @@ namespace Demos.Domain.Politics;
 /// ses recettes sont les productions possibles (un atelier fait du pain, des vêtements ou des meubles…), et chaque
 /// bâtiment construit en choisit une ; la première est celle par défaut. Le tier est la « liste » du bâtiment, son niveau
 /// technique : 1 pour les bâtiments chauffés et alimentés en eau, 2 pour ceux qui auront besoin d'électricité, 3 pour
-/// ceux qui auront besoin d'internet.
+/// ceux qui auront besoin d'internet. Un bâtiment à chauffage constant (la forge) chauffe autant toute l'année, au
+/// lieu de suivre les saisons.
 /// </summary>
 public sealed record BuildingType(
     string Id,
@@ -29,7 +30,8 @@ public sealed record BuildingType(
     Economy.StorageKind StorageKind = Economy.StorageKind.General,
     string? StorageProductId = null,
     IReadOnlyList<Production>? Recipes = null,
-    int Tier = 1)
+    int Tier = 1,
+    bool ConstantHeating = false)
 {
     /// <summary>Les productions possibles de ce type : ses recettes, ou sa seule production.</summary>
     public IReadOnlyList<Production> AvailableRecipes =>

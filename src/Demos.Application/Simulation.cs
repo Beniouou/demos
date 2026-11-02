@@ -213,7 +213,7 @@ public sealed class Simulation(World world, GameClock clock)
         WorkDay.Run(World.Structures, World.Workers, World.Classes, World.Laws, World.Treasury, World.MarketOf, World.CommuneFundOf, World.Wages,
             World.CompanyFundOf, World.EnergyEffectOf);
         World.EnergyShares = Energy.RunDaily(World.Structures, World.TierOf, Clock.Season, World.MarketOf, World.Treasury, World.CommuneFundOf,
-            World.CompanyFundOf, World.ClassesById, World.FuelStockOf);
+            World.CompanyFundOf, World.ClassesById, World.FuelStockOf, World.HeatsAllYear);
         Trade.RunDaily(communeIds, World.Classes, World.Products, World.MarketOf,
             (communeId, productId) => World.StorageOf(communeId).FreeFor(productId));
         Housing.RunDaily(World.Structures, World.Classes, World.Treasury, World.CompanyFundOf, World.EnergyEffectOf);

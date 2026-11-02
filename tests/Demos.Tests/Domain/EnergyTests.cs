@@ -137,6 +137,21 @@ public class EnergyTests
     }
 
     [Fact]
+    public void Une_forge_chauffe_autant_toute_l_annee()
+    {
+        var forge = new Structure("forge", "Forge", StructureKind.Building, "commune", Jobs: 100, HeatingProductId: "charbon");
+
+        foreach (var season in Enum.GetValues<Season>())
+        {
+            var heating = Energy.NeedsOf(forge, tier: 1, season, constantHeating: true).Single(n => n.ProductId == "charbon");
+            Assert.Equal(Energy.HeatingPerUnit, heating.Quantity, precision: 6);
+        }
+
+        // Un bâtiment ordinaire, lui, suit les saisons.
+        Assert.Equal(2 * Energy.HeatingPerUnit, Energy.NeedsOf(forge, tier: 1, Season.Winter).Single(n => n.ProductId == "charbon").Quantity, precision: 6);
+    }
+
+    [Fact]
     public void Un_batiment_de_la_liste_2_n_a_pas_encore_besoin_de_chauffage_ni_d_eau()
     {
         Assert.Empty(Energy.NeedsOf(Housing(), tier: 2, Season.Winter));

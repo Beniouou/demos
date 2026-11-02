@@ -178,6 +178,10 @@ public sealed class World
     public int TierOf(Structure building) =>
         building.TypeId is { } typeId && BuildingTypes.TryGetValue(typeId, out var type) ? type.Tier : 0;
 
+    /// <summary>Vrai pour un bâtiment qui chauffe autant toute l'année (la forge).</summary>
+    public bool HeatsAllYear(Structure building) =>
+        building.TypeId is { } typeId && BuildingTypes.TryGetValue(typeId, out var type) && type.ConstantHeating;
+
     /// <summary>Pollution de chaque commune par habitant et par jour, recalculée chaque jour.</summary>
     public IReadOnlyDictionary<string, double> PollutionByCommune { get; set; } = new Dictionary<string, double>();
 
