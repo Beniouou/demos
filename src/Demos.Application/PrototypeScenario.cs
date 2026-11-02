@@ -26,12 +26,23 @@ public static class PrototypeScenario
             new("etat", "État", StructureKind.PoliticalEntity, null),
             new(FirstCommuneId, "Première commune", StructureKind.PoliticalEntity, "etat"),
             types["camp-de-base"].Build("camp-de-base-1", FirstCommuneId),
-            // 1 700 emplois × 3 pains : à peu près ce que mangent les habitants (la ferme du catalogue en a 2 200).
-            types["ferme"].Build("ferme", FirstCommuneId, Ownership.Cooperative, "ouvriers", "Ferme coopérative") with { Jobs = 1_700 },
-            types["atelier"].Build("atelier", FirstCommuneId, Ownership.Private, "cadres", "Atelier de couture"),
-            types["menuiserie"].Build("menuiserie", FirstCommuneId, name: "Menuiserie d'État"),
+            // Chaîne du pain et de l'alcool : blé → farine → pain, alcool. Les emplois couvrent à peu près ce que
+            // consomment 5 000 habitants (5 000 pains et 280 alcools par jour).
+            types["ferme"].BuildFor("ble", "ferme", FirstCommuneId, Ownership.Cooperative, "ouvriers", "Ferme coopérative") with { Jobs = 700 },
+            types["atelier"].BuildFor("farine", "moulin", FirstCommuneId, Ownership.Cooperative, "ouvriers", "Moulin coopératif") with { Jobs = 230 },
+            types["atelier"].BuildFor("pain", "boulangerie", FirstCommuneId, Ownership.Cooperative, "ouvriers", "Boulangerie coopérative") with { Jobs = 210 },
+            types["atelier"].BuildFor("alcool", "distillerie", FirstCommuneId, Ownership.Private, "cadres", "Distillerie") with { Jobs = 30 },
+
+            // Chaîne des vêtements : lin → tissus → vêtements (50 par jour).
+            types["ferme"].BuildFor("lin", "champ-de-lin", FirstCommuneId, Ownership.Cooperative, "ouvriers", "Champ de lin coopératif") with { Jobs = 30 },
+            types["atelier"].BuildFor("tissus", "tissage", FirstCommuneId, Ownership.Private, "cadres", "Atelier de tissage") with { Jobs = 55 },
+            types["atelier"].BuildFor("vetements", "atelier", FirstCommuneId, Ownership.Private, "cadres", "Atelier de couture") with { Jobs = 55 },
+
+            // Chaîne des meubles : bois → planches → meubles (une vingtaine par jour).
+            types["atelier"].BuildFor("planche", "scierie", FirstCommuneId, name: "Scierie d'État") with { Jobs = 20 },
+            types["atelier"].BuildFor("meubles", "menuiserie", FirstCommuneId, name: "Menuiserie d'État") with { Jobs = 20 },
             types["carriere"].Build("carriere", FirstCommuneId, Ownership.Cooperative, "ouvriers", "Carrière coopérative"),
-            types["camp-forestier"].Build("camp-forestier", FirstCommuneId, name: "Camp forestier d'État"),
+            types["camp-forestier"].Build("camp-forestier", FirstCommuneId, name: "Camp de bûcheron d'État"),
             types["logements"].Build("logements-etat", FirstCommuneId, name: "Logements d'État") with { HousingPlaces = 3_000 },
             types["logements"].Build("logements-prives", FirstCommuneId, Ownership.Private, "cadres", "Logements privés")
                 with { HousingPlaces = 2_200, DailyRent = 0.5 },

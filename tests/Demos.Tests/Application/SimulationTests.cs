@@ -152,13 +152,15 @@ public class SimulationTests
         var simulation = CreatePrototype();
         AdvanceDays(simulation, 5);
 
-        // La scierie d'État (200 emplois pourvus × 0,2) produit 40 bois par jour : 200 en 5 jours.
+        // Le camp de bûcheron d'État produit 40 bois par jour ; la scierie d'État en utilise une partie.
+        var stockBefore = simulation.World.StateQuantityOf("commune-1", "bois");
         var housing = new Structure("logements", "Logements", StructureKind.Building, "commune-1");
-        var built = simulation.TryBuild(housing, [new MaterialCost("bois", 150)], PaymentMode.StockFirst);
+        var built = simulation.TryBuild(housing, [new MaterialCost("bois", 50)], PaymentMode.StockFirst);
 
+        Assert.True(stockBefore >= 50);
         Assert.True(built);
         Assert.Contains("logements", simulation.World.Structures.Keys);
-        Assert.Equal(50, simulation.World.StateQuantityOf("commune-1", "bois"));
+        Assert.Equal(stockBefore - 50, simulation.World.StateQuantityOf("commune-1", "bois"), precision: 6);
     }
 
     [Fact]
@@ -169,13 +171,15 @@ public class SimulationTests
         Assert.Equal(1, farm.Posts);
 
         simulation.UpdateBuilding(farm with { Ownership = Ownership.Public, OwnerClassId = null, Posts = 3 });
-        simulation.World.SetPrice("pain", 2);
+        // Le moulin est arrêté, pour que le blé reste dans le stockage.
+        simulation.UpdateBuilding(simulation.World.Structures["moulin"] with { Jobs = 0 });
+        simulation.World.SetPrice("ble", 2);
         simulation.AdvanceDay();
 
-        // Ferme publique : son pain arrive au stockage de la commune au nom de l'État, plus au nom des ouvriers.
-        Assert.True(simulation.World.StateQuantityOf("commune-1", "pain") > 0);
-        Assert.Equal(0, simulation.World.MarketOf("commune-1").QuantityOf("pain", "ouvriers"));
-        Assert.Equal(2, simulation.World.PriceOf("pain"));
+        // Ferme publique : son blé arrive au stockage de la commune au nom de l'État, plus au nom de l'entreprise.
+        Assert.True(simulation.World.StateQuantityOf("commune-1", "ble") > 0);
+        Assert.Equal(0, simulation.World.MarketOf("commune-1").QuantityOf("ble", Market.CompanySellerId("ferme")));
+        Assert.Equal(2, simulation.World.PriceOf("ble"));
         Assert.Equal(3, simulation.World.Structures["ferme"].Posts);
     }
 

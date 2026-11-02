@@ -21,8 +21,20 @@ public enum Ownership
     Cooperative,
 }
 
-/// <summary>Ce qu'une structure produit chaque jour, par travailleur. Les matières consommées viendront plus tard.</summary>
-public readonly record struct Production(string ProductId, double QuantityPerWorker);
+/// <summary>Matière consommée par une recette : quantité par unité produite.</summary>
+public readonly record struct RecipeInput(string ProductId, double Quantity);
+
+/// <summary>
+/// Recette d'une structure : ce qu'elle produit chaque jour par travailleur, et les matières qu'elle consomme pour
+/// chaque unité produite (aucune pour une extraction : ferme, mine, carrière…).
+/// </summary>
+public readonly record struct Production(string ProductId, double QuantityPerWorker, IReadOnlyList<RecipeInput>? Inputs = null)
+{
+    public IReadOnlyList<RecipeInput> Materials => Inputs ?? [];
+
+    /// <summary>Nom lisible de la recette, par exemple « vetements ← tissus ».</summary>
+    public string Label => Materials.Count == 0 ? ProductId : $"{ProductId} ← {string.Join(" + ", Materials.Select(m => m.ProductId))}";
+}
 
 /// <summary>
 /// Entité politique, organisme ou bâtiment. Les structures s'emboîtent :

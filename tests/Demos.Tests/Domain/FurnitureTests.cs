@@ -11,6 +11,7 @@ public class FurnitureTests
         new("pain", "Pain", NeedCategory.Food, 1),
         new("vetements", "Vêtements", NeedCategory.Clothing, 8),
         new("meubles", "Meubles", NeedCategory.Furniture, 20),
+        new("alcool", "Alcool", NeedCategory.Leisure, 2),
     ];
 
     private static SocialClass Resident(Rank rank, long population)
@@ -28,6 +29,7 @@ public class FurnitureTests
         market.Offer("pain", 10_000, "ferme");
         market.Offer("vetements", 1_000, "atelier");
         market.Offer("meubles", meubles, "menuiserie");
+        market.Offer("alcool", 1_000, "distillerie");
         return market;
     }
 
@@ -50,7 +52,7 @@ public class FurnitureTests
     }
 
     [Fact]
-    public void Sans_meubles_les_rangs_superieurs_ne_couvrent_que_trois_besoins_sur_quatre()
+    public void Sans_meubles_les_rangs_superieurs_ne_couvrent_que_quatre_besoins_sur_cinq()
     {
         var market = MarketWith(0);
         var workers = Resident(Rank.Workers, 1_000);
@@ -59,8 +61,9 @@ public class FurnitureTests
         Consumption.RunDaily([workers, executives], Products, market);
 
         Assert.Equal(1, workers.NeedsSatisfaction, precision: 6);
-        Assert.Equal(0.75, executives.NeedsSatisfaction, precision: 6);
-        Assert.Equal(0.25, executives.SeasonSupplyShortage, precision: 6);
+        // Se nourrir, s'habiller, se loger, se distraire, se meubler : il manque les meubles.
+        Assert.Equal(0.8, executives.NeedsSatisfaction, precision: 6);
+        Assert.Equal(0.2, executives.SeasonSupplyShortage, precision: 6);
     }
 
     [Fact]

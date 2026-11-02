@@ -26,8 +26,8 @@ public static class Privatization
     public const int ProfitDaysAccepted = 365;
 
     /// <summary>
-    /// Bénéfice attendu par jour avec le personnel actuel : valeur de la production, loyers et frais de scolarité
-    /// possibles, moins les salaires.
+    /// Bénéfice attendu par jour avec le personnel actuel : valeur de la production moins celle de ses matières, loyers
+    /// et frais de scolarité possibles, moins les salaires.
     /// </summary>
     public static double DailyProfitOf(
         Structure building,
@@ -35,7 +35,10 @@ public static class Privatization
         IReadOnlyList<SocialClass> classes,
         Func<string, double> priceOf)
     {
-        var production = building.Production is { } p ? p.QuantityPerWorker * productionWorkers * priceOf(p.ProductId) : 0;
+        var output = building.Production is { } p ? p.QuantityPerWorker * productionWorkers : 0;
+        var production = building.Production is { } recipe
+            ? output * (priceOf(recipe.ProductId) - recipe.Materials.Sum(m => m.Quantity * priceOf(m.ProductId)))
+            : 0;
         var places = building.HousingPlaces * building.DailyRent + building.SchoolPlaces * building.DailyTuition;
         var wages = classes.Sum(c => c.MembersWorkingIn(building.Id) * building.DailyWage * Staffing.WageMultiplier(c.Rank));
         return production + places - wages;

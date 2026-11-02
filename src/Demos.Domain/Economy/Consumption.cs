@@ -5,8 +5,9 @@ namespace Demos.Domain.Economy;
 public static class Consumption
 {
     /// <summary>
-    /// Besoins de base consommés chaque jour par personne, selon le rang : tout le monde mange et s'habille ; les
-    /// professions intermédiaires et les cadres ont aussi besoin de meubles (propositions : 0,02 et 0,1 par jour).
+    /// Besoins consommés chaque jour par personne, selon le rang : tout le monde mange, s'habille et a besoin de
+    /// loisirs (propositions : 0,05 par jour pour les ouvriers, 0,1 pour les professions intermédiaires, 0,2 pour les
+    /// cadres) ; les professions intermédiaires et les cadres ont aussi besoin de meubles (0,02 et 0,1 par jour).
     /// Se loger est aussi un besoin de base, mais c'est une capacité (voir <see cref="Housing"/>).
     /// </summary>
     public static IReadOnlyDictionary<NeedCategory, double> NeedsOf(Rank rank) => rank switch
@@ -23,17 +24,19 @@ public static class Consumption
     {
         [NeedCategory.Food] = 1,
         [NeedCategory.Clothing] = 0.01,
+        [NeedCategory.Leisure] = 0.05,
     };
 
-    private static readonly Dictionary<NeedCategory, double> IntermediateNeeds = new(WorkerNeeds) { [NeedCategory.Furniture] = 0.02 };
+    private static readonly Dictionary<NeedCategory, double> IntermediateNeeds = new(WorkerNeeds) { [NeedCategory.Furniture] = 0.02, [NeedCategory.Leisure] = 0.1 };
 
-    private static readonly Dictionary<NeedCategory, double> ExecutiveNeeds = new(WorkerNeeds) { [NeedCategory.Furniture] = 0.1 };
+    private static readonly Dictionary<NeedCategory, double> ExecutiveNeeds = new(WorkerNeeds) { [NeedCategory.Furniture] = 0.1, [NeedCategory.Leisure] = 0.2 };
 
     /// <summary>
-    /// Chaque classe couvre ses besoins avec les produits reçus en nature, puis achète le reste sur le marché
-    /// dans la limite de sa richesse. Quand un produit manque, chaque classe est servie au prorata de sa demande.
-    /// La satisfaction est la moyenne de la part couverte de chacun de ses besoins : se nourrir, s'habiller et se
-    /// loger, plus se meubler pour les professions intermédiaires et les cadres.
+    /// Chaque classe couvre ses besoins avec les produits reçus en nature, puis achète le reste sur le marché dans la
+    /// limite de sa richesse, en commençant par le produit le moins cher quand plusieurs couvrent le même besoin. Quand
+    /// un produit manque, chaque classe est servie au prorata de sa demande. La satisfaction est la moyenne de la part
+    /// couverte de chacun de ses besoins : se nourrir, s'habiller, se loger et se distraire, plus se meubler pour les
+    /// professions intermédiaires et les cadres.
     /// </summary>
     public static void RunDaily(IReadOnlyList<SocialClass> classes, IReadOnlyList<ProductDefinition> products, Market market)
     {
@@ -48,40 +51,66 @@ public static class Consumption
         foreach (var category in AllNeeds)
         {
             var concerned = classes.Where(c => NeedsOf(c.Rank).ContainsKey(category)).ToList();
-            if (products.FirstOrDefault(p => p.Need == category) is not { } product)
+
+            // Plusieurs produits peuvent couvrir un même besoin (pain ou viande pour se nourrir) : on prend d'abord
+            // les produits reçus en nature, puis on achète les moins chers d'abord.
+            var choices = products.Where(p => p.Need == category).OrderBy(p => market.PriceOf(p.Id)).ToList();
+            if (choices.Count == 0)
             {
                 foreach (var socialClass in concerned)
                     coverage[socialClass].Add(0);
                 continue;
             }
 
-            var price = market.PriceOf(product.Id);
-            var demands = new Dictionary<SocialClass, (double Needed, double FromGoods, double Wanted)>();
+            var needed = new Dictionary<SocialClass, double>();
+            var covered = new Dictionary<SocialClass, double>();
             foreach (var socialClass in concerned.Where(c => c.Population > 0))
             {
-                var needed = socialClass.Population * NeedsOf(socialClass.Rank)[category];
-                var fromGoods = Math.Min(needed, socialClass.Goods.QuantityOf(product.Id));
-                socialClass.Goods.TryRemove(product.Id, fromGoods);
-
-                var missing = needed - fromGoods;
-                var affordable = price > 0 ? Math.Max(0, socialClass.Wealth) / price : missing;
-                demands[socialClass] = (needed, fromGoods, Math.Min(missing, affordable));
+                needed[socialClass] = socialClass.Population * NeedsOf(socialClass.Rank)[category];
+                covered[socialClass] = 0;
+                foreach (var product in choices)
+                {
+                    var fromGoods = Math.Min(needed[socialClass] - covered[socialClass], socialClass.Goods.QuantityOf(product.Id));
+                    socialClass.Goods.TryRemove(product.Id, fromGoods);
+                    covered[socialClass] += fromGoods;
+                }
             }
 
-            var totalWanted = demands.Values.Sum(d => d.Wanted);
-            var servedRate = totalWanted > 0 ? Math.Min(1, market.QuantityOf(product.Id) / totalWanted) : 0;
-
-            foreach (var (socialClass, (needed, fromGoods, wanted)) in demands)
+            foreach (var product in choices)
             {
-                var bought = Math.Min(wanted * servedRate, market.QuantityOf(product.Id));
-                if (bought > 0 && market.TryBuy(product.Id, bought))
-                    socialClass.Wealth -= bought * price;
-                else
-                    bought = 0;
+                var price = market.PriceOf(product.Id);
+                var wanted = needed.Keys.ToDictionary(
+                    c => c,
+                    c =>
+                    {
+                        var missing = needed[c] - covered[c];
+                        return Math.Min(missing, price > 0 ? Math.Max(0, c.Wealth) / price : missing);
+                    });
 
-                coverage[socialClass].Add((fromGoods + bought) / needed);
-                moneyShortfall[socialClass].Add((needed - fromGoods - wanted) / needed);
-                supplyShortage[socialClass].Add((wanted - bought) / needed);
+                var totalWanted = wanted.Values.Sum();
+                var servedRate = totalWanted > 0 ? Math.Min(1, market.QuantityOf(product.Id) / totalWanted) : 0;
+                foreach (var (socialClass, quantity) in wanted)
+                {
+                    var bought = Math.Min(quantity * servedRate, market.QuantityOf(product.Id));
+                    if (bought <= 0 || !market.TryBuy(product.Id, bought))
+                        continue;
+
+                    socialClass.Wealth -= bought * price;
+                    covered[socialClass] += bought;
+                }
+            }
+
+            // Ce qui manque encore : faute d'argent pour en acheter plus au prix le plus bas, sinon faute de produits.
+            var cheapest = choices.Select(p => market.PriceOf(p.Id)).Where(p => p > 0).DefaultIfEmpty(0).Min();
+            foreach (var (socialClass, need) in needed)
+            {
+                var missing = need - covered[socialClass];
+                var stillAffordable = cheapest > 0 ? Math.Max(0, socialClass.Wealth) / cheapest : missing;
+                var lackingMoney = Math.Max(0, missing - stillAffordable);
+
+                coverage[socialClass].Add(covered[socialClass] / need);
+                moneyShortfall[socialClass].Add(lackingMoney / need);
+                supplyShortage[socialClass].Add((missing - lackingMoney) / need);
             }
         }
 

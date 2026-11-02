@@ -28,10 +28,17 @@ public static class Trade
             // Place libre pour ce produit dans chaque commune, selon les sortes de stockage et les limites.
             var freeStorage = communeIds.ToDictionary(c => c, c => freeStorageOf(c, product.Id));
 
+            // Le besoin d'une commune pour ce produit : ce que ses habitants consomment, moins ce que couvrent déjà les
+            // autres produits du même besoin (le pain et la viande nourrissent tous les deux).
+            var substitutes = products.Where(p => p.Need == need && p.Id != product.Id).Select(p => p.Id).ToList();
             var balance = communeIds.ToDictionary(
                 communeId => communeId,
-                communeId => marketOf(communeId).QuantityOf(product.Id)
-                    - classes.Sum(c => c.MembersLivingIn(communeId) * Consumption.NeedsOf(c.Rank).GetValueOrDefault(need)));
+                communeId =>
+                {
+                    var market = marketOf(communeId);
+                    var demand = classes.Sum(c => c.MembersLivingIn(communeId) * Consumption.NeedsOf(c.Rank).GetValueOrDefault(need));
+                    return market.QuantityOf(product.Id) - Math.Max(0, demand - substitutes.Sum(market.QuantityOf));
+                });
 
             var surplus = balance.Where(b => b.Value > 0).ToDictionary(b => b.Key, b => b.Value);
             var totalSurplus = surplus.Values.Sum();

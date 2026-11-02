@@ -9,7 +9,7 @@ namespace Demos.Game;
 
 /// <summary>
 /// Menu d'administration (outil de test, pas encore l'interface du joueur) : liste les bâtiments de la partie
-/// et permet de régler leur propriétaire, leurs emplois, leur salaire, leur production, leurs places,
+/// et permet de régler leur propriétaire, leurs emplois, leur salaire, leur recette et leur production, leurs places,
 /// leur loyer, le prix de vente de leur produit, et la gestion des stockages : ce que chacun accepte et la
 /// quantité maximale de chaque produit. On y règle aussi l'impôt d'État et l'impôt de la commune du bâtiment.
 /// </summary>
@@ -27,6 +27,8 @@ public partial class AdminPanel : PanelContainer
     private OptionButton _owner = null!;
     private SpinBox _jobs = null!;
     private SpinBox _wage = null!;
+    private OptionButton _recipe = null!;
+    private readonly List<Production> _recipes = [];
     private SpinBox _perWorker = null!;
     private SpinBox _places = null!;
     private SpinBox _rent = null!;
@@ -110,6 +112,8 @@ public partial class AdminPanel : PanelContainer
         {
             var perDay = production.QuantityPerWorker * workers;
             lines.Add($"Production : {perDay:N1} {production.ProductId} par jour, valeur {perDay * world.PriceOf(production.ProductId):N0}");
+            if (production.Materials.Count > 0)
+                lines.Add("Matières par jour : " + string.Join(", ", production.Materials.Select(m => $"{m.ProductId} {perDay * m.Quantity:N1}")));
         }
 
         var wages = world.Classes.Sum(c => c.MembersWorkingIn(building.Id) * building.DailyWage * Demos.Domain.Economy.Staffing.WageMultiplier(c.Rank));
@@ -173,6 +177,7 @@ public partial class AdminPanel : PanelContainer
         _owner = AddOption(form, "Classe propriétaire", _simulation.World.Classes.Select(c => c.Name));
         _jobs = AddSpin(form, "Emplois de production", 0, 100_000, 10);
         _wage = AddSpin(form, "Salaire de base par jour", 0, 1_000, 0.1);
+        _recipe = AddOption(form, "Recette (ce que produit le bâtiment)", []);
         _perWorker = AddSpin(form, "Production par travailleur", 0, 100, 0.01);
         _pollution = AddSpin(form, "Pollution par travailleur", 0, 100, 0.01);
         _storage = AddSpin(form, "Capacité de stockage", 0, 1_000_000, 100);
@@ -293,6 +298,15 @@ public partial class AdminPanel : PanelContainer
         ShowSale(building);
         ShowNationalization(building);
 
+        _recipe.Clear();
+        _recipes.Clear();
+        if (building.TypeId is { } recipeTypeId && _simulation.World.BuildingTypes.TryGetValue(recipeTypeId, out var recipeType))
+            _recipes.AddRange(recipeType.AvailableRecipes);
+        foreach (var recipe in _recipes)
+            _recipe.AddItem(recipe.Label);
+        _recipe.Disabled = _recipes.Count < 2;
+        _recipe.Select(_recipes.FindIndex(r => building.Production is { } current && r.Label == current.Label));
+
         var production = building.Production;
         _perWorker.Editable = _price.Editable = production is not null;
         _perWorker.Value = production?.QuantityPerWorker ?? 0;
@@ -313,7 +327,7 @@ public partial class AdminPanel : PanelContainer
             OwnerClassId = ownership == Ownership.Public ? null : _simulation.World.Classes[_owner.Selected].Id,
             Jobs = (int)_jobs.Value,
             DailyWage = _wage.Value,
-            Production = building.Production is { } production ? production with { QuantityPerWorker = _perWorker.Value } : null,
+            Production = ChosenProduction(building),
             HousingPlaces = (int)_places.Value,
             DailyRent = _rent.Value,
             PollutionPerWorker = _pollution.Value,
@@ -410,6 +424,18 @@ public partial class AdminPanel : PanelContainer
         };
         ShowBuilding(_buildingIds.IndexOf(building.Id));
         _saleMessage.Text = message;
+    }
+
+    /// <summary>La recette choisie : une nouvelle recette garde sa production du catalogue, la même garde le réglage.</summary>
+    private Production? ChosenProduction(Structure building)
+    {
+        var chosen = _recipe.Selected >= 0 && _recipe.Selected < _recipes.Count ? _recipes[_recipe.Selected] : building.Production;
+        if (chosen is not { } recipe)
+            return null;
+
+        return building.Production is { } current && current.Label == recipe.Label
+            ? recipe with { QuantityPerWorker = _perWorker.Value }
+            : recipe;
     }
 
     private string[] ProductIds => _simulation.World.Products.Select(p => p.Id).ToArray();

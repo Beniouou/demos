@@ -6,8 +6,9 @@ namespace Demos.Domain.Economy;
 public static class WorkDay
 {
     /// <summary>
-    /// Pour chaque lieu de travail : il produit selon ses travailleurs de production, paie ses emplois, puis livre
-    /// le reste au stockage de sa commune, en vente au nom de l'État s'il est public, de l'entreprise sinon.
+    /// Pour chaque lieu de travail : il prend ses matières (voir <see cref="Supply"/>), produit selon ses travailleurs
+    /// de production et ses matières, paie ses emplois, puis livre le reste au stockage de sa commune, en vente au nom
+    /// de l'État s'il est public, de l'entreprise sinon.
     /// Le travail est payé en salaire, sauf si une loi qui couvre le bâtiment impose le paiement en nature :
     /// les travailleurs reçoivent alors des produits du bâtiment, au prix du marché.
     /// Le salaire en argent vient de la caisse de la commune puis du trésor (public), ou de la caisse de l'entreprise
@@ -59,6 +60,10 @@ public static class WorkDay
             var produced = workplace.Production is { } production
                 ? production.QuantityPerWorker * productionWorkers.GetValueOrDefault(workplace.Id)
                 : 0;
+
+            // Les matières viennent du stockage de la commune ; sans elles, le bâtiment produit moins.
+            if (workplace.Production is { } recipe)
+                produced *= Supply.Acquire(workplace, recipe, produced, market, communeId, treasury, communeFundOf?.Invoke(communeId), companyFundOf, classesById);
 
             if (totalDue > 0 && produced > 0 && IsPaidInKind(workplace, structures, laws))
             {
