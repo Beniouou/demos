@@ -199,9 +199,10 @@ public sealed class Simulation(World world, GameClock clock)
     /// <summary>Dotation versée à la fondation : 60 jours de salaires de production du camp de base.</summary>
     public static double FoundingGrantOf(BuildingType camp) => FoundingGrantDays * camp.Jobs * camp.DailyWage;
 
-    // Ordre du document de règles : emplois, production et salaires, échanges entre communes, logement, école,
-    // consommation, ventes, bénéfices des entreprises versés aux propriétaires, impôts, légitimité, puis perte de ce
-    // qui déborde du stockage.
+    // Ordre du document de règles : emplois, production et salaires, énergie des bâtiments, échanges entre communes,
+    // logement, école, consommation, ventes, bénéfices des entreprises versés aux propriétaires, impôts, légitimité,
+    // puis perte de ce qui déborde du stockage ou se périme. L'énergie prise après la production d'un jour règle la
+    // production du lendemain, et le logement et l'école du jour même.
     // Les décisions du joueur et les événements restent à écrire.
     private void RunDailyCalculations()
     {
@@ -209,17 +210,20 @@ public sealed class Simulation(World world, GameClock clock)
 
         World.Workers = Employment.Assign(World.Structures, World.Classes);
         World.PollutionByCommune = Pollution.PerResidentByCommune(World.Structures, World.Workers, World.Classes);
-        WorkDay.Run(World.Structures, World.Workers, World.Classes, World.Laws, World.Treasury, World.MarketOf, World.CommuneFundOf, World.Wages, World.CompanyFundOf);
+        WorkDay.Run(World.Structures, World.Workers, World.Classes, World.Laws, World.Treasury, World.MarketOf, World.CommuneFundOf, World.Wages,
+            World.CompanyFundOf, World.EnergyEffectOf);
+        World.EnergyShares = Energy.RunDaily(World.Structures, World.TierOf, Clock.Season, World.MarketOf, World.Treasury, World.CommuneFundOf,
+            World.CompanyFundOf, World.ClassesById);
         Trade.RunDaily(communeIds, World.Classes, World.Products, World.MarketOf,
             (communeId, productId) => World.StorageOf(communeId).FreeFor(productId));
-        Housing.RunDaily(World.Structures, World.Classes, World.Treasury, World.CompanyFundOf);
-        Education.RunDaily(World.Structures, World.Classes, World.Treasury, World.CompanyFundOf);
+        Housing.RunDaily(World.Structures, World.Classes, World.Treasury, World.CompanyFundOf, World.EnergyEffectOf);
+        Education.RunDaily(World.Structures, World.Classes, World.Treasury, World.CompanyFundOf, World.EnergyEffectOf);
 
         foreach (var communeId in communeIds)
             Consumption.RunDaily(World.Classes.Where(c => c.CommuneId == communeId).ToList(), World.Products, World.MarketOf(communeId));
 
         PaySellers();
-        Companies.PayDividends(World.Structures, World.ClassesById, World.CompanyFundOf);
+        Companies.PayDividends(World.Structures, World.ClassesById, World.CompanyFundOf, World.PriceOf);
         Taxation.CollectDaily(World.Classes, World.StateTaxRate, World.CommuneTaxRateOf, World.Treasury, World.CommuneFundOf, World.Laws, World.Structures);
         LawEffects.ApplyDaily(World.Classes, World.Laws, World.Structures, World.Legitimacy);
         Storage.ApplyDaily(communeIds, World.Structures, World.Products, World.MarketOf);

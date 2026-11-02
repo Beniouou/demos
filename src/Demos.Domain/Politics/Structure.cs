@@ -61,6 +61,7 @@ public readonly record struct Production(string ProductId, double QuantityPerWor
 /// <param name="StorageKind">Ce que le stockage accepte : tout, l'alimentaire, le non alimentaire, ou un seul produit.</param>
 /// <param name="StorageProductId">Le produit accepté par un stockage spécifique.</param>
 /// <param name="StorageLimits">Quantité maximale de certains produits dans ce stockage ; un produit absent n'est pas limité.</param>
+/// <param name="HeatingProductId">Combustible du chauffage (bois ou charbon) ; le bois par défaut.</param>
 public sealed record Structure(
     string Id,
     string Name,
@@ -83,7 +84,8 @@ public sealed record Structure(
     int StorageCapacity = 0,
     StorageKind StorageKind = StorageKind.General,
     string? StorageProductId = null,
-    IReadOnlyDictionary<string, double>? StorageLimits = null)
+    IReadOnlyDictionary<string, double>? StorageLimits = null,
+    string? HeatingProductId = null)
 {
     public bool IsNational => ParentId is null;
 }

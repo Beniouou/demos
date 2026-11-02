@@ -156,6 +156,10 @@ public static class Storage
         foreach (var communeId in communeIds)
         {
             var market = marketOf(communeId);
+            // Ce qui ne se stocke pas (l'eau) est perdu le soir même, sans prendre de place.
+            foreach (var product in products.Where(p => !p.Stockable))
+                market.Keep(product.Id, 0);
+
             var held = new Dictionary<string, double>(market.Contents);
             var allocation = Allocate(communeId, structures, products, held);
 

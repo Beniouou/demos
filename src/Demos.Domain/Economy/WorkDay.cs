@@ -23,7 +23,8 @@ public static class WorkDay
         Func<string, Market> marketOf,
         Func<string, Treasury>? communeFundOf = null,
         WageLedger? wageLedger = null,
-        Func<Structure, Treasury>? companyFundOf = null)
+        Func<Structure, Treasury>? companyFundOf = null,
+        Func<Structure, double>? energyShareOf = null)
     {
         // Qui travaille où, rangé une fois par bâtiment, et les classes par identifiant : on ne parcourt pas toutes les
         // classes du pays pour chaque bâtiment.
@@ -60,6 +61,9 @@ public static class WorkDay
             var produced = workplace.Production is { } production
                 ? production.QuantityPerWorker * productionWorkers.GetValueOrDefault(workplace.Id)
                 : 0;
+
+            // Sans assez d'énergie la veille (chauffage, eau), le bâtiment produit moins.
+            produced *= energyShareOf?.Invoke(workplace) ?? 1;
 
             // Les matières viennent du stockage de la commune ; sans elles, le bâtiment produit moins.
             if (workplace.Production is { } recipe)

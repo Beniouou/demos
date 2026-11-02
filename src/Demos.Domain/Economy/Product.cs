@@ -22,7 +22,9 @@ public enum NeedCategory
 /// Durée de vie de base d'un produit périssable (pain, farine, alcool…), en jours, dans un stockage général ; plus longue
 /// dans un grenier ou un stockage spécifique. Null pour un produit qui ne se périme pas.
 /// </param>
-public sealed record ProductDefinition(string Id, string Name, NeedCategory? Need, double BasePrice, double? ShelfLifeDays = null)
+/// <param name="Stockable">Faux pour un produit qui se consomme le jour même ou se perd (l'eau, plus tard l'électricité).</param>
+public sealed record ProductDefinition(
+    string Id, string Name, NeedCategory? Need, double BasePrice, double? ShelfLifeDays = null, bool Stockable = true)
 {
     public bool IsPerishable => ShelfLifeDays is > 0;
 }

@@ -28,7 +28,8 @@ public static class Education
         IReadOnlyDictionary<string, Structure> structures,
         IReadOnlyList<SocialClass> classes,
         Treasury treasury,
-        Func<Structure, Treasury>? companyFundOf = null)
+        Func<Structure, Treasury>? companyFundOf = null,
+        Func<Structure, double>? energyShareOf = null)
     {
         foreach (var level in Enum.GetValues<EducationLevel>())
         {
@@ -36,7 +37,8 @@ public static class Education
                 structures,
                 classes,
                 treasury,
-                s => s.SchoolLevel == level ? s.SchoolPlaces : 0,
+                // Une école mal chauffée ou sans eau n'offre qu'une partie de ses places.
+                s => s.SchoolLevel == level ? s.SchoolPlaces * (energyShareOf?.Invoke(s) ?? 1) : 0,
                 s => s.DailyTuition,
                 c => c.Rank == StudentsOf(level),
                 s => s.PointsPerPupil,

@@ -23,7 +23,7 @@ public static class PlaceAllocation
         IReadOnlyDictionary<string, Structure> structures,
         IReadOnlyList<SocialClass> classes,
         Treasury treasury,
-        Func<Structure, int> placesOf,
+        Func<Structure, double> placesOf,
         Func<Structure, double> dailyFeeOf,
         Func<SocialClass, bool>? admits = null,
         Func<Structure, double>? valuePerPlaceOf = null,

@@ -7,6 +7,7 @@
   { "id": "alcool", "name": "Alcool", "need": "Leisure", "basePrice": 1, "shelfLifeDays": 365 },
   { "id": "services", "name": "Services", "need": "Services", "basePrice": 10 },
   { "id": "energie", "name": "Énergie", "need": "Energy", "basePrice": 2 },
+  { "id": "eau", "name": "Eau", "basePrice": 1, "stockable": false },
   { "id": "ble", "name": "Blé", "basePrice": 1, "shelfLifeDays": 180 },
   { "id": "lin", "name": "Lin", "basePrice": 1 },
   { "id": "carcasse", "name": "Carcasse", "basePrice": 1, "shelfLifeDays": 5 },

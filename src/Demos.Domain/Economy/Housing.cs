@@ -25,10 +25,12 @@ public static class Housing
         IReadOnlyDictionary<string, Structure> structures,
         IReadOnlyList<SocialClass> classes,
         Treasury treasury,
-        Func<Structure, Treasury>? companyFundOf = null)
+        Func<Structure, Treasury>? companyFundOf = null,
+        Func<Structure, double>? energyShareOf = null)
     {
+        // Un logement mal chauffé ou sans eau n'offre qu'une partie de ses places.
         var housed = PlaceAllocation.Allocate(
-            structures, classes, treasury, s => s.HousingPlaces, s => s.DailyRent,
+            structures, classes, treasury, s => s.HousingPlaces * (energyShareOf?.Invoke(s) ?? 1), s => s.DailyRent,
             companyFundOf: companyFundOf, placesPerMemberOf: c => PlacesPerPerson(c.Rank));
 
         foreach (var (socialClass, served) in housed)

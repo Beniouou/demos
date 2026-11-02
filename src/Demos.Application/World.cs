@@ -154,6 +154,20 @@ public sealed class World
     /// <summary>Nombre de travailleurs de production de chaque structure, recalculé chaque jour.</summary>
     public IReadOnlyDictionary<string, double> Workers { get; set; } = new Dictionary<string, double>();
 
+    /// <summary>
+    /// Part de ses besoins en énergie que chaque bâtiment a couverte le dernier jour (1 s'il n'en a pas besoin).
+    /// </summary>
+    public IReadOnlyDictionary<string, double> EnergyShares { get; set; } = new Dictionary<string, double>();
+
+    public double EnergyShareOf(Structure building) => EnergyShares.GetValueOrDefault(building.Id, 1);
+
+    /// <summary>Effet de son énergie sur un bâtiment : 1 s'il a tout, la moitié s'il n'a rien.</summary>
+    public double EnergyEffectOf(Structure building) => Energy.EffectOf(EnergyShareOf(building));
+
+    /// <summary>La « liste » d'un bâtiment, d'après son type du catalogue ; 0 (pas d'énergie) hors catalogue.</summary>
+    public int TierOf(Structure building) =>
+        building.TypeId is { } typeId && BuildingTypes.TryGetValue(typeId, out var type) ? type.Tier : 0;
+
     /// <summary>Pollution de chaque commune par habitant et par jour, recalculée chaque jour.</summary>
     public IReadOnlyDictionary<string, double> PollutionByCommune { get; set; } = new Dictionary<string, double>();
 

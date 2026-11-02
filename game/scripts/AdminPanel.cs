@@ -28,6 +28,7 @@ public partial class AdminPanel : PanelContainer
     private SpinBox _jobs = null!;
     private SpinBox _wage = null!;
     private OptionButton _recipe = null!;
+    private OptionButton _heating = null!;
     private readonly List<Production> _recipes = [];
     private SpinBox _perWorker = null!;
     private SpinBox _places = null!;
@@ -129,6 +130,9 @@ public partial class AdminPanel : PanelContainer
         if (building.StorageCapacity > 0)
             lines.Add(DescribeStorage(building));
 
+        if (world.TierOf(building) == 1 && Energy.UnitsOf(building) > 0)
+            lines.Add($"Énergie (chauffage au {building.HeatingProductId ?? Energy.DefaultHeating}, eau) : {world.EnergyShareOf(building):P0} des besoins couverts");
+
         lines.Add($"Postes de personnages : 0 occupé sur {building.Posts} (recrutement : menu à venir)");
 
         if (world.Wages.PaidShare(building.Id) is { } paidShare)
@@ -136,7 +140,7 @@ public partial class AdminPanel : PanelContainer
         var profit = _simulation.DailyProfitOf(building);
         lines.Add($"Bénéfice attendu : {profit:N0} par jour, prix accepté au plus {Privatization.MaximumPriceOf(profit):N0}");
         if (Companies.HasCompanyFund(building))
-            lines.Add($"Caisse de l'entreprise : {world.CompanyFundOf(building).Balance:N0} (réserve gardée : {Companies.ReserveOf(building):N0}, le reste va aux propriétaires)");
+            lines.Add($"Caisse de l'entreprise : {world.CompanyFundOf(building).Balance:N0} (réserve gardée : {Companies.ReserveOf(building, world.PriceOf):N0}, le reste va aux propriétaires)");
 
         lines.Add(building.Ownership == Ownership.Public
             ? $"Payé par la caisse de la commune puis le trésor ({world.Treasury.Balance:N0})"
@@ -178,6 +182,7 @@ public partial class AdminPanel : PanelContainer
         _jobs = AddSpin(form, "Emplois de production", 0, 100_000, 10);
         _wage = AddSpin(form, "Salaire de base par jour", 0, 1_000, 0.1);
         _recipe = AddOption(form, "Recette (ce que produit le bâtiment)", []);
+        _heating = AddOption(form, "Chauffage", Energy.HeatingFuels);
         _perWorker = AddSpin(form, "Production par travailleur", 0, 100, 0.01);
         _pollution = AddSpin(form, "Pollution par travailleur", 0, 100, 0.01);
         _storage = AddSpin(form, "Capacité de stockage", 0, 1_000_000, 100);
@@ -305,6 +310,8 @@ public partial class AdminPanel : PanelContainer
         foreach (var recipe in _recipes)
             _recipe.AddItem(recipe.Label);
         _recipe.Disabled = _recipes.Count < 2;
+        _heating.Select(System.Math.Max(0, Energy.HeatingFuels.ToList().IndexOf(building.HeatingProductId ?? Energy.DefaultHeating)));
+        _heating.Disabled = _simulation.World.TierOf(building) != 1 || Energy.UnitsOf(building) <= 0;
         _recipe.Select(_recipes.FindIndex(r => building.Production is { } current && r.Label == current.Label));
 
         var production = building.Production;
@@ -328,6 +335,7 @@ public partial class AdminPanel : PanelContainer
             Jobs = (int)_jobs.Value,
             DailyWage = _wage.Value,
             Production = ChosenProduction(building),
+            HeatingProductId = Energy.HeatingFuels[System.Math.Max(0, _heating.Selected)],
             HousingPlaces = (int)_places.Value,
             DailyRent = _rent.Value,
             PollutionPerWorker = _pollution.Value,

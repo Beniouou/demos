@@ -15,6 +15,8 @@ public static class PrototypeScenario
 {
     public const double StartingTreasury = 50_000;
 
+    public const double StartingCoal = 6_000;
+
     public const string FirstCommuneId = "commune-1";
 
     public static Simulation Create(IContentSource content)
@@ -27,6 +29,12 @@ public static class PrototypeScenario
             new(FirstCommuneId, "Première commune", StructureKind.PoliticalEntity, "etat"),
             types["camp-de-base"].Build("camp-de-base-1", FirstCommuneId),
             types["carriere"].Build("carriere", FirstCommuneId, Ownership.Cooperative, "ouvriers", "Carrière coopérative"),
+
+            // Énergie : un puits pour l'eau (1 000 par jour), une mine de charbon (100 par jour) qui chauffe tous les
+            // bâtiments de départ (190 par jour en hiver, 95 au printemps et en automne, rien en été).
+            types["puits"].Build("puits", FirstCommuneId, name: "Puits d'État"),
+            types["mine"].BuildFor("charbon", "mine", FirstCommuneId, Ownership.Cooperative, "ouvriers", "Mine de charbon coopérative")
+                with { Jobs = 200 },
 
             // Chaîne du pain et de l'alcool : blé → farine → pain, alcool. Les emplois couvrent à peu près ce que
             // consomment 5 000 habitants (5 000 pains et 280 alcools par jour).
@@ -47,7 +55,8 @@ public static class PrototypeScenario
             types["atelier"].BuildFor("meubles", "menuiserie", FirstCommuneId, name: "Menuiserie d'État") with { Jobs = 40 },
 
             // Logements : 5 600 places pour 4 500 ouvriers (1 place), 450 professions intermédiaires (2) et 50 cadres (4).
-            types["logements"].Build("logements-etat", FirstCommuneId, name: "Logements d'État") with { HousingPlaces = 3_100 },
+            types["logements"].Build("logements-etat", FirstCommuneId, name: "Logements d'État")
+                with { HousingPlaces = 3_100 },
             types["logements"].Build("logements-prives", FirstCommuneId, Ownership.Private, "cadres", "Logements privés")
                 with { HousingPlaces = 2_200, DailyRent = 0.5 },
             types["ecole"].Build("ecole", FirstCommuneId, name: "École d'État"),
@@ -55,6 +64,9 @@ public static class PrototypeScenario
             types["entrepot"].Build("entrepot", FirstCommuneId, name: "Entrepôt d'État"),
             types["grenier"].Build("grenier", FirstCommuneId, name: "Grenier d'État"),
         };
+
+        // Tous les bâtiments de départ se chauffent au charbon ; le bois sert aux planches et à construire.
+        structures = structures.Select(s => s.Kind == StructureKind.Building ? s with { HeatingProductId = "charbon" } : s).ToList();
 
         SocialClass[] classes =
         [
@@ -83,13 +95,18 @@ public static class PrototypeScenario
         // payer la dotation d'une première nouvelle commune.
         world.Treasury.Deposit(StartingTreasury);
 
-        // Chaque entreprise privée ou coopérative part avec sa réserve (30 jours de salaires), prise à ses propriétaires.
+        // Réserve de charbon de l'État pour passer le premier hiver : la partie commence le 1er janvier, et la mine ne
+        // fait que la moitié de ce qu'on brûle en hiver.
+        world.MarketOf(FirstCommuneId).Offer("charbon", StartingCoal, Market.StateSellerId(FirstCommuneId));
+
+        // Chaque entreprise privée ou coopérative part avec sa réserve (30 jours de salaires et d'énergie), prise à ses
+        // propriétaires.
         foreach (var building in world.Structures.Values.Where(Companies.HasCompanyFund))
         {
             if (building.OwnerClassId is not { } ownerId || !world.ClassesById.TryGetValue(ownerId, out var owner))
                 continue;
 
-            var reserve = Math.Min(Companies.ReserveOf(building), Math.Max(0, owner.Wealth));
+            var reserve = Math.Min(Companies.ReserveOf(building, world.PriceOf), Math.Max(0, owner.Wealth));
             owner.Wealth -= reserve;
             world.CompanyFundOf(building).Deposit(reserve);
         }

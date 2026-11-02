@@ -4,7 +4,9 @@ namespace Demos.Domain.Politics;
 /// Type de bâtiment du catalogue, avec ses paramètres par défaut. Le niveau indique la version améliorée
 /// d'un même usage (une ferme devient une entreprise agricole). Un bâtiment de production peut être polyvalent :
 /// ses recettes sont les productions possibles (un atelier fait du pain, des vêtements ou des meubles…), et chaque
-/// bâtiment construit en choisit une ; la première est celle par défaut.
+/// bâtiment construit en choisit une ; la première est celle par défaut. Le tier est la « liste » du bâtiment, son niveau
+/// technique : 1 pour les bâtiments chauffés et alimentés en eau, 2 pour ceux qui auront besoin d'électricité, 3 pour
+/// ceux qui auront besoin d'internet.
 /// </summary>
 public sealed record BuildingType(
     string Id,
@@ -26,7 +28,8 @@ public sealed record BuildingType(
     int StorageCapacity = 0,
     Economy.StorageKind StorageKind = Economy.StorageKind.General,
     string? StorageProductId = null,
-    IReadOnlyList<Production>? Recipes = null)
+    IReadOnlyList<Production>? Recipes = null,
+    int Tier = 1)
 {
     /// <summary>Les productions possibles de ce type : ses recettes, ou sa seule production.</summary>
     public IReadOnlyList<Production> AvailableRecipes =>
