@@ -197,7 +197,8 @@ public sealed class Simulation(World world, GameClock clock)
     }
 
     /// <summary>Dotation versée à la fondation : 60 jours de salaires de production du camp de base.</summary>
-    public static double FoundingGrantOf(BuildingType camp) => FoundingGrantDays * camp.Jobs * camp.DailyWage;
+    public static double FoundingGrantOf(BuildingType camp) =>
+        FoundingGrantDays * camp.Jobs * Staffing.WageOf(camp.DailyWage, camp.Wages, camp.MainRank);
 
     // Ordre du document de règles : emplois, production et salaires, énergie des bâtiments, échanges entre communes,
     // logement, école, consommation, ventes, bénéfices des entreprises versés aux propriétaires, impôts, légitimité,

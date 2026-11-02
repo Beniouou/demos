@@ -17,11 +17,12 @@ public static class Pricing
     public static double Margin => Balance.Current.Margin;
 
     /// <summary>
-    /// Salaires d'un emploi principal (de production d'ordinaire), avec la part d'encadrement et de direction qui
-    /// l'accompagne.
+    /// Salaires d'un emploi productif avec les proportions et les salaires par défaut (salaire de base × 1, 2 ou 4,
+    /// encadrement 0,1, direction 0,01). Un bâtiment du catalogue a ses propres proportions et salaires : voir
+    /// <see cref="Staffing.WageBillPerJob(BuildingType)"/>.
     /// </summary>
     public static double WageCostPerProductionJob(double dailyWage, Rank mainRank = Rank.Workers) =>
-        dailyWage * Enum.GetValues<Rank>().Sum(rank => Staffing.ShareOf(mainRank, rank) * Staffing.WageMultiplier(rank));
+        Staffing.WageBillPerJob(mainRank, null, dailyWage, null);
 
     /// <summary>
     /// Prix d'une unité produite par ce type avec sa première recette, ou null s'il ne produit rien. Les matières sont
@@ -36,7 +37,7 @@ public static class Pricing
             return null;
 
         var materials = recipe.Materials.Sum(m => m.Quantity * (priceOf?.Invoke(m.ProductId) ?? 0));
-        var perJob = WageCostPerProductionJob(reference.DailyWage, reference.MainRank) + EnergyCostPerJob(reference, recipe, priceOf);
+        var perJob = Staffing.WageBillPerJob(reference) + EnergyCostPerJob(reference, recipe, priceOf);
         return (1 + Margin) * (perJob / recipe.QuantityPerWorker + materials);
     }
 

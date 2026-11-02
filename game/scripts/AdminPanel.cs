@@ -26,7 +26,8 @@ public partial class AdminPanel : PanelContainer
     private OptionButton _ownership = null!;
     private OptionButton _owner = null!;
     private SpinBox _jobs = null!;
-    private SpinBox _wage = null!;
+    private readonly Dictionary<Demos.Domain.Population.Rank, SpinBox> _ratios = [];
+    private readonly Dictionary<Demos.Domain.Population.Rank, SpinBox> _wages = [];
     private OptionButton _recipe = null!;
     private OptionButton _heating = null!;
     private readonly List<Production> _recipes = [];
@@ -118,7 +119,7 @@ public partial class AdminPanel : PanelContainer
                 lines.Add("Matières par jour : " + string.Join(", ", production.Materials.Select(m => $"{m.ProductId} {perDay * m.Quantity:N1}")));
         }
 
-        var wages = world.Classes.Sum(c => c.MembersWorkingIn(building.Id) * building.DailyWage * Demos.Domain.Economy.Staffing.WageMultiplier(c.Rank));
+        var wages = world.Classes.Sum(c => c.MembersWorkingIn(building.Id) * Demos.Domain.Economy.Staffing.WageOf(building, c.Rank));
         if (wages > 0)
             lines.Add($"Salaires dus : {wages:N0} par jour");
         if (building.HousingPlaces > 0)
@@ -184,8 +185,12 @@ public partial class AdminPanel : PanelContainer
 
         _ownership = AddOption(form, "Propriétaire", ["État (public)", "Privé", "Coopérative"]);
         _owner = AddOption(form, "Classe propriétaire", _simulation.World.Classes.Select(c => c.Name));
-        _jobs = AddSpin(form, "Emplois de production", 0, 100_000, 10);
-        _wage = AddSpin(form, "Salaire de base par jour", 0, 1_000, 0.1);
+        _jobs = AddSpin(form, "Emplois productifs", 0, 100_000, 10);
+        foreach (var rank in Ranks)
+        {
+            _ratios[rank] = AddSpin(form, $"Emplois de {RankName(rank)} par emploi productif", 0, 10, 0.01);
+            _wages[rank] = AddSpin(form, $"Salaire par jour : {RankName(rank)}", 0, 1_000, 0.1);
+        }
         _recipe = AddOption(form, "Recette (ce que produit le bâtiment)", []);
         _heating = AddOption(form, "Chauffage", Energy.HeatingFuels);
         _perWorker = AddSpin(form, "Production par travailleur", 0, 100, 0.01);
@@ -289,7 +294,13 @@ public partial class AdminPanel : PanelContainer
         _owner.Disabled = building.Ownership == Ownership.Public;
 
         _jobs.Value = building.Jobs;
-        _wage.Value = building.DailyWage;
+        foreach (var rank in Ranks)
+        {
+            // Le rang productif compte 1 par emploi productif : sa proportion ne se règle pas.
+            _ratios[rank].Value = Staffing.RatioOf(building.MainRank, building.StaffRatios, rank);
+            _ratios[rank].Editable = rank != building.MainRank;
+            _wages[rank].Value = Staffing.WageOf(building, rank);
+        }
         _places.Value = building.HousingPlaces;
         _rent.Value = building.DailyRent;
         _pollution.Value = building.PollutionPerWorker;
@@ -338,7 +349,8 @@ public partial class AdminPanel : PanelContainer
             Ownership = ownership,
             OwnerClassId = ownership == Ownership.Public ? null : _simulation.World.Classes[_owner.Selected].Id,
             Jobs = (int)_jobs.Value,
-            DailyWage = _wage.Value,
+            StaffRatios = Ranks.Where(r => r != building.MainRank).ToDictionary(r => r, r => _ratios[r].Value),
+            Wages = Ranks.ToDictionary(r => r, r => _wages[r].Value),
             Production = ChosenProduction(building),
             HeatingProductId = Energy.HeatingFuels[System.Math.Max(0, _heating.Selected)],
             HousingPlaces = (int)_places.Value,
@@ -450,6 +462,16 @@ public partial class AdminPanel : PanelContainer
             ? recipe with { QuantityPerWorker = _perWorker.Value }
             : recipe;
     }
+
+    private static readonly Demos.Domain.Population.Rank[] Ranks =
+        [Demos.Domain.Population.Rank.Workers, Demos.Domain.Population.Rank.Intermediate, Demos.Domain.Population.Rank.Executives];
+
+    private static string RankName(Demos.Domain.Population.Rank rank) => rank switch
+    {
+        Demos.Domain.Population.Rank.Workers => "ouvriers",
+        Demos.Domain.Population.Rank.Intermediate => "prof. intermédiaires",
+        _ => "cadres",
+    };
 
     private string[] ProductIds => _simulation.World.Products.Select(p => p.Id).ToArray();
 

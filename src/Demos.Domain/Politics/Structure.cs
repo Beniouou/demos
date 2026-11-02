@@ -63,8 +63,11 @@ public readonly record struct Production(string ProductId, double QuantityPerWor
 /// <param name="StorageLimits">Quantité maximale de certains produits dans ce stockage ; un produit absent n'est pas limité.</param>
 /// <param name="HeatingProductId">Combustible du chauffage (bois ou charbon) ; le bois par défaut.</param>
 /// <param name="MainRank">
-/// Rang des emplois principaux : les ouvriers d'ordinaire, les professions intermédiaires dans un bâtiment de services.
+/// Rang productif : celui des emplois dont dépend la production (les ouvriers d'ordinaire, les professions intermédiaires
+/// dans un bâtiment de services). <c>Jobs</c> compte ces emplois productifs.
 /// </param>
+/// <param name="StaffRatios">Emplois des autres rangs par emploi productif ; null pour les proportions par défaut.</param>
+/// <param name="Wages">Salaire par jour de chaque rang ; null pour le salaire de base × multiplicateur.</param>
 public sealed record Structure(
     string Id,
     string Name,
@@ -89,7 +92,9 @@ public sealed record Structure(
     string? StorageProductId = null,
     IReadOnlyDictionary<string, double>? StorageLimits = null,
     string? HeatingProductId = null,
-    Population.Rank MainRank = Population.Rank.Workers)
+    Population.Rank MainRank = Population.Rank.Workers,
+    IReadOnlyDictionary<Population.Rank, double>? StaffRatios = null,
+    IReadOnlyDictionary<Population.Rank, double>? Wages = null)
 {
     public bool IsNational => ParentId is null;
 }

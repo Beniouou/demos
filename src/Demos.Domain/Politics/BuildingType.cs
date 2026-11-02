@@ -7,8 +7,8 @@ namespace Demos.Domain.Politics;
 /// bâtiment construit en choisit une ; la première est celle par défaut. Le tier est la « liste » du bâtiment, son niveau
 /// technique : 1 pour les bâtiments chauffés et alimentés en eau, 2 pour ceux qui auront besoin d'électricité, 3 pour
 /// ceux qui auront besoin d'internet. Un bâtiment à chauffage constant (la forge) chauffe autant toute l'année, au
-/// lieu de suivre les saisons. Le rang des emplois principaux est celui des ouvriers d'ordinaire, celui des professions
-/// intermédiaires dans un bâtiment de services.
+/// lieu de suivre les saisons. Le rang productif est celui des ouvriers d'ordinaire, celui des professions
+/// intermédiaires dans un bâtiment de services ; les proportions d'emplois et le salaire sont fixés pour chaque rang.
 /// </summary>
 public sealed record BuildingType(
     string Id,
@@ -33,7 +33,9 @@ public sealed record BuildingType(
     IReadOnlyList<Production>? Recipes = null,
     int Tier = 1,
     bool ConstantHeating = false,
-    Population.Rank MainRank = Population.Rank.Workers)
+    Population.Rank MainRank = Population.Rank.Workers,
+    IReadOnlyDictionary<Population.Rank, double>? StaffRatios = null,
+    IReadOnlyDictionary<Population.Rank, double>? Wages = null)
 {
     /// <summary>Les productions possibles de ce type : ses recettes, ou sa seule production.</summary>
     public IReadOnlyList<Production> AvailableRecipes =>
@@ -51,7 +53,8 @@ public sealed record BuildingType(
             DefaultProduction, Jobs, DailyWage, HousingPlaces, DailyRent, TypeId: Id, Posts: Posts,
             SchoolPlaces: SchoolPlaces, DailyTuition: DailyTuition, SchoolLevel: SchoolLevel, PointsPerPupil: PointsPerPupil,
             PollutionPerWorker: PollutionPerWorker, StorageCapacity: StorageCapacity,
-            StorageKind: StorageKind, StorageProductId: StorageProductId, MainRank: MainRank);
+            StorageKind: StorageKind, StorageProductId: StorageProductId, MainRank: MainRank,
+            StaffRatios: StaffRatios, Wages: Wages);
 
     /// <summary>Crée un bâtiment de ce type qui fabrique un produit précis, avec la première recette qui le fait.</summary>
     public Structure BuildFor(string productId, string id, string parentId, Ownership ownership = Ownership.Public, string? ownerClassId = null, string? name = null) =>

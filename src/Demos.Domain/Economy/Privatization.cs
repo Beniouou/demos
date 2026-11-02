@@ -40,7 +40,7 @@ public static class Privatization
             ? output * (priceOf(recipe.ProductId) - recipe.Materials.Sum(m => m.Quantity * priceOf(m.ProductId)))
             : 0;
         var places = building.HousingPlaces * building.DailyRent + building.SchoolPlaces * building.DailyTuition;
-        var wages = classes.Sum(c => c.MembersWorkingIn(building.Id) * building.DailyWage * Staffing.WageMultiplier(c.Rank));
+        var wages = classes.Sum(c => c.MembersWorkingIn(building.Id) * Staffing.WageOf(building, c.Rank));
         return production + places - wages;
     }
 

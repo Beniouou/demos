@@ -24,11 +24,14 @@ var catalogueWoodPrice = content.LoadProducts().First(p => p.Id == Energy.Defaul
 var book = new Book(workbook, world, balance, catalogueWoodPrice);
 book.WriteReadMe();
 book.WriteConstants();
-book.WriteProducts();
 book.WriteBuildings();
+book.WriteProducts();
 book.WriteRecipes();
 book.WriteNeeds();
 book.WriteStartingGame();
+
+// Les bâtiments sont écrits avant les produits (les prix s'y réfèrent), mais rangés après.
+workbook.Worksheet("Produits").Position = 3;
 workbook.SaveAs(outputPath);
 Console.WriteLine($"Tableur d'équilibrage écrit : {outputPath}");
 
@@ -87,13 +90,19 @@ internal sealed class Book(XLWorkbook workbook, World world, BalanceSettings bal
 
     private string Price(string productCell) => $"IFERROR(INDEX({_productPrices},MATCH({productCell},{_productIds},0)),0)";
 
-    /// <summary>Salaires d'un emploi principal, avec l'encadrement et la direction qui l'accompagnent.</summary>
-    private string WageCostFormula(string wageCell, Rank mainRank) => mainRank switch
-    {
-        Rank.Workers => $"{wageCell}*({C("MultOuvriers")}+{C("Encadrement")}*{C("MultPI")}+{C("Direction")}*{C("MultCadres")})",
-        Rank.Intermediate => $"{wageCell}*({C("MultPI")}+{C("Encadrement")}*{C("MultCadres")})",
-        _ => $"{wageCell}*{C("MultCadres")}",
-    };
+    // Feuille Bâtiments : dernière ligne, pour les recherches par identifiant de type.
+    private int _buildingLast;
+
+    private string BuildingColumn(string column) => $"'Bâtiments'!${column}$2:${column}${_buildingLast}";
+
+    /// <summary>Valeur d'une colonne de la feuille Bâtiments pour un type (par son identifiant).</summary>
+    private string Lookup(string typeIdCell, string column) =>
+        $"IFERROR(INDEX({BuildingColumn(column)},MATCH({typeIdCell},{BuildingColumn("A")},0)),0)";
+
+    // Colonnes de la feuille Bâtiments : proportion d'emplois et salaire de chaque rang, salaires par emploi productif.
+    private static readonly string[] RatioColumns = ["I", "J", "K"];
+    private static readonly string[] WageColumns = ["L", "M", "N"];
+    private const string WageBillColumn = "O";
 
     /// <summary>Énergie d'une unité (emploi ou place) sur l'année, pour un bâtiment de la liste 1.</summary>
     private string EnergyPerUnitFormula(int tier, bool constantHeating, string productCell)
@@ -174,19 +183,18 @@ internal sealed class Book(XLWorkbook workbook, World world, BalanceSettings bal
         (string Key, string Label, object Value, string Note)[] rows =
         [
             ("Marge", "Marge", balance.Margin, "Bénéfice d'un bâtiment de référence à plein régime : fixe les prix."),
-            ("Encadrement", "Encadrement par emploi", balance.SupervisorsPerJob, "Emplois du rang au-dessus pour un emploi principal."),
-            ("Direction", "Direction par emploi", balance.DirectorsPerJob, "Emplois deux rangs au-dessus pour un emploi principal."),
-            ("MultOuvriers", "Multiplicateur de salaire : ouvriers", balance.WageMultipliers[Rank.Workers], "Salaire = salaire de base × multiplicateur."),
-            ("MultPI", "Multiplicateur de salaire : prof. intermédiaires", balance.WageMultipliers[Rank.Intermediate], ""),
-            ("MultCadres", "Multiplicateur de salaire : cadres", balance.WageMultipliers[Rank.Executives], ""),
-            ("SalaireRef", "Salaire de base de référence", 2.0, "Salaire de base de la plupart des bâtiments (pour la feuille Besoins)."),
+            ("Encadrement", "Encadrement par emploi (par défaut)", balance.SupervisorsPerJob, "Pour un bâtiment sans proportions propres ; voir la feuille Bâtiments."),
+            ("Direction", "Direction par emploi (par défaut)", balance.DirectorsPerJob, "Pour un bâtiment sans proportions propres."),
+            ("MultOuvriers", "Multiplicateur de salaire : ouvriers (par défaut)", balance.WageMultipliers[Rank.Workers], "Pour un bâtiment sans salaires propres ; voir la feuille Bâtiments."),
+            ("MultPI", "Multiplicateur de salaire : prof. intermédiaires (par défaut)", balance.WageMultipliers[Rank.Intermediate], ""),
+            ("MultCadres", "Multiplicateur de salaire : cadres (par défaut)", balance.WageMultipliers[Rank.Executives], ""),
             ("Chauffage", "Chauffage par emploi ou place et par jour", balance.HeatingPerUnit, "Bois ou charbon, au printemps et en automne."),
             ("Eau", "Eau par emploi ou place et par jour", balance.WaterPerUnit, ""),
             ("Hiver", "Chauffage en hiver (×)", balance.HeatingBySeason[Season.Winter], ""),
             ("Printemps", "Chauffage au printemps (×)", balance.HeatingBySeason[Season.Spring], ""),
             ("Ete", "Chauffage en été (×)", balance.HeatingBySeason[Season.Summer], ""),
             ("Automne", "Chauffage en automne (×)", balance.HeatingBySeason[Season.Autumn], ""),
-            ("FacteurMoyen", "Chauffage moyen sur l'année (×)", "=AVERAGE(B11:B14)", "Calculé."),
+            ("FacteurMoyen", "Chauffage moyen sur l'année (×)", "=MOYENNE", "Calculé."),
             ("SansEnergie", "Activité sans énergie", balance.OutputWithoutEnergy, "Part de l'activité gardée sans chauffage ni eau."),
             ("ReserveCombustible", "Réserve de combustible (jours)", balance.FuelReserveDays, "Jours de chauffage normal gardés dans chaque bâtiment."),
             ("ReserveEntreprise", "Réserve des entreprises (jours)", balance.CompanyReserveDays, "Jours de salaires et d'énergie gardés en caisse."),
@@ -208,8 +216,8 @@ internal sealed class Book(XLWorkbook workbook, World world, BalanceSettings bal
             var (key, label, value, note) = rows[i];
             var row = i + 2;
             sheet.Cell(row, 1).Value = label;
-            if (value is string formula && formula.StartsWith('='))
-                sheet.Cell(row, 2).FormulaA1 = formula[1..];
+            if (key == "FacteurMoyen")
+                sheet.Cell(row, 2).FormulaA1 = $"AVERAGE({C("Hiver")},{C("Printemps")},{C("Ete")},{C("Automne")})";
             else
                 Input(sheet.Cell(row, 2), Convert.ToDouble(value));
             sheet.Cell(row, 3).Value = note;
@@ -223,8 +231,9 @@ internal sealed class Book(XLWorkbook workbook, World world, BalanceSettings bal
     {
         var sheet = workbook.AddWorksheet("Produits");
         Header(sheet, 1, "Id", "Nom", "Besoin", "Stockable", "Durée de vie (jours)", "Bâtiment de référence", "Liste",
-            "Rang principal", "Salaire de base", "Production par travailleur", "Matière 1", "Quantité 1", "Matière 2", "Quantité 2",
-            "Coût salarial par emploi", "Énergie par emploi", "Coût des matières", "Prix recalculé", "Prix du jeu", "Écart");
+            "Rang productif", "Salaires par emploi productif (feuille Bâtiments)", "Production par travailleur", "Matière 1",
+            "Quantité 1", "Matière 2", "Quantité 2", "Coût salarial par emploi", "Énergie par emploi", "Coût des matières",
+            "Prix recalculé", "Prix du jeu", "Écart");
 
         var products = world.Products;
         for (var i = 0; i < products.Count; i++)
@@ -253,10 +262,10 @@ internal sealed class Book(XLWorkbook workbook, World world, BalanceSettings bal
             }
 
             var (type, recipe) = reference;
-            sheet.Cell(row, 6).Value = type.Name;
+            sheet.Cell(row, 6).Value = type.Id;
             sheet.Cell(row, 7).Value = type.Tier;
             sheet.Cell(row, 8).Value = RankName(type.MainRank);
-            Input(sheet.Cell(row, 9), type.DailyWage);
+            sheet.Cell(row, 9).FormulaA1 = Lookup($"F{row}", WageBillColumn);
             Input(sheet.Cell(row, 10), recipe.QuantityPerWorker);
             for (var m = 0; m < Math.Min(2, recipe.Materials.Count); m++)
             {
@@ -264,7 +273,7 @@ internal sealed class Book(XLWorkbook workbook, World world, BalanceSettings bal
                 Input(sheet.Cell(row, 12 + 2 * m), recipe.Materials[m].Quantity);
             }
 
-            sheet.Cell(row, 15).FormulaA1 = WageCostFormula($"I{row}", type.MainRank);
+            sheet.Cell(row, 15).FormulaA1 = $"I{row}";
             sheet.Cell(row, 16).FormulaA1 = EnergyPerUnitFormula(type.Tier, type.ConstantHeating, $"A{row}");
             sheet.Cell(row, 17).FormulaA1 = $"L{row}*{Price($"K{row}")}+N{row}*{Price($"M{row}")}";
             sheet.Cell(row, 18).FormulaA1 = $"(1+{C("Marge")})*((O{row}+P{row})/J{row}+Q{row})";
@@ -278,13 +287,17 @@ internal sealed class Book(XLWorkbook workbook, World world, BalanceSettings bal
     public void WriteBuildings()
     {
         var sheet = workbook.AddWorksheet("Bâtiments");
-        Header(sheet, 1, "Id", "Nom", "Catégorie", "Niveau", "Liste", "Chauffage constant", "Rang principal", "Emplois principaux",
-            "Salaire de base", "Emplois d'encadrement", "Emplois de direction", "Salaires par jour", "Places de logement",
-            "Loyer par place", "Places d'élèves", "Frais par élève", "Stockage", "Sorte de stockage", "Pollution par travailleur",
-            "Unités d'énergie", "Chauffage par jour (moyen)", "Eau par jour", "Recettes");
+        Header(sheet, 1, "Id", "Nom", "Catégorie", "Niveau", "Liste", "Chauffage constant", "Rang productif", "Emplois productifs",
+            "Ouvriers par emploi productif", "Prof. intermédiaires par emploi productif", "Cadres par emploi productif",
+            "Salaire : ouvriers", "Salaire : prof. intermédiaires", "Salaire : cadres", "Salaires par emploi productif",
+            "Emplois d'ouvriers", "Emplois de prof. intermédiaires", "Emplois de cadres", "Salaires par jour",
+            "Places de logement", "Loyer par place", "Places d'élèves", "Frais par élève", "Stockage", "Sorte de stockage",
+            "Pollution par travailleur", "Unités d'énergie", "Chauffage par jour (moyen)", "Eau par jour", "Recettes");
 
+        var types = world.BuildingTypes.Values.OrderBy(t => t.Category).ThenBy(t => t.Level).ToList();
+        _buildingLast = types.Count + 1;
         var row = 2;
-        foreach (var type in world.BuildingTypes.Values.OrderBy(t => t.Category).ThenBy(t => t.Level))
+        foreach (var type in types)
         {
             sheet.Cell(row, 1).Value = type.Id;
             sheet.Cell(row, 2).Value = type.Name;
@@ -294,37 +307,48 @@ internal sealed class Book(XLWorkbook workbook, World world, BalanceSettings bal
             sheet.Cell(row, 6).Value = type.ConstantHeating ? "oui" : "";
             sheet.Cell(row, 7).Value = RankName(type.MainRank);
             Input(sheet.Cell(row, 8), type.Jobs);
-            Input(sheet.Cell(row, 9), type.DailyWage);
-            sheet.Cell(row, 10).FormulaA1 = type.MainRank == Rank.Executives ? "0" : $"H{row}*{C("Encadrement")}";
-            sheet.Cell(row, 11).FormulaA1 = type.MainRank == Rank.Workers ? $"H{row}*{C("Direction")}" : "0";
-            sheet.Cell(row, 12).FormulaA1 = $"H{row}*{WageCostFormula($"I{row}", type.MainRank)}";
-            Input(sheet.Cell(row, 13), type.HousingPlaces);
-            Input(sheet.Cell(row, 14), type.DailyRent);
-            Input(sheet.Cell(row, 15), type.SchoolPlaces);
-            Input(sheet.Cell(row, 16), type.DailyTuition);
-            Input(sheet.Cell(row, 17), type.StorageCapacity);
-            sheet.Cell(row, 18).Value = type.StorageCapacity > 0
+            for (var r = 0; r < Ranks.Length; r++)
+            {
+                // Le rang productif compte 1 par emploi productif ; les autres rangs se règlent.
+                var ratio = Staffing.RatioOf(type.MainRank, type.StaffRatios, Ranks[r]);
+                if (Ranks[r] == type.MainRank)
+                    sheet.Cell(row, 9 + r).Value = ratio;
+                else
+                    Input(sheet.Cell(row, 9 + r), ratio);
+                Input(sheet.Cell(row, 12 + r), Staffing.WageOf(type.DailyWage, type.Wages, Ranks[r]));
+                sheet.Cell(row, 16 + r).FormulaA1 = $"H{row}*{RatioColumns[r]}{row}";
+            }
+
+            sheet.Cell(row, 15).FormulaA1 = $"I{row}*L{row}+J{row}*M{row}+K{row}*N{row}";
+            sheet.Cell(row, 19).FormulaA1 = $"H{row}*O{row}";
+            Input(sheet.Cell(row, 20), type.HousingPlaces);
+            Input(sheet.Cell(row, 21), type.DailyRent);
+            Input(sheet.Cell(row, 22), type.SchoolPlaces);
+            Input(sheet.Cell(row, 23), type.DailyTuition);
+            Input(sheet.Cell(row, 24), type.StorageCapacity);
+            sheet.Cell(row, 25).Value = type.StorageCapacity > 0
                 ? type.StorageKind + (type.StorageProductId is { } stored ? $" ({stored})" : "")
                 : "";
-            Input(sheet.Cell(row, 19), type.PollutionPerWorker);
-            sheet.Cell(row, 20).FormulaA1 = $"H{row}+M{row}+O{row}";
+            Input(sheet.Cell(row, 26), type.PollutionPerWorker);
+            sheet.Cell(row, 27).FormulaA1 = $"H{row}+T{row}+V{row}";
             var factor = type.ConstantHeating ? "1" : C("FacteurMoyen");
-            sheet.Cell(row, 21).FormulaA1 = $"IF(E{row}=1,T{row}*{C("Chauffage")}*{factor},0)";
+            sheet.Cell(row, 28).FormulaA1 = $"IF(E{row}=1,AA{row}*{C("Chauffage")}*{factor},0)";
             var producesWater = type.AvailableRecipes.Any(r => r.ProductId == Energy.Water);
-            sheet.Cell(row, 22).FormulaA1 = producesWater ? "0" : $"IF(E{row}=1,T{row}*{C("Eau")},0)";
-            sheet.Cell(row, 23).Value = string.Join(" ; ", type.AvailableRecipes.Select(r => $"{r.Label} ({r.QuantityPerWorker})"));
+            sheet.Cell(row, 29).FormulaA1 = producesWater ? "0" : $"IF(E{row}=1,AA{row}*{C("Eau")},0)";
+            sheet.Cell(row, 30).Value = string.Join(" ; ", type.AvailableRecipes.Select(r => $"{r.Label} ({r.QuantityPerWorker})"));
             row++;
         }
 
-        sheet.Range(2, 10, row - 1, 12).Style.NumberFormat.Format = "0.00";
-        sheet.Range(2, 21, row - 1, 22).Style.NumberFormat.Format = "0.00";
+        sheet.Range(2, 15, row - 1, 19).Style.NumberFormat.Format = "0.00";
+        sheet.Range(2, 28, row - 1, 29).Style.NumberFormat.Format = "0.00";
         Finish(sheet, 1);
     }
 
     public void WriteRecipes()
     {
         var sheet = workbook.AddWorksheet("Recettes");
-        Header(sheet, 1, "Bâtiment", "Niveau", "Liste", "Rang principal", "Emplois principaux", "Salaire de base", "Produit",
+        Header(sheet, 1, "Bâtiment", "Niveau", "Liste", "Rang productif", "Emplois productifs",
+            "Salaires par emploi productif (feuille Bâtiments)", "Produit",
             "Production par travailleur", "Matière 1", "Quantité 1", "Matière 2", "Quantité 2", "Production par jour",
             "Valeur par jour", "Matières par jour", "Salaires par jour", "Énergie par jour", "Bénéfice par jour", "Marge réelle");
 
@@ -333,12 +357,12 @@ internal sealed class Book(XLWorkbook workbook, World world, BalanceSettings bal
         {
             foreach (var recipe in type.AvailableRecipes)
             {
-                sheet.Cell(row, 1).Value = type.Name;
+                sheet.Cell(row, 1).Value = type.Id;
                 sheet.Cell(row, 2).Value = type.Level;
                 sheet.Cell(row, 3).Value = type.Tier;
                 sheet.Cell(row, 4).Value = RankName(type.MainRank);
                 Input(sheet.Cell(row, 5), type.Jobs);
-                Input(sheet.Cell(row, 6), type.DailyWage);
+                sheet.Cell(row, 6).FormulaA1 = Lookup($"A{row}", WageBillColumn);
                 sheet.Cell(row, 7).Value = recipe.ProductId;
                 Input(sheet.Cell(row, 8), recipe.QuantityPerWorker);
                 for (var m = 0; m < Math.Min(2, recipe.Materials.Count); m++)
@@ -350,7 +374,7 @@ internal sealed class Book(XLWorkbook workbook, World world, BalanceSettings bal
                 sheet.Cell(row, 13).FormulaA1 = $"E{row}*H{row}";
                 sheet.Cell(row, 14).FormulaA1 = $"M{row}*{Price($"G{row}")}";
                 sheet.Cell(row, 15).FormulaA1 = $"M{row}*(J{row}*{Price($"I{row}")}+L{row}*{Price($"K{row}")})";
-                sheet.Cell(row, 16).FormulaA1 = $"E{row}*{WageCostFormula($"F{row}", type.MainRank)}";
+                sheet.Cell(row, 16).FormulaA1 = $"E{row}*F{row}";
                 sheet.Cell(row, 17).FormulaA1 = $"E{row}*({EnergyPerUnitFormula(type.Tier, type.ConstantHeating, $"G{row}")})";
                 sheet.Cell(row, 18).FormulaA1 = $"N{row}-O{row}-P{row}-Q{row}";
                 sheet.Cell(row, 19).FormulaA1 = $"IFERROR(R{row}/(O{row}+P{row}+Q{row}),0)";
@@ -397,15 +421,14 @@ internal sealed class Book(XLWorkbook workbook, World world, BalanceSettings bal
         var lastNeedRow = row;
         row += 2;
 
-        string[] multipliers = ["MultOuvriers", "MultPI", "MultCadres"];
         sheet.Cell(row, 1).Value = "Coût des besoins par jour";
-        sheet.Cell(row + 1, 1).Value = "Salaire d'un emploi principal par jour";
+        sheet.Cell(row + 1, 1).Value = "Salaire par jour dans une ferme (feuille Bâtiments)";
         sheet.Cell(row + 2, 1).Value = "Part du salaire";
         for (var r = 0; r < Ranks.Length; r++)
         {
             var column = XLHelper.GetColumnLetterFromNumber(4 + r);
             sheet.Cell(row, 4 + r).FormulaA1 = $"SUMPRODUCT($C$2:$C${lastNeedRow},{column}2:{column}{lastNeedRow})";
-            sheet.Cell(row + 1, 4 + r).FormulaA1 = $"{C("SalaireRef")}*{C(multipliers[r])}";
+            sheet.Cell(row + 1, 4 + r).FormulaA1 = Lookup("\"ferme\"", WageColumns[r]);
             sheet.Cell(row + 2, 4 + r).FormulaA1 = $"{column}{row}/{column}{row + 1}";
         }
 
@@ -434,7 +457,7 @@ internal sealed class Book(XLWorkbook workbook, World world, BalanceSettings bal
         const int header = 7;
         sheet.Cell(header - 1, 1).Value = "Bâtiments de départ (à plein régime)";
         sheet.Cell(header - 1, 1).Style.Font.Bold = true;
-        Header(sheet, header, "Nom", "Type", "Propriétaire", "Liste", "Rang principal", "Emplois principaux", "Salaire de base",
+        Header(sheet, header, "Nom", "Type", "Propriétaire", "Liste", "Rang productif", "Emplois productifs", "Salaires par emploi productif (feuille Bâtiments)",
             "Produit", "Production par travailleur", "Matière 1", "Quantité 1", "Matière 2", "Quantité 2", "Production par jour",
             "Matière 1 par jour", "Matière 2 par jour", "Combustible", "Unités d'énergie", "Chauffage par jour (moyen)", "Eau par jour",
             "Emplois ouvriers", "Emplois prof. intermédiaires", "Emplois cadres", "Valeur par jour", "Matières par jour",
@@ -452,12 +475,12 @@ internal sealed class Book(XLWorkbook workbook, World world, BalanceSettings bal
                   + (building.OwnerClassId is { } ownerId && world.ClassesById.TryGetValue(ownerId, out var o) ? o.Name : "?");
 
             sheet.Cell(row, 1).Value = building.Name;
-            sheet.Cell(row, 2).Value = type?.Name ?? "—";
+            sheet.Cell(row, 2).Value = type?.Id ?? "—";
             sheet.Cell(row, 3).Value = owner;
             sheet.Cell(row, 4).Value = tier;
             sheet.Cell(row, 5).Value = RankName(building.MainRank);
             Input(sheet.Cell(row, 6), building.Jobs);
-            Input(sheet.Cell(row, 7), building.DailyWage);
+            sheet.Cell(row, 7).FormulaA1 = Lookup($"B{row}", WageBillColumn);
             if (building.Production is { } recipe)
             {
                 sheet.Cell(row, 8).Value = recipe.ProductId;
@@ -477,22 +500,11 @@ internal sealed class Book(XLWorkbook workbook, World world, BalanceSettings bal
             var factor = world.HeatsAllYear(building) ? "1" : C("FacteurMoyen");
             sheet.Cell(row, 19).FormulaA1 = $"IF(D{row}=1,R{row}*{C("Chauffage")}*{factor},0)";
             sheet.Cell(row, 20).FormulaA1 = $"IF(AND(D{row}=1,H{row}<>\"eau\"),R{row}*{C("Eau")},0)";
-            sheet.Cell(row, 21).FormulaA1 = building.MainRank == Rank.Workers ? $"F{row}" : "0";
-            sheet.Cell(row, 22).FormulaA1 = building.MainRank switch
-            {
-                Rank.Workers => $"F{row}*{C("Encadrement")}",
-                Rank.Intermediate => $"F{row}",
-                _ => "0",
-            };
-            sheet.Cell(row, 23).FormulaA1 = building.MainRank switch
-            {
-                Rank.Workers => $"F{row}*{C("Direction")}",
-                Rank.Intermediate => $"F{row}*{C("Encadrement")}",
-                _ => $"F{row}",
-            };
+            for (var r = 0; r < Ranks.Length; r++)
+                sheet.Cell(row, 21 + r).FormulaA1 = $"F{row}*{Lookup($"B{row}", RatioColumns[r])}";
             sheet.Cell(row, 24).FormulaA1 = $"N{row}*{Price($"H{row}")}";
             sheet.Cell(row, 25).FormulaA1 = $"O{row}*{Price($"J{row}")}+P{row}*{Price($"L{row}")}";
-            sheet.Cell(row, 26).FormulaA1 = $"F{row}*{WageCostFormula($"G{row}", building.MainRank)}";
+            sheet.Cell(row, 26).FormulaA1 = $"F{row}*G{row}";
             sheet.Cell(row, 27).FormulaA1 = $"S{row}*{Price($"Q{row}")}+T{row}*{C("PrixEau")}";
             sheet.Cell(row, 28).Value = building.HousingPlaces * building.DailyRent + building.SchoolPlaces * building.DailyTuition;
             sheet.Cell(row, 29).FormulaA1 = $"X{row}-Y{row}-Z{row}-AA{row}+AB{row}";

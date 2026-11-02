@@ -52,7 +52,7 @@ public static class WorkDay
             var market = marketOf(communeId);
 
             var dues = (staffOf.TryGetValue(workplace.Id, out var workers) ? workers : [])
-                .Select(c => (Class: c, Due: c.MembersWorkingIn(workplace.Id) * workplace.DailyWage * Staffing.WageMultiplier(c.Rank)))
+                .Select(c => (Class: c, Due: c.MembersWorkingIn(workplace.Id) * Staffing.WageOf(workplace, c.Rank)))
                 .Where(d => d.Due > 0)
                 .ToList();
             var totalDue = dues.Sum(d => d.Due);
