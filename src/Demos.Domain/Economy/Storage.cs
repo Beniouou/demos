@@ -8,10 +8,10 @@ public enum StorageKind
     /// <summary>Accepte tous les produits (le camp de base, le dépôt logistique).</summary>
     General,
 
-    /// <summary>Produits alimentaires seulement (le grenier).</summary>
+    /// <summary>Produits alimentaires et périssables seulement (le grenier).</summary>
     Food,
 
-    /// <summary>Produits non alimentaires seulement (l'entrepôt).</summary>
+    /// <summary>Produits non alimentaires et non périssables seulement (l'entrepôt).</summary>
     NonFood,
 
     /// <summary>Un seul produit, choisi pour le bâtiment (un silo à pierre, par exemple).</summary>
@@ -58,6 +58,8 @@ public sealed class StorageAllocation
     }
 
     internal double FreeIn(Structure building) => _freeByBuilding[building.Id];
+
+    internal IEnumerable<Structure> Buildings => _buildings;
 }
 
 /// <summary>
@@ -65,8 +67,9 @@ public sealed class StorageAllocation
 /// des classes comme ceux de l'État. Chaque bâtiment n'accepte que sa sorte de produits (général, alimentaire, non
 /// alimentaire, ou un produit précis), et peut limiter la quantité de chaque produit (sans limite par défaut).
 /// Les produits sont rangés d'abord dans les stockages spécifiques, puis alimentaires et non alimentaires, puis
-/// généraux. En fin de journée, ce qui n'a pas trouvé de place est perdu. Les produits déjà chez les habitants
-/// ne comptent pas.
+/// généraux. En fin de journée, ce qui n'a pas trouvé de place est perdu. Les produits périssables (pain, farine,
+/// alcool…) se perdent aussi peu à peu : chaque jour, un bâtiment en perd 1 ÷ leur durée de vie, durée qui est
+/// triplée dans un stockage spécifique et doublée dans un grenier. Les produits déjà chez les habitants ne comptent pas.
 /// </summary>
 public static class Storage
 {
@@ -75,11 +78,23 @@ public static class Storage
 
     public static bool Accepts(Structure building, ProductDefinition? product, string productId) => building.StorageKind switch
     {
-        StorageKind.Food => product?.Need == NeedCategory.Food,
-        StorageKind.NonFood => product?.Need != NeedCategory.Food,
+        StorageKind.Food => IsFood(product),
+        StorageKind.NonFood => !IsFood(product),
         StorageKind.Specific => building.StorageProductId == productId,
         _ => true,
     };
+
+    /// <summary>Ce que le grenier accepte : ce qui nourrit, et tout ce qui se périme.</summary>
+    public static bool IsFood(ProductDefinition? product) => product is not null && (product.Need == NeedCategory.Food || product.IsPerishable);
+
+    /// <summary>Durée de vie d'un produit périssable dans un bâtiment : triplée en stockage spécifique, doublée au grenier.</summary>
+    public static double ShelfLifeIn(Structure building, ProductDefinition product) =>
+        (product.ShelfLifeDays ?? double.PositiveInfinity) * building.StorageKind switch
+        {
+            StorageKind.Specific => 3,
+            StorageKind.Food => 2,
+            _ => 1,
+        };
 
     public static double LimitOf(Structure building, string productId) =>
         building.StorageLimits is { } limits && limits.TryGetValue(productId, out var limit) ? limit : double.PositiveInfinity;
@@ -128,7 +143,8 @@ public static class Storage
 
     /// <summary>
     /// Fin de journée : ce qui n'a pas trouvé de place dans le stockage de chaque commune est perdu, produit par
-    /// produit. Renvoie le rangement de chaque commune, pour l'affichage.
+    /// produit, et les produits périssables perdent une part selon leur durée de vie dans le bâtiment qui les garde.
+    /// Renvoie le rangement de chaque commune, pour l'affichage.
     /// </summary>
     public static Dictionary<string, StorageAllocation> ApplyDaily(
         IEnumerable<string> communeIds,
@@ -145,7 +161,15 @@ public static class Storage
 
             foreach (var (productId, quantity) in held)
             {
-                var kept = quantity > 0 ? Math.Min(1, allocation.Stored.GetValueOrDefault(productId) / quantity) : 1;
+                // Ce qui a trouvé une place, moins ce qui se périme dans chaque bâtiment.
+                var stored = allocation.Stored.GetValueOrDefault(productId);
+                if (products.FirstOrDefault(p => p.Id == productId) is { IsPerishable: true } product)
+                {
+                    foreach (var building in allocation.Buildings)
+                        stored -= allocation.In(building.Id).GetValueOrDefault(productId) / ShelfLifeIn(building, product);
+                }
+
+                var kept = quantity > 0 ? Math.Clamp(stored / quantity, 0, 1) : 1;
                 if (kept >= 1)
                     continue;
 
