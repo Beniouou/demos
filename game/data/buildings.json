@@ -1,8 +1,8 @@
 [
   { "id": "camp-de-base", "name": "Camp de base", "category": "Administration", "level": 0, "description": "Fonde une commune", "jobs": 300, "dailyWage": 1.5, "housingPlaces": 300, "dailyRent": 0, "posts": 1, "storageCapacity": 300, "tier": 1 },
-  { "id": "mairie", "name": "Mairie", "category": "Administration", "level": 1, "description": "Gestion administrative", "tier": 1 },
-  { "id": "prefecture", "name": "Préfecture", "category": "Administration", "level": 2, "description": "Gestion administrative", "tier": 2 },
-  { "id": "palais", "name": "Palais", "category": "Administration", "level": 3, "description": "Gestion administrative", "tier": 3 },
+  { "id": "mairie", "name": "Mairie", "category": "Administration", "level": 1, "description": "Gestion administrative", "jobs": 20, "dailyWage": 2, "mainRank": "Intermediate", "recipes": [ { "productId": "administration", "quantityPerWorker": 3 } ], "posts": 1, "tier": 1 },
+  { "id": "prefecture", "name": "Préfecture", "category": "Administration", "level": 2, "description": "Gestion administrative", "jobs": 40, "dailyWage": 2, "mainRank": "Intermediate", "recipes": [ { "productId": "administration", "quantityPerWorker": 4 } ], "posts": 1, "tier": 2 },
+  { "id": "palais", "name": "Palais", "category": "Administration", "level": 3, "description": "Gestion administrative", "jobs": 60, "dailyWage": 2, "mainRank": "Intermediate", "recipes": [ { "productId": "administration", "quantityPerWorker": 5 } ], "posts": 1, "tier": 3 },
 
   { "id": "ferme", "name": "Ferme", "category": "Extraction", "level": 1, "description": "Production agricole : blé, lin, élevage", "jobs": 2200, "dailyWage": 2, "recipes": [ { "productId": "ble", "quantityPerWorker": 8 }, { "productId": "lin", "quantityPerWorker": 2 }, { "productId": "carcasse", "quantityPerWorker": 1 } ], "posts": 1, "pollutionPerWorker": 0.02, "tier": 1 },
   { "id": "entreprise-agricole", "name": "Entreprise agricole", "category": "Extraction", "level": 2, "description": "Production agricole", "tier": 2 },
@@ -35,8 +35,8 @@
   { "id": "ecole", "name": "École", "category": "Services", "level": 1, "description": "Éducation de base : forme les ouvriers aux professions intermédiaires", "jobs": 25, "dailyWage": 2, "schoolPlaces": 500, "dailyTuition": 0, "schoolLevel": "Basic", "pointsPerPupil": 1, "posts": 1, "tier": 1 },
   { "id": "lycee", "name": "Lycée", "category": "Services", "level": 2, "description": "Éducation de base renforcée : rapporte 2 points par élève", "jobs": 30, "dailyWage": 2.5, "schoolPlaces": 500, "dailyTuition": 0, "schoolLevel": "Basic", "pointsPerPupil": 2, "posts": 1, "tier": 2 },
   { "id": "universite", "name": "Université", "category": "Services", "level": 3, "description": "Éducation avancée : forme les professions intermédiaires aux postes de cadre", "jobs": 40, "dailyWage": 3, "schoolPlaces": 100, "dailyTuition": 0, "schoolLevel": "Advanced", "pointsPerPupil": 1, "posts": 1, "tier": 2 },
-  { "id": "caserne-pompiers", "name": "Caserne de pompiers", "category": "Services", "level": 1, "description": "Sécurité", "tier": 1 },
-  { "id": "poste-police", "name": "Poste de police", "category": "Services", "level": 2, "description": "Sécurité", "tier": 2 },
+  { "id": "caserne-pompiers", "name": "Caserne de pompiers", "category": "Services", "level": 1, "description": "Sécurité", "jobs": 20, "dailyWage": 2, "mainRank": "Intermediate", "recipes": [ { "productId": "securite", "quantityPerWorker": 3 } ], "posts": 1, "tier": 1 },
+  { "id": "poste-police", "name": "Poste de police", "category": "Services", "level": 2, "description": "Sécurité", "jobs": 40, "dailyWage": 2, "mainRank": "Intermediate", "recipes": [ { "productId": "securite", "quantityPerWorker": 4 } ], "posts": 1, "tier": 2 },
 
   { "id": "marche", "name": "Marché", "category": "Logistique", "level": 1, "description": "Vente", "tier": 1 },
   { "id": "magasin", "name": "Magasin", "category": "Logistique", "level": 2, "description": "Vente", "tier": 2 },

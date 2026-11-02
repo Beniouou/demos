@@ -6,7 +6,13 @@ public enum NeedCategory
     Clothing,
     Furniture,
     Housing,
-    Services,
+
+    /// <summary>Être administré : les services administratifs (mairie, préfecture, palais).</summary>
+    Administration,
+
+    /// <summary>Être protégé : les services de sécurité (caserne de pompiers, poste de police).</summary>
+    Security,
+
     Energy,
 
     /// <summary>Se distraire : les activités et le plaisir (l'alcool pour commencer).</summary>

@@ -26,12 +26,12 @@ public class PricingTests
             new("usine", "Usine", "Production", 2, "", Jobs: 100, DailyWage: 3, Production: new Production("vetements", 1)),
             new("atelier", "Atelier", "Production", 1, "", Jobs: 150, DailyWage: 2, Production: new Production("vetements", 0.35)),
         ];
-        ProductDefinition[] products = [new("vetements", "Vêtements", NeedCategory.Clothing, 8), new("services", "Services", NeedCategory.Services, 10)];
+        ProductDefinition[] products = [new("vetements", "Vêtements", NeedCategory.Clothing, 8), new("securite", "Sécurité", NeedCategory.Security, 10)];
 
         var priced = Pricing.WithReferencePrices(products, catalogue);
 
         Assert.Equal(1.3 * 2.48 / 0.35, priced[0].BasePrice, precision: 6);
-        // Aucun bâtiment ne fait de services : le prix du catalogue reste.
+        // Aucun bâtiment ne fait de sécurité : le prix du catalogue reste.
         Assert.Equal(10, priced[1].BasePrice);
     }
 }

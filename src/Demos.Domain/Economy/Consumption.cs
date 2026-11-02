@@ -26,6 +26,8 @@ public static class Consumption
         [NeedCategory.Clothing] = 0.01,
         [NeedCategory.Furniture] = 0.005,
         [NeedCategory.Leisure] = 0.05,
+        [NeedCategory.Administration] = 0.01,
+        [NeedCategory.Security] = 0.01,
     };
 
     private static readonly Dictionary<NeedCategory, double> IntermediateNeeds = new()
@@ -34,6 +36,8 @@ public static class Consumption
         [NeedCategory.Clothing] = 0.02,
         [NeedCategory.Furniture] = 0.02,
         [NeedCategory.Leisure] = 0.1,
+        [NeedCategory.Administration] = 0.02,
+        [NeedCategory.Security] = 0.02,
     };
 
     private static readonly Dictionary<NeedCategory, double> ExecutiveNeeds = new()
@@ -42,13 +46,16 @@ public static class Consumption
         [NeedCategory.Clothing] = 0.05,
         [NeedCategory.Furniture] = 0.1,
         [NeedCategory.Leisure] = 0.2,
+        [NeedCategory.Administration] = 0.05,
+        [NeedCategory.Security] = 0.05,
     };
 
     /// <summary>
     /// Chaque classe couvre ses besoins avec les produits reçus en nature, puis achète le reste sur le marché dans la
     /// limite de sa richesse, en commençant par le produit le moins cher quand plusieurs couvrent le même besoin. Quand
     /// un produit manque, chaque classe est servie au prorata de sa demande. La satisfaction est la moyenne de la part
-    /// couverte de chacun de ses besoins : se nourrir, s'habiller, se meubler, se distraire et se loger.
+    /// couverte de chacun de ses besoins : se nourrir, s'habiller, se meubler, se distraire, être administré, être
+    /// protégé et se loger. Les services (administratif, sécurité) ne se stockent pas : on consomme ceux du jour.
     /// </summary>
     public static void RunDaily(IReadOnlyList<SocialClass> classes, IReadOnlyList<ProductDefinition> products, Market market)
     {

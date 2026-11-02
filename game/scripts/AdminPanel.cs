@@ -106,7 +106,8 @@ public partial class AdminPanel : PanelContainer
         var lines = new List<string>
         {
             $"Type : {(building.TypeId is { } typeId && world.BuildingTypes.TryGetValue(typeId, out var type) ? $"{type.Name} ({type.Category}, niveau {type.Level})" : "—")}",
-            $"Personnel : {staff:N0} dont {workers:N0} en production",
+            $"Personnel : {staff:N0} dont {workers:N0} aux emplois principaux"
+                + (building.MainRank == Demos.Domain.Population.Rank.Intermediate ? " (professions intermédiaires)" : ""),
         };
 
         if (building.Production is { } production)

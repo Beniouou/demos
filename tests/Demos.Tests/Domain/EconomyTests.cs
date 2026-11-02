@@ -12,6 +12,8 @@ public class EconomyTests
         new("vetements", "Vêtements", NeedCategory.Clothing, 8),
         new("alcool", "Alcool", NeedCategory.Leisure, 2),
         new("meubles", "Meubles", NeedCategory.Furniture, 20),
+        new("administration", "Administration", NeedCategory.Administration, 1, Stockable: false),
+        new("securite", "Sécurité", NeedCategory.Security, 1, Stockable: false),
         new("pierre", "Pierre", null, 3),
         new("bois", "Bois", null, 2),
     ];
@@ -192,15 +194,17 @@ public class EconomyTests
         market.Offer("vetements", 1, "vendeur");
         market.Offer("alcool", 5, "vendeur");
         market.Offer("meubles", 1, "vendeur");
+        market.Offer("administration", 1, "mairie");
+        market.Offer("securite", 1, "caserne");
         var workers = Workers(100, wealth: 1_000);
         workers.HousingCoverage = 1;
 
         Consumption.RunDaily([workers], Products, market);
 
-        // 100 pains (100 × 1), 1 vêtement (100 × 0,01), 0,5 meuble (100 × 0,005) et 5 alcools (100 × 0,05) :
-        // 100 + 8 + 10 + 10 dépensés, tout est couvert.
+        // 100 pains (100 × 1), 1 vêtement (100 × 0,01), 0,5 meuble (100 × 0,005), 5 alcools (100 × 0,05), 1 service
+        // administratif et 1 de sécurité (100 × 0,01) : 100 + 8 + 10 + 10 + 2 dépensés, tout est couvert.
         Assert.Equal(1, workers.NeedsSatisfaction, precision: 6);
-        Assert.Equal(872, workers.Wealth, precision: 6);
+        Assert.Equal(870, workers.Wealth, precision: 6);
     }
 
     [Fact]

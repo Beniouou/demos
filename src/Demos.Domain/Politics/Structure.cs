@@ -62,6 +62,9 @@ public readonly record struct Production(string ProductId, double QuantityPerWor
 /// <param name="StorageProductId">Le produit accepté par un stockage spécifique.</param>
 /// <param name="StorageLimits">Quantité maximale de certains produits dans ce stockage ; un produit absent n'est pas limité.</param>
 /// <param name="HeatingProductId">Combustible du chauffage (bois ou charbon) ; le bois par défaut.</param>
+/// <param name="MainRank">
+/// Rang des emplois principaux : les ouvriers d'ordinaire, les professions intermédiaires dans un bâtiment de services.
+/// </param>
 public sealed record Structure(
     string Id,
     string Name,
@@ -85,7 +88,8 @@ public sealed record Structure(
     StorageKind StorageKind = StorageKind.General,
     string? StorageProductId = null,
     IReadOnlyDictionary<string, double>? StorageLimits = null,
-    string? HeatingProductId = null)
+    string? HeatingProductId = null,
+    Population.Rank MainRank = Population.Rank.Workers)
 {
     public bool IsNational => ParentId is null;
 }

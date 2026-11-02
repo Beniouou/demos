@@ -34,6 +34,11 @@ public static class PrototypeScenario
             types["mine"].BuildFor("charbon", "mine", FirstCommuneId, Ownership.Cooperative, "ouvriers", "Mine de charbon coopérative")
                 with { Jobs = 200 },
 
+            // Services : une mairie et une caserne de pompiers d'État, tenues par des professions intermédiaires
+            // (60 services administratifs et 60 de sécurité par jour, pour environ 57 demandés).
+            types["mairie"].Build("mairie", FirstCommuneId, name: "Mairie"),
+            types["caserne-pompiers"].Build("caserne", FirstCommuneId, name: "Caserne de pompiers d'État"),
+
             // Chaîne du pain et de l'alcool : blé → farine → pain, alcool. Les emplois couvrent à peu près ce que
             // consomment 5 000 habitants (5 000 pains et 280 alcools par jour).
             types["ferme"].BuildFor("ble", "ferme", FirstCommuneId, Ownership.Cooperative, "ouvriers", "Ferme coopérative") with { Jobs = 700 },

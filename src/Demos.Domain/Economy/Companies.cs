@@ -23,7 +23,7 @@ public static class Companies
     /// </summary>
     public static double ReserveOf(Structure building, Func<string, double>? priceOf = null)
     {
-        var wages = building.Jobs * Pricing.WageCostPerProductionJob(building.DailyWage);
+        var wages = building.Jobs * Pricing.WageCostPerProductionJob(building.DailyWage, building.MainRank);
         var energy = priceOf is null
             ? 0
             : Energy.UnitsOf(building) * (Energy.HeatingPerUnit * Energy.HeatingFactor(Shared.Season.Winter)

@@ -58,7 +58,7 @@ public static class Employment
                 foreach (var workplace in workplaces)
                 {
                     var filled = Staffing.JobsOf(workplace, rank) * fillRate;
-                    if (rank == Rank.Workers)
+                    if (rank == workplace.MainRank)
                         productionWorkers[workplace.Id] = filled;
 
                     foreach (var (socialClass, members) in candidates)

@@ -22,7 +22,8 @@ public static class Trade
     {
         foreach (var product in products)
         {
-            if (product.Need is not { } need || !Consumption.AllNeeds.Contains(need))
+            // Ce qui ne se stocke pas (l'eau, les services) ne voyage pas entre communes.
+            if (product.Need is not { } need || !Consumption.AllNeeds.Contains(need) || !product.Stockable)
                 continue;
 
             // Place libre pour ce produit dans chaque commune, selon les sortes de stockage et les limites.
