@@ -134,6 +134,9 @@ public sealed class SocialClass(string id, string name, Rank rank, Ideology ideo
 
     public double MembersWorkingIn(string structureId) => Population * _employment.GetValueOrDefault(structureId);
 
+    /// <summary>Part des membres employée dans chaque structure.</summary>
+    public IReadOnlyDictionary<string, double> Employment => _employment;
+
     /// <summary>Membres sans emploi, d'après la dernière répartition des emplois.</summary>
     public double UnemployedMembers => Math.Max(0, Population * (1 - _employment.Values.Sum()));
 

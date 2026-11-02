@@ -24,13 +24,32 @@ public static class WorkDay
         WageLedger? wageLedger = null,
         Func<Structure, Treasury>? companyFundOf = null)
     {
+        // Qui travaille où, rangé une fois par bâtiment, et les classes par identifiant : on ne parcourt pas toutes les
+        // classes du pays pour chaque bâtiment.
+        var staffOf = new Dictionary<string, List<SocialClass>>();
+        foreach (var socialClass in classes)
+        {
+            foreach (var (structureId, share) in socialClass.Employment)
+            {
+                if (share <= 0)
+                    continue;
+                if (!staffOf.TryGetValue(structureId, out var staff))
+                    staffOf[structureId] = staff = [];
+                staff.Add(socialClass);
+            }
+        }
+
+        var classesById = new Dictionary<string, SocialClass>();
+        foreach (var socialClass in classes)
+            classesById.TryAdd(socialClass.Id, socialClass);
+
         foreach (var workplace in structures.Values.Where(s => s.Jobs > 0))
         {
             // Chaque bâtiment livre au stock et au marché de sa propre commune.
             var communeId = Communes.CommuneOf(workplace, structures) ?? "";
             var market = marketOf(communeId);
 
-            var dues = classes
+            var dues = (staffOf.TryGetValue(workplace.Id, out var workers) ? workers : [])
                 .Select(c => (Class: c, Due: c.MembersWorkingIn(workplace.Id) * workplace.DailyWage * Staffing.WageMultiplier(c.Rank)))
                 .Where(d => d.Due > 0)
                 .ToList();
@@ -59,7 +78,7 @@ public static class WorkDay
                 totalDue *= 1 - settled;
             }
 
-            var paidInMoney = PayInMoney(workplace, dues, totalDue, classes, treasury, communeFundOf?.Invoke(communeId), companyFundOf);
+            var paidInMoney = PayInMoney(workplace, dues, totalDue, classesById, treasury, communeFundOf?.Invoke(communeId), companyFundOf);
             wageLedger?.Record(workplace.Id, initialDue, initialDue - totalDue + paidInMoney);
 
             if (produced > 0 && workplace.Production is { } delivered)
@@ -80,7 +99,7 @@ public static class WorkDay
         Structure workplace,
         List<(SocialClass Class, double Due)> dues,
         double totalDue,
-        IReadOnlyList<SocialClass> classes,
+        IReadOnlyDictionary<string, SocialClass> classesById,
         Treasury treasury,
         Treasury? communeFund,
         Func<Structure, Treasury>? companyFundOf)
@@ -103,7 +122,7 @@ public static class WorkDay
             paid = Math.Min(totalDue, companyFund.Balance);
             companyFund.TrySpend(paid);
         }
-        else if (classes.FirstOrDefault(c => c.Id == workplace.OwnerClassId) is { } owner)
+        else if (workplace.OwnerClassId is { } ownerId && classesById.TryGetValue(ownerId, out var owner))
         {
             paid = Math.Min(totalDue, Math.Max(0, owner.Wealth));
             owner.Wealth -= paid;

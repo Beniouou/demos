@@ -18,16 +18,36 @@ public static class Employment
         foreach (var socialClass in classes)
             socialClass.ClearEmployment();
 
+        // On range une fois les lieux de travail et les habitants par commune : seuls les habitants d'une commune
+        // travaillent dans ses bâtiments.
+        var workplacesByCommune = structures.Values
+            .Where(s => s.Jobs > 0)
+            .GroupBy(s => Communes.CommuneOf(s, structures))
+            .Where(g => g.Key is not null)
+            .ToDictionary(g => g.Key!, g => g.ToList());
+        var residentsByCommune = new Dictionary<string, List<SocialClass>>();
+        foreach (var socialClass in classes)
+        {
+            foreach (var (communeId, share) in socialClass.Residence)
+            {
+                if (share <= 0)
+                    continue;
+                if (!residentsByCommune.TryGetValue(communeId, out var residents))
+                    residentsByCommune[communeId] = residents = [];
+                residents.Add(socialClass);
+            }
+        }
+
         foreach (var commune in Communes.All(structures))
         {
-            var workplaces = structures.Values
-                .Where(s => s.Jobs > 0 && Communes.CommuneOf(s, structures) == commune.Id)
-                .ToList();
+            if (!workplacesByCommune.TryGetValue(commune.Id, out var workplaces)
+                || !residentsByCommune.TryGetValue(commune.Id, out var residents))
+                continue;
 
             foreach (var rank in Enum.GetValues<Rank>())
             {
                 var jobs = workplaces.Sum(s => Staffing.JobsOf(s, rank));
-                var candidates = classes
+                var candidates = residents
                     .Where(c => c.Rank == rank)
                     .ToDictionary(c => c, c => c.MembersLivingIn(commune.Id));
                 var available = candidates.Values.Sum();
