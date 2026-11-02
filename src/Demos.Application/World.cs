@@ -139,10 +139,10 @@ public sealed class World
     /// Impôt d'État : part de sa richesse que chaque groupe verse chaque jour au trésor. À l'essai : 0,3 %, soit avec
     /// l'impôt communal 0,5 % en tout. Les lois peuvent le plafonner ou l'augmenter.
     /// </summary>
-    public double StateTaxRate { get; set; } = 0.003;
+    public double StateTaxRate { get; set; } = Balance.Current.StateTaxRate;
 
     /// <summary>Impôt communal de départ de chaque commune (0,2 % par jour, à l'essai), versé à sa caisse.</summary>
-    public double DefaultCommuneTaxRate { get; set; } = 0.002;
+    public double DefaultCommuneTaxRate { get; set; } = Balance.Current.CommuneTaxRate;
 
     private readonly Dictionary<string, double> _communeTaxRates = [];
 

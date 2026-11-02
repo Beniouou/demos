@@ -33,3 +33,18 @@ dotnet test
 
 Ouvrir `game/project.godot` dans Godot .NET, puis F5.
 Espace met en pause ou relance le temps ; 1 à 4 changent la vitesse (un jour dure 5 s en ×1) ; B construit des logements d'État avec le stock, complété par le trésor ; C bâtit un camp de base qui fonde une nouvelle commune ; A ouvre le menu d'administration des bâtiments.
+
+## Équilibrer l'économie
+
+Les réglages d'équilibrage (besoins par rang, taille des logements, salaires, encadrement, marge, énergie, saisons,
+impôts, réserves…) sont dans `game/data/equilibrage.json`, à côté du catalogue des produits et des bâtiments.
+
+Le tableur d'équilibrage se génère à partir de ces données et de la partie de départ :
+
+```bash
+dotnet run --project tools/Demos.Equilibrage
+```
+
+(ou `generer-equilibrage.bat`). Il écrit `equilibrage demos.xlsx` à côté du dossier `demos`. Les cellules jaunes sont
+des réglages ; les prix, les coûts, les bilans, la demande et le chômage attendu se recalculent par formules. Pour
+appliquer un réglage au jeu, le reporter dans `game/data`.

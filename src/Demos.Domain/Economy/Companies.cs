@@ -11,8 +11,8 @@ namespace Demos.Domain.Economy;
 /// </summary>
 public static class Companies
 {
-    /// <summary>Proposition : une entreprise garde de quoi payer 30 jours de salaires à plein régime.</summary>
-    public const int ReserveDays = 30;
+    /// <summary>Une entreprise garde de quoi payer ce nombre de jours (réglage d'équilibrage : 30).</summary>
+    public static int ReserveDays => Balance.Current.CompanyReserveDays;
 
     public static bool HasCompanyFund(Structure building) =>
         building.Kind == StructureKind.Building && building.Ownership != Ownership.Public;

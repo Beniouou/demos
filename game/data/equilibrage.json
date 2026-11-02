@@ -1,0 +1,24 @@
+{
+  "needsByRank": {
+    "Workers": { "Food": 1, "Clothing": 0.01, "Furniture": 0.005, "Leisure": 0.05, "Administration": 0.01, "Security": 0.01 },
+    "Intermediate": { "Food": 1, "Clothing": 0.02, "Furniture": 0.02, "Leisure": 0.1, "Administration": 0.02, "Security": 0.02 },
+    "Executives": { "Food": 1, "Clothing": 0.05, "Furniture": 0.1, "Leisure": 0.2, "Administration": 0.05, "Security": 0.05 }
+  },
+  "housingPlacesByRank": { "Workers": 1, "Intermediate": 2, "Executives": 4 },
+  "supervisorsPerJob": 0.1,
+  "directorsPerJob": 0.01,
+  "wageMultipliers": { "Workers": 1, "Intermediate": 2, "Executives": 4 },
+  "margin": 0.3,
+  "companyReserveDays": 30,
+  "heatingPerUnit": 0.01,
+  "waterPerUnit": 0.1,
+  "heatingBySeason": { "Winter": 2, "Spring": 1, "Summer": 0.5, "Autumn": 1 },
+  "outputWithoutEnergy": 0.5,
+  "fuelReserveDays": 120,
+  "stateTaxRate": 0.003,
+  "communeTaxRate": 0.002,
+  "transportLoss": 0.2,
+  "distantPollutionShare": 0.1,
+  "pollutedThreshold": 0.1,
+  "foundingGrantDays": 60
+}

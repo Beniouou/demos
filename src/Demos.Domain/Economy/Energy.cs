@@ -15,26 +15,26 @@ namespace Demos.Domain.Economy;
 /// </summary>
 public static class Energy
 {
-    /// <summary>Proposition : 0,01 de bois ou de charbon par emploi ou par place, et par jour, au printemps et en automne.</summary>
-    public const double HeatingPerUnit = 0.01;
+    /// <summary>Bois ou charbon par emploi ou par place, et par jour, au printemps et en automne (réglage : 0,01).</summary>
+    public static double HeatingPerUnit => Balance.Current.HeatingPerUnit;
 
-    /// <summary>Proposition : 0,1 d'eau par emploi ou par place, et par jour.</summary>
-    public const double WaterPerUnit = 0.1;
+    /// <summary>Eau par emploi ou par place, et par jour (réglage : 0,1).</summary>
+    public static double WaterPerUnit => Balance.Current.WaterPerUnit;
 
     /// <summary>
-    /// Proposition : sans énergie, un bâtiment tourne à moitié (on travaille au froid, on porte l'eau) ; il ne s'arrête
-    /// jamais tout à fait, ce qui évite qu'un puits et une mine qui ont besoin l'un de l'autre se bloquent.
+    /// Sans énergie, un bâtiment tourne à moitié (réglage : 0,5 ; on travaille au froid, on porte l'eau) ; il ne
+    /// s'arrête jamais tout à fait, ce qui évite qu'un puits et une mine qui ont besoin l'un de l'autre se bloquent.
     /// </summary>
-    public const double OutputWithoutEnergy = 0.5;
+    public static double OutputWithoutEnergy => Balance.Current.OutputWithoutEnergy;
 
     /// <summary>Effet de l'énergie couverte sur un bâtiment : de la moitié (rien) à tout (tous ses besoins couverts).</summary>
     public static double EffectOf(double coveredShare) => OutputWithoutEnergy + (1 - OutputWithoutEnergy) * coveredShare;
 
     /// <summary>
-    /// Proposition : chaque bâtiment garde une réserve de combustible pour 120 jours de chauffage normal. Il puise
+    /// Chaque bâtiment garde une réserve de combustible pour 120 jours de chauffage normal (réglage). Il puise
     /// dedans d'abord, et la remplit dès qu'il le peut, même en été : sa consommation d'hiver est lissée sur l'année.
     /// </summary>
-    public const double FuelReserveDays = 120;
+    public static double FuelReserveDays => Balance.Current.FuelReserveDays;
 
     /// <summary>Taille de la réserve de combustible d'un bâtiment.</summary>
     public static double FuelReserveOf(Structure building) => UnitsOf(building) * HeatingPerUnit * FuelReserveDays;
@@ -46,13 +46,8 @@ public static class Energy
     /// <summary>Les combustibles possibles pour le chauffage, au début de la partie.</summary>
     public static readonly IReadOnlyList<string> HeatingFuels = ["bois", "charbon"];
 
-    /// <summary>Le chauffage double en hiver et diminue de moitié en été (propositions).</summary>
-    public static double HeatingFactor(Season season) => season switch
-    {
-        Season.Winter => 2,
-        Season.Summer => 0.5,
-        _ => 1,
-    };
+    /// <summary>Chauffage de la saison par rapport au chauffage normal (réglages : × 2 en hiver, × 0,5 en été).</summary>
+    public static double HeatingFactor(Season season) => Balance.Current.HeatingBySeason.GetValueOrDefault(season, 1);
 
     /// <summary>Ce qui consomme de l'énergie dans un bâtiment : ses emplois de production et ses places.</summary>
     public static double UnitsOf(Structure building) => building.Jobs + building.HousingPlaces + building.SchoolPlaces;

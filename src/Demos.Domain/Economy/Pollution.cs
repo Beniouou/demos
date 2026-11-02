@@ -13,10 +13,10 @@ namespace Demos.Domain.Economy;
 public static class Pollution
 {
     /// <summary>Proposition : une commune reçoit 10 % de la pollution produite dans les autres communes.</summary>
-    public const double DistantShare = 0.1;
+    public static double DistantShare => Balance.Current.DistantPollutionShare;
 
     /// <summary>Proposition : une commune est polluée au-delà de 0,1 point de pollution par habitant et par jour.</summary>
-    public const double PollutedThreshold = 0.1;
+    public static double PollutedThreshold => Balance.Current.PollutedThreshold;
 
     /// <summary>Pollution de chaque commune par habitant et par jour.</summary>
     public static Dictionary<string, double> PerResidentByCommune(

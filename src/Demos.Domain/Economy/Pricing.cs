@@ -13,8 +13,8 @@ namespace Demos.Domain.Economy;
 /// </summary>
 public static class Pricing
 {
-    /// <summary>Proposition : 30 % de bénéfice à plein régime.</summary>
-    public const double Margin = 0.3;
+    /// <summary>Bénéfice à plein régime (réglage d'équilibrage : 30 %).</summary>
+    public static double Margin => Balance.Current.Margin;
 
     /// <summary>
     /// Salaires d'un emploi principal (de production d'ordinaire), avec la part d'encadrement et de direction qui

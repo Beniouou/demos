@@ -12,4 +12,7 @@ public interface IContentSource
     IReadOnlyList<ProductDefinition> LoadProducts();
 
     IReadOnlyList<BuildingType> LoadBuildingTypes();
+
+    /// <summary>Réglages d'équilibrage de l'économie ; ceux par défaut si le fichier n'existe pas.</summary>
+    BalanceSettings LoadBalance();
 }

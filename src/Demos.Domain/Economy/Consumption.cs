@@ -6,49 +6,15 @@ public static class Consumption
 {
     /// <summary>
     /// Besoins consommés chaque jour par personne. Tout le monde a les mêmes besoins ; seules les quantités changent avec
-    /// le rang (propositions : voir le tableau du document). Plus tard, elles varieront aussi selon l'idéologie. Se loger
-    /// est aussi un besoin, mais c'est une capacité : les rangs supérieurs occupent des logements plus grands (voir
-    /// <see cref="Housing"/>).
+    /// le rang (réglages d'équilibrage, voir <see cref="BalanceSettings.NeedsByRank"/>). Plus tard, elles varieront aussi
+    /// selon l'idéologie. Se loger est aussi un besoin, mais c'est une capacité : les rangs supérieurs occupent des
+    /// logements plus grands (voir <see cref="Housing"/>).
     /// </summary>
-    public static IReadOnlyDictionary<NeedCategory, double> NeedsOf(Rank rank) => rank switch
-    {
-        Rank.Intermediate => IntermediateNeeds,
-        Rank.Executives => ExecutiveNeeds,
-        _ => WorkerNeeds,
-    };
+    public static IReadOnlyDictionary<NeedCategory, double> NeedsOf(Rank rank) =>
+        Balance.Current.NeedsByRank.TryGetValue(rank, out var needs) ? needs : new Dictionary<NeedCategory, double>();
 
     /// <summary>Tous les besoins consommés, quel que soit le rang.</summary>
     public static IEnumerable<NeedCategory> AllNeeds => Enum.GetValues<Rank>().SelectMany(r => NeedsOf(r).Keys).Distinct();
-
-    private static readonly Dictionary<NeedCategory, double> WorkerNeeds = new()
-    {
-        [NeedCategory.Food] = 1,
-        [NeedCategory.Clothing] = 0.01,
-        [NeedCategory.Furniture] = 0.005,
-        [NeedCategory.Leisure] = 0.05,
-        [NeedCategory.Administration] = 0.01,
-        [NeedCategory.Security] = 0.01,
-    };
-
-    private static readonly Dictionary<NeedCategory, double> IntermediateNeeds = new()
-    {
-        [NeedCategory.Food] = 1,
-        [NeedCategory.Clothing] = 0.02,
-        [NeedCategory.Furniture] = 0.02,
-        [NeedCategory.Leisure] = 0.1,
-        [NeedCategory.Administration] = 0.02,
-        [NeedCategory.Security] = 0.02,
-    };
-
-    private static readonly Dictionary<NeedCategory, double> ExecutiveNeeds = new()
-    {
-        [NeedCategory.Food] = 1,
-        [NeedCategory.Clothing] = 0.05,
-        [NeedCategory.Furniture] = 0.1,
-        [NeedCategory.Leisure] = 0.2,
-        [NeedCategory.Administration] = 0.05,
-        [NeedCategory.Security] = 0.05,
-    };
 
     /// <summary>
     /// Chaque classe couvre ses besoins avec les produits reçus en nature, puis achète le reste sur le marché dans la

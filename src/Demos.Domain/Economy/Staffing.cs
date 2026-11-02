@@ -12,11 +12,11 @@ namespace Demos.Domain.Economy;
 /// </summary>
 public static class Staffing
 {
-    /// <summary>Proposition : 1 profession intermédiaire pour 10 emplois de production.</summary>
-    public const double IntermediatesPerProductionJob = 0.1;
+    /// <summary>Emplois d'encadrement pour un emploi principal (réglage d'équilibrage : 0,1).</summary>
+    public static double IntermediatesPerProductionJob => Balance.Current.SupervisorsPerJob;
 
-    /// <summary>Proposition : 1 cadre pour 100 emplois de production.</summary>
-    public const double ExecutivesPerProductionJob = 0.01;
+    /// <summary>Emplois de direction pour un emploi principal (réglage d'équilibrage : 0,01).</summary>
+    public static double ExecutivesPerProductionJob => Balance.Current.DirectorsPerJob;
 
     public static double JobsOf(Structure structure, Rank rank) => structure.Jobs * ShareOf(structure.MainRank, rank);
 
@@ -33,10 +33,5 @@ public static class Staffing
     };
 
     /// <summary>Le salaire d'un emploi est le salaire de base du bâtiment × ce multiplicateur (proposition).</summary>
-    public static double WageMultiplier(Rank rank) => rank switch
-    {
-        Rank.Workers => 1,
-        Rank.Intermediate => 2,
-        _ => 4,
-    };
+    public static double WageMultiplier(Rank rank) => Balance.Current.WageMultipliers.GetValueOrDefault(rank, 1);
 }

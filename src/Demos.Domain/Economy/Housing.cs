@@ -10,16 +10,8 @@ namespace Demos.Domain.Economy;
 /// </summary>
 public static class Housing
 {
-    /// <summary>
-    /// Places de logement occupées par personne (propositions : 1 pour un ouvrier, 2 pour une profession intermédiaire,
-    /// 4 pour un cadre).
-    /// </summary>
-    public static double PlacesPerPerson(Rank rank) => rank switch
-    {
-        Rank.Intermediate => 2,
-        Rank.Executives => 4,
-        _ => 1,
-    };
+    /// <summary>Places de logement occupées par personne (réglages d'équilibrage : 1, 2 et 4 selon le rang).</summary>
+    public static double PlacesPerPerson(Rank rank) => Balance.Current.HousingPlacesByRank.GetValueOrDefault(rank, 1);
 
     public static void RunDaily(
         IReadOnlyDictionary<string, Structure> structures,

@@ -20,7 +20,7 @@ public sealed class Simulation(World world, GameClock clock)
     /// Proposition : la dotation d'une nouvelle commune couvre 60 jours de salaires de son camp de base, le temps
     /// que ses premiers bâtiments de production produisent.
     /// </summary>
-    public const int FoundingGrantDays = 60;
+    public static int FoundingGrantDays => Balance.Current.FoundingGrantDays;
 
     public World World { get; } = world;
     public GameClock Clock { get; } = clock;

@@ -10,8 +10,8 @@ namespace Demos.Domain.Economy;
 /// </summary>
 public static class Trade
 {
-    /// <summary>Part perdue en route. Les bâtiments de logistique viendront la réduire.</summary>
-    public const double TransportLoss = 0.2;
+    /// <summary>Part perdue en route (réglage d'équilibrage : 20 %). Les bâtiments de logistique viendront la réduire.</summary>
+    public static double TransportLoss => Balance.Current.TransportLoss;
 
     public static void RunDaily(
         IReadOnlyList<string> communeIds,

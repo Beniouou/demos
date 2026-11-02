@@ -19,6 +19,9 @@ public static class PrototypeScenario
 
     public static Simulation Create(IContentSource content)
     {
+        // Les réglages d'équilibrage d'abord : le catalogue, les prix et le monde en dépendent.
+        Balance.Current = content.LoadBalance();
+
         var types = content.LoadBuildingTypes().ToDictionary(t => t.Id);
 
         var structures = new List<Structure>
