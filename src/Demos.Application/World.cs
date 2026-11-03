@@ -212,6 +212,40 @@ public sealed class World
 
     public void AddStructure(Structure structure) => _structures.Add(structure.Id, structure);
 
+    private readonly List<ConstructionSite> _constructionSites = [];
+
+    /// <summary>Bâtiments en chantier : ils ne sont pas encore dans <see cref="Structures"/>.</summary>
+    public IReadOnlyList<ConstructionSite> ConstructionSites => _constructionSites;
+
+    public void AddConstructionSite(ConstructionSite site) => _constructionSites.Add(site);
+
+    /// <summary>Un identifiant est pris par une structure ou par un bâtiment en chantier.</summary>
+    public bool IsIdTaken(string id) => _structures.ContainsKey(id) || _constructionSites.Any(s => s.Building.Id == id);
+
+    /// <summary>
+    /// Avance chaque chantier d'un jour ; les bâtiments dont le chantier est fini rejoignent la partie. Renvoie ces
+    /// bâtiments.
+    /// </summary>
+    public IReadOnlyList<Structure> AdvanceConstructionSites()
+    {
+        var finished = new List<Structure>();
+        for (var i = _constructionSites.Count - 1; i >= 0; i--)
+        {
+            var site = _constructionSites[i] with { DaysLeft = _constructionSites[i].DaysLeft - 1 };
+            if (site.DaysLeft > 0)
+            {
+                _constructionSites[i] = site;
+                continue;
+            }
+
+            _constructionSites.RemoveAt(i);
+            AddStructure(site.Building);
+            finished.Insert(0, site.Building);
+        }
+
+        return finished;
+    }
+
     /// <summary>Ajoute une classe née en cours de partie (par exemple d'un passage entre classes).</summary>
     public void AddClass(SocialClass socialClass)
     {

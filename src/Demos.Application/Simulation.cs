@@ -45,23 +45,34 @@ public sealed class Simulation(World world, GameClock clock)
             RunYearlyCalculations();
     }
 
+    /// <summary>Un bâtiment dont le chantier vient de finir : il est actif à partir du lendemain.</summary>
+    public event Action<Structure>? BuildingCompleted;
+
     /// <summary>
-    /// Action du joueur : construire une structure en payant ses matériaux avec ce que l'État a produit dans le
-    /// stockage de sa commune, en les achetant avec l'argent du trésor, ou les deux. Renvoie false, sans rien construire ni dépenser, si c'est
-    /// impossible.
+    /// Action du joueur : lancer le chantier d'un bâtiment. Son coût de construction (celui de son type) est payé en
+    /// entier au lancement, avec ce que l'État a produit dans le stockage de sa commune, en l'achetant avec l'argent du
+    /// trésor, ou les deux. Le bâtiment rejoint la partie à la fin du chantier. Renvoie false, sans rien lancer ni
+    /// dépenser, si c'est impossible (type sans coût de construction, matériaux ou argent insuffisants).
     /// </summary>
-    public bool TryBuild(Structure structure, IReadOnlyList<MaterialCost> cost, PaymentMode mode)
+    public bool TryBuild(Structure structure, PaymentMode mode)
     {
-        if (World.Structures.ContainsKey(structure.Id)
+        if (World.IsIdTaken(structure.Id)
+            || structure.TypeId is not { } typeId
+            || !World.BuildingTypes.TryGetValue(typeId, out var type)
+            || !type.CanBeBuilt
             || structure.ParentId is not { } parentId
             || !World.Structures.TryGetValue(parentId, out var parent)
             || World.CommuneOf(parent) is not { } communeId
-            || !Construction.TryPay(cost, mode, Market.StateSellerId(communeId), World.Treasury, World.MarketOf(communeId)))
+            || !Construction.TryPay(type.Construction!.Materials, mode, Market.StateSellerId(communeId), World.Treasury, World.MarketOf(communeId)))
             return false;
 
-        World.AddStructure(structure);
+        World.AddConstructionSite(new ConstructionSite(structure, type.Construction.Days));
         return true;
     }
+
+    /// <summary>Ancienne signature, gardée pour l'interface : le coût passé n'est plus utilisé, c'est celui du type.</summary>
+    [Obsolete("Le coût de construction vient du type de bâtiment : utiliser TryBuild(structure, mode).")]
+    public bool TryBuild(Structure structure, IReadOnlyList<MaterialCost> cost, PaymentMode mode) => TryBuild(structure, mode);
 
     /// <summary>
     /// Outil d'administration : remplace les paramètres d'un bâtiment (propriétaire, emplois, salaire, production,
@@ -170,15 +181,15 @@ public sealed class Simulation(World world, GameClock clock)
 
     /// <summary>
     /// Action du joueur : bâtir un camp de base, qui fonde une nouvelle commune rattachée à l'État.
-    /// Il coûte des ressources, prises dans la commune qui l'envoie, de la légitimité (dans le pôle choisi), et la
-    /// dotation que l'État verse du trésor à la caisse de la nouvelle commune. Le pôle choisi devient la charte de
+    /// Il coûte son coût de construction (celui du type camp de base), pris dans la commune qui l'envoie, de la
+    /// légitimité (dans le pôle choisi), et la dotation que l'État verse du trésor à la caisse de la nouvelle commune.
+    /// La commune est fondée tout de suite ; son camp de base est en chantier. Le pôle choisi devient la charte de
     /// fondation de la commune : une loi de ce pôle, qui attire les classes du même pôle et repousse celles du pôle opposé.
     /// Renvoie la nouvelle commune, ou null, sans rien dépenser, si c'est impossible.
     /// </summary>
     public Structure? TryFoundCommune(
         string name,
         string payingCommuneId,
-        IReadOnlyList<MaterialCost> cost,
         PaymentMode mode,
         Orientation legitimacyPole,
         double legitimacyCost)
@@ -190,12 +201,13 @@ public sealed class Simulation(World world, GameClock clock)
         var camp = campType.Build($"camp-de-base-{number}", commune.Id, name: $"{campType.Name} ({name})");
         var grant = FoundingGrantOf(campType);
 
-        if (World.Structures.ContainsKey(commune.Id)
+        if (World.IsIdTaken(commune.Id)
+            || !campType.CanBeBuilt
             || World.Legitimacy[legitimacyPole] < legitimacyCost
             || !World.Treasury.TrySpend(grant))
             return null;
 
-        if (!Construction.TryPay(cost, mode, Market.StateSellerId(payingCommuneId), World.Treasury, World.MarketOf(payingCommuneId)))
+        if (!Construction.TryPay(campType.Construction!.Materials, mode, Market.StateSellerId(payingCommuneId), World.Treasury, World.MarketOf(payingCommuneId)))
         {
             World.Treasury.Deposit(grant);
             return null;
@@ -204,10 +216,16 @@ public sealed class Simulation(World world, GameClock clock)
         World.Legitimacy.TrySpend(legitimacyPole, legitimacyCost);
         World.CommuneFundOf(commune.Id).Deposit(grant);
         World.AddStructure(commune);
-        World.AddStructure(camp);
+        World.AddConstructionSite(new ConstructionSite(camp, campType.Construction.Days));
         World.AddLaw(new Law($"charte-{commune.Id}", $"Charte de fondation : {name}", commune.Id, [legitimacyPole], [LawRule.FoundingCharter]));
         return commune;
     }
+
+    /// <summary>Ancienne signature, gardée pour l'interface : le coût passé n'est plus utilisé, c'est celui du camp de base.</summary>
+    [Obsolete("Le coût de construction vient du type camp de base : utiliser TryFoundCommune(name, payingCommuneId, mode, pole, legitimacyCost).")]
+    public Structure? TryFoundCommune(string name, string payingCommuneId, IReadOnlyList<MaterialCost> cost, PaymentMode mode,
+        Orientation legitimacyPole, double legitimacyCost) =>
+        TryFoundCommune(name, payingCommuneId, mode, legitimacyPole, legitimacyCost);
 
     /// <summary>Dotation versée à la fondation : 60 jours de salaires de production du camp de base.</summary>
     public static double FoundingGrantOf(BuildingType camp) =>
@@ -215,7 +233,7 @@ public sealed class Simulation(World world, GameClock clock)
 
     // Ordre du document de règles : emplois, production et salaires, énergie des bâtiments, échanges entre communes,
     // logement, école, consommation, ventes, bénéfices des entreprises versés aux propriétaires, impôts, légitimité,
-    // puis perte de ce qui déborde du stockage ou se périme. L'énergie prise après la production d'un jour règle la
+    // puis perte de ce qui déborde du stockage ou se périme, et enfin les chantiers. L'énergie prise après la production d'un jour règle la
     // production du lendemain, et le logement et l'école du jour même.
     // Les décisions du joueur et les événements restent à écrire.
     private void RunDailyCalculations()
@@ -243,6 +261,10 @@ public sealed class Simulation(World world, GameClock clock)
         Taxation.CollectDaily(World.Classes, World.StateTaxRate, World.CommuneTaxRateOf, World.Treasury, World.CommuneFundOf, World.Laws, World.Structures);
         LawEffects.ApplyDaily(World.Classes, World.Laws, World.Structures, World.Legitimacy);
         Storage.ApplyDaily(communeIds, World.Structures, World.Products, World.MarketOf);
+
+        // Les chantiers finis en fin de journée : leurs bâtiments travaillent dès le lendemain.
+        foreach (var building in World.AdvanceConstructionSites())
+            BuildingCompleted?.Invoke(building);
     }
 
     private void PaySellers()

@@ -32,5 +32,6 @@
   { "id": "piece-de-theatre", "name": "Pièce de théâtre", "need": "Leisure", "basePrice": 1, "stockable": false },
   { "id": "materiaux-de-construction", "name": "materiaux de construction", "basePrice": 1 },
   { "id": "materiaux-de-construction-technique", "name": "Materiaux de construction technique", "basePrice": 1 },
-  { "id": "ciment", "name": "Ciment", "basePrice": 1 }
+  { "id": "ciment", "name": "Ciment", "basePrice": 1 },
+  { "id": "plaque-de-fer", "name": "Plaque de fer", "basePrice": 1 }
 ]

@@ -466,7 +466,8 @@ internal sealed class Book(XLWorkbook workbook, World world, BalanceSettings bal
             "Salaire : ouvriers", "Salaire : prof. intermédiaires", "Salaire : cadres", "Salaires par emploi productif",
             "Emplois d'ouvriers", "Emplois de prof. intermédiaires", "Emplois de cadres", "Salaires par jour",
             "Places de logement", "Loyer par place", "Places d'élèves", "Frais par élève", "Stockage", "Sorte de stockage",
-            "Pollution par travailleur", "Unités d'énergie", "Chauffage par jour (moyen)", "Eau par jour", "Recettes", "Produit stocké (stockage spécifique)");
+            "Pollution par travailleur", "Unités d'énergie", "Chauffage par jour (moyen)", "Eau par jour", "Recettes", "Produit stocké (stockage spécifique)",
+            "Matériau de construction", "Quantité de construction", "Durée de construction (jours)", "Coût de construction (au prix du marché)");
 
         var types = world.BuildingTypes.Values.OrderBy(t => t.Category).ThenBy(t => t.Level).ToList();
         _buildingLast = types.Count + 1;
@@ -509,11 +510,17 @@ internal sealed class Book(XLWorkbook workbook, World world, BalanceSettings bal
             var producesWater = type.AvailableRecipes.Any(r => r.ProductId == Energy.Water);
             sheet.Cell(row, 29).FormulaA1 = producesWater ? "0" : $"IF(E{row}=1,AA{row}*{C("Eau")},0)";
             sheet.Cell(row, 30).Value = string.Join(" ; ", type.AvailableRecipes.Select(r => $"{r.Label} ({r.QuantityPerWorker})"));
+            // Coût de construction : un matériau, sa quantité et la durée du chantier ; vide pour un type qui ne se construit pas.
+            Choice(sheet.Cell(row, 32), type.Construction?.ProductId ?? "", _productList, allowBlank: true);
+            Input(sheet.Cell(row, 33), type.Construction is { } cost ? (XLCellValue)cost.Quantity : Blank.Value);
+            Input(sheet.Cell(row, 34), type.Construction is { } c ? (XLCellValue)c.Days : Blank.Value);
+            sheet.Cell(row, 35).FormulaA1 = $"AG{row}*{Price($"AF{row}")}";
             row++;
         }
 
         sheet.Range(2, 15, row - 1, 19).Style.NumberFormat.Format = "0.00";
         sheet.Range(2, 28, row - 1, 29).Style.NumberFormat.Format = "0.00";
+        sheet.Range(2, 35, row - 1, 35).Style.NumberFormat.Format = "0.00";
         Finish(sheet, 1);
     }
 

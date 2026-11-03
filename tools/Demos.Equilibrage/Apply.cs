@@ -248,11 +248,13 @@ public static class BalanceApplier
         /// Vérifie que la colonne clé est à sa place : un tableur généré avant un changement de colonnes (plus de
         /// matières par recette, par exemple) serait sinon lu de travers.
         /// </summary>
-        private bool KeyColumnAt(IXLWorksheet sheet, int headerRow, string keyColumn)
+        private bool KeyColumnAt(IXLWorksheet sheet, int headerRow, string keyColumn) => HeaderAt(sheet, headerRow, keyColumn, KeyHeader);
+
+        private bool HeaderAt(IXLWorksheet sheet, int headerRow, string column, string title)
         {
-            if (Text(sheet.Cell(headerRow, keyColumn)) == KeyHeader)
+            if (Text(sheet.Cell(headerRow, column)) == title)
                 return true;
-            Errors.Add($"{sheet.Name} : la colonne {keyColumn} n'est pas « {KeyHeader} » : le tableur date d'une ancienne version, régénérez-le.");
+            Errors.Add($"{sheet.Name} : la colonne {column} n'est pas « {title} » : le tableur date d'une ancienne version, régénérez-le.");
             return false;
         }
 
@@ -379,6 +381,9 @@ public static class BalanceApplier
         {
             if (Sheet("Bâtiments") is not { } sheet)
                 return;
+            // Sans les colonnes de construction (ancien tableur), les coûts de construction seraient effacés.
+            if (!HeaderAt(sheet, 1, "AF", "Matériau de construction"))
+                return;
 
             foreach (var row in Rows(sheet, 2, "A"))
             {
@@ -500,7 +505,48 @@ public static class BalanceApplier
                         json["storageProductId"] = storedId;
                     Changes.Add($"{id} : produit stocké {type.StorageProductId ?? "aucun"} → {(storedId == "" ? "aucun" : storedId)}");
                 }
+
+                ApplyConstruction(row, id, type, json);
             }
+        }
+
+        /// <summary>
+        /// Coût de construction : un matériau, sa quantité et la durée du chantier, les trois ensemble ; trois cases
+        /// vides pour un type qui ne se construit pas.
+        /// </summary>
+        private void ApplyConstruction(IXLRow row, string id, BuildingType type, JsonObject json)
+        {
+            var materialCell = row.Cell("AF");
+            var materialId = Text(materialCell);
+            var quantity = Number(row.Cell("AG"), optional: true);
+            var days = Number(row.Cell("AH"), integer: true, optional: true);
+            ConstructionCost? cost = null;
+            if (materialId != "" || quantity is not null || days is not null)
+            {
+                if (materialId == "" || !_products.ContainsKey(materialId))
+                {
+                    Errors.Add($"{Where(materialCell)} : matériau de construction inconnu « {materialId} ».");
+                    return;
+                }
+
+                if (quantity is not > 0 || days is not >= 1)
+                {
+                    Errors.Add($"{Where(row.Cell("AG"))} : un coût de construction a une quantité et une durée d'au moins un jour (videz les trois cases pour un type qui ne se construit pas).");
+                    return;
+                }
+
+                cost = new ConstructionCost(materialId, quantity.Value, (int)days.Value);
+            }
+
+            if (cost == type.Construction)
+                return;
+            if (cost is null)
+                json.Remove("construction");
+            else
+                json["construction"] = new JsonObject { ["productId"] = cost.ProductId, ["quantity"] = Json(cost.Quantity), ["days"] = cost.Days };
+            Changes.Add($"{id} : construction {Describe(type.Construction)} → {Describe(cost)}");
+
+            static string Describe(ConstructionCost? c) => c is null ? "impossible" : $"{Show(c.Quantity)} {c.ProductId} en {c.Days} jours";
         }
 
         private void ApplyRecipes()

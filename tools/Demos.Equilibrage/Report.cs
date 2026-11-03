@@ -64,11 +64,12 @@ internal static class SimulationReport
     {
         var world = simulation.World;
         var pole = Orientation.All.MaxBy(p => world.Legitimacy[p]);
-        var commune = simulation.TryFoundCommune("Deuxième commune", PrototypeScenario.FirstCommuneId, [new MaterialCost("bois", 100)],
-            PaymentMode.StockFirst, pole, 5);
+        var commune = simulation.TryFoundCommune("Deuxième commune", PrototypeScenario.FirstCommuneId, PaymentMode.StockFirst, pole, 5);
+        var cost = world.BuildingTypes[Simulation.BaseCampTypeId].Construction;
+        var materials = cost is null ? "aucun coût de construction" : $"{Count(cost.Quantity)} {cost.ProductId}, {cost.Days} jours de chantier";
         return commune is not null
-            ? $"Deuxième commune fondée le jour {FoundingDay} (charte {pole.Code}, 100 bois payés par le stock ou le trésor)."
-            : $"La deuxième commune n'a pas pu être fondée le jour {FoundingDay} (bois, argent ou légitimité insuffisants).";
+            ? $"Deuxième commune fondée le jour {FoundingDay} (charte {pole.Code}, {materials}, payés par le stock ou le trésor)."
+            : $"La deuxième commune n'a pas pu être fondée le jour {FoundingDay} ({materials} : matériaux, argent ou légitimité insuffisants).";
     }
 
     private static Dictionary<string, double> StockOf(World world)

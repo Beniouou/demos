@@ -15,6 +15,21 @@ public enum PaymentMode
 /// <summary>Quantité de matière nécessaire à une construction.</summary>
 public readonly record struct MaterialCost(string ProductId, double Quantity);
 
+/// <summary>
+/// Coût de construction d'un type de bâtiment : un matériau préfabriqué (matériaux de construction pour la liste 1,
+/// matériaux de construction technique pour la liste 2), sa quantité, et la durée du chantier en jours.
+/// </summary>
+public sealed record ConstructionCost(string ProductId, double Quantity, int Days)
+{
+    public IReadOnlyList<MaterialCost> Materials => [new(ProductId, Quantity)];
+}
+
+/// <summary>
+/// Un bâtiment en chantier : payé au lancement, il n'a ni emplois, ni production, ni places, ni énergie tant qu'il
+/// reste des jours de chantier ; il rejoint alors la partie et devient actif le lendemain.
+/// </summary>
+public sealed record ConstructionSite(Politics.Structure Building, int DaysLeft);
+
 public static class Construction
 {
     /// <summary>

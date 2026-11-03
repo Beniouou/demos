@@ -10,6 +10,10 @@ public class SimulationTests
 {
     private static Simulation CreatePrototype() => PrototypeScenario.Create(GameData.Content());
 
+    /// <summary>Matériaux de construction dans le stock de l'État de la première commune (personne n'en fabrique au départ).</summary>
+    private static void GiveBuildingMaterials(Simulation simulation, double quantity) =>
+        simulation.World.MarketOf("commune-1").Offer("materiaux-de-construction", quantity, Market.StateSellerId("commune-1"));
+
     private static void AdvanceDays(Simulation simulation, int days)
     {
         for (var day = 0; day < days; day++)
@@ -83,8 +87,9 @@ public class SimulationTests
         var simulation = CreatePrototype();
         AdvanceDays(simulation, 10);
         var pole = new Orientation(IdeologicalAxis.Property, Pole.B);
+        GiveBuildingMaterials(simulation, 600);
 
-        var commune = simulation.TryFoundCommune("Nouvelle commune", "commune-1", [new MaterialCost("bois", 100)], PaymentMode.StockFirst, pole, 2);
+        var commune = simulation.TryFoundCommune("Nouvelle commune", "commune-1", PaymentMode.StockFirst, pole, 2);
 
         Assert.NotNull(commune);
         Assert.True(simulation.World.IsGhostTown(commune.Id));
@@ -93,10 +98,15 @@ public class SimulationTests
         var charter = Assert.Single(simulation.World.Laws, l => l.StructureId == commune.Id);
         Assert.True(charter.Has(LawRule.FoundingCharter));
         Assert.Equal([pole], charter.Orientations);
-        Assert.Equal(simulation.World.BuildingTypes[Simulation.BaseCampTypeId].HousingPlaces, simulation.World.HousingPlaces(commune.Id));
+        // Le camp de base est en chantier 30 jours : pas encore de logements.
+        var camp = simulation.World.BuildingTypes[Simulation.BaseCampTypeId];
+        Assert.Equal(0, simulation.World.HousingPlaces(commune.Id));
+        Assert.Equal(0, simulation.World.StateQuantityOf("commune-1", "materiaux-de-construction"), precision: 6);
+        AdvanceDays(simulation, camp.Construction!.Days);
+        Assert.Equal(camp.HousingPlaces, simulation.World.HousingPlaces(commune.Id));
 
         // Au changement de saison (1er mars), des sans-emploi rejoignent la nouvelle commune.
-        AdvanceDays(simulation, 50);
+        AdvanceDays(simulation, 50 - camp.Construction.Days);
         Assert.False(simulation.World.IsGhostTown(commune.Id));
     }
 
@@ -106,10 +116,11 @@ public class SimulationTests
         var simulation = CreatePrototype();
         AdvanceDays(simulation, 10);
         var grant = Simulation.FoundingGrantOf(simulation.World.BuildingTypes[Simulation.BaseCampTypeId]);
+        GiveBuildingMaterials(simulation, 600);
         var treasuryBefore = simulation.World.Treasury.Balance;
 
         var commune = simulation.TryFoundCommune(
-            "Nouvelle commune", "commune-1", [new MaterialCost("bois", 100)], PaymentMode.StockFirst,
+            "Nouvelle commune", "commune-1", PaymentMode.StockFirst,
             new Orientation(IdeologicalAxis.Property, Pole.B), 2);
 
         // 60 jours × 300 emplois × 1,5 = 27 000.
@@ -128,7 +139,7 @@ public class SimulationTests
         var stockBefore = simulation.World.StateQuantityOf("commune-1", "bois");
 
         var commune = simulation.TryFoundCommune(
-            "Nouvelle commune", "commune-1", [new MaterialCost("bois", 100)], PaymentMode.StockFirst,
+            "Nouvelle commune", "commune-1", PaymentMode.StockFirst,
             new Orientation(IdeologicalAxis.Property, Pole.B), 2);
 
         Assert.Null(commune);
@@ -144,7 +155,7 @@ public class SimulationTests
         var stockBefore = simulation.World.StateQuantityOf("commune-1", "bois");
 
         var commune = simulation.TryFoundCommune(
-            "Nouvelle commune", "commune-1", [new MaterialCost("bois", 100)], PaymentMode.StockFirst,
+            "Nouvelle commune", "commune-1", PaymentMode.StockFirst,
             new Orientation(IdeologicalAxis.Hierarchy, Pole.B), 1_000);
 
         Assert.Null(commune);
@@ -152,20 +163,49 @@ public class SimulationTests
     }
 
     [Fact]
-    public void Construire_avec_le_stock_de_l_Etat_ajoute_la_structure()
+    public void Construire_lance_un_chantier_paye_par_le_stock_de_l_Etat_et_le_batiment_arrive_a_la_fin()
     {
         var simulation = CreatePrototype();
         AdvanceDays(simulation, 5);
+        var type = simulation.World.BuildingTypes["logements"];
+        var cost = type.Construction!;
+        Assert.Equal(("materiaux-de-construction", 30), (cost.ProductId, cost.Days));
+        GiveBuildingMaterials(simulation, cost.Quantity + 10);
+        var completed = new List<Structure>();
+        simulation.BuildingCompleted += completed.Add;
 
-        // Le camp de bûcheron d'État produit 40 bois par jour ; la scierie d'État en utilise une partie.
-        var stockBefore = simulation.World.StateQuantityOf("commune-1", "bois");
-        var housing = new Structure("logements", "Logements", StructureKind.Building, "commune-1");
-        var built = simulation.TryBuild(housing, [new MaterialCost("bois", 50)], PaymentMode.StockFirst);
+        var housing = type.Build("logements-neufs", "commune-1");
+        Assert.True(simulation.TryBuild(housing, PaymentMode.StockFirst));
 
-        Assert.True(stockBefore >= 50);
-        Assert.True(built);
-        Assert.Contains("logements", simulation.World.Structures.Keys);
-        Assert.Equal(stockBefore - 50, simulation.World.StateQuantityOf("commune-1", "bois"), precision: 6);
+        // Payé en entier au lancement ; le bâtiment n'existe pas encore.
+        Assert.Equal(10, simulation.World.StateQuantityOf("commune-1", "materiaux-de-construction"), precision: 6);
+        Assert.DoesNotContain("logements-neufs", simulation.World.Structures.Keys);
+        Assert.Single(simulation.World.ConstructionSites);
+        Assert.False(simulation.TryBuild(housing, PaymentMode.StockFirst));
+
+        AdvanceDays(simulation, cost.Days - 1);
+        Assert.DoesNotContain("logements-neufs", simulation.World.Structures.Keys);
+        simulation.AdvanceDay();
+        Assert.Contains("logements-neufs", simulation.World.Structures.Keys);
+        Assert.Empty(simulation.World.ConstructionSites);
+        Assert.Equal(["logements-neufs"], completed.Select(b => b.Id));
+    }
+
+    [Fact]
+    public void Sans_materiaux_ou_sans_cout_de_construction_aucun_chantier_ne_demarre()
+    {
+        var simulation = CreatePrototype();
+        var treasuryBefore = simulation.World.Treasury.Balance;
+
+        // Personne ne vend de matériaux de construction au départ.
+        Assert.False(simulation.TryBuild(simulation.World.BuildingTypes["logements"].Build("logements-neufs", "commune-1"), PaymentMode.StockFirst));
+        // Un bâtiment de la liste 3 n'a pas encore de coût de construction.
+        var palace = simulation.World.BuildingTypes["palais"];
+        Assert.False(palace.CanBeBuilt);
+        Assert.False(simulation.TryBuild(palace.Build("palais-neuf", "commune-1"), PaymentMode.MoneyOnly));
+
+        Assert.Empty(simulation.World.ConstructionSites);
+        Assert.Equal(treasuryBefore, simulation.World.Treasury.Balance, precision: 6);
     }
 
     [Fact]

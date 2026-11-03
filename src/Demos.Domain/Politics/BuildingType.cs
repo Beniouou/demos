@@ -35,8 +35,12 @@ public sealed record BuildingType(
     bool ConstantHeating = false,
     Population.Rank MainRank = Population.Rank.Workers,
     IReadOnlyDictionary<Population.Rank, double>? StaffRatios = null,
-    IReadOnlyDictionary<Population.Rank, double>? Wages = null)
+    IReadOnlyDictionary<Population.Rank, double>? Wages = null,
+    Economy.ConstructionCost? Construction = null)
 {
+    /// <summary>Un type sans coût de construction (la liste 3, pour l'instant) ne peut pas être construit.</summary>
+    public bool CanBeBuilt => Construction is { Quantity: > 0, Days: > 0 };
+
     /// <summary>Les productions possibles de ce type : ses recettes, ou sa seule production.</summary>
     public IReadOnlyList<Production> AvailableRecipes =>
         Recipes is { Count: > 0 } recipes ? recipes : Production is { } production ? [production] : [];

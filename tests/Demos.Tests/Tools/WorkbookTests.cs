@@ -1,4 +1,5 @@
 using ClosedXML.Excel;
+using Demos.Domain.Economy;
 using Demos.Infrastructure;
 
 namespace Demos.Tests.Tools;
@@ -70,6 +71,32 @@ public sealed class WorkbookTests : IDisposable
         Assert.Equal(0, BalanceApplier.Apply(Workbook, _folder, Saved()));
         foreach (var (file, text) in before)
             Assert.Equal(text, File.ReadAllText(file));
+    }
+
+    [Fact]
+    public void Le_cout_et_la_duree_de_construction_se_reglent_dans_la_feuille_Batiments()
+    {
+        WorkbookGenerator.Generate(Saved(), Workbook);
+        using (var workbook = new XLWorkbook(Workbook))
+        {
+            var sheet = workbook.Worksheet("Bâtiments");
+            var housing = sheet.RowsUsed().First(r => r.Cell("A").GetString() == "logements");
+            Assert.Equal("materiaux-de-construction", housing.Cell("AF").GetString());
+            housing.Cell("AG").Value = 400;
+            housing.Cell("AH").Value = 45;
+
+            // Trois cases vides : le type ne se construit plus.
+            var well = sheet.RowsUsed().First(r => r.Cell("A").GetString() == "puits");
+            foreach (var column in new[] { "AF", "AG", "AH" })
+                well.Cell(column).Value = Blank.Value;
+            workbook.Save();
+        }
+
+        Assert.Equal(0, BalanceApplier.Apply(Workbook, _folder, Saved()));
+        var types = Saved().LoadBuildingTypes().ToDictionary(t => t.Id);
+        Assert.Equal(new ConstructionCost("materiaux-de-construction", 400, 45), types["logements"].Construction);
+        Assert.Null(types["puits"].Construction);
+        Assert.False(types["puits"].CanBeBuilt);
     }
 
     [Fact]
