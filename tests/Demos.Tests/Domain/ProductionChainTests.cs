@@ -30,7 +30,7 @@ public class ProductionChainTests
         return (structures, workers);
     }
 
-    private static void Run(Dictionary<string, Structure> structures, SocialClass workers, Market market, Treasury fund, Treasury? treasury = null) =>
+    private static Dictionary<string, double> Run(Dictionary<string, Structure> structures, SocialClass workers, Market market, Treasury fund, Treasury? treasury = null) =>
         WorkDay.Run(structures, Employment.Assign(structures, [workers]), [workers], [], treasury ?? new Treasury(), _ => market,
             companyFundOf: _ => fund);
 
@@ -65,6 +65,21 @@ public class ProductionChainTests
 
         Assert.Equal(0, market.QuantityOf("ble"), precision: 6);
         Assert.Equal(30, market.QuantityOf("farine"), precision: 6);
+    }
+
+    [Fact]
+    public void La_journee_de_travail_renvoie_ce_que_chaque_batiment_a_produit()
+    {
+        var (structures, workers) = Town();
+        var market = new Market(Products);
+        market.Offer("ble", 30, "ferme");
+        var fund = new Treasury();
+        fund.Deposit(1_000);
+
+        var produced = Run(structures, workers, market, fund);
+
+        // 100 farines à plein régime, 30 faute de blé : c'est ce qui a vraiment été produit.
+        Assert.Equal(30, produced["moulin"], precision: 6);
     }
 
     [Fact]

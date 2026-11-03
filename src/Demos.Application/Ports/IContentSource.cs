@@ -15,4 +15,7 @@ public interface IContentSource
 
     /// <summary>Réglages d'équilibrage de l'économie ; ceux par défaut si le fichier n'existe pas.</summary>
     BalanceSettings LoadBalance();
+
+    /// <summary>La partie de départ : communes, bâtiments, classes, lois et trésor.</summary>
+    ScenarioDefinition LoadScenario();
 }

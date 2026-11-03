@@ -154,6 +154,9 @@ public sealed class World
     /// <summary>Nombre de travailleurs de production de chaque structure, recalculé chaque jour.</summary>
     public IReadOnlyDictionary<string, double> Workers { get; set; } = new Dictionary<string, double>();
 
+    /// <summary>Ce que chaque lieu de travail a produit le dernier jour (après le manque d'énergie et de matières).</summary>
+    public IReadOnlyDictionary<string, double> Produced { get; set; } = new Dictionary<string, double>();
+
     /// <summary>
     /// Part de ses besoins en énergie que chaque bâtiment a couverte le dernier jour (1 s'il n'en a pas besoin).
     /// </summary>

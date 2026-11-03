@@ -14,7 +14,8 @@ public static class WorkDay
     /// Le salaire en argent vient de la caisse de la commune puis du trésor (public), ou de la caisse de l'entreprise
     /// (privé, coopératif), et est versé en partie si l'argent manque.
     /// </summary>
-    public static void Run(
+    /// <returns>Ce que chaque lieu de travail a produit dans la journée.</returns>
+    public static Dictionary<string, double> Run(
         IReadOnlyDictionary<string, Structure> structures,
         IReadOnlyDictionary<string, double> productionWorkers,
         IReadOnlyList<SocialClass> classes,
@@ -45,6 +46,7 @@ public static class WorkDay
         foreach (var socialClass in classes)
             classesById.TryAdd(socialClass.Id, socialClass);
 
+        var output = new Dictionary<string, double>();
         foreach (var workplace in structures.Values.Where(s => s.Jobs > 0))
         {
             // Chaque bâtiment livre au stock et au marché de sa propre commune.
@@ -68,6 +70,8 @@ public static class WorkDay
             // Les matières viennent du stockage de la commune ; sans elles, le bâtiment produit moins.
             if (workplace.Production is { } recipe)
                 produced *= Supply.Acquire(workplace, recipe, produced, market, communeId, treasury, communeFundOf?.Invoke(communeId), companyFundOf, classesById);
+
+            output[workplace.Id] = produced;
 
             if (totalDue > 0 && produced > 0 && IsPaidInKind(workplace, structures, laws))
             {
@@ -98,6 +102,8 @@ public static class WorkDay
                 market.Offer(delivered.ProductId, produced, sellerId);
             }
         }
+
+        return output;
     }
 
     private static bool IsPaidInKind(Structure workplace, IReadOnlyDictionary<string, Structure> structures, IReadOnlyList<Law> laws) =>

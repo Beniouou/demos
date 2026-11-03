@@ -1,0 +1,654 @@
+using System.Globalization;
+using System.Text.Json.Nodes;
+using ClosedXML.Excel;
+using Demos.Application;
+using Demos.Application.Ports;
+using Demos.Domain.Economy;
+using Demos.Domain.Politics;
+using Demos.Domain.Population;
+using Demos.Domain.Shared;
+using Demos.Infrastructure;
+
+/// <summary>
+/// Commande « appliquer » : lit les cellules jaunes du tableur et les reporte dans les fichiers de game/data.
+/// Chaque réglage est retrouvé par sa clé (colonne « Clé (ne pas modifier) », ou l'identifiant du bâtiment ou du
+/// produit). Seules les valeurs changées sont écrites. Si une valeur est fausse, rien n'est écrit.
+/// </summary>
+internal static class BalanceApplier
+{
+    private static readonly Rank[] Ranks = [Rank.Workers, Rank.Intermediate, Rank.Executives];
+
+    private const string BalanceFile = "equilibrage.json";
+    private const string BuildingsFile = "buildings.json";
+    private const string ProductsFile = "products.json";
+    private const string ScenarioFile = "partie-depart.json";
+
+    // Les constantes reportées : clé du tableur, chemin dans equilibrage.json, valeur actuelle.
+    private static readonly (string Key, string[] Path, Func<BalanceSettings, double> Current)[] Constants =
+    [
+        ("Marge", ["margin"], b => b.Margin),
+        ("Encadrement", ["supervisorsPerJob"], b => b.SupervisorsPerJob),
+        ("Direction", ["directorsPerJob"], b => b.DirectorsPerJob),
+        ("MultOuvriers", ["wageMultipliers", "Workers"], b => b.WageMultipliers[Rank.Workers]),
+        ("MultPI", ["wageMultipliers", "Intermediate"], b => b.WageMultipliers[Rank.Intermediate]),
+        ("MultCadres", ["wageMultipliers", "Executives"], b => b.WageMultipliers[Rank.Executives]),
+        ("Chauffage", ["heatingPerUnit"], b => b.HeatingPerUnit),
+        ("Eau", ["waterPerUnit"], b => b.WaterPerUnit),
+        ("Hiver", ["heatingBySeason", "Winter"], b => b.HeatingBySeason[Season.Winter]),
+        ("Printemps", ["heatingBySeason", "Spring"], b => b.HeatingBySeason[Season.Spring]),
+        ("Ete", ["heatingBySeason", "Summer"], b => b.HeatingBySeason[Season.Summer]),
+        ("Automne", ["heatingBySeason", "Autumn"], b => b.HeatingBySeason[Season.Autumn]),
+        ("SansEnergie", ["outputWithoutEnergy"], b => b.OutputWithoutEnergy),
+        ("ReserveCombustible", ["fuelReserveDays"], b => b.FuelReserveDays),
+        ("ReserveEntreprise", ["companyReserveDays"], b => b.CompanyReserveDays),
+        ("ImpotEtat", ["stateTaxRate"], b => b.StateTaxRate),
+        ("ImpotCommune", ["communeTaxRate"], b => b.CommuneTaxRate),
+        ("Transport", ["transportLoss"], b => b.TransportLoss),
+        ("PollutionLoin", ["distantPollutionShare"], b => b.DistantPollutionShare),
+        ("SeuilPollution", ["pollutedThreshold"], b => b.PollutedThreshold),
+        ("Dotation", ["foundingGrantDays"], b => b.FoundingGrantDays),
+    ];
+
+    public static int Apply(string workbookPath, string dataDirectory, IContentSource content)
+    {
+        if (!File.Exists(workbookPath))
+        {
+            Console.WriteLine($"Tableur introuvable : {workbookPath}. Lancez d'abord generer-equilibrage.bat.");
+            return 1;
+        }
+
+        XLWorkbook workbook;
+        try
+        {
+            // Lecture partagée : le tableur peut rester ouvert dans Excel (c'est la version enregistrée qui compte).
+            using var stream = new FileStream(workbookPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+            workbook = new XLWorkbook(stream);
+        }
+        catch (Exception e) when (e is IOException or InvalidDataException)
+        {
+            Console.WriteLine($"Impossible de lire le tableur : {e.Message}");
+            return 1;
+        }
+
+        var texts = new[] { BalanceFile, BuildingsFile, ProductsFile, ScenarioFile }
+            .ToDictionary(f => f, f => File.ReadAllText(Path.Combine(dataDirectory, f)));
+        var applier = new Applier(workbook, content,
+            JsonNode.Parse(texts[BalanceFile])!.AsObject(),
+            JsonNode.Parse(texts[BuildingsFile])!.AsArray(),
+            JsonNode.Parse(texts[ProductsFile])!.AsArray(),
+            JsonNode.Parse(texts[ScenarioFile])!.AsObject());
+
+        applier.Run();
+        using (workbook) { }
+
+        if (applier.Errors.Count > 0)
+        {
+            Console.WriteLine($"{applier.Errors.Count} erreur(s) dans le tableur ; rien n'a été écrit :");
+            foreach (var error in applier.Errors)
+                Console.WriteLine($"  - {error}");
+            return 1;
+        }
+
+        if (applier.Changes.Count == 0)
+        {
+            Console.WriteLine("Aucun changement : le jeu a déjà les réglages du tableur.");
+            return 0;
+        }
+
+        var written = new Dictionary<string, string>
+        {
+            [BalanceFile] = JsonFormat.Write(applier.BalanceJson, texts[BalanceFile]),
+            [BuildingsFile] = JsonFormat.Write(applier.BuildingsJson, texts[BuildingsFile]),
+            [ProductsFile] = JsonFormat.Write(applier.ProductsJson, texts[ProductsFile]),
+            [ScenarioFile] = JsonFormat.Write(applier.ScenarioJson, texts[ScenarioFile]),
+        };
+
+        // Essai à blanc : le jeu doit pouvoir charger les nouveaux fichiers et créer la partie de départ.
+        var saved = Balance.Current;
+        try
+        {
+            PrototypeScenario.Create(new JsonContentSource(file => written[file]));
+        }
+        catch (Exception e)
+        {
+            Console.WriteLine($"Les nouveaux réglages empêchent le jeu de démarrer ; rien n'a été écrit : {e.Message}");
+            return 1;
+        }
+        finally
+        {
+            Balance.Current = saved;
+        }
+
+        foreach (var (file, text) in written.Where(w => w.Value != texts[w.Key]))
+            File.WriteAllText(Path.Combine(dataDirectory, file), text);
+
+        Console.WriteLine($"{applier.Changes.Count} changement(s) reporté(s) dans le jeu :");
+        foreach (var change in applier.Changes)
+            Console.WriteLine($"  - {change}");
+        Console.WriteLine("Lancez simuler.bat pour voir l'effet, ou generer-equilibrage.bat pour revoir les prix recalculés.");
+        return 0;
+    }
+
+    private sealed class Applier(XLWorkbook workbook, IContentSource content, JsonObject balanceJson, JsonArray buildingsJson,
+        JsonArray productsJson, JsonObject scenarioJson)
+    {
+        public List<string> Errors { get; } = [];
+
+        public List<string> Changes { get; } = [];
+
+        public JsonObject BalanceJson => balanceJson;
+
+        public JsonArray BuildingsJson => buildingsJson;
+
+        public JsonArray ProductsJson => productsJson;
+
+        public JsonObject ScenarioJson => scenarioJson;
+
+        private readonly BalanceSettings _balance = content.LoadBalance();
+        private readonly Dictionary<string, BuildingType> _types = content.LoadBuildingTypes().ToDictionary(t => t.Id);
+        private readonly Dictionary<string, ProductDefinition> _products = content.LoadProducts().ToDictionary(p => p.Id);
+        private readonly ScenarioDefinition _scenario = content.LoadScenario();
+
+        public void Run()
+        {
+            ApplyConstants();
+            ApplyNeeds();
+            ApplyBuildings();
+            ApplyRecipes();
+            ApplyProducts();
+            ApplyStartingGame();
+        }
+
+        private IXLWorksheet? Sheet(string name)
+        {
+            if (workbook.TryGetWorksheet(name, out var sheet))
+                return sheet;
+
+            Errors.Add($"la feuille « {name} » manque : régénérez le tableur.");
+            return null;
+        }
+
+        // Lecture des cellules ----------------------------------------------------------------------------------------
+
+        private static string Where(IXLCell cell) => $"{cell.Worksheet.Name}!{cell.Address}";
+
+        private static string Text(IXLCell cell) => cell.Value.IsBlank ? "" : cell.Value.ToString(CultureInfo.InvariantCulture).Trim();
+
+        /// <summary>Un nombre positif ou nul (entier si demandé) ; null et une erreur sinon, ou null sans erreur si la case peut être vide.</summary>
+        private double? Number(IXLCell cell, bool integer = false, bool optional = false)
+        {
+            double value;
+            var cellValue = cell.Value;
+            if (cellValue.IsBlank || cellValue.IsText && string.IsNullOrWhiteSpace(cellValue.GetText()))
+            {
+                if (!optional)
+                    Errors.Add($"{Where(cell)} : la case est vide.");
+                return null;
+            }
+
+            if (cellValue.IsNumber)
+                value = cellValue.GetNumber();
+            else if (cellValue.IsText && (double.TryParse(cellValue.GetText().Replace(" ", ""), NumberStyles.Float, CultureInfo.GetCultureInfo("fr-FR"), out value)
+                         || double.TryParse(cellValue.GetText(), NumberStyles.Float, CultureInfo.InvariantCulture, out value)))
+            {
+            }
+            else
+            {
+                Errors.Add($"{Where(cell)} : « {cellValue} » n'est pas un nombre.");
+                return null;
+            }
+
+            if (value < 0)
+            {
+                Errors.Add($"{Where(cell)} : {Show(value)} est négatif.");
+                return null;
+            }
+
+            if (integer && Math.Abs(value - Math.Round(value)) > 1e-9)
+            {
+                Errors.Add($"{Where(cell)} : {Show(value)} doit être un nombre entier.");
+                return null;
+            }
+
+            // Arrondi : Excel garde parfois 0,15 sous la forme 0,1499999999…
+            return Math.Round(value, 10);
+        }
+
+        /// <summary>Les lignes d'une feuille, de la première jusqu'à la première case vide dans la colonne clé.</summary>
+        private static IEnumerable<IXLRow> Rows(IXLWorksheet sheet, int first, string keyColumn)
+        {
+            for (var row = first; !sheet.Cell(row, keyColumn).Value.IsBlank; row++)
+                yield return sheet.Row(row);
+        }
+
+        // Écriture dans les fichiers ----------------------------------------------------------------------------------
+
+        private static bool Same(double a, double b) => Math.Abs(a - b) < 1e-9;
+
+        public static string Show(double value) => value.ToString("0.##########", CultureInfo.GetCultureInfo("fr-FR"));
+
+        private static JsonNode Json(double value) =>
+            Math.Abs(value - Math.Round(value)) < 1e-9 && Math.Abs(value) < 1e15
+                ? JsonValue.Create((long)Math.Round(value))
+                : JsonValue.Create(value);
+
+        private static JsonObject ObjectAt(JsonObject root, IEnumerable<string> path)
+        {
+            var node = root;
+            foreach (var key in path)
+            {
+                if (node[key] is not JsonObject child)
+                {
+                    child = new JsonObject();
+                    node[key] = child;
+                }
+
+                node = child;
+            }
+
+            return node;
+        }
+
+        /// <summary>Reporte une valeur si elle a changé, et le note dans le journal.</summary>
+        private void Set(JsonObject target, string key, double? value, double current, string label, bool removeWhenZero = false)
+        {
+            if (value is not { } v || Same(v, current))
+                return;
+
+            if (removeWhenZero && v == 0)
+                target.Remove(key);
+            else
+                target[key] = Json(v);
+            Changes.Add($"{label} : {Show(current)} → {Show(v)}");
+        }
+
+        private JsonObject? BuildingJson(string id) =>
+            buildingsJson.OfType<JsonObject>().FirstOrDefault(b => b["id"]?.GetValue<string>() == id);
+
+        // Feuilles ------------------------------------------------------------------------------------------------------
+
+        private void ApplyConstants()
+        {
+            if (Sheet("Constantes") is not { } sheet)
+                return;
+
+            var rows = Rows(sheet, 2, "A").ToDictionary(r => Text(r.Cell("D")), r => r);
+            foreach (var (key, path, current) in Constants)
+            {
+                if (!rows.TryGetValue(key, out var row))
+                {
+                    Errors.Add($"Constantes : la clé « {key} » manque : régénérez le tableur.");
+                    continue;
+                }
+
+                var integer = key is "ReserveCombustible" or "ReserveEntreprise" or "Dotation";
+                Set(ObjectAt(balanceJson, path[..^1]), path[^1], Number(row.Cell("B"), integer), current(_balance),
+                    $"constante « {Text(row.Cell("A"))} »");
+            }
+        }
+
+        private void ApplyNeeds()
+        {
+            if (Sheet("Besoins") is not { } sheet)
+                return;
+
+            foreach (var row in Rows(sheet, 2, "G"))
+            {
+                var key = Text(row.Cell("G"));
+                var label = Text(row.Cell("A"));
+                for (var r = 0; r < Ranks.Length; r++)
+                {
+                    var rank = Ranks[r];
+                    var cell = row.Cell(4 + r);
+                    var value = Number(cell);
+                    if (key == "Housing")
+                    {
+                        if (value == 0)
+                        {
+                            Errors.Add($"{Where(cell)} : il faut au moins une place de logement par personne.");
+                            continue;
+                        }
+
+                        Set(ObjectAt(balanceJson, ["housingPlacesByRank"]), rank.ToString(), value, Housing.PlacesPerPerson(rank),
+                            $"besoin « {label} » des {RankLabel(rank)}");
+                    }
+                    else if (Enum.TryParse<NeedCategory>(key, out var need))
+                    {
+                        Set(ObjectAt(balanceJson, ["needsByRank", rank.ToString()]), need.ToString(), value,
+                            _balance.NeedsByRank.GetValueOrDefault(rank)?.GetValueOrDefault(need) ?? 0,
+                            $"besoin « {label} » des {RankLabel(rank)}", removeWhenZero: true);
+                    }
+                    else
+                    {
+                        Errors.Add($"{Where(row.Cell("G"))} : besoin inconnu « {key} ».");
+                        break;
+                    }
+                }
+            }
+        }
+
+        private void ApplyBuildings()
+        {
+            if (Sheet("Bâtiments") is not { } sheet)
+                return;
+
+            foreach (var row in Rows(sheet, 2, "A"))
+            {
+                var id = Text(row.Cell("A"));
+                if (!_types.TryGetValue(id, out var type) || BuildingJson(id) is not { } json)
+                {
+                    Errors.Add($"{Where(row.Cell("A"))} : type de bâtiment inconnu « {id} ».");
+                    continue;
+                }
+
+                var tier = Number(row.Cell("E"), integer: true);
+                if (tier is < 1 or > 3)
+                {
+                    Errors.Add($"{Where(row.Cell("E"))} : la liste doit être 1, 2 ou 3.");
+                    tier = null;
+                }
+
+                Set(json, "tier", tier, type.Tier, $"{id} : liste");
+                Set(json, "jobs", Number(row.Cell("H"), integer: true), type.Jobs, $"{id} : emplois productifs");
+
+                // Proportions d'emplois des rangs autres que le rang productif : toutes écrites dès que l'une change.
+                var ratios = Ranks.Where(r => r != type.MainRank)
+                    .Select(r => (Rank: r, Value: Number(row.Cell(9 + Array.IndexOf(Ranks, r))), Current: Staffing.RatioOf(type.MainRank, type.StaffRatios, r)))
+                    .ToList();
+                if (ratios.All(r => r.Value is not null) && ratios.Any(r => !Same(r.Value!.Value, r.Current)))
+                {
+                    var target = ObjectAt(json, ["staffRatios"]);
+                    foreach (var (rank, value, current) in ratios)
+                    {
+                        // Un rang sans emploi n'a pas besoin d'être écrit (les rangs sous le rang productif).
+                        if (value == 0 && target[rank.ToString()] is null)
+                            continue;
+                        target[rank.ToString()] = Json(value!.Value);
+                        if (!Same(value.Value, current))
+                            Changes.Add($"{id} : {RankLabel(rank)} par emploi productif : {Show(current)} → {Show(value.Value)}");
+                    }
+                }
+
+                // Salaires : les trois écrits dès que l'un change.
+                var wages = Ranks.Select((r, i) => (Rank: r, Value: Number(row.Cell(12 + i)), Current: Staffing.WageOf(type.DailyWage, type.Wages, r))).ToList();
+                if (wages.All(w => w.Value is not null) && wages.Any(w => !Same(w.Value!.Value, w.Current)))
+                {
+                    var target = ObjectAt(json, ["wages"]);
+                    foreach (var (rank, value, current) in wages)
+                    {
+                        target[rank.ToString()] = Json(value!.Value);
+                        if (!Same(value.Value, current))
+                            Changes.Add($"{id} : salaire des {RankLabel(rank)} : {Show(current)} → {Show(value.Value)}");
+                    }
+                }
+
+                Set(json, "housingPlaces", Number(row.Cell("T"), integer: true), type.HousingPlaces, $"{id} : places de logement");
+                Set(json, "dailyRent", Number(row.Cell("U")), type.DailyRent, $"{id} : loyer par place");
+                Set(json, "schoolPlaces", Number(row.Cell("V"), integer: true), type.SchoolPlaces, $"{id} : places d'élèves");
+                Set(json, "dailyTuition", Number(row.Cell("W")), type.DailyTuition, $"{id} : frais par élève");
+                Set(json, "storageCapacity", Number(row.Cell("X"), integer: true), type.StorageCapacity, $"{id} : stockage");
+                Set(json, "pollutionPerWorker", Number(row.Cell("Z")), type.PollutionPerWorker, $"{id} : pollution par travailleur");
+            }
+        }
+
+        private void ApplyRecipes()
+        {
+            if (Sheet("Recettes") is not { } sheet)
+                return;
+
+            foreach (var row in Rows(sheet, 2, "T"))
+            {
+                var key = Text(row.Cell("T"));
+                var parts = key.Split('#');
+                if (parts.Length != 2 || !_types.TryGetValue(parts[0], out var type) || !int.TryParse(parts[1], out var index)
+                    || index < 0 || index >= type.AvailableRecipes.Count || BuildingJson(type.Id) is not { } building)
+                {
+                    Errors.Add($"{Where(row.Cell("T"))} : recette inconnue « {key} » : régénérez le tableur.");
+                    continue;
+                }
+
+                var recipe = type.AvailableRecipes[index];
+                var json = building["recipes"] is JsonArray recipes ? recipes[index]!.AsObject() : building["production"]!.AsObject();
+                var label = $"{type.Id}, recette {recipe.Label}";
+
+                var productId = Text(row.Cell("G"));
+                if (!_products.ContainsKey(productId))
+                    Errors.Add($"{Where(row.Cell("G"))} : produit inconnu « {productId} ».");
+                else if (productId != recipe.ProductId)
+                {
+                    json["productId"] = productId;
+                    Changes.Add($"{label} : produit {recipe.ProductId} → {productId}");
+                }
+
+                Set(json, "quantityPerWorker", Number(row.Cell("H")), recipe.QuantityPerWorker, $"{label} : production par travailleur");
+
+                // Matières : deux au plus dans le tableur ; les suivantes, s'il y en a, sont gardées.
+                var materials = new List<(string ProductId, double Quantity)>();
+                var valid = true;
+                for (var m = 0; m < 2; m++)
+                {
+                    var idCell = row.Cell(9 + 2 * m);
+                    var quantityCell = row.Cell(10 + 2 * m);
+                    var materialId = Text(idCell);
+                    if (materialId == "" && quantityCell.Value.IsBlank)
+                        continue;
+                    if (materialId == "" || !_products.ContainsKey(materialId))
+                    {
+                        Errors.Add($"{Where(idCell)} : produit inconnu « {materialId} ».");
+                        valid = false;
+                        continue;
+                    }
+
+                    if (Number(quantityCell) is { } quantity)
+                        materials.Add((materialId, quantity));
+                    else
+                        valid = false;
+                }
+
+                var old = recipe.Materials.Take(2).Select(i => (i.ProductId, i.Quantity)).ToList();
+                if (!valid || materials.Count == old.Count && materials.Zip(old).All(p => p.First.ProductId == p.Second.ProductId && Same(p.First.Quantity, p.Second.Quantity)))
+                    continue;
+
+                var inputs = new JsonArray();
+                foreach (var (materialId, quantity) in materials)
+                    inputs.Add(new JsonObject { ["productId"] = materialId, ["quantity"] = Json(quantity) });
+                foreach (var extra in (json["inputs"] as JsonArray)?.Skip(2).ToList() ?? [])
+                    inputs.Add(extra!.DeepClone());
+                if (inputs.Count == 0)
+                    json.Remove("inputs");
+                else
+                    json["inputs"] = inputs;
+                Changes.Add($"{label} : matières {Describe(old)} → {Describe(materials)}");
+            }
+        }
+
+        private static string Describe(List<(string ProductId, double Quantity)> materials) =>
+            materials.Count == 0 ? "aucune" : string.Join(" + ", materials.Select(m => $"{Show(m.Quantity)} {m.ProductId}"));
+
+        private void ApplyProducts()
+        {
+            if (Sheet("Produits") is not { } sheet)
+                return;
+
+            foreach (var row in Rows(sheet, 2, "A"))
+            {
+                var id = Text(row.Cell("A"));
+                var json = productsJson.OfType<JsonObject>().FirstOrDefault(p => p["id"]?.GetValue<string>() == id);
+                if (json is null || !_products.TryGetValue(id, out var product))
+                {
+                    Errors.Add($"{Where(row.Cell("A"))} : produit inconnu « {id} ».");
+                    continue;
+                }
+
+                // Durée de vie : une case vide veut dire « ne se périme pas ».
+                var cell = row.Cell("E");
+                var life = Number(cell, integer: true, optional: true);
+                if (life == 0)
+                {
+                    Errors.Add($"{Where(cell)} : une durée de vie est d'au moins un jour (videz la case pour un produit qui ne se périme pas).");
+                    continue;
+                }
+
+                if (life is null && cell.Value.IsBlank && product.ShelfLifeDays is { } old)
+                {
+                    json.Remove("shelfLifeDays");
+                    Changes.Add($"{id} : durée de vie {Show(old)} jours → ne se périme plus");
+                }
+                else if (life is { } days && (product.ShelfLifeDays is not { } current || !Same(days, current)))
+                {
+                    json["shelfLifeDays"] = Json(days);
+                    Changes.Add($"{id} : durée de vie {(product.ShelfLifeDays is { } c ? $"{Show(c)} jours" : "aucune")} → {Show(days)} jours");
+                }
+            }
+        }
+
+        private void ApplyStartingGame()
+        {
+            if (Sheet("Partie de départ") is not { } sheet)
+                return;
+
+            // Population par rang : partagée entre les classes du rang au prorata de leur population.
+            var classesJson = scenarioJson["classes"]!.AsArray().OfType<JsonObject>().ToList();
+            for (var row = 2; row <= 4; row++)
+            {
+                if (!Enum.TryParse<Rank>(Text(sheet.Cell(row, "C")), out var rank))
+                {
+                    Errors.Add($"{Where(sheet.Cell(row, "C"))} : rang inconnu : régénérez le tableur.");
+                    continue;
+                }
+
+                var classes = _scenario.Classes.Where(c => c.Rank == rank).ToList();
+                var current = classes.Sum(c => c.Population);
+                if (Number(sheet.Cell(row, "B"), integer: true) is not { } total || Same(total, current))
+                    continue;
+                if (classes.Count == 0)
+                {
+                    Errors.Add($"{Where(sheet.Cell(row, "B"))} : la partie de départ n'a pas de classe de ce rang.");
+                    continue;
+                }
+
+                var left = (long)total;
+                for (var i = 0; i < classes.Count; i++)
+                {
+                    var share = i == classes.Count - 1
+                        ? left
+                        : current > 0 ? (long)Math.Round(total * classes[i].Population / current) : (long)total / classes.Count;
+                    left -= share;
+                    classesJson.First(c => c["id"]?.GetValue<string>() == classes[i].Id)["population"] = share;
+                }
+
+                Changes.Add($"partie de départ : population des {RankLabel(rank)} : {Show(current)} → {Show(total)}");
+            }
+
+            // Emplois productifs des bâtiments de départ, retrouvés par leur identifiant (colonne AD).
+            var buildingsJsonList = scenarioJson["buildings"]!.AsArray().OfType<JsonObject>().ToList();
+            foreach (var row in Rows(sheet, 8, "AD"))
+            {
+                var id = Text(row.Cell("AD"));
+                var building = _scenario.Buildings.FirstOrDefault(b => b.Id == id);
+                var json = buildingsJsonList.FirstOrDefault(b => b["id"]?.GetValue<string>() == id);
+                if (building is null || json is null || !_types.TryGetValue(building.Type, out var type))
+                {
+                    Errors.Add($"{Where(row.Cell("AD"))} : bâtiment de départ inconnu « {id} ».");
+                    continue;
+                }
+
+                Set(json, "jobs", Number(row.Cell("F"), integer: true), building.Jobs ?? type.Jobs, $"partie de départ, {building.Name ?? id} : emplois productifs");
+            }
+        }
+
+        private static string RankLabel(Rank rank) => rank switch
+        {
+            Rank.Workers => "ouvriers",
+            Rank.Intermediate => "prof. intermédiaires",
+            _ => "cadres",
+        };
+    }
+}
+
+/// <summary>
+/// Écrit les fichiers de game/data dans leur forme habituelle : une ligne par bâtiment, produit, classe ou loi, et les
+/// accents tels quels.
+/// </summary>
+internal static class JsonFormat
+{
+    private static readonly System.Text.Json.JsonSerializerOptions Options = new()
+    {
+        Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
+    };
+
+    /// <param name="original">Le texte d'origine du fichier, dont on garde les lignes vides entre les éléments.</param>
+    public static string Write(JsonNode root, string original)
+    {
+        var text = new System.Text.StringBuilder();
+        if (root is JsonArray array)
+        {
+            // Une liste de premier niveau (bâtiments, produits) : une ligne par élément, et les lignes vides d'origine.
+            var blankBefore = BlankLinesBefore(original);
+            text.Append("[\n");
+            for (var i = 0; i < array.Count; i++)
+            {
+                if (blankBefore.Contains(i))
+                    text.Append('\n');
+                text.Append("  ").Append(Compact(array[i])).Append(i < array.Count - 1 ? ",\n" : "\n");
+            }
+
+            text.Append("]\n");
+            return text.ToString();
+        }
+
+        var properties = root.AsObject().ToList();
+        text.Append("{\n");
+        for (var i = 0; i < properties.Count; i++)
+        {
+            var (key, value) = properties[i];
+            text.Append($"  \"{key}\": ");
+            if (value is JsonArray list)
+                text.Append(list.Count == 0 ? "[]" : "[\n" + string.Join(",\n", list.Select(e => "    " + Compact(e))) + "\n  ]");
+            else if (value is JsonObject obj && obj.Count > 0 && obj.All(p => p.Value is JsonObject))
+                text.Append("{\n" + string.Join(",\n", obj.Select(p => $"    \"{p.Key}\": {Compact(p.Value)}")) + "\n  }");
+            else
+                text.Append(Compact(value));
+            text.Append(i < properties.Count - 1 ? ",\n" : "\n");
+        }
+
+        text.Append("}\n");
+        return text.ToString();
+    }
+
+    /// <summary>Les éléments précédés d'une ligne vide, dans un fichier écrit à raison d'un élément par ligne.</summary>
+    private static HashSet<int> BlankLinesBefore(string original)
+    {
+        var result = new HashSet<int>();
+        var lines = original.Replace("\r", "").Split('\n').Skip(1).TakeWhile(l => l.Trim() != "]").ToList();
+        var index = 0;
+        var blank = false;
+        foreach (var line in lines)
+        {
+            if (line.Trim() == "")
+            {
+                blank = true;
+                continue;
+            }
+
+            if (blank)
+                result.Add(index);
+            blank = false;
+            index++;
+        }
+
+        return result;
+    }
+
+    private static string Compact(JsonNode? node, string? key = null) => node switch
+    {
+        JsonObject obj when obj.Count == 0 => "{}",
+        JsonObject obj => "{ " + string.Join(", ", obj.Select(p => $"\"{p.Key}\": {Compact(p.Value, p.Key)}")) + " }",
+        JsonArray list when list.Count == 0 => "[]",
+        // Les matières d'une recette s'écrivent serrées : [{ … }].
+        JsonArray list when key == "inputs" => "[" + string.Join(", ", list.Select(e => Compact(e))) + "]",
+        JsonArray list => "[ " + string.Join(", ", list.Select(e => Compact(e))) + " ]",
+        null => "null",
+        _ => node.ToJsonString(Options),
+    };
+}

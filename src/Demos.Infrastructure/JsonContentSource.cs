@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Demos.Application;
 using Demos.Application.Ports;
 using Demos.Domain.Economy;
 using Demos.Domain.Politics;
@@ -40,6 +41,10 @@ public sealed class JsonContentSource(Func<string, string> readText) : IContentS
             ? new BalanceSettings()
             : JsonSerializer.Deserialize<BalanceSettings>(text, Options) ?? new BalanceSettings();
     }
+
+    public ScenarioDefinition LoadScenario() =>
+        JsonSerializer.Deserialize<ScenarioDefinition>(readText("partie-depart.json"), Options)
+        ?? throw new InvalidDataException("partie-depart.json est vide.");
 
     private List<T> Load<T>(string fileName) =>
         JsonSerializer.Deserialize<List<T>>(readText(fileName), Options) ?? [];

@@ -1,0 +1,41 @@
+{
+  "startingTreasury": 50000,
+  "heatingFuel": "charbon",
+  "communes": [
+    { "id": "commune-1", "name": "Première commune" }
+  ],
+  "buildings": [
+    { "id": "camp-de-base-1", "type": "camp-de-base", "commune": "commune-1" },
+    { "id": "carriere", "type": "carriere", "commune": "commune-1", "name": "Carrière coopérative", "ownership": "Cooperative", "owner": "ouvriers" },
+    { "id": "puits", "type": "puits", "commune": "commune-1", "name": "Puits d'État" },
+    { "id": "mine", "type": "mine", "commune": "commune-1", "name": "Mine de charbon coopérative", "product": "charbon", "ownership": "Cooperative", "owner": "ouvriers", "jobs": 200 },
+    { "id": "mairie", "type": "mairie", "commune": "commune-1", "name": "Mairie" },
+    { "id": "caserne", "type": "caserne-pompiers", "commune": "commune-1", "name": "Caserne de pompiers d'État" },
+    { "id": "ferme", "type": "ferme", "commune": "commune-1", "name": "Ferme coopérative", "product": "ble", "ownership": "Cooperative", "owner": "ouvriers", "jobs": 700 },
+    { "id": "moulin", "type": "atelier", "commune": "commune-1", "name": "Moulin coopératif", "product": "farine", "ownership": "Cooperative", "owner": "ouvriers", "jobs": 230 },
+    { "id": "boulangerie", "type": "atelier", "commune": "commune-1", "name": "Boulangerie coopérative", "product": "pain", "ownership": "Cooperative", "owner": "ouvriers", "jobs": 210 },
+    { "id": "distillerie", "type": "atelier", "commune": "commune-1", "name": "Distillerie", "product": "alcool", "ownership": "Private", "owner": "cadres", "jobs": 30 },
+    { "id": "champ-de-lin", "type": "ferme", "commune": "commune-1", "name": "Champ de lin coopératif", "product": "lin", "ownership": "Cooperative", "owner": "ouvriers", "jobs": 30 },
+    { "id": "tissage", "type": "atelier", "commune": "commune-1", "name": "Atelier de tissage", "product": "tissus", "ownership": "Private", "owner": "cadres", "jobs": 60 },
+    { "id": "atelier", "type": "atelier", "commune": "commune-1", "name": "Atelier de couture", "product": "vetements", "ownership": "Private", "owner": "cadres", "jobs": 60 },
+    { "id": "camp-forestier", "type": "camp-forestier", "commune": "commune-1", "name": "Camp de bûcheron d'État", "jobs": 300 },
+    { "id": "scierie", "type": "atelier", "commune": "commune-1", "name": "Scierie d'État", "product": "planche", "jobs": 40 },
+    { "id": "menuiserie", "type": "atelier", "commune": "commune-1", "name": "Menuiserie d'État", "product": "meubles", "jobs": 40 },
+    { "id": "logements-etat", "type": "logements", "commune": "commune-1", "name": "Logements d'État", "housingPlaces": 3100 },
+    { "id": "logements-prives", "type": "logements", "commune": "commune-1", "name": "Logements privés", "ownership": "Private", "owner": "cadres", "housingPlaces": 2200, "dailyRent": 0.5 },
+    { "id": "ecole", "type": "ecole", "commune": "commune-1", "name": "École d'État" },
+    { "id": "universite", "type": "universite", "commune": "commune-1", "name": "Université d'État" },
+    { "id": "entrepot", "type": "entrepot", "commune": "commune-1", "name": "Entrepôt d'État" },
+    { "id": "grenier", "type": "grenier", "commune": "commune-1", "name": "Grenier d'État" }
+  ],
+  "classes": [
+    { "id": "ouvriers", "name": "Ouvriers communistes", "rank": "Workers", "hierarchy": "A", "production": "A", "property": "A", "population": 4500, "wealth": 225000, "commune": "commune-1" },
+    { "id": "intermediaires", "name": "Professions intermédiaires libertaires", "rank": "Intermediate", "hierarchy": "A", "production": "A", "property": "B", "population": 450, "wealth": 135000, "commune": "commune-1" },
+    { "id": "cadres", "name": "Cadres capitalistes", "rank": "Executives", "hierarchy": "B", "production": "A", "property": "B", "population": 50, "wealth": 100000, "commune": "commune-1" }
+  ],
+  "laws": [
+    { "id": "liberte-entreprendre", "name": "Liberté d'entreprendre", "structure": "etat", "orientations": [ { "axis": "Property", "pole": "B" } ] },
+    { "id": "impot-progressif", "name": "Impôt progressif", "structure": "commune-1", "orientations": [ { "axis": "Hierarchy", "pole": "A" }, { "axis": "Property", "pole": "A" } ] },
+    { "id": "quotas-extraction", "name": "Quotas d'extraction", "structure": "carriere", "orientations": [ { "axis": "Production", "pole": "B" } ] }
+  ]
+}

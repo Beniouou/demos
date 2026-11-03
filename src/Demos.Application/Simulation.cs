@@ -211,7 +211,7 @@ public sealed class Simulation(World world, GameClock clock)
 
         World.Workers = Employment.Assign(World.Structures, World.Classes);
         World.PollutionByCommune = Pollution.PerResidentByCommune(World.Structures, World.Workers, World.Classes);
-        WorkDay.Run(World.Structures, World.Workers, World.Classes, World.Laws, World.Treasury, World.MarketOf, World.CommuneFundOf, World.Wages,
+        World.Produced = WorkDay.Run(World.Structures, World.Workers, World.Classes, World.Laws, World.Treasury, World.MarketOf, World.CommuneFundOf, World.Wages,
             World.CompanyFundOf, World.EnergyEffectOf);
         World.EnergyShares = Energy.RunDaily(World.Structures, World.TierOf, Clock.Season, World.MarketOf, World.Treasury, World.CommuneFundOf,
             World.CompanyFundOf, World.ClassesById, World.FuelStockOf, World.HeatsAllYear);

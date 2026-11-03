@@ -6,34 +6,57 @@ using Demos.Domain.Population;
 using Demos.Domain.Shared;
 using Demos.Infrastructure;
 
-// Génère le tableur d'équilibrage à partir des données du jeu (game/data) et de la partie de départ.
-// Usage : dotnet run --project tools/Demos.Equilibrage -- [dossier game/data] [fichier .xlsx]
-// Les cellules jaunes sont des réglages ; tout le reste est calculé par des formules à partir d'elles.
+// Outil d'équilibrage, à lancer depuis le dossier demos :
+//   dotnet run --project tools/Demos.Equilibrage -- generer          refait le tableur depuis les données du jeu
+//   dotnet run --project tools/Demos.Equilibrage -- appliquer        reporte les cellules jaunes du tableur dans game/data
+//   dotnet run --project tools/Demos.Equilibrage -- simuler [années] [commune]
+//                                     simule la partie de départ (avec une 2e commune si « commune ») et écrit un rapport HTML
+// Le tableur (equilibrage demos.xlsx) et le rapport (rapport simulation.html) sont à côté du dossier demos.
 
-var dataDirectory = args.Length > 0 ? args[0] : FindDataDirectory();
-var outputPath = args.Length > 1
-    ? args[1]
-    : Path.Combine(Directory.GetParent(Directory.GetParent(dataDirectory)!.FullName)!.Parent!.FullName, "equilibrage demos.xlsx");
-
+Console.OutputEncoding = System.Text.Encoding.UTF8;
+var command = args.Length > 0 ? args[0].ToLowerInvariant() : "generer";
+var dataDirectory = FindDataDirectory();
+var outputDirectory = Directory.GetParent(Directory.GetParent(dataDirectory)!.FullName)!.Parent!.FullName;
+var workbookPath = Path.Combine(outputDirectory, "equilibrage demos.xlsx");
+var reportPath = Path.Combine(outputDirectory, "rapport simulation.html");
 var content = new JsonContentSource(file => File.ReadAllText(Path.Combine(dataDirectory, file)));
-var world = PrototypeScenario.Create(content).World;
-var balance = Balance.Current;
 
-using var workbook = new XLWorkbook();
-var catalogueWoodPrice = content.LoadProducts().First(p => p.Id == Energy.DefaultHeating).BasePrice;
-var book = new Book(workbook, world, balance, catalogueWoodPrice);
-book.WriteReadMe();
-book.WriteConstants();
-book.WriteBuildings();
-book.WriteProducts();
-book.WriteRecipes();
-book.WriteNeeds();
-book.WriteStartingGame();
+switch (command)
+{
+    case "generer":
+        Generate();
+        return 0;
+    case "appliquer":
+        return BalanceApplier.Apply(workbookPath, dataDirectory, content);
+    case "simuler":
+        var years = args.Skip(1).Select(a => int.TryParse(a, out var y) ? y : 0).FirstOrDefault(y => y > 0, 3);
+        var secondCommune = args.Skip(1).Any(a => a.Equals("commune", StringComparison.OrdinalIgnoreCase));
+        SimulationReport.Write(content, years, secondCommune, reportPath);
+        return 0;
+    default:
+        Console.WriteLine("Commandes : generer, appliquer, simuler [années] [commune].");
+        return 1;
+}
 
-// Les bâtiments sont écrits avant les produits (les prix s'y réfèrent), mais rangés après.
-workbook.Worksheet("Produits").Position = 3;
-workbook.SaveAs(outputPath);
-Console.WriteLine($"Tableur d'équilibrage écrit : {outputPath}");
+void Generate()
+{
+    var world = PrototypeScenario.Create(content).World;
+    using var workbook = new XLWorkbook();
+    var catalogueWoodPrice = content.LoadProducts().First(p => p.Id == Energy.DefaultHeating).BasePrice;
+    var book = new Book(workbook, world, Balance.Current, catalogueWoodPrice);
+    book.WriteReadMe();
+    book.WriteConstants();
+    book.WriteBuildings();
+    book.WriteRecipes();
+    book.WriteProducts();
+    book.WriteNeeds();
+    book.WriteStartingGame();
+
+    // Les bâtiments et les recettes sont écrits avant les produits (les prix s'y réfèrent), mais rangés après.
+    workbook.Worksheet("Produits").Position = 3;
+    workbook.SaveAs(workbookPath);
+    Console.WriteLine($"Tableur d'équilibrage écrit : {workbookPath}");
+}
 
 static string FindDataDirectory()
 {
@@ -93,6 +116,27 @@ internal sealed class Book(XLWorkbook workbook, World world, BalanceSettings bal
     // Feuille Bâtiments : dernière ligne, pour les recherches par identifiant de type.
     private int _buildingLast;
 
+    // Feuille Recettes : ligne de chaque recette (type, numéro de la recette dans le type).
+    private readonly Dictionary<(string TypeId, int Index), int> _recipeRows = [];
+
+    /// <summary>Les réglages de la feuille Constantes que « appliquer » reporte dans equilibrage.json.</summary>
+    public static readonly HashSet<string> AppliedConstants =
+    [
+        "Marge", "Encadrement", "Direction", "MultOuvriers", "MultPI", "MultCadres", "Chauffage", "Eau", "Hiver", "Printemps",
+        "Ete", "Automne", "SansEnergie", "ReserveCombustible", "ReserveEntreprise", "ImpotEtat", "ImpotCommune", "Transport",
+        "PollutionLoin", "SeuilPollution", "Dotation",
+    ];
+
+    /// <summary>Ligne de la recette d'un bâtiment dans la feuille Recettes, ou null si elle n'y est pas.</summary>
+    private int? RecipeRowOf(string? typeId, Production? recipe)
+    {
+        if (typeId is null || recipe is null || !world.BuildingTypes.TryGetValue(typeId, out var type))
+            return null;
+
+        var index = type.AvailableRecipes.ToList().FindIndex(r => r.Label == recipe.Value.Label);
+        return _recipeRows.TryGetValue((typeId, index), out var row) ? row : null;
+    }
+
     private string BuildingColumn(string column) => $"'Bâtiments'!${column}$2:${column}${_buildingLast}";
 
     /// <summary>Valeur d'une colonne de la feuille Bâtiments pour un type (par son identifiant).</summary>
@@ -134,6 +178,15 @@ internal sealed class Book(XLWorkbook workbook, World world, BalanceSettings bal
         cell.Style.Fill.BackgroundColor = InputColor;
     }
 
+    /// <summary>Renvoie à une cellule de la feuille Recettes, ou écrit la valeur si la recette n'y est pas.</summary>
+    private static void SetOrRefer(IXLCell cell, int? recipeRow, string column, double value)
+    {
+        if (recipeRow is { } row)
+            cell.FormulaA1 = $"Recettes!${column}${row}";
+        else
+            cell.Value = value;
+    }
+
     private static void Finish(IXLWorksheet sheet, int headerRow)
     {
         sheet.SheetView.FreezeRows(headerRow);
@@ -148,21 +201,27 @@ internal sealed class Book(XLWorkbook workbook, World world, BalanceSettings bal
         [
             "Tableur d'équilibrage de Projet Démos",
             "",
-            "Généré depuis les données du jeu (game/data : produits, bâtiments, equilibrage.json) et la partie de départ.",
+            "Généré depuis les données du jeu (game/data : produits, bâtiments, equilibrage.json, partie-depart.json).",
             "Les cellules jaunes sont des réglages : changez-les pour voir l'effet ; tout le reste se recalcule par formules.",
-            "Pour reporter un réglage dans le jeu, il faut le modifier dans game/data (le tableur ne réécrit pas encore les fichiers).",
+            "Les colonnes « Clé (ne pas modifier) » servent à retrouver chaque réglage dans les données du jeu.",
+            "",
+            "Trois commandes, à lancer en double-cliquant sur les fichiers .bat du dossier demos :",
+            "- appliquer-equilibrage.bat : reporte les cellules jaunes dans le jeu (game/data). Les valeurs sont vérifiées d'abord :",
+            "  en cas d'erreur, rien n'est écrit et la feuille et la cellule fautives sont indiquées. Affiche ce qui a changé.",
+            "- simuler.bat : simule la partie de départ (3 ans) et ouvre le rapport « rapport simulation.html ».",
+            "- generer-equilibrage.bat : refait ce tableur depuis le jeu. Attention : les modifications non appliquées sont perdues.",
+            "  Fermez le tableur avant d'appliquer ou de régénérer (et enregistrez-le avant d'appliquer).",
             "",
             "Feuilles :",
             "- Constantes : marge, salaires, encadrement, énergie, saisons, impôts, réserves…",
-            "- Produits : prix recalculé avec la règle des 30 % (salaires, énergie, matières), comparé au prix du jeu.",
+            "- Produits : prix recalculé avec la règle des 30 % (salaires, énergie, matières), comparé au prix du jeu ; durée de vie.",
             "- Bâtiments : tous les types du catalogue, avec leurs emplois, coûts, places, stockage et énergie.",
             "- Recettes : chaque recette à plein régime : production, valeur, coûts et bénéfice par jour.",
             "- Besoins : quantités par rang, coût de la vie par jour comparé au salaire de chaque rang.",
-            "- Partie de départ : bâtiments de départ, production comparée à la demande, emplois comparés à la population.",
+            "- Partie de départ : population, emplois des bâtiments de départ, production comparée à la demande.",
             "",
             "Les prix recalculés suivent les mêmes règles que le jeu ; la colonne Écart doit rester à 0 tant que rien n'est changé.",
-            "",
-            "Pour régénérer : dotnet run --project tools/Demos.Equilibrage (depuis le dossier demos).",
+            "Le jeu recalcule ses prix à partir des réglages : après « appliquer », régénérez pour voir les nouveaux prix du jeu.",
         ];
         for (var i = 0; i < lines.Length; i++)
             sheet.Cell(i + 1, 1).Value = lines[i];
@@ -174,7 +233,7 @@ internal sealed class Book(XLWorkbook workbook, World world, BalanceSettings bal
     public void WriteConstants()
     {
         var sheet = workbook.AddWorksheet("Constantes");
-        Header(sheet, 1, "Réglage", "Valeur", "Explication");
+        Header(sheet, 1, "Réglage", "Valeur", "Explication", "Clé (ne pas modifier)");
 
         var averageRent = world.Structures.Values.Where(s => s.HousingPlaces > 0) is var housing && housing.Sum(s => s.HousingPlaces) > 0
             ? housing.Sum(s => s.HousingPlaces * s.DailyRent) / housing.Sum(s => s.HousingPlaces)
@@ -218,9 +277,12 @@ internal sealed class Book(XLWorkbook workbook, World world, BalanceSettings bal
             sheet.Cell(row, 1).Value = label;
             if (key == "FacteurMoyen")
                 sheet.Cell(row, 2).FormulaA1 = $"AVERAGE({C("Hiver")},{C("Printemps")},{C("Ete")},{C("Automne")})";
-            else
+            else if (AppliedConstants.Contains(key))
                 Input(sheet.Cell(row, 2), Convert.ToDouble(value));
+            else
+                sheet.Cell(row, 2).Value = Convert.ToDouble(value);
             sheet.Cell(row, 3).Value = note;
+            sheet.Cell(row, 4).Value = key;
             _constants[key] = $"Constantes!$B${row}";
         }
 
@@ -266,11 +328,16 @@ internal sealed class Book(XLWorkbook workbook, World world, BalanceSettings bal
             sheet.Cell(row, 7).Value = type.Tier;
             sheet.Cell(row, 8).Value = RankName(type.MainRank);
             sheet.Cell(row, 9).FormulaA1 = Lookup($"F{row}", WageBillColumn);
-            Input(sheet.Cell(row, 10), recipe.QuantityPerWorker);
+
+            // La production et les matières se règlent dans la feuille Recettes : on y renvoie.
+            var recipeRow = RecipeRowOf(type.Id, recipe);
+            sheet.Cell(row, 10).FormulaA1 = recipeRow is { } r ? $"Recettes!$H${r}" : recipe.QuantityPerWorker.ToString(System.Globalization.CultureInfo.InvariantCulture);
             for (var m = 0; m < Math.Min(2, recipe.Materials.Count); m++)
             {
                 sheet.Cell(row, 11 + 2 * m).Value = recipe.Materials[m].ProductId;
-                Input(sheet.Cell(row, 12 + 2 * m), recipe.Materials[m].Quantity);
+                sheet.Cell(row, 12 + 2 * m).FormulaA1 = recipeRow is { } rr
+                    ? $"Recettes!${(m == 0 ? "J" : "L")}${rr}"
+                    : recipe.Materials[m].Quantity.ToString(System.Globalization.CultureInfo.InvariantCulture);
             }
 
             sheet.Cell(row, 15).FormulaA1 = $"I{row}";
@@ -352,16 +419,20 @@ internal sealed class Book(XLWorkbook workbook, World world, BalanceSettings bal
             "Production par travailleur", "Matière 1", "Quantité 1", "Matière 2", "Quantité 2", "Production par jour",
             "Valeur par jour", "Matières par jour", "Salaires par jour", "Énergie par jour", "Bénéfice par jour", "Marge réelle");
 
+        sheet.Cell(1, 20).Value = "Clé (ne pas modifier)";
         var row = 2;
         foreach (var type in world.BuildingTypes.Values.Where(t => t.Jobs > 0).OrderBy(t => t.Category).ThenBy(t => t.Level))
         {
-            foreach (var recipe in type.AvailableRecipes)
+            for (var index = 0; index < type.AvailableRecipes.Count; index++)
             {
+                var recipe = type.AvailableRecipes[index];
+                _recipeRows[(type.Id, index)] = row;
+                sheet.Cell(row, 20).Value = $"{type.Id}#{index}";
                 sheet.Cell(row, 1).Value = type.Id;
                 sheet.Cell(row, 2).Value = type.Level;
                 sheet.Cell(row, 3).Value = type.Tier;
                 sheet.Cell(row, 4).Value = RankName(type.MainRank);
-                Input(sheet.Cell(row, 5), type.Jobs);
+                sheet.Cell(row, 5).FormulaA1 = Lookup($"A{row}", "H");
                 sheet.Cell(row, 6).FormulaA1 = Lookup($"A{row}", WageBillColumn);
                 sheet.Cell(row, 7).Value = recipe.ProductId;
                 Input(sheet.Cell(row, 8), recipe.QuantityPerWorker);
@@ -391,7 +462,7 @@ internal sealed class Book(XLWorkbook workbook, World world, BalanceSettings bal
     {
         var sheet = workbook.AddWorksheet("Besoins");
         Header(sheet, 1, "Besoin", "Produit principal (le moins cher produit au départ)", "Prix", RankName(Rank.Workers), RankName(Rank.Intermediate),
-            RankName(Rank.Executives));
+            RankName(Rank.Executives), "Clé (ne pas modifier)");
 
         var needs = Consumption.AllNeeds.ToList();
         var row = 2;
@@ -410,10 +481,12 @@ internal sealed class Book(XLWorkbook workbook, World world, BalanceSettings bal
             sheet.Cell(row, 3).FormulaA1 = Price($"B{row}");
             for (var r = 0; r < Ranks.Length; r++)
                 Input(sheet.Cell(row, 4 + r), Consumption.NeedsOf(Ranks[r]).GetValueOrDefault(need));
+            sheet.Cell(row, 7).Value = need.ToString();
             row++;
         }
 
         sheet.Cell(row, 1).Value = "Se loger (places)";
+        sheet.Cell(row, 7).Value = "Housing";
         sheet.Cell(row, 2).Value = "loyer moyen";
         sheet.Cell(row, 3).FormulaA1 = C("LoyerMoyen");
         for (var r = 0; r < Ranks.Length; r++)
@@ -450,8 +523,11 @@ internal sealed class Book(XLWorkbook workbook, World world, BalanceSettings bal
         {
             sheet.Cell(2 + r, 1).Value = RankName(Ranks[r]);
             Input(sheet.Cell(2 + r, 2), world.Classes.Where(c => c.Rank == Ranks[r]).Sum(c => c.Population));
+            sheet.Cell(2 + r, 3).Value = Ranks[r].ToString();
             populationCells[Ranks[r]] = $"$B${2 + r}";
         }
+
+        sheet.Cell(1, 3).Value = "Clé (ne pas modifier)";
 
         // Bâtiments de départ.
         const int header = 7;
@@ -461,7 +537,7 @@ internal sealed class Book(XLWorkbook workbook, World world, BalanceSettings bal
             "Produit", "Production par travailleur", "Matière 1", "Quantité 1", "Matière 2", "Quantité 2", "Production par jour",
             "Matière 1 par jour", "Matière 2 par jour", "Combustible", "Unités d'énergie", "Chauffage par jour (moyen)", "Eau par jour",
             "Emplois ouvriers", "Emplois prof. intermédiaires", "Emplois cadres", "Valeur par jour", "Matières par jour",
-            "Salaires par jour", "Énergie par jour", "Loyers et frais par jour", "Bénéfice par jour");
+            "Salaires par jour", "Énergie par jour", "Loyers et frais par jour", "Bénéfice par jour", "Clé (ne pas modifier)");
 
         var buildings = world.Structures.Values.Where(s => s.Kind == StructureKind.Building).ToList();
         var row = header + 1;
@@ -483,14 +559,18 @@ internal sealed class Book(XLWorkbook workbook, World world, BalanceSettings bal
             sheet.Cell(row, 7).FormulaA1 = Lookup($"B{row}", WageBillColumn);
             if (building.Production is { } recipe)
             {
+                // La production et les matières se règlent dans la feuille Recettes : on y renvoie.
+                var recipeRow = RecipeRowOf(building.TypeId, recipe);
                 sheet.Cell(row, 8).Value = recipe.ProductId;
-                Input(sheet.Cell(row, 9), recipe.QuantityPerWorker);
+                SetOrRefer(sheet.Cell(row, 9), recipeRow, "H", recipe.QuantityPerWorker);
                 for (var m = 0; m < Math.Min(2, recipe.Materials.Count); m++)
                 {
                     sheet.Cell(row, 10 + 2 * m).Value = recipe.Materials[m].ProductId;
-                    Input(sheet.Cell(row, 11 + 2 * m), recipe.Materials[m].Quantity);
+                    SetOrRefer(sheet.Cell(row, 11 + 2 * m), recipeRow, m == 0 ? "J" : "L", recipe.Materials[m].Quantity);
                 }
             }
+
+            sheet.Cell(row, 30).Value = building.Id;
 
             sheet.Cell(row, 14).FormulaA1 = $"F{row}*I{row}";
             sheet.Cell(row, 15).FormulaA1 = $"N{row}*K{row}";
