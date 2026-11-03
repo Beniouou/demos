@@ -45,6 +45,7 @@ void Generate()
     var catalogueWoodPrice = content.LoadProducts().First(p => p.Id == Energy.DefaultHeating).BasePrice;
     var book = new Book(workbook, world, Balance.Current, catalogueWoodPrice);
     book.WriteReadMe();
+    book.WriteLists();
     book.WriteConstants();
     book.WriteBuildings();
     book.WriteRecipes();
@@ -54,6 +55,8 @@ void Generate()
 
     // Les bâtiments et les recettes sont écrits avant les produits (les prix s'y réfèrent), mais rangés après.
     workbook.Worksheet("Produits").Position = 3;
+    workbook.Worksheet("Listes").Position = workbook.Worksheets.Count;
+    book.ProtectSheets();
     workbook.SaveAs(workbookPath);
     Console.WriteLine($"Tableur d'équilibrage écrit : {workbookPath}");
 }
@@ -88,14 +91,9 @@ internal sealed class Book(XLWorkbook workbook, World world, BalanceSettings bal
     private readonly Dictionary<NeedCategory, int> _needRows = [];
     private readonly Dictionary<NeedCategory, string> _mainProductOfNeed = [];
 
-    private static readonly Rank[] Ranks = [Rank.Workers, Rank.Intermediate, Rank.Executives];
+    private static readonly Rank[] Ranks = Labels.Ranks;
 
-    private static string RankName(Rank rank) => rank switch
-    {
-        Rank.Workers => "Ouvriers",
-        Rank.Intermediate => "Prof. intermédiaires",
-        _ => "Cadres",
-    };
+    private static string RankName(Rank rank) => Labels.RankName(rank);
 
     private static string NeedName(NeedCategory need) => need switch
     {
@@ -172,10 +170,67 @@ internal sealed class Book(XLWorkbook workbook, World world, BalanceSettings bal
         }
     }
 
+    /// <summary>Un réglage : une case jaune, la seule modifiable une fois la feuille protégée.</summary>
     private static void Input(IXLCell cell, XLCellValue value)
     {
         cell.Value = value;
         cell.Style.Fill.BackgroundColor = InputColor;
+        cell.Style.Protection.Locked = false;
+    }
+
+    /// <summary>Un réglage à choisir dans un menu déroulant : une plage de la feuille Listes, ou une liste écrite (« a,b »).</summary>
+    private static void Choice(IXLCell cell, string value, string list, bool allowBlank = false)
+    {
+        Input(cell, value == "" ? Blank.Value : value);
+        var validation = cell.CreateDataValidation();
+        validation.List(list.StartsWith('=') ? list[1..] : $"\"{list}\"", true);
+        validation.IgnoreBlanks = allowBlank;
+        validation.ErrorStyle = XLErrorStyle.Stop;
+        validation.ErrorTitle = "Valeur impossible";
+        validation.ErrorMessage = "Choisissez une valeur dans le menu déroulant.";
+    }
+
+    // Feuille Listes (cachée) : les valeurs des menus déroulants.
+    private string _productList = "";
+    private string _rankList = "";
+    private string _yesNoList = "";
+    private string _storageKindList = "";
+    private string _ownershipList = "";
+    private string _classList = "";
+
+    /// <summary>Écrit la feuille cachée des listes des menus déroulants.</summary>
+    public void WriteLists()
+    {
+        var sheet = workbook.AddWorksheet("Listes");
+        string Column(int column, string title, IEnumerable<string> values)
+        {
+            sheet.Cell(1, column).Value = title;
+            var items = values.ToList();
+            for (var i = 0; i < items.Count; i++)
+                sheet.Cell(i + 2, column).Value = items[i];
+            var letter = XLHelper.GetColumnLetterFromNumber(column);
+            return $"=Listes!${letter}$2:${letter}${Math.Max(2, items.Count + 1)}";
+        }
+
+        _productList = Column(1, "Produits", world.Products.Select(p => p.Id));
+        _rankList = Column(2, "Rangs", Ranks.Select(RankName));
+        _yesNoList = Column(3, "Oui ou non", [Labels.Yes, Labels.No]);
+        _storageKindList = Column(4, "Sortes de stockage", Labels.StorageKinds.Select(Labels.StorageKindName));
+        _ownershipList = Column(5, "Propriété", Labels.Ownerships.Select(Labels.OwnershipName));
+        _classList = Column(6, "Classes de départ", world.Classes.Select(c => c.Name).Distinct());
+        sheet.Visibility = XLWorksheetVisibility.Hidden;
+    }
+
+    /// <summary>Protège chaque feuille, sans mot de passe : seules les cases jaunes restent modifiables.</summary>
+    public void ProtectSheets()
+    {
+        foreach (var sheet in workbook.Worksheets)
+            sheet.Protect()
+                .AllowElement(XLSheetProtectionElements.SelectEverything)
+                .AllowElement(XLSheetProtectionElements.FormatColumns)
+                .AllowElement(XLSheetProtectionElements.FormatRows)
+                .AllowElement(XLSheetProtectionElements.AutoFilter)
+                .AllowElement(XLSheetProtectionElements.Sort);
     }
 
     /// <summary>Renvoie à une cellule de la feuille Recettes, ou écrit la valeur si la recette n'y est pas.</summary>
@@ -203,7 +258,11 @@ internal sealed class Book(XLWorkbook workbook, World world, BalanceSettings bal
             "",
             "Généré depuis les données du jeu (game/data : produits, bâtiments, equilibrage.json, partie-depart.json).",
             "Les cellules jaunes sont des réglages : changez-les pour voir l'effet ; tout le reste se recalcule par formules.",
+            "Les mots à choisir (rang, produit, matière, propriétaire, sorte de stockage, oui ou non) ont un menu déroulant.",
+            "Les feuilles sont protégées, sans mot de passe : seules les cases jaunes se modifient. Pour changer autre chose,",
+            "Révision → Ôter la protection de la feuille (ce qui n'est pas jaune n'est de toute façon pas reporté dans le jeu).",
             "Les colonnes « Clé (ne pas modifier) » servent à retrouver chaque réglage dans les données du jeu.",
+            "Après un changement de rang productif ou de produit fabriqué, appliquez puis régénérez pour revoir les proportions et les calculs.",
             "",
             "Trois commandes, à lancer en double-cliquant sur les fichiers .bat du dossier demos :",
             "- appliquer-equilibrage.bat : reporte les cellules jaunes dans le jeu (game/data). Les valeurs sont vérifiées d'abord :",
@@ -359,7 +418,7 @@ internal sealed class Book(XLWorkbook workbook, World world, BalanceSettings bal
             "Salaire : ouvriers", "Salaire : prof. intermédiaires", "Salaire : cadres", "Salaires par emploi productif",
             "Emplois d'ouvriers", "Emplois de prof. intermédiaires", "Emplois de cadres", "Salaires par jour",
             "Places de logement", "Loyer par place", "Places d'élèves", "Frais par élève", "Stockage", "Sorte de stockage",
-            "Pollution par travailleur", "Unités d'énergie", "Chauffage par jour (moyen)", "Eau par jour", "Recettes");
+            "Pollution par travailleur", "Unités d'énergie", "Chauffage par jour (moyen)", "Eau par jour", "Recettes", "Produit stocké (stockage spécifique)");
 
         var types = world.BuildingTypes.Values.OrderBy(t => t.Category).ThenBy(t => t.Level).ToList();
         _buildingLast = types.Count + 1;
@@ -371,8 +430,8 @@ internal sealed class Book(XLWorkbook workbook, World world, BalanceSettings bal
             sheet.Cell(row, 3).Value = type.Category;
             sheet.Cell(row, 4).Value = type.Level;
             Input(sheet.Cell(row, 5), type.Tier);
-            sheet.Cell(row, 6).Value = type.ConstantHeating ? "oui" : "";
-            sheet.Cell(row, 7).Value = RankName(type.MainRank);
+            Choice(sheet.Cell(row, 6), type.ConstantHeating ? Labels.Yes : Labels.No, _yesNoList);
+            Choice(sheet.Cell(row, 7), RankName(type.MainRank), _rankList);
             Input(sheet.Cell(row, 8), type.Jobs);
             for (var r = 0; r < Ranks.Length; r++)
             {
@@ -393,9 +452,8 @@ internal sealed class Book(XLWorkbook workbook, World world, BalanceSettings bal
             Input(sheet.Cell(row, 22), type.SchoolPlaces);
             Input(sheet.Cell(row, 23), type.DailyTuition);
             Input(sheet.Cell(row, 24), type.StorageCapacity);
-            sheet.Cell(row, 25).Value = type.StorageCapacity > 0
-                ? type.StorageKind + (type.StorageProductId is { } stored ? $" ({stored})" : "")
-                : "";
+            Choice(sheet.Cell(row, 25), Labels.StorageKindName(type.StorageKind), _storageKindList);
+            Choice(sheet.Cell(row, 31), type.StorageProductId ?? "", _productList, allowBlank: true);
             Input(sheet.Cell(row, 26), type.PollutionPerWorker);
             sheet.Cell(row, 27).FormulaA1 = $"H{row}+T{row}+V{row}";
             var factor = type.ConstantHeating ? "1" : C("FacteurMoyen");
@@ -434,12 +492,17 @@ internal sealed class Book(XLWorkbook workbook, World world, BalanceSettings bal
                 sheet.Cell(row, 4).Value = RankName(type.MainRank);
                 sheet.Cell(row, 5).FormulaA1 = Lookup($"A{row}", "H");
                 sheet.Cell(row, 6).FormulaA1 = Lookup($"A{row}", WageBillColumn);
-                sheet.Cell(row, 7).Value = recipe.ProductId;
+                Choice(sheet.Cell(row, 7), recipe.ProductId, _productList);
                 Input(sheet.Cell(row, 8), recipe.QuantityPerWorker);
-                for (var m = 0; m < Math.Min(2, recipe.Materials.Count); m++)
+                for (var m = 0; m < 2; m++)
                 {
-                    sheet.Cell(row, 9 + 2 * m).Value = recipe.Materials[m].ProductId;
-                    Input(sheet.Cell(row, 10 + 2 * m), recipe.Materials[m].Quantity);
+                    // Deux matières au plus ; une case vide veut dire « pas de matière ».
+                    var material = m < recipe.Materials.Count ? recipe.Materials[m] : (RecipeInput?)null;
+                    Choice(sheet.Cell(row, 9 + 2 * m), material?.ProductId ?? "", _productList, allowBlank: true);
+                    if (material is { } input)
+                        Input(sheet.Cell(row, 10 + 2 * m), input.Quantity);
+                    else
+                        Input(sheet.Cell(row, 10 + 2 * m), Blank.Value);
                 }
 
                 sheet.Cell(row, 13).FormulaA1 = $"E{row}*H{row}";
@@ -537,7 +600,7 @@ internal sealed class Book(XLWorkbook workbook, World world, BalanceSettings bal
             "Produit", "Production par travailleur", "Matière 1", "Quantité 1", "Matière 2", "Quantité 2", "Production par jour",
             "Matière 1 par jour", "Matière 2 par jour", "Combustible", "Unités d'énergie", "Chauffage par jour (moyen)", "Eau par jour",
             "Emplois ouvriers", "Emplois prof. intermédiaires", "Emplois cadres", "Valeur par jour", "Matières par jour",
-            "Salaires par jour", "Énergie par jour", "Loyers et frais par jour", "Bénéfice par jour", "Clé (ne pas modifier)");
+            "Salaires par jour", "Énergie par jour", "Loyers et frais par jour", "Bénéfice par jour", "Clé (ne pas modifier)", "Classe propriétaire");
 
         var buildings = world.Structures.Values.Where(s => s.Kind == StructureKind.Building).ToList();
         var row = header + 1;
@@ -545,14 +608,12 @@ internal sealed class Book(XLWorkbook workbook, World world, BalanceSettings bal
         {
             var type = building.TypeId is { } typeId ? world.BuildingTypes.GetValueOrDefault(typeId) : null;
             var tier = world.TierOf(building);
-            var owner = building.Ownership == Ownership.Public
-                ? "État"
-                : $"{(building.Ownership == Ownership.Cooperative ? "Coopérative" : "Privé")} : "
-                  + (building.OwnerClassId is { } ownerId && world.ClassesById.TryGetValue(ownerId, out var o) ? o.Name : "?");
-
             sheet.Cell(row, 1).Value = building.Name;
             sheet.Cell(row, 2).Value = type?.Id ?? "—";
-            sheet.Cell(row, 3).Value = owner;
+            // Propriétaire : la propriété, et la classe propriétaire pour une coopérative ou une entreprise privée.
+            Choice(sheet.Cell(row, 3), Labels.OwnershipName(building.Ownership), _ownershipList);
+            var ownerName = building.OwnerClassId is { } ownerId && world.ClassesById.TryGetValue(ownerId, out var o) ? o.Name : "";
+            Choice(sheet.Cell(row, 31), ownerName, _classList, allowBlank: true);
             sheet.Cell(row, 4).Value = tier;
             sheet.Cell(row, 5).Value = RankName(building.MainRank);
             Input(sheet.Cell(row, 6), building.Jobs);
@@ -561,7 +622,12 @@ internal sealed class Book(XLWorkbook workbook, World world, BalanceSettings bal
             {
                 // La production et les matières se règlent dans la feuille Recettes : on y renvoie.
                 var recipeRow = RecipeRowOf(building.TypeId, recipe);
-                sheet.Cell(row, 8).Value = recipe.ProductId;
+                // Le produit fabriqué se choisit parmi les recettes du type, quand il y en a plusieurs.
+                var products = type?.AvailableRecipes.Select(r => r.ProductId).Distinct().ToList() ?? [];
+                if (products.Count > 1)
+                    Choice(sheet.Cell(row, 8), recipe.ProductId, string.Join(",", products));
+                else
+                    sheet.Cell(row, 8).Value = recipe.ProductId;
                 SetOrRefer(sheet.Cell(row, 9), recipeRow, "H", recipe.QuantityPerWorker);
                 for (var m = 0; m < Math.Min(2, recipe.Materials.Count); m++)
                 {

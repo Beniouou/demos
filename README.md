@@ -48,8 +48,10 @@ L'outil `tools/Demos.Equilibrage` a trois commandes, chacune lancée par un fich
 | `appliquer-equilibrage.bat` | `appliquer` | Reporte les cellules jaunes du tableur dans `game/data`. Vérifie d'abord chaque valeur (nombre, pas de négatif, pas de produit inconnu, pas de case vide) : en cas d'erreur, rien n'est écrit et la feuille et la cellule sont indiquées. Affiche chaque changement. |
 | `simuler.bat` | `simuler [années] [commune]` | Joue la partie de départ sans joueur (3 ans par défaut, `commune` pour fonder une deuxième commune) et ouvre le rapport `rapport simulation.html` : trésor, caisses, pollution, classes, chômage par rang, production et stocks, bâtiments en difficulté. |
 
-Le tableur recalcule par formules les prix, les coûts, les bilans, la demande et le chômage attendu. Les colonnes
-« Clé (ne pas modifier) » servent à retrouver chaque réglage. Sans les `.bat` :
+Le tableur recalcule par formules les prix, les coûts, les bilans, la demande et le chômage attendu. Les mots à
+choisir (rang, produit, matière, propriétaire, sorte de stockage, oui/non) ont un menu déroulant, et les feuilles sont
+protégées sans mot de passe : seules les cases jaunes se modifient. Les colonnes « Clé (ne pas modifier) » servent à
+retrouver chaque réglage. Sans les `.bat` :
 
 ```bash
 dotnet run --project tools/Demos.Equilibrage -- appliquer

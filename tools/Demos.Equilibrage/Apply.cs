@@ -214,6 +214,17 @@ internal static class BalanceApplier
             return Math.Round(value, 10);
         }
 
+        /// <summary>Une valeur choisie dans un menu déroulant ; null et une erreur si elle n'est pas dans le menu.</summary>
+        private T? Pick<T>(IXLCell cell, Func<string, T?> parse) where T : struct
+        {
+            var text = Text(cell);
+            if (parse(text) is { } value)
+                return value;
+
+            Errors.Add($"{Where(cell)} : « {text} » n'est pas dans le menu déroulant.");
+            return null;
+        }
+
         /// <summary>Les lignes d'une feuille, de la première jusqu'à la première case vide dans la colonne clé.</summary>
         private static IEnumerable<IXLRow> Rows(IXLWorksheet sheet, int first, string keyColumn)
         {
@@ -351,13 +362,41 @@ internal static class BalanceApplier
                 Set(json, "tier", tier, type.Tier, $"{id} : liste");
                 Set(json, "jobs", Number(row.Cell("H"), integer: true), type.Jobs, $"{id} : emplois productifs");
 
+                // Chauffage constant (la forge) : oui ou non.
+                if (Pick<bool>(row.Cell("F"), text => text == Labels.Yes ? true : text == Labels.No ? false : null) is { } constant
+                    && constant != type.ConstantHeating)
+                {
+                    if (constant)
+                        json["constantHeating"] = true;
+                    else
+                        json.Remove("constantHeating");
+                    Changes.Add($"{id} : chauffage constant {(type.ConstantHeating ? Labels.Yes : Labels.No)} → {(constant ? Labels.Yes : Labels.No)}");
+                }
+
+                // Rang productif : celui qui produit ; les autres rangs encadrent.
+                var mainRank = Pick(row.Cell("G"), Labels.RankOf) ?? type.MainRank;
+                var mainRankChanged = mainRank != type.MainRank;
+                if (mainRankChanged)
+                {
+                    if (mainRank == Rank.Workers)
+                        json.Remove("mainRank");
+                    else
+                        json["mainRank"] = mainRank.ToString();
+                    Changes.Add($"{id} : rang productif {Labels.RankName(type.MainRank)} → {Labels.RankName(mainRank)}");
+                }
+
                 // Proportions d'emplois des rangs autres que le rang productif : toutes écrites dès que l'une change.
-                var ratios = Ranks.Where(r => r != type.MainRank)
-                    .Select(r => (Rank: r, Value: Number(row.Cell(9 + Array.IndexOf(Ranks, r))), Current: Staffing.RatioOf(type.MainRank, type.StaffRatios, r)))
+                // Quand le rang productif change, l'ancien (qui comptait 1) prend la proportion par défaut : à revoir
+                // après avoir régénéré le tableur.
+                var ratios = Ranks.Where(r => r != mainRank)
+                    .Select(r => (Rank: r,
+                        Value: mainRankChanged && r == type.MainRank ? Staffing.ShareOf(mainRank, r) : Number(row.Cell(9 + Array.IndexOf(Ranks, r))),
+                        Current: Staffing.RatioOf(type.MainRank, type.StaffRatios, r)))
                     .ToList();
-                if (ratios.All(r => r.Value is not null) && ratios.Any(r => !Same(r.Value!.Value, r.Current)))
+                if (ratios.All(r => r.Value is not null) && (mainRankChanged || ratios.Any(r => !Same(r.Value!.Value, r.Current))))
                 {
                     var target = ObjectAt(json, ["staffRatios"]);
+                    target.Remove(mainRank.ToString());
                     foreach (var (rank, value, current) in ratios)
                     {
                         // Un rang sans emploi n'a pas besoin d'être écrit (les rangs sous le rang productif).
@@ -388,6 +427,42 @@ internal static class BalanceApplier
                 Set(json, "dailyTuition", Number(row.Cell("W")), type.DailyTuition, $"{id} : frais par élève");
                 Set(json, "storageCapacity", Number(row.Cell("X"), integer: true), type.StorageCapacity, $"{id} : stockage");
                 Set(json, "pollutionPerWorker", Number(row.Cell("Z")), type.PollutionPerWorker, $"{id} : pollution par travailleur");
+
+                // Sorte de stockage, et produit stocké pour un stockage spécifique (le château d'eau garde l'eau).
+                var kind = Pick(row.Cell("Y"), Labels.StorageKindOf) ?? type.StorageKind;
+                var storedId = Text(row.Cell("AE"));
+                if (storedId != "" && !_products.ContainsKey(storedId))
+                {
+                    Errors.Add($"{Where(row.Cell("AE"))} : produit inconnu « {storedId} ».");
+                    continue;
+                }
+
+                if (kind == StorageKind.Specific && storedId == "" && type.StorageCapacity > 0
+                    && (kind != type.StorageKind || type.StorageProductId is not null))
+                {
+                    Errors.Add($"{Where(row.Cell("AE"))} : un stockage spécifique doit dire quel produit il garde.");
+                    continue;
+                }
+
+                if (kind != StorageKind.Specific)
+                    storedId = "";
+                if (kind != type.StorageKind)
+                {
+                    if (kind == StorageKind.General)
+                        json.Remove("storageKind");
+                    else
+                        json["storageKind"] = kind.ToString();
+                    Changes.Add($"{id} : sorte de stockage {Labels.StorageKindName(type.StorageKind)} → {Labels.StorageKindName(kind)}");
+                }
+
+                if (storedId != (type.StorageProductId ?? ""))
+                {
+                    if (storedId == "")
+                        json.Remove("storageProductId");
+                    else
+                        json["storageProductId"] = storedId;
+                    Changes.Add($"{id} : produit stocké {type.StorageProductId ?? "aucun"} → {(storedId == "" ? "aucun" : storedId)}");
+                }
             }
         }
 
@@ -553,7 +628,58 @@ internal static class BalanceApplier
                     continue;
                 }
 
-                Set(json, "jobs", Number(row.Cell("F"), integer: true), building.Jobs ?? type.Jobs, $"partie de départ, {building.Name ?? id} : emplois productifs");
+                var label = $"partie de départ, {building.Name ?? id}";
+                Set(json, "jobs", Number(row.Cell("F"), integer: true), building.Jobs ?? type.Jobs, $"{label} : emplois productifs");
+
+                // Produit fabriqué : une des recettes du type.
+                var productCell = row.Cell("H");
+                var productId = Text(productCell);
+                var currentProduct = building.Product ?? type.DefaultProduction?.ProductId;
+                if (productId != "" && productId != currentProduct)
+                {
+                    if (type.AvailableRecipes.All(r => r.ProductId != productId))
+                        Errors.Add($"{Where(productCell)} : un bâtiment « {type.Id} » ne sait pas fabriquer « {productId} ».");
+                    else
+                    {
+                        json["product"] = productId;
+                        Changes.Add($"{label} : produit {currentProduct} → {productId}");
+                    }
+                }
+
+                // Propriétaire : l'État, ou une coopérative ou une entreprise privée et sa classe propriétaire.
+                if (Pick(row.Cell("C"), Labels.OwnershipOf) is not { } ownership)
+                    continue;
+                var ownerName = Text(row.Cell("AE"));
+                string? ownerId = null;
+                if (ownership != Ownership.Public)
+                {
+                    ownerId = _scenario.Classes.FirstOrDefault(c => c.Name == ownerName)?.Id;
+                    if (ownerId is null)
+                    {
+                        Errors.Add(ownerName == ""
+                            ? $"{Where(row.Cell("AE"))} : un bâtiment {(ownership == Ownership.Private ? "privé" : "coopératif")} doit avoir une classe propriétaire."
+                            : $"{Where(row.Cell("AE"))} : classe inconnue « {ownerName} ».");
+                        continue;
+                    }
+                }
+
+                if (ownership == building.Ownership && ownerId == (ownership == Ownership.Public ? null : building.Owner))
+                    continue;
+                if (ownership == Ownership.Public)
+                {
+                    json.Remove("ownership");
+                    json.Remove("owner");
+                }
+                else
+                {
+                    json["ownership"] = ownership.ToString();
+                    json["owner"] = ownerId;
+                }
+
+                string Describe(Ownership o, string? owner) =>
+                    o == Ownership.Public ? Labels.OwnershipName(o)
+                    : $"{Labels.OwnershipName(o)} ({_scenario.Classes.FirstOrDefault(c => c.Id == owner)?.Name ?? owner})";
+                Changes.Add($"{label} : propriétaire {Describe(building.Ownership, building.Owner)} → {Describe(ownership, ownerId)}");
             }
         }
 
