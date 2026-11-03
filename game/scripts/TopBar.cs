@@ -66,20 +66,19 @@ public partial class TopBar : PanelContainer
             row.AddChild(LegitimacyChip(pole));
     }
 
-    public void Refresh(Simulation simulation, bool paused, int speedIndex)
+    public void Refresh(GameView view, bool paused, int speedIndex)
     {
-        var world = simulation.World;
         _pause.Text = paused ? "Reprendre" : "Pause";
-        _date.Text = $"{simulation.Clock.Today:dd/MM/yyyy}";
-        _season.Text = WorldText.SeasonName(simulation.Clock.Season);
-        _treasury.Text = $"{world.Treasury.Balance:N0}";
-        _treasury.AddThemeColorOverride("font_color", world.Treasury.Balance < 0 ? UiTheme.Danger : UiTheme.Text);
+        _date.Text = $"{view.Today:dd/MM/yyyy}";
+        _season.Text = WorldText.SeasonName(view.Season);
+        _treasury.Text = $"{view.TreasuryBalance:N0}";
+        _treasury.AddThemeColorOverride("font_color", view.TreasuryBalance < 0 ? UiTheme.Danger : UiTheme.Text);
 
         for (var index = 0; index < _speeds.Count; index++)
             _speeds[index].SetPressedNoSignal(index == speedIndex);
 
         foreach (var (pole, label) in _legitimacy)
-            label.Text = $"{pole.Code} {world.Legitimacy[pole]:F0}";
+            label.Text = $"{pole.Code} {view.LegitimacyOf(pole):F0}";
     }
 
     /// <summary>Une pastille de la couleur du pôle et sa légitimité ; le nom complet s'affiche au survol.</summary>

@@ -69,6 +69,9 @@ public sealed class World
 
     private readonly Dictionary<string, Treasury> _communeFunds = [];
 
+    /// <summary>Solde de la caisse d'une commune, sans la créer si elle n'existe pas encore (0 dans ce cas).</summary>
+    public double CommuneFundBalanceOf(string communeId) => _communeFunds.TryGetValue(communeId, out var fund) ? fund.Balance : 0;
+
     /// <summary>
     /// Caisse d'une entreprise privée ou coopérative, distincte de la richesse de sa classe propriétaire : ventes,
     /// loyers et frais y arrivent, salaires et bénéfices versés aux propriétaires en sortent.
@@ -96,9 +99,17 @@ public sealed class World
     /// Ressources matérielles du joueur dans une commune : ce que ses structures publiques ont produit, rangé dans le
     /// stockage de la commune et en vente au nom de l'État. Les habitants peuvent l'acheter ; l'État peut le reprendre.
     /// </summary>
-    public IReadOnlyDictionary<string, double> StateHoldingsOf(string communeId) => MarketOf(communeId).ContentsOf(Market.StateSellerId(communeId));
+    public IReadOnlyDictionary<string, double> StateHoldingsOf(string communeId) =>
+        _markets.TryGetValue(communeId, out var market) ? market.ContentsOf(Market.StateSellerId(communeId)) : NoProducts;
 
-    public double StateQuantityOf(string communeId, string productId) => MarketOf(communeId).QuantityOf(productId, Market.StateSellerId(communeId));
+    public double StateQuantityOf(string communeId, string productId) =>
+        _markets.TryGetValue(communeId, out var market) ? market.QuantityOf(productId, Market.StateSellerId(communeId)) : 0;
+
+    /// <summary>Tout ce qui est en vente dans une commune, sans créer son marché s'il n'existe pas encore.</summary>
+    public IReadOnlyDictionary<string, double> StockOf(string communeId) =>
+        _markets.TryGetValue(communeId, out var market) ? market.Contents : NoProducts;
+
+    private static readonly IReadOnlyDictionary<string, double> NoProducts = new Dictionary<string, double>();
 
     /// <summary>Marché d'une commune : on vend et on achète là où l'on est.</summary>
     public Market MarketOf(string communeId)
@@ -133,7 +144,7 @@ public sealed class World
 
     /// <summary>Rangement actuel des produits de la commune dans ses bâtiments de stockage.</summary>
     public StorageAllocation StorageOf(string communeId) =>
-        Storage.Allocate(communeId, _structures, Products, MarketOf(communeId).Contents);
+        Storage.Allocate(communeId, _structures, Products, StockOf(communeId));
 
     /// <summary>
     /// Impôt d'État : part de sa richesse que chaque groupe verse chaque jour au trésor. À l'essai : 0,3 %, soit avec

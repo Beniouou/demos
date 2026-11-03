@@ -16,6 +16,10 @@ Les règles du jeu sont décrites dans le document « Projet Démos — Règles 
 
 Règle d'or : `Demos.Domain` ne référence rien. Les autres projets dépendent de lui, jamais l'inverse.
 
+L'interface du joueur (`game/scripts`, sauf l'outil d'administration) ne voit la partie qu'à travers `GameView`
+(`Demos.Application`), qui ne donne que des copies : elle ne peut rien modifier. Les actions du joueur passent par
+`Simulation`.
+
 ## Prérequis
 
 - [SDK .NET 10](https://dotnet.microsoft.com/download/dotnet/10.0)

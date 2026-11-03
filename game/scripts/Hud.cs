@@ -17,7 +17,7 @@ public partial class Hud : Control
     public MainMenu Menu { get; private set; } = null!;
     private Label _message = null!;
 
-    public void Init(Simulation simulation, string[] speedLabels)
+    public void Init(GameView view, string[] speedLabels)
     {
         Theme = UiTheme.Create();
         SetAnchorsAndOffsetsPreset(LayoutPreset.FullRect);
@@ -38,7 +38,7 @@ public partial class Hud : Control
         layout.AddChild(middle);
 
         Menu = new MainMenu();
-        Menu.Init(simulation.World);
+        Menu.Init(view);
         middle.AddChild(Menu);
 
         // La carte viendra ici ; en attendant, la place reste vide.

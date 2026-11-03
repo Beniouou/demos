@@ -8,7 +8,7 @@ using Orientation = Demos.Domain.Politics.Orientation;
 namespace Demos.Game;
 
 /// <summary>
-/// Textes de l'interface tirés de l'état de la partie : noms des pôles et des saisons, fiches des communes et des stocks.
+/// Textes de l'interface tirés de la vue de la partie : noms des pôles et des saisons, fiches des communes et des stocks.
 /// En attendant des écrans dédiés, les menus les affichent tels quels.
 /// </summary>
 public static class WorldText
@@ -32,26 +32,21 @@ public static class WorldText
     };
 
     /// <summary>Chaque commune : habitants, emplois, logements, pollution, caisse, puis ses groupes locaux (une classe par ligne).</summary>
-    public static string Communes(World world)
+    public static string Communes(GameView view)
     {
         var text = new StringBuilder();
-        foreach (var commune in world.Communes)
+        foreach (var commune in view.Communes())
         {
-            var jobs = world.Structures.Values
-                .Where(s => s.Jobs > 0 && Demos.Domain.Politics.Communes.CommuneOf(s, world.Structures) == commune.Id)
-                .ToList();
-            var filled = jobs.Sum(s => world.Workers.GetValueOrDefault(s.Id));
-
-            text.AppendLine(commune.Name.ToUpperInvariant() + (world.IsGhostTown(commune.Id) ? "   — VILLE FANTÔME (bâtiments en ruine)" : ""));
-            text.AppendLine($"  Habitants {world.Residents(commune.Id):N0}   logements {world.HousingPlaces(commune.Id):N0} places");
-            text.AppendLine($"  Emplois de production pourvus {filled:N0} / {jobs.Sum(s => s.Jobs):N0}");
+            text.AppendLine(commune.Name.ToUpperInvariant() + (commune.IsGhostTown ? "   — VILLE FANTÔME (bâtiments en ruine)" : ""));
+            text.AppendLine($"  Habitants {commune.Residents:N0}   logements {commune.HousingPlaces:N0} places");
+            text.AppendLine($"  Emplois de production pourvus {commune.JobsFilled:N0} / {commune.Jobs:N0}");
             text.AppendLine(
-                $"  Pollution {world.PollutionByCommune.GetValueOrDefault(commune.Id):F3} par habitant " +
+                $"  Pollution {commune.PollutionPerResident:F3} par habitant " +
                 $"(seuil {Demos.Domain.Economy.Pollution.PollutedThreshold})");
-            text.AppendLine($"  Caisse {world.CommuneFundOf(commune.Id).Balance:N0}   impôt communal {world.CommuneTaxRateOf(commune.Id):P2} par jour");
+            text.AppendLine($"  Caisse {commune.Fund:N0}   impôt communal {commune.TaxRate:P2} par jour");
             text.AppendLine();
 
-            foreach (var socialClass in world.Classes.Where(c => c.CommuneId == commune.Id && c.Population > 0))
+            foreach (var socialClass in commune.Classes)
             {
                 text.AppendLine($"  {socialClass.Name}");
                 text.AppendLine(
@@ -67,22 +62,20 @@ public static class WorldText
     }
 
     /// <summary>Le stockage de chaque commune : remplissage, contenu et part de l'État.</summary>
-    public static string Stocks(World world)
+    public static string Stocks(GameView view)
     {
         var text = new StringBuilder();
-        text.AppendLine($"Trésor de l'État {world.Treasury.Balance:N0}   impôt d'État {world.StateTaxRate:P2} par jour");
+        text.AppendLine($"Trésor de l'État {view.TreasuryBalance:N0}   impôt d'État {view.StateTaxRate:P2} par jour");
         text.AppendLine();
 
-        foreach (var commune in world.Communes)
+        foreach (var commune in view.Communes())
         {
-            var market = world.MarketOf(commune.Id);
-            var state = world.StateHoldingsOf(commune.Id);
             text.AppendLine(commune.Name.ToUpperInvariant());
-            text.AppendLine($"  Stockage {world.StorageOf(commune.Id).Stored.Values.Sum():N0} / {world.StorageCapacity(commune.Id):N0}");
-            if (market.Contents.Count == 0)
+            text.AppendLine($"  Stockage {commune.Stored:N0} / {commune.StorageCapacity:N0}");
+            if (commune.Stock.Count == 0)
                 text.AppendLine("  Vide");
-            foreach (var item in market.Contents.OrderBy(i => i.Key))
-                text.AppendLine($"  {item.Key} {item.Value:N0}   (dont l'État {state.GetValueOrDefault(item.Key):N0})");
+            foreach (var item in commune.Stock.OrderBy(i => i.Key))
+                text.AppendLine($"  {item.Key} {item.Value:N0}   (dont l'État {commune.StateStock.GetValueOrDefault(item.Key):N0})");
             text.AppendLine();
         }
 

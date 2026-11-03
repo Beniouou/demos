@@ -392,11 +392,11 @@ public partial class AdminPanel : PanelContainer
         };
 
         _simulation.UpdateBuilding(updated);
-        _simulation.World.StateTaxRate = _stateTax.Value / 100;
+        _simulation.SetStateTaxRate(_stateTax.Value / 100);
         if (_simulation.World.CommuneOf(updated) is { } communeId)
-            _simulation.World.SetCommuneTaxRate(communeId, _communeTax.Value / 100);
+            _simulation.SetCommuneTaxRate(communeId, _communeTax.Value / 100);
         if (updated.Production is { } changed)
-            _simulation.World.SetPrice(changed.ProductId, _price.Value);
+            _simulation.SetPrice(changed.ProductId, _price.Value);
 
         UpdateInfo();
     }

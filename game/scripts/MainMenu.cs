@@ -11,7 +11,7 @@ namespace Demos.Game;
 public partial class MainMenu : HBoxContainer
 {
     /// <summary>Un onglet : son titre et son texte, ou à défaut ce qu'il contiendra plus tard.</summary>
-    private sealed record Page(string Title, string Coming, System.Func<World, string>? Describe = null);
+    private sealed record Page(string Title, string Coming, System.Func<GameView, string>? Describe = null);
 
     private sealed record Menu(string Title, Page[] Pages);
 
@@ -60,7 +60,7 @@ public partial class MainMenu : HBoxContainer
 
     private const float PanelWidth = 640;
 
-    private World _world = null!;
+    private GameView _view = null!;
     private readonly List<Button> _buttons = [];
     private PanelContainer _panel = null!;
     private Label _panelTitle = null!;
@@ -68,9 +68,9 @@ public partial class MainMenu : HBoxContainer
     private readonly List<Label> _pageTexts = [];
     private int _open = -1;
 
-    public void Init(World world)
+    public void Init(GameView view)
     {
-        _world = world;
+        _view = view;
         AddThemeConstantOverride("separation", 0);
         MouseFilter = MouseFilterEnum.Ignore;
 
@@ -137,7 +137,7 @@ public partial class MainMenu : HBoxContainer
         for (var index = 0; index < pages.Length; index++)
         {
             if (pages[index].Describe is { } describe && index == _tabs.CurrentTab)
-                _pageTexts[index].Text = describe(_world);
+                _pageTexts[index].Text = describe(_view);
         }
     }
 

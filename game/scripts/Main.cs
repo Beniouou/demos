@@ -23,6 +23,7 @@ public partial class Main : Node
     private const double BaseCampLegitimacyCost = 20;
 
     private Simulation _simulation = null!;
+    private GameView _view = null!;
     private Hud _hud = null!;
     private AdminPanel _admin = null!;
     private PopupMenu _polePicker = null!;
@@ -42,7 +43,9 @@ public partial class Main : Node
 
         _hud = new Hud();
         interfaceLayer.AddChild(_hud);
-        _hud.Init(_simulation, SpeedLabels);
+        // L'interface du joueur ne reçoit que la vue en lecture seule ; ses actions repassent par Main et la simulation.
+        _view = new GameView(_simulation);
+        _hud.Init(_view, SpeedLabels);
         _hud.TopBar.PauseToggled += () => _paused = !_paused;
         _hud.TopBar.SpeedChosen += speed => _speedIndex = speed;
         _hud.BuildHousingPressed += BuildHousing;
@@ -71,7 +74,7 @@ public partial class Main : Node
             }
         }
 
-        _hud.TopBar.Refresh(_simulation, _paused, _speedIndex);
+        _hud.TopBar.Refresh(_view, _paused, _speedIndex);
         _hud.Menu.Refresh();
         if (_admin.Visible)
             _admin.UpdateInfo();

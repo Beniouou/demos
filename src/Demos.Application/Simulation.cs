@@ -69,6 +69,15 @@ public sealed class Simulation(World world, GameClock clock)
     /// </summary>
     public void UpdateBuilding(Structure building) => World.UpdateStructure(building);
 
+    /// <summary>Outil d'administration : règle l'impôt d'État (part de la richesse versée chaque jour).</summary>
+    public void SetStateTaxRate(double rate) => World.StateTaxRate = rate;
+
+    /// <summary>Outil d'administration : règle l'impôt d'une commune, versé à sa caisse.</summary>
+    public void SetCommuneTaxRate(string communeId, double rate) => World.SetCommuneTaxRate(communeId, rate);
+
+    /// <summary>Outil d'administration : fixe le prix d'un produit dans toutes les communes.</summary>
+    public void SetPrice(string productId, double price) => World.SetPrice(productId, price);
+
     /// <summary>Proposition : vendre un bâtiment public coûte 10 de légitimité libérale (LI).</summary>
     public const double SaleLegitimacyCost = 10;
 
