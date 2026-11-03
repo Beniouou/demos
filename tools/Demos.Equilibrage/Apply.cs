@@ -471,6 +471,8 @@ internal static class BalanceApplier
             if (Sheet("Recettes") is not { } sheet)
                 return;
 
+            // Recettes déjà vues, par bâtiment : produit et matières (sans les quantités) → cellule de la ligne.
+            var seen = new Dictionary<(string TypeId, string Signature), IXLCell>();
             foreach (var row in Rows(sheet, 2, "T"))
             {
                 var key = Text(row.Cell("T"));
@@ -486,14 +488,9 @@ internal static class BalanceApplier
                 var json = building["recipes"] is JsonArray recipes ? recipes[index]!.AsObject() : building["production"]!.AsObject();
                 var label = $"{type.Id}, recette {recipe.Label}";
 
-                var productId = Text(row.Cell("G"));
-                if (!_products.ContainsKey(productId))
-                    Errors.Add($"{Where(row.Cell("G"))} : produit inconnu « {productId} ».");
-                else if (productId != recipe.ProductId)
-                {
-                    json["productId"] = productId;
-                    Changes.Add($"{label} : produit {recipe.ProductId} → {productId}");
-                }
+                // Le produit d'une recette fait partie de la définition du bâtiment (buildings.json) : il ne se change pas ici.
+                if (Text(row.Cell("G")) != recipe.ProductId)
+                    Errors.Add($"{Where(row.Cell("G"))} : le produit d'une recette ne se change pas dans le tableur (remettre « {recipe.ProductId} »).");
 
                 Set(json, "quantityPerWorker", Number(row.Cell("H")), recipe.QuantityPerWorker, $"{label} : production par travailleur");
 
@@ -521,6 +518,19 @@ internal static class BalanceApplier
                 }
 
                 var old = recipe.Materials.Take(2).Select(i => (i.ProductId, i.Quantity)).ToList();
+
+                // Deux recettes du même bâtiment ne peuvent pas faire le même produit avec les mêmes matières.
+                var finalMaterials = (valid ? materials.Select(m => m.ProductId) : old.Select(m => m.ProductId))
+                    .Concat(recipe.Materials.Skip(2).Select(m => m.ProductId)).Order();
+                var signature = $"{recipe.ProductId} ← {string.Join(" + ", finalMaterials)}";
+                if (seen.TryGetValue((type.Id, signature), out var twin))
+                {
+                    Errors.Add($"{Where(row.Cell("I"))} : cette recette de « {type.Id} » devient identique à celle de la ligne {twin.Address.RowNumber} ({signature}).");
+                    valid = false;
+                }
+                else
+                    seen[(type.Id, signature)] = row.Cell("I");
+
                 if (!valid || materials.Count == old.Count && materials.Zip(old).All(p => p.First.ProductId == p.Second.ProductId && Same(p.First.Quantity, p.Second.Quantity)))
                     continue;
 

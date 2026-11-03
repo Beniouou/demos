@@ -492,7 +492,8 @@ internal sealed class Book(XLWorkbook workbook, World world, BalanceSettings bal
                 sheet.Cell(row, 4).Value = RankName(type.MainRank);
                 sheet.Cell(row, 5).FormulaA1 = Lookup($"A{row}", "H");
                 sheet.Cell(row, 6).FormulaA1 = Lookup($"A{row}", WageBillColumn);
-                Choice(sheet.Cell(row, 7), recipe.ProductId, _productList);
+                // Le produit fait partie de la définition du bâtiment : il ne se règle pas ici.
+                sheet.Cell(row, 7).Value = recipe.ProductId;
                 Input(sheet.Cell(row, 8), recipe.QuantityPerWorker);
                 for (var m = 0; m < 2; m++)
                 {
