@@ -32,6 +32,10 @@ public sealed class Simulation(World world, GameClock clock)
     {
         var change = Clock.AdvanceDay();
 
+        // Au changement de mois, les entreprises licencient ou réembauchent avant la journée de travail.
+        if (change.HasFlag(CalendarChange.NewMonth))
+            RunMonthlyCalculations();
+
         RunDailyCalculations();
 
         if (change.HasFlag(CalendarChange.NewSeason))
@@ -261,6 +265,12 @@ public sealed class Simulation(World world, GameClock clock)
             World.AddClass(created);
 
         YearPassed?.Invoke();
+    }
+
+    private void RunMonthlyCalculations()
+    {
+        foreach (var building in Layoffs.RunMonthly(World.Structures, World.MarketOf, World.Wages, World.CompanyFundOf))
+            World.UpdateStructure(building);
     }
 
     // Passages entre classes, commune par commune, puis migration. Prévu : climat, revendications, recherche.

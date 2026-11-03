@@ -18,7 +18,7 @@ public class GameClockTests
     {
         var clock = new GameClock(new DateOnly(1900, 2, 28));
 
-        Assert.Equal(CalendarChange.NewSeason, clock.AdvanceDay());
+        Assert.Equal(CalendarChange.NewMonth | CalendarChange.NewSeason, clock.AdvanceDay());
         Assert.Equal(Season.Spring, clock.Season);
     }
 
@@ -27,8 +27,16 @@ public class GameClockTests
     {
         var clock = new GameClock(new DateOnly(1900, 12, 31));
 
-        Assert.Equal(CalendarChange.NewYear, clock.AdvanceDay());
+        Assert.Equal(CalendarChange.NewMonth | CalendarChange.NewYear, clock.AdvanceDay());
         Assert.Equal(Season.Winter, clock.Season);
+    }
+
+    [Fact]
+    public void Le_1er_du_mois_commence_un_nouveau_mois()
+    {
+        var clock = new GameClock(new DateOnly(1900, 4, 30));
+
+        Assert.Equal(CalendarChange.NewMonth, clock.AdvanceDay());
     }
 
     [Theory]

@@ -93,7 +93,7 @@ internal static class SimulationReport
         double Stock, double StockChange);
 
     private sealed record BuildingLine(string Name, string Type, string Commune, string Owner, int Jobs, double Workers, double? ProducedPerDay,
-        double? Potential, string? Product, double Energy, double? PaidShare, bool Struggling, double? Fund);
+        double? Potential, string? Product, double Energy, double? PaidShare, bool Struggling, double? Fund, int Capacity, double WageCut);
 
     private sealed record Snapshot(
         string Title,
@@ -149,7 +149,7 @@ internal static class SimulationReport
                 return new ProductLine(p.Id, p.Name, world.PriceOf(p.Id), made, used, made - used - change / 365, stock.GetValueOrDefault(p.Id), change);
             }).ToList();
 
-            var buildingLines = buildings.Where(b => b.Jobs > 0 || b.HousingPlaces > 0).Select(b =>
+            var buildingLines = buildings.Where(b => b.JobCapacity > 0 || b.HousingPlaces > 0).Select(b =>
             {
                 var owner = b.Ownership == Ownership.Public ? "État"
                     : (b.Ownership == Ownership.Cooperative ? "Coop. " : "Privé ")
@@ -159,7 +159,7 @@ internal static class SimulationReport
                 double? potential = b.Production is { } r ? r.QuantityPerWorker * b.Jobs : null;
                 return new BuildingLine(b.Name, b.TypeId ?? "", CommuneName(world.CommuneOf(b)), owner, b.Jobs, workers, perDay, potential,
                     b.Production?.ProductId, energy?.GetValueOrDefault(b.Id) / 365 ?? world.EnergyShareOf(b), world.Wages.PaidShare(b.Id),
-                    simulation.IsStruggling(b), Companies.HasCompanyFund(b) ? world.CompanyFundOf(b).Balance : null);
+                    simulation.IsStruggling(b), Companies.HasCompanyFund(b) ? world.CompanyFundOf(b).Balance : null, b.JobCapacity, b.WageCut);
             }).ToList();
 
             return new Snapshot(title, simulation.Clock.Today, world.Treasury.Balance,
@@ -232,6 +232,7 @@ internal static class SimulationReport
             Row(html, $"Chômage : {RankName(rank)}", all.Select(s => s.Ranks.First(r => r.Rank == rank) is var r && r.Population > 0
                 ? Percent(1 - r.Employed / r.Population) : "—"));
         Row(html, "Bâtiments en difficulté", all.Select(s => Count(s.Buildings.Count(b => b.Struggling))));
+        Row(html, "Postes fermés (licenciements)", all.Select(s => Count(s.Buildings.Sum(b => b.Capacity - b.Jobs))));
         html.Append("</table></div>");
         html.Append(Chart(curve));
 
@@ -310,21 +311,22 @@ internal static class SimulationReport
         html.Append("</table></div><p class=\"muted\">« Autres usages » : ce qui a été produit et n'est ni devenu matière ni resté en stock : achats des habitants, ")
             .Append("chauffage et eau des bâtiments, péremption, pertes entre communes (le stock de départ entre dans le calcul).</p>");
 
-        html.Append("<h3>Bâtiments</h3><div class=\"scroll\"><table><tr><th>Bâtiment</th><th>Commune</th><th>Propriétaire</th><th>Emplois</th><th>Pourvus</th>")
-            .Append("<th>Produit</th><th>Production par jour</th><th>À plein régime</th><th>Énergie</th><th>Salaires payés (30 j)</th><th>Caisse</th></tr>");
+        html.Append("<h3>Bâtiments</h3><div class=\"scroll\"><table><tr><th>Bâtiment</th><th>Commune</th><th>Propriétaire</th><th>Postes ouverts / capacité</th><th>Pourvus</th>")
+            .Append("<th>Produit</th><th>Production par jour</th><th>À plein régime</th><th>Énergie</th><th>Salaires payés (30 j)</th><th>Baisse des salaires</th><th>Caisse</th></tr>");
         foreach (var b in s.Buildings.OrderByDescending(b => b.Struggling).ThenBy(b => b.Commune))
         {
             var filled = b.Jobs > 0 ? b.Workers / b.Jobs : 1;
             var lowOutput = b.ProducedPerDay is { } made && b.Potential is > 0 && made / b.Potential < 0.5;
             var trouble = b.Struggling || lowOutput || b.Energy < 0.9;
             html.Append($"<tr class=\"{(trouble ? "bad" : "")}\"><td>{E(b.Name)}</td><td class=\"text\">{E(b.Commune)}</td><td class=\"text\">{E(b.Owner)}</td>")
-                .Append($"<td>{Count(b.Jobs)}</td><td>{(b.Jobs > 0 ? Percent(filled) : "—")}</td><td class=\"text\">{E(b.Product ?? "")}</td>")
+                .Append($"<td class=\"{(b.Jobs < b.Capacity ? "bad" : "")}\">{Count(b.Jobs)} / {Count(b.Capacity)}</td><td>{(b.Jobs > 0 ? Percent(filled) : "—")}</td><td class=\"text\">{E(b.Product ?? "")}</td>")
                 .Append($"<td>{(b.ProducedPerDay is { } p ? Number(p, 1) : "—")}</td><td>{(b.Potential is { } pot ? Number(pot, 1) : "—")}</td>")
-                .Append($"<td>{Percent(b.Energy)}</td><td>{(b.PaidShare is { } paid ? Percent(paid) : "—")}</td><td>{(b.Fund is { } f ? Money(f) : "—")}</td></tr>");
+                .Append($"<td>{Percent(b.Energy)}</td><td>{(b.PaidShare is { } paid ? Percent(paid) : "—")}</td><td>{(b.WageCut > 0 ? "−" + Percent(b.WageCut) : "—")}</td><td>{(b.Fund is { } f ? Money(f) : "—")}</td></tr>");
         }
 
         html.Append("</table></div><p class=\"muted\">En rouge, en tête : un bâtiment en difficulté (moins de 80 % des salaires payés sur 30 jours), ")
-            .Append("qui produit moins de la moitié de son plein régime (emplois non pourvus, matières manquantes), ou qui manque d'énergie.</p>");
+            .Append("qui produit moins de la moitié de son plein régime (emplois non pourvus, matières manquantes), ou qui manque d'énergie. ")
+            .Append("Les postes ouverts en rouge sont sous la capacité : l'entreprise a licencié (au changement de mois, selon son statut).</p>");
     }
 
     /// <summary>Petit graphique du trésor et de la population, relevés chaque semaine.</summary>

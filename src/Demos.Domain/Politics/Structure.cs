@@ -68,6 +68,13 @@ public readonly record struct Production(string ProductId, double QuantityPerWor
 /// </param>
 /// <param name="StaffRatios">Emplois des autres rangs par emploi productif ; null pour les proportions par défaut.</param>
 /// <param name="Wages">Salaire par jour de chaque rang ; null pour le salaire de base × multiplicateur.</param>
+/// <param name="Capacity">
+/// Capacité : les emplois productifs du bâtiment à sa construction ; null si elle est égale à <c>Jobs</c>. <c>Jobs</c> compte
+/// les postes ouverts, qui baissent quand l'entreprise licencie et remontent quand elle réembauche (voir
+/// <see cref="Economy.Layoffs"/>), sans dépasser la capacité.
+/// </param>
+/// <param name="JobsSetByPlayer">Postes ouverts fixés à la main par le joueur (bâtiment public) : ils ne bougent plus seuls.</param>
+/// <param name="WageCut">Baisse des salaires d'une SCOP en difficulté (0,2 pour −20 %).</param>
 public sealed record Structure(
     string Id,
     string Name,
@@ -94,7 +101,13 @@ public sealed record Structure(
     string? HeatingProductId = null,
     Population.Rank MainRank = Population.Rank.Workers,
     IReadOnlyDictionary<Population.Rank, double>? StaffRatios = null,
-    IReadOnlyDictionary<Population.Rank, double>? Wages = null)
+    IReadOnlyDictionary<Population.Rank, double>? Wages = null,
+    int? Capacity = null,
+    bool JobsSetByPlayer = false,
+    double WageCut = 0)
 {
     public bool IsNational => ParentId is null;
+
+    /// <summary>Le plus grand nombre de postes que le bâtiment peut ouvrir.</summary>
+    public int JobCapacity => Math.Max(Capacity ?? Jobs, Jobs);
 }

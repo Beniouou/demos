@@ -134,7 +134,8 @@ internal sealed class Book(XLWorkbook workbook, World world, BalanceSettings bal
     [
         "Marge", "Encadrement", "Direction", "MultOuvriers", "MultPI", "MultCadres", "Chauffage", "Eau", "Hiver", "Printemps",
         "Ete", "Automne", "SansEnergie", "ReserveCombustible", "ReserveEntreprise", "ImpotEtat", "ImpotCommune", "Transport",
-        "PollutionLoin", "SeuilPollution", "Dotation",
+        "PollutionLoin", "SeuilPollution", "Dotation", "LicenciementInvendus", "EmbaucheInvendus", "VitessePublic", "VitesseScop",
+        "VitessePrive", "BaisseSalaireScop", "BaisseSalaireScopMax",
     ];
 
     /// <summary>Ligne de la recette d'un bâtiment dans la feuille Recettes, ou null si elle n'y est pas.</summary>
@@ -336,6 +337,15 @@ internal sealed class Book(XLWorkbook workbook, World world, BalanceSettings bal
             ("PollutionLoin", "Part de la pollution des autres communes", balance.DistantPollutionShare, ""),
             ("SeuilPollution", "Seuil de pollution (par habitant et par jour)", balance.PollutedThreshold, ""),
             ("Dotation", "Dotation d'une nouvelle commune (jours)", balance.FoundingGrantDays, "Jours de salaires du camp de base."),
+            ("LicenciementInvendus", "Licenciement : invendus (jours de production)", balance.LayoffUnsoldDays,
+                "Au changement de mois, une entreprise licencie si ses invendus dépassent ce nombre de jours de production."),
+            ("EmbaucheInvendus", "Embauche : invendus (jours de production)", balance.HireUnsoldDays,
+                "Elle réembauche si ses invendus sont en dessous, et si elle paie tous ses salaires."),
+            ("VitessePublic", "Licenciement ou embauche par mois : public", balance.JobChangePerMonth[Ownership.Public], "Part de la capacité du bâtiment (au moins un poste)."),
+            ("VitesseScop", "Licenciement ou embauche par mois : SCOP", balance.JobChangePerMonth[Ownership.Cooperative], ""),
+            ("VitessePrive", "Licenciement ou embauche par mois : privé", balance.JobChangePerMonth[Ownership.Private], ""),
+            ("BaisseSalaireScop", "Baisse des salaires d'une SCOP par mois", balance.CooperativeWageCutStep, "Avant de licencier, une SCOP en difficulté baisse ses salaires."),
+            ("BaisseSalaireScopMax", "Baisse maximale des salaires d'une SCOP", balance.CooperativeWageCutMax, "Au-delà, elle licencie."),
             ("PrixCombustible", "Prix du combustible de référence (bois)", world.PriceOf(Energy.DefaultHeating), "Prix du jeu ; sert au coût du chauffage."),
             ("PrixEau", "Prix de l'eau", world.PriceOf(Energy.Water), "Prix du jeu ; sert au coût de l'eau."),
             ("PrixCatalogueBois", "Prix de catalogue du bois", catalogueWoodPrice,

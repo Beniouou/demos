@@ -26,6 +26,8 @@ public partial class AdminPanel : PanelContainer
     private OptionButton _ownership = null!;
     private OptionButton _owner = null!;
     private SpinBox _jobs = null!;
+    private SpinBox _capacity = null!;
+    private CheckBox _manualJobs = null!;
     private readonly Dictionary<Demos.Domain.Population.Rank, SpinBox> _ratios = [];
     private readonly Dictionary<Demos.Domain.Population.Rank, SpinBox> _wages = [];
     private OptionButton _recipe = null!;
@@ -111,6 +113,12 @@ public partial class AdminPanel : PanelContainer
                 + (building.MainRank == Demos.Domain.Population.Rank.Intermediate ? " (professions intermédiaires)" : ""),
         };
 
+        if (building.JobCapacity > 0)
+            lines.Add($"Postes ouverts : {building.Jobs:N0} sur {building.JobCapacity:N0}"
+                + (building.JobsSetByPlayer ? " (fixés à la main)" : building.Ownership == Ownership.Public ? " (règle lente de l'État)" : ""));
+        if (building.WageCut > 0)
+            lines.Add($"Salaires baissés de {building.WageCut:P0} (SCOP en difficulté)");
+
         if (building.Production is { } production)
         {
             var perDay = production.QuantityPerWorker * workers;
@@ -185,7 +193,16 @@ public partial class AdminPanel : PanelContainer
 
         _ownership = AddOption(form, "Propriétaire", ["État (public)", "Privé", "Coopérative"]);
         _owner = AddOption(form, "Classe propriétaire", _simulation.World.Classes.Select(c => c.Name));
-        _jobs = AddSpin(form, "Emplois productifs", 0, 100_000, 10);
+        _capacity = AddSpin(form, "Capacité (emplois productifs)", 0, 100_000, 10);
+        _jobs = AddSpin(form, "Postes ouverts (emplois productifs)", 0, 100_000, 10);
+        // Les postes ouverts d'un bâtiment public suivent la règle lente de l'État, sauf si le joueur les fixe à la main.
+        _manualJobs = new CheckBox { Text = "Postes fixés à la main (bâtiment public ; sinon automatique)" };
+        form.AddChild(_manualJobs);
+        _jobs.ValueChanged += _ =>
+        {
+            if (!_manualJobs.Disabled)
+                _manualJobs.ButtonPressed = true;
+        };
         foreach (var rank in Ranks)
         {
             _ratios[rank] = AddSpin(form, $"Emplois de {RankName(rank)} par emploi productif", 0, 10, 0.01);
@@ -293,13 +310,18 @@ public partial class AdminPanel : PanelContainer
         _owner.Select(ownerIndex < 0 ? 0 : ownerIndex);
         _owner.Disabled = building.Ownership == Ownership.Public;
 
+        _capacity.Value = building.JobCapacity;
+        _manualJobs.Disabled = false;
         _jobs.Value = building.Jobs;
+        _manualJobs.ButtonPressed = building.JobsSetByPlayer;
+        _manualJobs.Disabled = building.Ownership != Ownership.Public;
         foreach (var rank in Ranks)
         {
             // Le rang productif compte 1 par emploi productif : sa proportion ne se règle pas.
             _ratios[rank].Value = Staffing.RatioOf(building.MainRank, building.StaffRatios, rank);
             _ratios[rank].Editable = rank != building.MainRank;
-            _wages[rank].Value = Staffing.WageOf(building, rank);
+            // Le salaire du bâtiment, sans la baisse d'une SCOP en difficulté (affichée à part).
+            _wages[rank].Value = Staffing.WageOf(building.DailyWage, building.Wages, rank);
         }
         _places.Value = building.HousingPlaces;
         _rent.Value = building.DailyRent;
@@ -349,6 +371,8 @@ public partial class AdminPanel : PanelContainer
             Ownership = ownership,
             OwnerClassId = ownership == Ownership.Public ? null : _simulation.World.Classes[_owner.Selected].Id,
             Jobs = (int)_jobs.Value,
+            Capacity = System.Math.Max((int)_capacity.Value, (int)_jobs.Value),
+            JobsSetByPlayer = ownership == Ownership.Public && _manualJobs.ButtonPressed,
             StaffRatios = Ranks.Where(r => r != building.MainRank).ToDictionary(r => r, r => _ratios[r].Value),
             Wages = Ranks.ToDictionary(r => r, r => _wages[r].Value),
             Production = ChosenProduction(building),

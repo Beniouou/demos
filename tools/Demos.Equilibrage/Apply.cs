@@ -47,6 +47,13 @@ public static class BalanceApplier
         ("PollutionLoin", ["distantPollutionShare"], b => b.DistantPollutionShare),
         ("SeuilPollution", ["pollutedThreshold"], b => b.PollutedThreshold),
         ("Dotation", ["foundingGrantDays"], b => b.FoundingGrantDays),
+        ("LicenciementInvendus", ["layoffUnsoldDays"], b => b.LayoffUnsoldDays),
+        ("EmbaucheInvendus", ["hireUnsoldDays"], b => b.HireUnsoldDays),
+        ("VitessePublic", ["jobChangePerMonth", "Public"], b => b.JobChangePerMonth[Ownership.Public]),
+        ("VitesseScop", ["jobChangePerMonth", "Cooperative"], b => b.JobChangePerMonth[Ownership.Cooperative]),
+        ("VitessePrive", ["jobChangePerMonth", "Private"], b => b.JobChangePerMonth[Ownership.Private]),
+        ("BaisseSalaireScop", ["cooperativeWageCutStep"], b => b.CooperativeWageCutStep),
+        ("BaisseSalaireScopMax", ["cooperativeWageCutMax"], b => b.CooperativeWageCutMax),
     ];
 
     public static int Apply(string workbookPath, string dataDirectory, IContentSource content)
@@ -294,8 +301,19 @@ public static class BalanceApplier
                 }
 
                 var integer = key is "ReserveCombustible" or "ReserveEntreprise" or "Dotation";
-                Set(ObjectAt(balanceJson, path[..^1]), path[^1], Number(row.Cell("B"), integer), current(_balance),
-                    $"constante « {Text(row.Cell("A"))} »");
+                var value = Number(row.Cell("B"), integer);
+
+                // Une part (vitesse de licenciement, baisse des salaires) ne dépasse pas 100 %.
+                if (key.StartsWith("Vitesse") || key.StartsWith("BaisseSalaire"))
+                {
+                    if (value > 1)
+                    {
+                        Errors.Add($"{Where(row.Cell("B"))} : {Show(value.Value)} dépasse 1 (100 %).");
+                        value = null;
+                    }
+                }
+
+                Set(ObjectAt(balanceJson, path[..^1]), path[^1], value, current(_balance), $"constante « {Text(row.Cell("A"))} »");
             }
         }
 

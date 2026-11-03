@@ -16,6 +16,7 @@ public enum CalendarChange
     None = 0,
     NewSeason = 1,
     NewYear = 2,
+    NewMonth = 4,
 }
 
 /// <summary>
@@ -35,13 +36,15 @@ public sealed class GameClock(DateOnly start)
         _ => Season.Autumn,
     };
 
-    /// <summary>Avance d'un jour et indique si une nouvelle saison ou une nouvelle année commence.</summary>
+    /// <summary>Avance d'un jour et indique si un nouveau mois, une nouvelle saison ou une nouvelle année commence.</summary>
     public CalendarChange AdvanceDay()
     {
         var previous = Today;
         Today = Today.AddDays(1);
 
         var change = CalendarChange.None;
+        if (Today.Month != previous.Month)
+            change |= CalendarChange.NewMonth;
         if (SeasonOf(Today) != SeasonOf(previous))
             change |= CalendarChange.NewSeason;
         if (Today.Year != previous.Year)

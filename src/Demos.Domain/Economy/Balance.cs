@@ -1,3 +1,4 @@
+using Demos.Domain.Politics;
 using Demos.Domain.Population;
 using Demos.Domain.Shared;
 
@@ -107,6 +108,26 @@ public sealed record BalanceSettings
 
     /// <summary>Dotation d'une nouvelle commune, en jours de salaires de son camp de base.</summary>
     public int FoundingGrantDays { get; init; } = 60;
+
+    /// <summary>Au changement de mois, une entreprise licencie si ses invendus dépassent ce nombre de jours de production.</summary>
+    public double LayoffUnsoldDays { get; init; } = 30;
+
+    /// <summary>Elle réembauche si ses invendus sont sous ce nombre de jours de production (et ses salaires tous payés).</summary>
+    public double HireUnsoldDays { get; init; } = 10;
+
+    /// <summary>Part de sa capacité qu'une entreprise licencie ou réembauche chaque mois, selon son statut.</summary>
+    public Dictionary<Ownership, double> JobChangePerMonth { get; init; } = new()
+    {
+        [Ownership.Public] = 0.02,
+        [Ownership.Cooperative] = 0.05,
+        [Ownership.Private] = 0.15,
+    };
+
+    /// <summary>Baisse des salaires d'une SCOP en difficulté, par mois, avant de licencier.</summary>
+    public double CooperativeWageCutStep { get; init; } = 0.05;
+
+    /// <summary>Baisse maximale des salaires d'une SCOP ; au-delà, elle licencie.</summary>
+    public double CooperativeWageCutMax { get; init; } = 0.2;
 }
 
 /// <summary>Les réglages d'équilibrage en vigueur dans la partie.</summary>
