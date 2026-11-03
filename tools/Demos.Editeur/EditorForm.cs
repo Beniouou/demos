@@ -11,9 +11,9 @@ namespace Demos.Editeur;
 internal sealed class EditorForm : Form
 {
     private readonly ToolPaths _paths;
-    private readonly ComboBox _kind = new() { DropDownStyle = ComboBoxStyle.DropDownList, Width = 420 };
+    private readonly ComboBox _kind = new() { DropDownStyle = ComboBoxStyle.DropDownList, Width = 420, AccessibleName = "Que voulez-vous créer ?" };
     private readonly Panel _formArea = new() { Dock = DockStyle.Fill, AutoScroll = true };
-    private readonly TextBox _log = new() { Dock = DockStyle.Fill, Multiline = true, ReadOnly = true, ScrollBars = ScrollBars.Vertical };
+    private readonly TextBox _log = new() { Dock = DockStyle.Fill, Multiline = true, ReadOnly = true, ScrollBars = ScrollBars.Vertical, AccessibleName = "Journal" };
     private readonly Button _create = new() { Text = "Créer", Width = 160, Height = 34 };
 
     // L'action du formulaire affiché : elle crée l'élément dans le contenu donné et renvoie les erreurs.

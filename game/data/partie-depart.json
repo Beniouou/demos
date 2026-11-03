@@ -26,7 +26,8 @@
     { "id": "ecole", "type": "ecole", "commune": "commune-1", "name": "École d'État" },
     { "id": "universite", "type": "universite", "commune": "commune-1", "name": "Université d'État" },
     { "id": "entrepot", "type": "entrepot", "commune": "commune-1", "name": "Entrepôt d'État" },
-    { "id": "grenier", "type": "grenier", "commune": "commune-1", "name": "Grenier d'État" }
+    { "id": "grenier", "type": "grenier", "commune": "commune-1", "name": "Grenier d'État" },
+    { "id": "theatre", "type": "theatre", "commune": "commune-1", "name": "Théâtre" }
   ],
   "classes": [
     { "id": "ouvriers", "name": "Ouvriers communistes", "rank": "Workers", "hierarchy": "A", "production": "A", "property": "A", "population": 4500, "wealth": 225000, "commune": "commune-1" },

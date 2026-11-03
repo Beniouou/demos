@@ -30,6 +30,7 @@ internal sealed class Fields
     {
         control.Width = 400;
         control.Margin = new Padding(3, 4, 3, 2);
+        control.AccessibleName = label;
         Panel.Controls.Add(new Label { Text = label, AutoSize = true, Margin = new Padding(3, 8, 3, 2) });
         Panel.Controls.Add(control);
         if (help is not null)

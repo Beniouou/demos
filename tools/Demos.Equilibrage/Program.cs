@@ -103,8 +103,10 @@ internal sealed class Book(XLWorkbook workbook, World world, BalanceSettings bal
 
     // Feuille Produits : ligne de chaque produit, et plages pour les recherches.
     private readonly Dictionary<string, int> _productRows = [];
-    private string _productIds = "";
-    private string _productPrices = "";
+    // Plages des identifiants et des prix recalculés : connues dès le départ (une ligne par produit, dans l'ordre du
+    // catalogue), car les feuilles Recettes et Bâtiments, écrites avant la feuille Produits, s'en servent déjà.
+    private string _productIds => $"Produits!$A$2:$A${world.Products.Count + 1}";
+    private string _productPrices => $"Produits!$R$2:$R${world.Products.Count + 1}";
 
     // Feuille Besoins : ligne de chaque besoin, et produit principal de chaque besoin.
     private readonly Dictionary<NeedCategory, int> _needRows = [];
@@ -372,8 +374,6 @@ internal sealed class Book(XLWorkbook workbook, World world, BalanceSettings bal
         for (var i = 0; i < products.Count; i++)
             _productRows[products[i].Id] = i + 2;
         var last = products.Count + 1;
-        _productIds = $"Produits!$A$2:$A${last}";
-        _productPrices = $"Produits!$R$2:$R${last}";
 
         foreach (var product in products)
         {

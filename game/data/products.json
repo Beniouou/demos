@@ -28,5 +28,6 @@
   { "id": "lingot-fer", "name": "Lingot de fer", "basePrice": 1 },
   { "id": "lingot-cuivre", "name": "Lingot de cuivre", "basePrice": 1 },
   { "id": "outils", "name": "Outils", "basePrice": 1 },
-  { "id": "sculpture", "name": "Sculpture", "basePrice": 1 }
+  { "id": "sculpture", "name": "Sculpture", "basePrice": 1 },
+  { "id": "piece-de-theatre", "name": "Pièce de théâtre", "need": "Leisure", "basePrice": 1, "stockable": false }
 ]
