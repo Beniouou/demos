@@ -81,6 +81,23 @@ public static class UiTheme
         return label;
     }
 
+    /// <summary>Une marge égale sur les quatre côtés.</summary>
+    public static MarginContainer Margin(int size)
+    {
+        var margin = new MarginContainer { SizeFlagsHorizontal = Control.SizeFlags.ExpandFill };
+        foreach (var side in new[] { "left", "right", "top", "bottom" })
+            margin.AddThemeConstantOverride($"margin_{side}", size);
+        return margin;
+    }
+
+    /// <summary>Un titre de section dans une page : en majuscules discrètes, comme sur une fiche.</summary>
+    public static Label Section(string text)
+    {
+        var label = Caption(text.ToUpperInvariant());
+        label.AddThemeFontSizeOverride("font_size", FontSize - 2);
+        return label;
+    }
+
     public static Label Title(string text)
     {
         var label = new Label { Text = text };

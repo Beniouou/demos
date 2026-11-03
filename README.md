@@ -16,8 +16,9 @@ Les règles du jeu sont décrites dans le document « Projet Démos — Règles 
 
 Règle d'or : `Demos.Domain` ne référence rien. Les autres projets dépendent de lui, jamais l'inverse.
 
-L'interface du joueur (`game/scripts`, sauf l'outil d'administration) ne voit la partie qu'à travers `GameView`
-(`Demos.Application`), qui ne donne que des copies : elle ne peut rien modifier. Les actions du joueur passent par
+Les écrans du joueur (`game/scripts`) ne voient la partie qu'à travers `GameView` (`Demos.Application`) et
+`PlayerDesk` (`game/scripts`), qui ne donnent que des copies : ils ne peuvent rien modifier eux-mêmes. Chaque décision
+du joueur (vente, nationalisation, postes ouverts, recette, chauffage, impôts) passe par `PlayerDesk`, qui appelle
 `Simulation`.
 
 ## Prérequis
@@ -36,9 +37,11 @@ dotnet test
 ## Lancer le jeu
 
 Ouvrir `game/project.godot` dans Godot .NET, puis F5.
-Espace met en pause ou relance le temps ; 1 à 4 changent la vitesse (un jour dure 5 s en ×1) ; B construit des logements d'État avec le stock, complété par le trésor ; C bâtit un camp de base qui fonde une nouvelle commune ; A ouvre le menu d'administration des bâtiments.
+Espace met en pause ou relance le temps ; 1 à 4 changent la vitesse (un jour dure 5 s en ×1) ; B construit des logements d'État avec le stock, complété par le trésor ; C bâtit un camp de base qui fonde une nouvelle commune.
 Les menus du joueur (carte, lois, structure, production, recherche, ressources, aide) s'ouvrent depuis la colonne de
-gauche ; Échap ferme le menu ouvert.
+gauche ; Échap ferme le menu ouvert. Un bâtiment se gère dans Production → Unités de production, les impôts dans
+Ressources → Impôts. Le contenu du jeu (emplois, salaires, production, stockage, prix…) se règle dans le tableur
+d'équilibrage et l'éditeur de contenu, plus dans le jeu.
 
 ## Équilibrer l'économie
 

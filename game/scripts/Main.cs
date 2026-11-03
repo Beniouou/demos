@@ -25,7 +25,6 @@ public partial class Main : Node
     private Simulation _simulation = null!;
     private GameView _view = null!;
     private Hud _hud = null!;
-    private AdminPanel _admin = null!;
     private PopupMenu _polePicker = null!;
     private bool _paused = true;
     private int _speedIndex;
@@ -43,18 +42,14 @@ public partial class Main : Node
 
         _hud = new Hud();
         interfaceLayer.AddChild(_hud);
-        // L'interface du joueur ne reçoit que la vue en lecture seule ; ses actions repassent par Main et la simulation.
+        // L'interface du joueur ne reçoit que la vue en lecture seule et le bureau du joueur, dont chaque décision
+        // passe par la simulation : elle ne touche jamais le moteur.
         _view = new GameView(_simulation);
-        _hud.Init(_view, SpeedLabels);
+        _hud.Init(_view, new PlayerDesk(_simulation), SpeedLabels);
         _hud.TopBar.PauseToggled += () => _paused = !_paused;
         _hud.TopBar.SpeedChosen += speed => _speedIndex = speed;
         _hud.BuildHousingPressed += BuildHousing;
         _hud.FoundCommunePressed += ChoosePole;
-        _hud.AdminPressed += ToggleAdmin;
-
-        _admin = new AdminPanel { Visible = false };
-        interfaceLayer.AddChild(_admin);
-        _admin.Init(_simulation);
 
         // Choix du pôle de légitimité à la fondation d'une commune : il devient sa charte de fondation.
         _polePicker = new PopupMenu { Title = "Charte de fondation : quel pôle payer ?" };
@@ -76,8 +71,6 @@ public partial class Main : Node
 
         _hud.TopBar.Refresh(_view, _paused, _speedIndex);
         _hud.Menu.Refresh();
-        if (_admin.Visible)
-            _admin.UpdateInfo();
     }
 
     public override void _UnhandledInput(InputEvent @event)
@@ -94,7 +87,6 @@ public partial class Main : Node
             case Key.Key4: _speedIndex = 3; break;
             case Key.B: BuildHousing(); break;
             case Key.C: ChoosePole(); break;
-            case Key.A: ToggleAdmin(); break;
             case Key.Escape: _hud.Menu.Close(); break;
         }
     }
@@ -114,13 +106,6 @@ public partial class Main : Node
         {
             _hud.ShowMessage("Construction impossible : ni le stock, ni le trésor, ni le marché ne suffisent.");
         }
-    }
-
-    private void ToggleAdmin()
-    {
-        _admin.Visible = !_admin.Visible;
-        if (_admin.Visible)
-            _admin.Refresh();
     }
 
     /// <summary>Ouvre le choix du pôle : ceux où la légitimité ne suffit pas sont grisés.</summary>

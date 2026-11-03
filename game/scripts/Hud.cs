@@ -5,19 +5,18 @@ namespace Demos.Game;
 
 /// <summary>
 /// Écran de jeu du joueur : barre du haut, menus à gauche, place de la carte au centre, et en bas le dernier message
-/// et les constructions de démonstration. N'affiche que l'état de la partie ; les actions remontent à <see cref="Main"/>.
+/// et les constructions de démonstration. N'affiche que l'état de la partie ; les décisions passent par le bureau du joueur, les constructions de démonstration remontent à <see cref="Main"/>.
 /// </summary>
 public partial class Hud : Control
 {
     public event System.Action? BuildHousingPressed;
     public event System.Action? FoundCommunePressed;
-    public event System.Action? AdminPressed;
 
     public TopBar TopBar { get; private set; } = null!;
     public MainMenu Menu { get; private set; } = null!;
     private Label _message = null!;
 
-    public void Init(GameView view, string[] speedLabels)
+    public void Init(GameView view, PlayerDesk desk, string[] speedLabels)
     {
         Theme = UiTheme.Create();
         SetAnchorsAndOffsetsPreset(LayoutPreset.FullRect);
@@ -38,7 +37,7 @@ public partial class Hud : Control
         layout.AddChild(middle);
 
         Menu = new MainMenu();
-        Menu.Init(view);
+        Menu.Init(view, desk);
         middle.AddChild(Menu);
 
         // La carte viendra ici ; en attendant, la place reste vide.
@@ -64,7 +63,6 @@ public partial class Hud : Control
         row.AddChild(UiTheme.Caption("Démonstration :"));
         row.AddChild(ActionButton("Logements d'État", "Touche B : 500 places pour 200 pierre et 100 bois", () => BuildHousingPressed?.Invoke()));
         row.AddChild(ActionButton("Camp de base", "Touche C : fonde une nouvelle commune", () => FoundCommunePressed?.Invoke()));
-        row.AddChild(ActionButton("Administration", "Touche A : outil de test des bâtiments", () => AdminPressed?.Invoke()));
         return bar;
     }
 
