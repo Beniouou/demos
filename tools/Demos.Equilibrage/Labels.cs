@@ -6,7 +6,7 @@ using Demos.Domain.Population;
 /// Les mots des menus déroulants du tableur, et leur traduction en valeurs du jeu : le générateur les écrit,
 /// « appliquer » les relit.
 /// </summary>
-internal static class Labels
+public static class Labels
 {
     public const string Yes = "oui";
     public const string No = "non";

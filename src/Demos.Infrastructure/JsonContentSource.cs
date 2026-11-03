@@ -17,12 +17,14 @@ public sealed class JsonContentSource(Func<string, string> readText) : IContentS
     private static readonly JsonSerializerOptions Options = new()
     {
         PropertyNameCaseInsensitive = true,
-        Converters = { new JsonStringEnumConverter() },
+        Converters = { new JsonStringEnumConverter(), new NeedCategoryConverter() },
     };
 
     public IReadOnlyList<ProductDefinition> LoadProducts() => Load<ProductDefinition>("products.json");
 
     public IReadOnlyList<BuildingType> LoadBuildingTypes() => Load<BuildingType>("buildings.json");
+
+    public IReadOnlyList<NeedDefinition> LoadNeeds() => Load<NeedDefinition>("besoins.json");
 
     /// <summary>Réglages d'équilibrage (equilibrage.json) ; ceux par défaut si le fichier manque ou est vide.</summary>
     public BalanceSettings LoadBalance()

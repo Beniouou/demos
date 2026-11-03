@@ -21,6 +21,7 @@
     <ProjectReference Include="..\..\src\Demos.Domain\Demos.Domain.csproj" />
     <ProjectReference Include="..\..\src\Demos.Application\Demos.Application.csproj" />
     <ProjectReference Include="..\..\src\Demos.Infrastructure\Demos.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\tools\Demos.Equilibrage\Demos.Equilibrage.csproj" />
   </ItemGroup>
 
 </Project>

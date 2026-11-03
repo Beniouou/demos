@@ -13,6 +13,9 @@ public interface IContentSource
 
     IReadOnlyList<BuildingType> LoadBuildingTypes();
 
+    /// <summary>La liste des besoins des habitants et leurs noms.</summary>
+    IReadOnlyList<NeedDefinition> LoadNeeds();
+
     /// <summary>Réglages d'équilibrage de l'économie ; ceux par défaut si le fichier n'existe pas.</summary>
     BalanceSettings LoadBalance();
 

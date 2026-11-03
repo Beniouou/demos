@@ -14,7 +14,7 @@ using Demos.Infrastructure;
 /// Chaque réglage est retrouvé par sa clé (colonne « Clé (ne pas modifier) », ou l'identifiant du bâtiment ou du
 /// produit). Seules les valeurs changées sont écrites. Si une valeur est fausse, rien n'est écrit.
 /// </summary>
-internal static class BalanceApplier
+public static class BalanceApplier
 {
     private static readonly Rank[] Ranks = [Rank.Workers, Rank.Intermediate, Rank.Executives];
 
@@ -148,6 +148,7 @@ internal static class BalanceApplier
         private readonly Dictionary<string, BuildingType> _types = content.LoadBuildingTypes().ToDictionary(t => t.Id);
         private readonly Dictionary<string, ProductDefinition> _products = content.LoadProducts().ToDictionary(p => p.Id);
         private readonly ScenarioDefinition _scenario = content.LoadScenario();
+        private readonly HashSet<string> _needs = content.LoadNeeds().Select(n => n.Id).ToHashSet();
 
         public void Run()
         {
@@ -323,7 +324,7 @@ internal static class BalanceApplier
                         Set(ObjectAt(balanceJson, ["housingPlacesByRank"]), rank.ToString(), value, Housing.PlacesPerPerson(rank),
                             $"besoin « {label} » des {RankLabel(rank)}");
                     }
-                    else if (Enum.TryParse<NeedCategory>(key, out var need))
+                    else if (_needs.Contains(key) && new NeedCategory(key) is var need)
                     {
                         Set(ObjectAt(balanceJson, ["needsByRank", rank.ToString()]), need.ToString(), value,
                             _balance.NeedsByRank.GetValueOrDefault(rank)?.GetValueOrDefault(need) ?? 0,
@@ -706,7 +707,7 @@ internal static class BalanceApplier
 /// Écrit les fichiers de game/data dans leur forme habituelle : une ligne par bâtiment, produit, classe ou loi, et les
 /// accents tels quels.
 /// </summary>
-internal static class JsonFormat
+public static class JsonFormat
 {
     private static readonly System.Text.Json.JsonSerializerOptions Options = new()
     {
@@ -719,12 +720,17 @@ internal static class JsonFormat
         var text = new System.Text.StringBuilder();
         if (root is JsonArray array)
         {
-            // Une liste de premier niveau (bâtiments, produits) : une ligne par élément, et les lignes vides d'origine.
-            var blankBefore = BlankLinesBefore(original);
+            // Une liste de premier niveau (bâtiments, produits) : une ligne par élément, et les lignes vides d'origine,
+            // retrouvées par l'identifiant de l'élément qui les suit. Un nouvel élément qui ouvre une nouvelle catégorie
+            // en reçoit une aussi.
+            var (known, blankBefore) = BlankLinesBefore(original);
             text.Append("[\n");
             for (var i = 0; i < array.Count; i++)
             {
-                if (blankBefore.Contains(i))
+                var id = array[i]?["id"]?.ToString() ?? "";
+                var category = array[i]?["category"]?.ToString();
+                var newGroup = i > 0 && !known.Contains(id) && category is not null && category != array[i - 1]?["category"]?.ToString();
+                if (blankBefore.Contains(id) || newGroup)
                     text.Append('\n');
                 text.Append("  ").Append(Compact(array[i])).Append(i < array.Count - 1 ? ",\n" : "\n");
             }
@@ -752,12 +758,14 @@ internal static class JsonFormat
         return text.ToString();
     }
 
-    /// <summary>Les éléments précédés d'une ligne vide, dans un fichier écrit à raison d'un élément par ligne.</summary>
-    private static HashSet<int> BlankLinesBefore(string original)
+    /// <summary>
+    /// Les identifiants des éléments du fichier d'origine, et ceux précédés d'une ligne vide (un élément par ligne).
+    /// </summary>
+    private static (HashSet<string> Known, HashSet<string> BlankBefore) BlankLinesBefore(string original)
     {
-        var result = new HashSet<int>();
+        var known = new HashSet<string>();
+        var result = new HashSet<string>();
         var lines = original.Replace("\r", "").Split('\n').Skip(1).TakeWhile(l => l.Trim() != "]").ToList();
-        var index = 0;
         var blank = false;
         foreach (var line in lines)
         {
@@ -767,13 +775,15 @@ internal static class JsonFormat
                 continue;
             }
 
+            var match = System.Text.RegularExpressions.Regex.Match(line, "\"id\": \"([^\"]*)\"");
+            var id = match.Success ? match.Groups[1].Value : "";
+            known.Add(id);
             if (blank)
-                result.Add(index);
+                result.Add(id);
             blank = false;
-            index++;
         }
 
-        return result;
+        return (known, result);
     }
 
     private static string Compact(JsonNode? node, string? key = null) => node switch

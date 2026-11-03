@@ -1,5 +1,6 @@
 ﻿using ClosedXML.Excel;
 using Demos.Application;
+using Demos.Application.Ports;
 using Demos.Domain.Economy;
 using Demos.Domain.Politics;
 using Demos.Domain.Population;
@@ -15,66 +16,84 @@ using Demos.Infrastructure;
 
 Console.OutputEncoding = System.Text.Encoding.UTF8;
 var command = args.Length > 0 ? args[0].ToLowerInvariant() : "generer";
-var dataDirectory = FindDataDirectory();
-var outputDirectory = Directory.GetParent(Directory.GetParent(dataDirectory)!.FullName)!.Parent!.FullName;
-var workbookPath = Path.Combine(outputDirectory, "equilibrage demos.xlsx");
-var reportPath = Path.Combine(outputDirectory, "rapport simulation.html");
-var content = new JsonContentSource(file => File.ReadAllText(Path.Combine(dataDirectory, file)));
+var paths = ToolPaths.Find();
+var content = paths.Content();
 
 switch (command)
 {
     case "generer":
-        Generate();
+        WorkbookGenerator.Generate(content, paths.Workbook);
+        Console.WriteLine($"Tableur d'équilibrage écrit : {paths.Workbook}");
         return 0;
     case "appliquer":
-        return BalanceApplier.Apply(workbookPath, dataDirectory, content);
+        return BalanceApplier.Apply(paths.Workbook, paths.Data, content);
     case "simuler":
         var years = args.Skip(1).Select(a => int.TryParse(a, out var y) ? y : 0).FirstOrDefault(y => y > 0, 3);
         var secondCommune = args.Skip(1).Any(a => a.Equals("commune", StringComparison.OrdinalIgnoreCase));
-        SimulationReport.Write(content, years, secondCommune, reportPath);
+        SimulationReport.Write(content, years, secondCommune, paths.Report);
         return 0;
     default:
         Console.WriteLine("Commandes : generer, appliquer, simuler [années] [commune].");
         return 1;
 }
 
-void Generate()
+/// <summary>
+/// Les chemins des outils : les données du jeu (game/data), et à côté du dossier demos le tableur et le rapport.
+/// </summary>
+public sealed record ToolPaths(string Data, string Workbook, string Report)
 {
-    var world = PrototypeScenario.Create(content).World;
-    using var workbook = new XLWorkbook();
-    var catalogueWoodPrice = content.LoadProducts().First(p => p.Id == Energy.DefaultHeating).BasePrice;
-    var book = new Book(workbook, world, Balance.Current, catalogueWoodPrice);
-    book.WriteReadMe();
-    book.WriteLists();
-    book.WriteConstants();
-    book.WriteBuildings();
-    book.WriteRecipes();
-    book.WriteProducts();
-    book.WriteNeeds();
-    book.WriteStartingGame();
-
-    // Les bâtiments et les recettes sont écrits avant les produits (les prix s'y réfèrent), mais rangés après.
-    workbook.Worksheet("Produits").Position = 3;
-    workbook.Worksheet("Listes").Position = workbook.Worksheets.Count;
-    book.ProtectSheets();
-    workbook.SaveAs(workbookPath);
-    Console.WriteLine($"Tableur d'équilibrage écrit : {workbookPath}");
-}
-
-static string FindDataDirectory()
-{
-    for (var directory = new DirectoryInfo(Directory.GetCurrentDirectory()); directory is not null; directory = directory.Parent)
+    /// <summary>Cherche game/data en remontant depuis le dossier courant (puis depuis celui du programme).</summary>
+    public static ToolPaths Find()
     {
-        var candidate = Path.Combine(directory.FullName, "game", "data");
-        if (Directory.Exists(candidate))
-            return candidate;
+        foreach (var start in new[] { Directory.GetCurrentDirectory(), AppContext.BaseDirectory })
+        {
+            for (var directory = new DirectoryInfo(start); directory is not null; directory = directory.Parent)
+            {
+                var data = Path.Combine(directory.FullName, "game", "data");
+                if (!Directory.Exists(data))
+                    continue;
+
+                // demos/game/data → le dossier qui contient demos.
+                var outside = directory.Parent?.FullName ?? directory.FullName;
+                return new ToolPaths(data, Path.Combine(outside, "equilibrage demos.xlsx"), Path.Combine(outside, "rapport simulation.html"));
+            }
+        }
+
+        throw new DirectoryNotFoundException("Dossier game/data introuvable : lancez l'outil depuis le dépôt.");
     }
 
-    throw new DirectoryNotFoundException("Dossier game/data introuvable : lancez l'outil depuis le dépôt, ou donnez le chemin.");
+    public JsonContentSource Content() => new(file => File.ReadAllText(Path.Combine(Data, file)));
+}
+
+/// <summary>Refait le tableur d'équilibrage depuis les données du jeu.</summary>
+public static class WorkbookGenerator
+{
+    public static void Generate(IContentSource content, string workbookPath)
+    {
+        var world = PrototypeScenario.Create(content).World;
+        using var workbook = new XLWorkbook();
+        var catalogueWoodPrice = content.LoadProducts().First(p => p.Id == Energy.DefaultHeating).BasePrice;
+        var book = new Book(workbook, world, Balance.Current, catalogueWoodPrice, content.LoadNeeds());
+        book.WriteReadMe();
+        book.WriteLists();
+        book.WriteConstants();
+        book.WriteBuildings();
+        book.WriteRecipes();
+        book.WriteProducts();
+        book.WriteNeeds();
+        book.WriteStartingGame();
+
+        // Les bâtiments et les recettes sont écrits avant les produits (les prix s'y réfèrent), mais rangés après.
+        workbook.Worksheet("Produits").Position = 3;
+        workbook.Worksheet("Listes").Position = workbook.Worksheets.Count;
+        book.ProtectSheets();
+        workbook.SaveAs(workbookPath);
+    }
 }
 
 /// <summary>Écrit les feuilles du tableur et garde l'adresse des cellules utiles aux formules.</summary>
-internal sealed class Book(XLWorkbook workbook, World world, BalanceSettings balance, double catalogueWoodPrice)
+internal sealed class Book(XLWorkbook workbook, World world, BalanceSettings balance, double catalogueWoodPrice,
+    IReadOnlyList<NeedDefinition> needs)
 {
     private static readonly XLColor InputColor = XLColor.FromHtml("#FFF4C2");
     private static readonly XLColor HeaderColor = XLColor.FromHtml("#DCE6F1");
@@ -95,17 +114,8 @@ internal sealed class Book(XLWorkbook workbook, World world, BalanceSettings bal
 
     private static string RankName(Rank rank) => Labels.RankName(rank);
 
-    private static string NeedName(NeedCategory need) => need switch
-    {
-        NeedCategory.Food => "Se nourrir",
-        NeedCategory.Clothing => "S'habiller",
-        NeedCategory.Furniture => "Se meubler",
-        NeedCategory.Leisure => "Se distraire",
-        NeedCategory.Administration => "Être administré",
-        NeedCategory.Security => "Être protégé",
-        NeedCategory.Comfort => "Confort",
-        _ => need.ToString(),
-    };
+    // Nom affiché de chaque besoin (game/data/besoins.json).
+    private string NeedName(NeedCategory need) => needs.FirstOrDefault(n => n.Id == need.Id)?.Name ?? need.Id;
 
     private string C(string key) => _constants[key];
 
@@ -270,6 +280,8 @@ internal sealed class Book(XLWorkbook workbook, World world, BalanceSettings bal
             "- simuler.bat : simule la partie de départ (3 ans) et ouvre le rapport « rapport simulation.html ».",
             "- generer-equilibrage.bat : refait ce tableur depuis le jeu. Attention : les modifications non appliquées sont perdues.",
             "  Fermez le tableur avant d'appliquer ou de régénérer (et enregistrez-le avant d'appliquer).",
+            "- editeur.bat : ouvre l'éditeur de contenu pour créer un produit, une recette, un type de bâtiment ou un besoin ;",
+            "  il applique d'abord ce tableur, ajoute l'élément au jeu, puis régénère le tableur (fermez-le avant).",
             "",
             "Feuilles :",
             "- Constantes : marge, salaires, encadrement, énergie, saisons, impôts, réserves…",
@@ -528,9 +540,10 @@ internal sealed class Book(XLWorkbook workbook, World world, BalanceSettings bal
         Header(sheet, 1, "Besoin", "Produit principal (le moins cher produit au départ)", "Prix", RankName(Rank.Workers), RankName(Rank.Intermediate),
             RankName(Rank.Executives), "Clé (ne pas modifier)");
 
-        var needs = Consumption.AllNeeds.ToList();
+        // Tous les besoins de la liste (besoins.json) qui s'achètent : se loger a sa propre ligne, l'énergie n'est pas un achat.
+        var consumed = needs.Select(n => n.Category).Where(n => n != NeedCategory.Housing && n != NeedCategory.Energy).ToList();
         var row = 2;
-        foreach (var need in needs)
+        foreach (var need in consumed)
         {
             // Le produit principal : le moins cher parmi ceux que la partie de départ produit, sinon le moins cher de tous.
             var produced = world.Structures.Values.Select(s => s.Production?.ProductId).ToHashSet();

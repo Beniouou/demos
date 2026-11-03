@@ -1,0 +1,11 @@
+[
+  { "id": "Food", "name": "Se nourrir" },
+  { "id": "Clothing", "name": "S'habiller" },
+  { "id": "Furniture", "name": "Se meubler" },
+  { "id": "Housing", "name": "Se loger", "description": "Une capacité : des places de logement, pas un produit." },
+  { "id": "Administration", "name": "Être administré" },
+  { "id": "Security", "name": "Être protégé" },
+  { "id": "Energy", "name": "Énergie", "description": "Chauffage et eau des bâtiments, pas un achat des habitants." },
+  { "id": "Leisure", "name": "Se distraire" },
+  { "id": "Comfort", "name": "Confort" }
+]
