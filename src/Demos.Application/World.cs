@@ -212,6 +212,19 @@ public sealed class World
 
     public void AddStructure(Structure structure) => _structures.Add(structure.Id, structure);
 
+    private readonly Dictionary<string, Inventory> _constructionReserves = [];
+
+    /// <summary>
+    /// Réserve de chantier d'une commune : les matériaux reçus à sa fondation. Hors du stockage, elle ne se perd ni ne
+    /// se vend ; ses chantiers la prennent avant le stock de l'État et le marché.
+    /// </summary>
+    public Inventory ConstructionReserveOf(string communeId)
+    {
+        if (!_constructionReserves.TryGetValue(communeId, out var reserve))
+            _constructionReserves[communeId] = reserve = new Inventory();
+        return reserve;
+    }
+
     private readonly List<ConstructionSite> _constructionSites = [];
 
     /// <summary>Bâtiments en chantier : ils ne sont pas encore dans <see cref="Structures"/>.</summary>

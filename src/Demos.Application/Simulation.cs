@@ -63,7 +63,8 @@ public sealed class Simulation(World world, GameClock clock)
             || structure.ParentId is not { } parentId
             || !World.Structures.TryGetValue(parentId, out var parent)
             || World.CommuneOf(parent) is not { } communeId
-            || !Construction.TryPay(type.Construction!.Materials, mode, Market.StateSellerId(communeId), World.Treasury, World.MarketOf(communeId)))
+            || !Construction.TryPay(type.Construction!.Materials, mode, Market.StateSellerId(communeId), World.Treasury, World.MarketOf(communeId),
+                World.ConstructionReserveOf(communeId)))
             return false;
 
         World.AddConstructionSite(new ConstructionSite(structure, type.Construction.Days));
@@ -183,8 +184,9 @@ public sealed class Simulation(World world, GameClock clock)
     /// Action du joueur : bâtir un camp de base, qui fonde une nouvelle commune rattachée à l'État.
     /// Il coûte son coût de construction (celui du type camp de base), pris dans la commune qui l'envoie, de la
     /// légitimité (dans le pôle choisi), et la dotation que l'État verse du trésor à la caisse de la nouvelle commune.
-    /// La commune est fondée tout de suite ; son camp de base est en chantier. Le pôle choisi devient la charte de
-    /// fondation de la commune : une loi de ce pôle, qui attire les classes du même pôle et repousse celles du pôle opposé.
+    /// La commune est fondée tout de suite ; son camp de base est en chantier. Elle reçoit sa réserve de chantier de
+    /// fondation. Le pôle choisi devient la charte de fondation de la commune : une loi de ce pôle, qui attire les
+    /// classes du même pôle et repousse celles du pôle opposé.
     /// Renvoie la nouvelle commune, ou null, sans rien dépenser, si c'est impossible.
     /// </summary>
     public Structure? TryFoundCommune(
@@ -207,7 +209,8 @@ public sealed class Simulation(World world, GameClock clock)
             || !World.Treasury.TrySpend(grant))
             return null;
 
-        if (!Construction.TryPay(campType.Construction!.Materials, mode, Market.StateSellerId(payingCommuneId), World.Treasury, World.MarketOf(payingCommuneId)))
+        if (!Construction.TryPay(campType.Construction!.Materials, mode, Market.StateSellerId(payingCommuneId), World.Treasury,
+                World.MarketOf(payingCommuneId), World.ConstructionReserveOf(payingCommuneId)))
         {
             World.Treasury.Deposit(grant);
             return null;
@@ -217,6 +220,7 @@ public sealed class Simulation(World world, GameClock clock)
         World.CommuneFundOf(commune.Id).Deposit(grant);
         World.AddStructure(commune);
         World.AddConstructionSite(new ConstructionSite(camp, campType.Construction.Days));
+        GiveFoundingMaterials(commune.Id);
         World.AddLaw(new Law($"charte-{commune.Id}", $"Charte de fondation : {name}", commune.Id, [legitimacyPole], [LawRule.FoundingCharter]));
         return commune;
     }
@@ -226,6 +230,16 @@ public sealed class Simulation(World world, GameClock clock)
     public Structure? TryFoundCommune(string name, string payingCommuneId, IReadOnlyList<MaterialCost> cost, PaymentMode mode,
         Orientation legitimacyPole, double legitimacyCost) =>
         TryFoundCommune(name, payingCommuneId, mode, legitimacyPole, legitimacyCost);
+
+    /// <summary>
+    /// Donne à une commune sa réserve de chantier de fondation : des matériaux de construction (ceux du camp de base),
+    /// en quantité réglée dans l'équilibrage.
+    /// </summary>
+    public void GiveFoundingMaterials(string communeId)
+    {
+        if (World.BuildingTypes.GetValueOrDefault(BaseCampTypeId)?.Construction is { } cost)
+            World.ConstructionReserveOf(communeId).Add(cost.ProductId, Balance.Current.FoundingMaterials);
+    }
 
     /// <summary>Dotation versée à la fondation : 60 jours de salaires de production du camp de base.</summary>
     public static double FoundingGrantOf(BuildingType camp) =>
@@ -312,9 +326,7 @@ public sealed class Simulation(World world, GameClock clock)
 
     private void RunMonthlyCalculations()
     {
-        // Le camp de base ne licencie jamais : ses matériaux de construction servent à bâtir la commune, même invendus.
-        foreach (var building in Layoffs.RunMonthly(World.Structures, World.MarketOf, World.Wages, World.CompanyFundOf,
-                     keepsJobs: b => b.TypeId == BaseCampTypeId))
+        foreach (var building in Layoffs.RunMonthly(World.Structures, World.MarketOf, World.Wages, World.CompanyFundOf))
             World.UpdateStructure(building);
     }
 

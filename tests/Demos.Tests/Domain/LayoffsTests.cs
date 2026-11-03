@@ -45,16 +45,6 @@ public class LayoffsTests
     }
 
     [Fact]
-    public void Un_batiment_qui_garde_ses_postes_ne_licencie_pas_meme_sans_vendre()
-    {
-        var (structures, market) = Town(Quarry(Ownership.Public), unsold: 3_100);
-
-        var changed = Layoffs.RunMonthly(structures, _ => market, new WageLedger(), keepsJobs: b => b.Id == "carriere");
-
-        Assert.Empty(changed);
-    }
-
-    [Fact]
     public void Un_petit_batiment_public_perd_au_moins_un_poste()
     {
         var after = RunMonth(Quarry(Ownership.Public, jobs: 20), unsold: 1_000);

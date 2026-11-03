@@ -68,7 +68,7 @@ internal static class SimulationReport
         var cost = world.BuildingTypes[Simulation.BaseCampTypeId].Construction;
         var materials = cost is null ? "aucun coût de construction" : $"{Count(cost.Quantity)} {cost.ProductId}, {cost.Days} jours de chantier";
         return commune is not null
-            ? $"Deuxième commune fondée le jour {FoundingDay} (charte {pole.Code}, {materials}, payés par le stock ou le trésor)."
+            ? $"Deuxième commune fondée le jour {FoundingDay} (charte {pole.Code}, {materials}, payés par la réserve de chantier, le stock ou le trésor)."
             : $"La deuxième commune n'a pas pu être fondée le jour {FoundingDay} ({materials} : matériaux, argent ou légitimité insuffisants).";
     }
 

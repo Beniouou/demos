@@ -149,7 +149,7 @@ internal sealed class Book(XLWorkbook workbook, World world, BalanceSettings bal
     [
         "Marge", "Encadrement", "Direction", "MultOuvriers", "MultPI", "MultCadres", "Chauffage", "Eau", "Hiver", "Printemps",
         "Ete", "Automne", "SansEnergie", "ReserveCombustible", "ReserveEntreprise", "ReserveDepart", "EpargneReserve", "ImpotEtat", "ImpotCommune", "Transport",
-        "PollutionLoin", "SeuilPollution", "Dotation", "TvaEtat", "TvaCommune", "LicenciementInvendus", "EmbaucheInvendus", "VitessePublic", "VitesseScop",
+        "PollutionLoin", "SeuilPollution", "Dotation", "StockFondation", "TvaEtat", "TvaCommune", "LicenciementInvendus", "EmbaucheInvendus", "VitessePublic", "VitesseScop",
         "VitessePrive", "BaisseSalaireScop", "BaisseSalaireScopMax",
     ];
 
@@ -359,6 +359,7 @@ internal sealed class Book(XLWorkbook workbook, World world, BalanceSettings bal
             ("PollutionLoin", "Part de la pollution des autres communes", balance.DistantPollutionShare, ""),
             ("SeuilPollution", "Seuil de pollution (par habitant et par jour)", balance.PollutedThreshold, ""),
             ("Dotation", "Dotation d'une nouvelle commune (jours)", balance.FoundingGrantDays, "Jours de salaires du camp de base."),
+            ("StockFondation", "Réserve de chantier d'une commune à sa fondation", balance.FoundingMaterials, "Matériaux de construction, hors stockage : pour ses premiers chantiers (et ceux de la première commune)."),
             ("LicenciementInvendus", "Licenciement : invendus (jours de production)", balance.LayoffUnsoldDays,
                 "Au changement de mois, une entreprise licencie si ses invendus dépassent ce nombre de jours de production."),
             ("EmbaucheInvendus", "Embauche : invendus (jours de production)", balance.HireUnsoldDays,

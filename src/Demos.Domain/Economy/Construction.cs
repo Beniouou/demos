@@ -34,37 +34,41 @@ public static class Construction
 {
     /// <summary>
     /// Paie une construction avec les produits de l'État dans le stockage de la commune, en argent, ou en mélangeant
-    /// les deux. Tout ou rien : si le stockage ou le trésor ne suffit pas, rien n'est dépensé.
+    /// les deux. La réserve de chantier de la commune, s'il y en a une, passe avant tout le reste. Tout ou rien : si
+    /// le stockage ou le trésor ne suffit pas, rien n'est dépensé.
     /// </summary>
     public static bool TryPay(
         IReadOnlyList<MaterialCost> cost,
         PaymentMode mode,
         string stateSellerId,
         Treasury treasury,
-        Market market)
+        Market market,
+        Inventory? reserve = null)
     {
-        var plan = new List<(string ProductId, double FromState, double Bought)>();
+        var plan = new List<(string ProductId, double FromReserve, double FromState, double Bought)>();
         double money = 0;
 
         foreach (var item in cost)
         {
+            var fromReserve = Math.Min(reserve?.QuantityOf(item.ProductId) ?? 0, item.Quantity);
             var fromState = mode == PaymentMode.StockFirst
-                ? Math.Min(market.QuantityOf(item.ProductId, stateSellerId), item.Quantity)
+                ? Math.Min(market.QuantityOf(item.ProductId, stateSellerId), item.Quantity - fromReserve)
                 : 0;
-            var bought = item.Quantity - fromState;
+            var bought = item.Quantity - fromReserve - fromState;
 
             if (market.QuantityOfOthers(item.ProductId, stateSellerId) < bought)
                 return false;
 
             money += market.CostOf(item.ProductId, bought);
-            plan.Add((item.ProductId, fromState, bought));
+            plan.Add((item.ProductId, fromReserve, fromState, bought));
         }
 
         if (!treasury.TrySpend(money))
             return false;
 
-        foreach (var (productId, fromState, bought) in plan)
+        foreach (var (productId, fromReserve, fromState, bought) in plan)
         {
+            reserve?.TryRemove(productId, fromReserve);
             market.TryWithdraw(productId, fromState, stateSellerId);
             market.TryBuy(productId, bought, exceptSellerId: stateSellerId);
         }

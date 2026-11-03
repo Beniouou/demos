@@ -25,6 +25,7 @@
   "distantPollutionShare": 0.1,
   "pollutedThreshold": 0.1,
   "foundingGrantDays": 60,
+  "foundingMaterials": 1000,
   "layoffUnsoldDays": 30,
   "hireUnsoldDays": 10,
   "jobChangePerMonth": { "Public": 0.02, "Cooperative": 0.05, "Private": 0.15 },

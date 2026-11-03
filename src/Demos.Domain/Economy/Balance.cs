@@ -133,6 +133,12 @@ public sealed record BalanceSettings
     /// <summary>Dotation d'une nouvelle commune, en jours de salaires de son camp de base.</summary>
     public int FoundingGrantDays { get; init; } = 60;
 
+    /// <summary>
+    /// Proposition : réserve de chantier d'une commune à sa fondation (et de la première commune au départ), en
+    /// matériaux de construction. Hors du stockage, elle ne se perd ni ne se vend : elle sert à ses premiers chantiers.
+    /// </summary>
+    public double FoundingMaterials { get; init; } = 1000;
+
     /// <summary>Au changement de mois, une entreprise licencie si ses invendus dépassent ce nombre de jours de production.</summary>
     public double LayoffUnsoldDays { get; init; } = 30;
 

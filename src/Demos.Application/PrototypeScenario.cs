@@ -66,7 +66,11 @@ public static class PrototypeScenario
             world.CompanyFundOf(building).Deposit(reserve);
         }
 
-        return new Simulation(world, new GameClock(new DateOnly(1900, 1, 1)));
+        var simulation = new Simulation(world, new GameClock(new DateOnly(1900, 1, 1)));
+        // Les communes de départ reçoivent la même réserve de chantier qu'une commune fondée en cours de partie.
+        foreach (var commune in world.Communes)
+            simulation.GiveFoundingMaterials(commune.Id);
+        return simulation;
     }
 
     /// <summary>Un bâtiment de départ : son type du catalogue, avec ce que la partie de départ change.</summary>

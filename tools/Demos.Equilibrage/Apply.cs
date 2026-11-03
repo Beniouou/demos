@@ -51,6 +51,7 @@ public static class BalanceApplier
         ("PollutionLoin", ["distantPollutionShare"], b => b.DistantPollutionShare),
         ("SeuilPollution", ["pollutedThreshold"], b => b.PollutedThreshold),
         ("Dotation", ["foundingGrantDays"], b => b.FoundingGrantDays),
+        ("StockFondation", ["foundingMaterials"], b => b.FoundingMaterials),
         ("LicenciementInvendus", ["layoffUnsoldDays"], b => b.LayoffUnsoldDays),
         ("EmbaucheInvendus", ["hireUnsoldDays"], b => b.HireUnsoldDays),
         ("VitessePublic", ["jobChangePerMonth", "Public"], b => b.JobChangePerMonth[Ownership.Public]),
