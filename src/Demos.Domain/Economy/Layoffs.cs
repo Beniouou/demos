@@ -9,7 +9,7 @@ namespace Demos.Domain.Economy;
 /// statut : l'État 2 % de sa capacité par mois, une SCOP 5 %, le privé 15 % (réglages). Une SCOP baisse d'abord ses
 /// salaires, jusqu'à −20 %, avant de licencier, et les remonte avant de réembaucher. Un bâtiment dont le joueur a fixé
 /// les postes ne bouge pas. Une entreprise privée ou coopérative ne rouvre que les postes que sa caisse peut payer
-/// pendant la durée de sa réserve (30 jours) : sans argent, elle est en faillite et reste fermée tant que personne n'y
+/// pendant 30 jours (réglage) : sans argent, elle est en faillite et reste fermée tant que personne n'y
 /// remet de l'argent (l'État peut la racheter).
 /// </summary>
 public static class Layoffs
@@ -66,7 +66,7 @@ public static class Layoffs
     }
 
     /// <summary>
-    /// Postes qu'une entreprise peut rouvrir : ceux dont sa caisse paie les salaires pendant la durée de sa réserve. Sans
+    /// Postes qu'une entreprise peut rouvrir : ceux dont sa caisse paie les salaires pendant 30 jours (réglage). Sans
     /// limite pour un bâtiment public, que paient la commune et l'État.
     /// </summary>
     public static int AffordableJobs(Structure building, Func<Structure, Treasury>? companyFundOf)
@@ -74,7 +74,7 @@ public static class Layoffs
         if (building.Ownership == Ownership.Public || companyFundOf is null)
             return int.MaxValue;
 
-        var perJob = Staffing.WageBillPerJob(building) * Balance.Current.CompanyReserveDays;
+        var perJob = Staffing.WageBillPerJob(building) * Balance.Current.StartingReserveDays;
         return perJob <= 0 ? int.MaxValue : (int)Math.Floor(companyFundOf(building).Balance / perJob);
     }
 

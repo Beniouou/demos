@@ -215,6 +215,8 @@ public sealed class Simulation(World world, GameClock clock)
 
         World.Workers = Employment.Assign(World.Structures, World.Classes);
         World.PollutionByCommune = Pollution.PerResidentByCommune(World.Structures, World.Workers, World.Classes);
+        // La caisse de chaque entreprise au début de la journée : son bénéfice du jour décide de ce qu'elle verse.
+        var fundsAtDayStart = World.Structures.Values.Where(Companies.HasCompanyFund).ToDictionary(b => b.Id, b => World.CompanyFundOf(b).Balance);
         World.Produced = WorkDay.Run(World.Structures, World.Workers, World.Classes, World.Laws, World.Treasury, World.MarketOf, World.CommuneFundOf, World.Wages,
             World.CompanyFundOf, World.EnergyEffectOf);
         World.EnergyShares = Energy.RunDaily(World.Structures, World.TierOf, Clock.Season, World.MarketOf, World.Treasury, World.CommuneFundOf,
@@ -228,7 +230,7 @@ public sealed class Simulation(World world, GameClock clock)
             Consumption.RunDaily(World.Classes.Where(c => c.CommuneId == communeId).ToList(), World.Products, World.MarketOf(communeId));
 
         PaySellers();
-        Companies.PayDividends(World.Structures, World.ClassesById, World.CompanyFundOf, World.PriceOf);
+        Companies.PayDividends(World.Structures, World.ClassesById, World.CompanyFundOf, World.PriceOf, b => fundsAtDayStart.GetValueOrDefault(b.Id));
         Taxation.CollectDaily(World.Classes, World.StateTaxRate, World.CommuneTaxRateOf, World.Treasury, World.CommuneFundOf, World.Laws, World.Structures);
         LawEffects.ApplyDaily(World.Classes, World.Laws, World.Structures, World.Legitimacy);
         Storage.ApplyDaily(communeIds, World.Structures, World.Products, World.MarketOf);
@@ -248,7 +250,17 @@ public sealed class Simulation(World world, GameClock clock)
                 else if (Market.BuildingOfCompanySeller(sellerId) is { } buildingId && World.Structures.TryGetValue(buildingId, out var building))
                 {
                     if (Companies.HasCompanyFund(building))
-                        World.CompanyFundOf(building).Deposit(amount);
+                    {
+                        // La TVA sur sa valeur ajoutée part d'abord, à l'État et à la commune ; le reste entre dans la caisse.
+                        var commune = World.CommuneOf(building);
+                        var valueAdded = amount * Taxation.ValueAddedShare(building, World.PriceOf);
+                        var toState = valueAdded * Balance.Current.VatStateRate;
+                        var toCommune = commune is null ? 0 : valueAdded * Balance.Current.VatCommuneRate;
+                        World.Treasury.Deposit(toState);
+                        if (commune is not null)
+                            World.CommuneFundOf(commune).Deposit(toCommune);
+                        World.CompanyFundOf(building).Deposit(amount - toState - toCommune);
+                    }
                     else if (World.CommuneOf(building) is { } buildingCommune)
                         World.CommuneFundOf(buildingCommune).Deposit(amount);
                 }

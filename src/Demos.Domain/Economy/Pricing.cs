@@ -8,8 +8,8 @@ namespace Demos.Domain.Economy;
 /// dégager 30 % de bénéfice. Le bâtiment de référence d'un produit est le type du catalogue de plus bas niveau qui le
 /// fabrique, avec sa première recette pour ce produit. Les charges sont les salaires de tous ses emplois (production,
 /// encadrement, direction), son énergie (chauffage et eau) et ses matières, à leur propre prix : le prix se calcule
-/// donc en remontant la chaîne de production. Un produit sans bâtiment de référence garde son prix du catalogue. Le prix
-/// reste national et modifiable à la main.
+/// donc en remontant la chaîne de production. Le prix inclut la TVA des entreprises.
+/// Un produit sans bâtiment de référence garde son prix du catalogue. Le prix reste national et modifiable à la main.
 /// </summary>
 public static class Pricing
 {
@@ -38,7 +38,11 @@ public static class Pricing
 
         var materials = recipe.Materials.Sum(m => m.Quantity * (priceOf?.Invoke(m.ProductId) ?? 0));
         var perJob = Staffing.WageBillPerJob(reference) + EnergyCostPerJob(reference, recipe, priceOf);
-        return (1 + Margin) * (perJob / recipe.QuantityPerWorker + materials);
+        // Le prix inclut la TVA, payée sur la seule valeur ajoutée (le prix moins les matières) : la TVA des fournisseurs,
+        // déjà dans le prix des matières, est déduite, et la marge se calcule hors taxes. Prix P, TVA t, charges C par unité,
+        // matières M : P = (1 + marge) × (C / (1 − t) + M), soit la même chaîne de prix qu'à 0 %, chaque étape augmentée de t/(1 − t).
+        var vat = Math.Clamp(Balance.Current.VatRate, 0, 0.9);
+        return (1 + Margin) * (perJob / recipe.QuantityPerWorker / (1 - vat) + materials);
     }
 
     /// <summary>

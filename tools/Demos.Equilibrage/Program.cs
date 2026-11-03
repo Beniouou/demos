@@ -121,6 +121,9 @@ internal sealed class Book(XLWorkbook workbook, World world, BalanceSettings bal
 
     private string C(string key) => _constants[key];
 
+    // TVA des entreprises, État et commune ensemble.
+    private string Vat => $"({C("TvaEtat")}+{C("TvaCommune")})";
+
     private string Price(string productCell) => $"IFERROR(INDEX({_productPrices},MATCH({productCell},{_productIds},0)),0)";
 
     // Feuille Bâtiments : dernière ligne, pour les recherches par identifiant de type.
@@ -133,8 +136,8 @@ internal sealed class Book(XLWorkbook workbook, World world, BalanceSettings bal
     public static readonly HashSet<string> AppliedConstants =
     [
         "Marge", "Encadrement", "Direction", "MultOuvriers", "MultPI", "MultCadres", "Chauffage", "Eau", "Hiver", "Printemps",
-        "Ete", "Automne", "SansEnergie", "ReserveCombustible", "ReserveEntreprise", "ImpotEtat", "ImpotCommune", "Transport",
-        "PollutionLoin", "SeuilPollution", "Dotation", "LicenciementInvendus", "EmbaucheInvendus", "VitessePublic", "VitesseScop",
+        "Ete", "Automne", "SansEnergie", "ReserveCombustible", "ReserveEntreprise", "ReserveDepart", "EpargneReserve", "ImpotEtat", "ImpotCommune", "Transport",
+        "PollutionLoin", "SeuilPollution", "Dotation", "TvaEtat", "TvaCommune", "LicenciementInvendus", "EmbaucheInvendus", "VitessePublic", "VitesseScop",
         "VitessePrive", "BaisseSalaireScop", "BaisseSalaireScopMax",
     ];
 
@@ -330,9 +333,16 @@ internal sealed class Book(XLWorkbook workbook, World world, BalanceSettings bal
             ("FacteurMoyen", "Chauffage moyen sur l'année (×)", "=MOYENNE", "Calculé."),
             ("SansEnergie", "Activité sans énergie", balance.OutputWithoutEnergy, "Part de l'activité gardée sans chauffage ni eau."),
             ("ReserveCombustible", "Réserve de combustible (jours)", balance.FuelReserveDays, "Jours de chauffage normal gardés dans chaque bâtiment."),
-            ("ReserveEntreprise", "Réserve des entreprises (jours)", balance.CompanyReserveDays, "Jours de salaires et d'énergie gardés en caisse."),
+            ("ReserveEntreprise", "Réserve des entreprises (jours)", balance.CompanyReserveDays, "Jours de salaires et d'énergie gardés en caisse ; au-delà, tout va aux propriétaires."),
+            ("ReserveDepart", "Réserve de départ des entreprises (jours)", balance.StartingReserveDays,
+                "Prise aux propriétaires au début de la partie ; une entreprise ne rouvre que les postes que sa caisse paie ce nombre de jours."),
+            ("EpargneReserve", "Part du bénéfice mise en réserve", balance.ReserveSavingsShare,
+                "Tant que la réserve n'est pas pleine ; le reste va aux propriétaires. 1 : tout est gardé jusqu'à la remplir."),
             ("ImpotEtat", "Impôt d'État (par jour)", balance.StateTaxRate, "Part de la richesse versée chaque jour au trésor."),
             ("ImpotCommune", "Impôt communal (par jour)", balance.CommuneTaxRate, "Part de la richesse versée chaque jour à la caisse de la commune."),
+            ("TvaEtat", "TVA des entreprises : État", balance.VatStateRate,
+                "Part de la valeur ajoutée (ventes moins matières) des entreprises privées et des SCOP versée au trésor. Les prix l'incluent."),
+            ("TvaCommune", "TVA des entreprises : commune", balance.VatCommuneRate, "Part versée à la caisse de la commune."),
             ("Transport", "Perte en route entre communes", balance.TransportLoss, ""),
             ("PollutionLoin", "Part de la pollution des autres communes", balance.DistantPollutionShare, ""),
             ("SeuilPollution", "Seuil de pollution (par habitant et par jour)", balance.PollutedThreshold, ""),
@@ -424,7 +434,8 @@ internal sealed class Book(XLWorkbook workbook, World world, BalanceSettings bal
             sheet.Cell(row, 15).FormulaA1 = $"I{row}";
             sheet.Cell(row, 16).FormulaA1 = EnergyPerUnitFormula(type.Tier, type.ConstantHeating, $"A{row}");
             sheet.Cell(row, 17).FormulaA1 = $"L{row}*{Price($"K{row}")}+N{row}*{Price($"M{row}")}";
-            sheet.Cell(row, 18).FormulaA1 = $"(1+{C("Marge")})*((O{row}+P{row})/J{row}+Q{row})";
+            // Le prix inclut la TVA, payée sur la valeur ajoutée (prix moins matières) ; la marge se calcule hors taxes.
+            sheet.Cell(row, 18).FormulaA1 = $"(1+{C("Marge")})*((O{row}+P{row})/J{row}/(1-{Vat})+Q{row})";
             sheet.Cell(row, 20).FormulaA1 = $"R{row}-S{row}";
         }
 
@@ -533,7 +544,8 @@ internal sealed class Book(XLWorkbook workbook, World world, BalanceSettings bal
                 sheet.Cell(row, 15).FormulaA1 = $"M{row}*(J{row}*{Price($"I{row}")}+L{row}*{Price($"K{row}")})";
                 sheet.Cell(row, 16).FormulaA1 = $"E{row}*F{row}";
                 sheet.Cell(row, 17).FormulaA1 = $"E{row}*({EnergyPerUnitFormula(type.Tier, type.ConstantHeating, $"G{row}")})";
-                sheet.Cell(row, 18).FormulaA1 = $"N{row}-O{row}-P{row}-Q{row}";
+                // Bénéfice d'une entreprise : la TVA sur sa valeur ajoutée est déduite (un bâtiment public ne la paie pas).
+                sheet.Cell(row, 18).FormulaA1 = $"N{row}-{Vat}*(N{row}-O{row})-O{row}-P{row}-Q{row}";
                 sheet.Cell(row, 19).FormulaA1 = $"IFERROR(R{row}/(O{row}+P{row}+Q{row}),0)";
                 row++;
             }
@@ -677,7 +689,8 @@ internal sealed class Book(XLWorkbook workbook, World world, BalanceSettings bal
             sheet.Cell(row, 26).FormulaA1 = $"F{row}*G{row}";
             sheet.Cell(row, 27).FormulaA1 = $"S{row}*{Price($"Q{row}")}+T{row}*{C("PrixEau")}";
             sheet.Cell(row, 28).Value = building.HousingPlaces * building.DailyRent + building.SchoolPlaces * building.DailyTuition;
-            sheet.Cell(row, 29).FormulaA1 = $"X{row}-Y{row}-Z{row}-AA{row}+AB{row}";
+            var taxed = building.Ownership == Ownership.Public ? "" : $"-{Vat}*(X{row}-Y{row})";
+            sheet.Cell(row, 29).FormulaA1 = $"X{row}-Y{row}-Z{row}-AA{row}+AB{row}{taxed}";
             row++;
         }
 

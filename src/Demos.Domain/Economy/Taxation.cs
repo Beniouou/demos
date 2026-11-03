@@ -32,6 +32,20 @@ public readonly record struct TaxAdjustment(TaxLevel Level, TaxAdjustmentKind Ki
 /// </summary>
 public static class Taxation
 {
+    /// <summary>
+    /// Part des ventes d'une entreprise qui est sa valeur ajoutée, celle sur laquelle elle paie la TVA : le prix de son
+    /// produit moins les matières de sa recette, au prix du marché. La TVA payée par ses fournisseurs est déjà dans le prix de
+    /// ces matières.
+    /// </summary>
+    public static double ValueAddedShare(Structure building, Func<string, double> priceOf)
+    {
+        if (building.Production is not { } recipe || priceOf(recipe.ProductId) is var price && price <= 0)
+            return 1;
+
+        var materials = recipe.Materials.Sum(m => m.Quantity * priceOf(m.ProductId));
+        return Math.Clamp(1 - materials / price, 0, 1);
+    }
+
     public static void CollectDaily(
         IEnumerable<SocialClass> classes,
         double stateRate,

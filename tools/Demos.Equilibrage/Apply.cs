@@ -41,8 +41,12 @@ public static class BalanceApplier
         ("SansEnergie", ["outputWithoutEnergy"], b => b.OutputWithoutEnergy),
         ("ReserveCombustible", ["fuelReserveDays"], b => b.FuelReserveDays),
         ("ReserveEntreprise", ["companyReserveDays"], b => b.CompanyReserveDays),
+        ("ReserveDepart", ["startingReserveDays"], b => b.StartingReserveDays),
+        ("EpargneReserve", ["reserveSavingsShare"], b => b.ReserveSavingsShare),
         ("ImpotEtat", ["stateTaxRate"], b => b.StateTaxRate),
         ("ImpotCommune", ["communeTaxRate"], b => b.CommuneTaxRate),
+        ("TvaEtat", ["vatStateRate"], b => b.VatStateRate),
+        ("TvaCommune", ["vatCommuneRate"], b => b.VatCommuneRate),
         ("Transport", ["transportLoss"], b => b.TransportLoss),
         ("PollutionLoin", ["distantPollutionShare"], b => b.DistantPollutionShare),
         ("SeuilPollution", ["pollutedThreshold"], b => b.PollutedThreshold),
@@ -300,11 +304,11 @@ public static class BalanceApplier
                     continue;
                 }
 
-                var integer = key is "ReserveCombustible" or "ReserveEntreprise" or "Dotation";
+                var integer = key is "ReserveCombustible" or "ReserveEntreprise" or "ReserveDepart" or "Dotation";
                 var value = Number(row.Cell("B"), integer);
 
                 // Une part (vitesse de licenciement, baisse des salaires) ne dépasse pas 100 %.
-                if (key.StartsWith("Vitesse") || key.StartsWith("BaisseSalaire"))
+                if (key.StartsWith("Vitesse") || key.StartsWith("BaisseSalaire") || key.StartsWith("Tva") || key == "EpargneReserve")
                 {
                     if (value > 1)
                     {

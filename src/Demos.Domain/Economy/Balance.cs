@@ -70,6 +70,18 @@ public sealed record BalanceSettings
     /// <summary>Une entreprise garde de quoi payer ce nombre de jours de salaires et d'énergie.</summary>
     public int CompanyReserveDays { get; init; } = 30;
 
+    /// <summary>
+    /// Réserve prise aux propriétaires au début de la partie, et que doivent couvrir les postes qu'une entreprise rouvre, en
+    /// jours de salaires.
+    /// </summary>
+    public int StartingReserveDays { get; init; } = 30;
+
+    /// <summary>
+    /// Part de son bénéfice du jour qu'une entreprise met de côté tant que sa réserve n'est pas pleine ; elle verse le reste
+    /// à ses propriétaires. 1 : elle garde tout jusqu'à remplir sa réserve.
+    /// </summary>
+    public double ReserveSavingsShare { get; init; } = 1;
+
     /// <summary>Bois ou charbon par emploi ou par place, et par jour, au printemps et en automne.</summary>
     public double HeatingPerUnit { get; init; } = 0.01;
 
@@ -96,6 +108,18 @@ public sealed record BalanceSettings
 
     /// <summary>Impôt communal de départ de chaque commune, versé à sa caisse.</summary>
     public double CommuneTaxRate { get; init; } = 0.002;
+
+    /// <summary>
+    /// TVA des entreprises privées et coopératives versée au trésor : une part de leur valeur ajoutée (leurs ventes moins
+    /// les matières qu'elles ont achetées).
+    /// </summary>
+    public double VatStateRate { get; init; }
+
+    /// <summary>TVA versée à la caisse de la commune de l'entreprise.</summary>
+    public double VatCommuneRate { get; init; }
+
+    /// <summary>La TVA en tout : les prix l'incluent.</summary>
+    public double VatRate => VatStateRate + VatCommuneRate;
 
     /// <summary>Part perdue en route dans les échanges entre communes.</summary>
     public double TransportLoss { get; init; } = 0.2;

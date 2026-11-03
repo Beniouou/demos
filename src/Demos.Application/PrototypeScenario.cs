@@ -61,7 +61,7 @@ public static class PrototypeScenario
             if (building.OwnerClassId is not { } ownerId || !world.ClassesById.TryGetValue(ownerId, out var owner))
                 continue;
 
-            var reserve = Math.Min(Companies.ReserveOf(building, world.PriceOf), Math.Max(0, owner.Wealth));
+            var reserve = Math.Min(Companies.ReserveOf(building, world.PriceOf, Balance.Current.StartingReserveDays), Math.Max(0, owner.Wealth));
             owner.Wealth -= reserve;
             world.CompanyFundOf(building).Deposit(reserve);
         }
