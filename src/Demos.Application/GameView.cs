@@ -50,7 +50,71 @@ public sealed class GameView(Simulation simulation)
                 c.Id, c.Name, c.Population, c.Wealth, c.NeedsSatisfaction, c.HousingCoverage, c.Adhesion,
                 c.EducationPoints, c.AdvancedEducationPoints)).ToList());
     }
+
+    /// <summary>
+    /// Les structures emboîtées, de l'État (la racine) aux communes, puis à leurs organismes et bâtiments, chacune
+    /// avec les lois créées chez elle.
+    /// </summary>
+    public IReadOnlyList<StructureNode> StructureTree() =>
+        World.Structures.Values.Where(s => s.IsNational).Select(DescribeNode).ToList();
+
+    private StructureNode DescribeNode(Structure structure) => new(
+        structure.Id,
+        structure.Name,
+        structure.Kind switch
+        {
+            StructureKind.PoliticalEntity => structure.IsNational ? StructureNodeKind.State : StructureNodeKind.Commune,
+            StructureKind.Organization => StructureNodeKind.Organization,
+            _ => StructureNodeKind.Building,
+        },
+        World.Laws.Where(l => l.StructureId == structure.Id).Select(DescribeLaw).ToList(),
+        World.Structures.Values.Where(s => s.ParentId == structure.Id).Select(DescribeNode).ToList());
+
+    /// <summary>
+    /// Les lois qui s'appliquent à une structure : une loi créée dans une structure s'applique à tout ce qu'elle
+    /// contient. De la plus large (l'État) à la structure elle-même.
+    /// </summary>
+    public IReadOnlyList<LawView> LawsApplyingTo(string structureId)
+    {
+        var chain = new List<string>();
+        for (var current = World.Structures.GetValueOrDefault(structureId); current is not null;
+             current = current.ParentId is { } parentId ? World.Structures.GetValueOrDefault(parentId) : null)
+            chain.Insert(0, current.Id);
+
+        return chain.SelectMany(id => World.Laws.Where(l => l.StructureId == id)).Select(DescribeLaw).ToList();
+    }
+
+    private LawView DescribeLaw(Law law) => new(
+        law.Id,
+        law.Name,
+        law.StructureId,
+        World.Structures.TryGetValue(law.StructureId, out var structure) ? structure.Name : law.StructureId,
+        law.Orientations.ToList());
 }
+
+public enum StructureNodeKind
+{
+    State,
+    Commune,
+    Organization,
+    Building,
+}
+
+/// <summary>Une structure dans l'arbre de l'État, ses lois et ce qu'elle contient.</summary>
+public sealed record StructureNode(
+    string Id,
+    string Name,
+    StructureNodeKind Kind,
+    IReadOnlyList<LawView> Laws,
+    IReadOnlyList<StructureNode> Children);
+
+/// <summary>Une loi vue par le joueur : où elle a été créée, et ses pôles idéologiques.</summary>
+public sealed record LawView(
+    string Id,
+    string Name,
+    string StructureId,
+    string StructureName,
+    IReadOnlyList<Orientation> Orientations);
 
 /// <summary>Une commune vue par le joueur, à un instant donné.</summary>
 public sealed record CommuneView(

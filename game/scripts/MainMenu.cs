@@ -19,7 +19,8 @@ public partial class MainMenu : HBoxContainer
     /// <summary>Un onglet : son titre et de quoi construire sa page à l'ouverture du menu.</summary>
     private sealed record Page(string Title, System.Func<Control> Create);
 
-    private sealed record Menu(string Title, Page[] Pages);
+    /// <summary>Un menu et ses onglets ; un menu large prend presque toute la place de la carte (deux colonnes).</summary>
+    private sealed record Menu(string Title, Page[] Pages, bool Wide = false);
 
     private const string HelpText =
         "Espace : pause ou reprise\n" +
@@ -58,9 +59,9 @@ public partial class MainMenu : HBoxContainer
             ]),
             new("Structure",
             [
-                Text("Entité politique", () => WorldText.Communes(view)),
+                new("Entité politique", () => new StructurePage(view, desk)),
                 Coming("Organisme", "Les organismes : domaine d'application, pouvoir, postes et fonctionnement."),
-            ]),
+            ], Wide: true),
             new("Production",
             [
                 new("Unités de production", () => new BuildingsPage(desk)),
@@ -135,6 +136,15 @@ public partial class MainMenu : HBoxContainer
             _buttons[_open].SetPressedNoSignal(false);
         _open = -1;
         _panel.Visible = false;
+        SetWide(false);
+    }
+
+    /// <summary>Un menu large s'étend sur la place de la carte, dont il laisse un quart visible.</summary>
+    private void SetWide(bool wide)
+    {
+        SizeFlagsHorizontal = wide ? SizeFlags.ExpandFill : SizeFlags.Fill;
+        SizeFlagsStretchRatio = wide ? 3 : 1;
+        _panel.SizeFlagsHorizontal = wide ? SizeFlags.ExpandFill : SizeFlags.Fill;
     }
 
     /// <summary>Met à jour la page affichée (l'état de la partie change chaque jour).</summary>
@@ -155,6 +165,7 @@ public partial class MainMenu : HBoxContainer
         _open = menu;
         _buttons[menu].SetPressedNoSignal(true);
         _panelTitle.Text = _menus[menu].Title;
+        SetWide(_menus[menu].Wide);
         BuildPages(_menus[menu]);
         _panel.Visible = true;
         Refresh();

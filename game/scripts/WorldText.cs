@@ -31,31 +31,28 @@ public static class WorldText
         _ => "Automne",
     };
 
-    /// <summary>Chaque commune : habitants, emplois, logements, pollution, caisse, puis ses groupes locaux (une classe par ligne).</summary>
-    public static string Communes(GameView view)
+    /// <summary>Une commune : habitants, emplois, logements, pollution, caisse, puis ses groupes locaux (une classe par ligne).</summary>
+    public static string Commune(CommuneView commune)
     {
         var text = new StringBuilder();
-        foreach (var commune in view.Communes())
-        {
-            text.AppendLine(commune.Name.ToUpperInvariant() + (commune.IsGhostTown ? "   — VILLE FANTÔME (bâtiments en ruine)" : ""));
-            text.AppendLine($"  Habitants {commune.Residents:N0}   logements {commune.HousingPlaces:N0} places");
-            text.AppendLine($"  Emplois de production pourvus {commune.JobsFilled:N0} / {commune.Jobs:N0}");
-            text.AppendLine(
-                $"  Pollution {commune.PollutionPerResident:F3} par habitant " +
-                $"(seuil {Demos.Domain.Economy.Pollution.PollutedThreshold})");
-            text.AppendLine($"  Caisse {commune.Fund:N0}   impôt communal {commune.TaxRate:P2} par jour");
-            text.AppendLine();
+        if (commune.IsGhostTown)
+            text.AppendLine("VILLE FANTÔME (bâtiments en ruine)");
+        text.AppendLine($"Habitants {commune.Residents:N0}   logements {commune.HousingPlaces:N0} places");
+        text.AppendLine($"Emplois de production pourvus {commune.JobsFilled:N0} / {commune.Jobs:N0}");
+        text.AppendLine(
+            $"Pollution {commune.PollutionPerResident:F3} par habitant " +
+            $"(seuil {Demos.Domain.Economy.Pollution.PollutedThreshold})");
+        text.AppendLine($"Caisse {commune.Fund:N0}   impôt communal {commune.TaxRate:P2} par jour");
+        text.AppendLine();
 
-            foreach (var socialClass in commune.Classes)
-            {
-                text.AppendLine($"  {socialClass.Name}");
-                text.AppendLine(
-                    $"      population {socialClass.Population:N0}   richesse {socialClass.Wealth:N0}   adhésion {socialClass.Adhesion:P0}");
-                text.AppendLine(
-                    $"      besoins couverts {socialClass.NeedsSatisfaction:P0} (logés {socialClass.HousingCoverage:P0})   " +
-                    $"éducation {socialClass.EducationPoints:N0} (avancée {socialClass.AdvancedEducationPoints:N0})");
-            }
-            text.AppendLine();
+        foreach (var socialClass in commune.Classes)
+        {
+            text.AppendLine(socialClass.Name);
+            text.AppendLine(
+                $"    population {socialClass.Population:N0}   richesse {socialClass.Wealth:N0}   adhésion {socialClass.Adhesion:P0}");
+            text.AppendLine(
+                $"    besoins couverts {socialClass.NeedsSatisfaction:P0} (logés {socialClass.HousingCoverage:P0})   " +
+                $"éducation {socialClass.EducationPoints:N0} (avancée {socialClass.AdvancedEducationPoints:N0})");
         }
 
         return Clean(text);
