@@ -4,9 +4,3 @@
 
 [node name="Main" type="Node"]
 script = ExtResource("1_main")
-
-[node name="Status" type="Label" parent="."]
-offset_left = 16.0
-offset_top = 16.0
-offset_right = 816.0
-offset_bottom = 416.0
