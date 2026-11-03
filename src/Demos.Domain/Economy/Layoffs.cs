@@ -8,7 +8,7 @@ namespace Demos.Domain.Economy;
 /// (invendus sous 10 jours) et paie tous ses salaires en rouvre, sans dépasser sa capacité. La vitesse dépend du
 /// statut : l'État 2 % de sa capacité par mois, une SCOP 5 %, le privé 15 % (réglages). Une SCOP baisse d'abord ses
 /// salaires, jusqu'à −20 %, avant de licencier, et les remonte avant de réembaucher. Un bâtiment dont le joueur a fixé
-/// les postes ne bouge pas. Une entreprise privée ou coopérative ne rouvre que les postes que sa caisse peut payer
+/// les postes ne bouge pas, ni un bâtiment qui garde toujours ses postes (le camp de base). Une entreprise privée ou coopérative ne rouvre que les postes que sa caisse peut payer
 /// pendant 30 jours (réglage) : sans argent, elle est en faillite et reste fermée tant que personne n'y
 /// remet de l'argent (l'État peut la racheter).
 /// </summary>
@@ -20,14 +20,17 @@ public static class Layoffs
     /// <summary>Part des salaires payés à partir de laquelle une entreprise peut réembaucher (tous payés).</summary>
     public const double HealthyPaidShare = 0.999;
 
-    /// <summary>Renvoie les bâtiments qui changent ce mois-ci (postes ouverts ou baisse des salaires).</summary>
+    /// <summary>
+    /// Renvoie les bâtiments qui changent ce mois-ci (postes ouverts ou baisse des salaires). <paramref name="keepsJobs"/>
+    /// désigne les bâtiments qui ne licencient jamais, même quand leur production ne se vend pas.
+    /// </summary>
     public static List<Structure> RunMonthly(IReadOnlyDictionary<string, Structure> structures, Func<string, Market> marketOf, WageLedger wages,
-        Func<Structure, Treasury>? companyFundOf = null)
+        Func<Structure, Treasury>? companyFundOf = null, Func<Structure, bool>? keepsJobs = null)
     {
         var balance = Balance.Current;
         var changed = new List<Structure>();
         var workplaces = structures.Values.Where(s => s.Kind == StructureKind.Building && s.JobCapacity > 0).ToList();
-        foreach (var building in workplaces.Where(b => !b.JobsSetByPlayer))
+        foreach (var building in workplaces.Where(b => !b.JobsSetByPlayer && keepsJobs?.Invoke(b) != true))
         {
             var unsoldDays = UnsoldDaysOf(building, structures, workplaces, marketOf);
             // Sans poste ouvert, rien n'est dû : le bâtiment peut rouvrir des postes quand ses invendus sont écoulés.

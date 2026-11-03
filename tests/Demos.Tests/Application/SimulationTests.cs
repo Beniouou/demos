@@ -10,7 +10,7 @@ public class SimulationTests
 {
     private static Simulation CreatePrototype() => PrototypeScenario.Create(GameData.Content());
 
-    /// <summary>Matériaux de construction dans le stock de l'État de la première commune (personne n'en fabrique au départ).</summary>
+    /// <summary>Matériaux de construction dans le stock de l'État de la première commune (au départ, seul le camp de base en fabrique, lentement).</summary>
     private static void GiveBuildingMaterials(Simulation simulation, double quantity) =>
         simulation.World.MarketOf("commune-1").Offer("materiaux-de-construction", quantity, Market.StateSellerId("commune-1"));
 
@@ -35,6 +35,37 @@ public class SimulationTests
 
         Assert.Equal(4, seasons);
         Assert.Equal(1, years);
+    }
+
+    [Fact]
+    public void Le_camp_de_base_fabrique_sur_place_des_materiaux_de_construction_sans_matiere()
+    {
+        var simulation = CreatePrototype();
+        var campType = simulation.World.BuildingTypes[Simulation.BaseCampTypeId];
+
+        // Sa seule recette : des matériaux de construction, sans matière première (bois et pierre récoltés autour du camp).
+        var recipe = Assert.Single(campType.AvailableRecipes);
+        Assert.Equal("materiaux-de-construction", recipe.ProductId);
+        Assert.Empty(recipe.Materials);
+
+        AdvanceDays(simulation, 5);
+
+        var workers = simulation.World.Workers.GetValueOrDefault("camp-de-base-1");
+        Assert.True(workers > 0);
+        Assert.Equal(workers * recipe.QuantityPerWorker, simulation.World.Produced["camp-de-base-1"], precision: 6);
+    }
+
+    [Fact]
+    public void Le_camp_de_base_ne_licencie_pas_meme_quand_ses_materiaux_ne_se_vendent_pas()
+    {
+        var simulation = CreatePrototype();
+        // Bien plus de 30 jours de sa production en stock : un autre bâtiment public licencierait.
+        GiveBuildingMaterials(simulation, 10_000);
+
+        AdvanceDays(simulation, 120);
+
+        var camp = simulation.World.Structures["camp-de-base-1"];
+        Assert.Equal(camp.JobCapacity, camp.Jobs);
     }
 
     [Fact]
@@ -87,6 +118,8 @@ public class SimulationTests
         var simulation = CreatePrototype();
         AdvanceDays(simulation, 10);
         var pole = new Orientation(IdeologicalAxis.Property, Pole.B);
+        // Le camp de base a déjà fabriqué quelques matériaux : on compte à partir de son stock.
+        var produced = simulation.World.StateQuantityOf("commune-1", "materiaux-de-construction");
         GiveBuildingMaterials(simulation, 600);
 
         var commune = simulation.TryFoundCommune("Nouvelle commune", "commune-1", PaymentMode.StockFirst, pole, 2);
@@ -101,7 +134,7 @@ public class SimulationTests
         // Le camp de base est en chantier 30 jours : pas encore de logements.
         var camp = simulation.World.BuildingTypes[Simulation.BaseCampTypeId];
         Assert.Equal(0, simulation.World.HousingPlaces(commune.Id));
-        Assert.Equal(0, simulation.World.StateQuantityOf("commune-1", "materiaux-de-construction"), precision: 6);
+        Assert.Equal(produced, simulation.World.StateQuantityOf("commune-1", "materiaux-de-construction"), precision: 6);
         AdvanceDays(simulation, camp.Construction!.Days);
         Assert.Equal(camp.HousingPlaces, simulation.World.HousingPlaces(commune.Id));
 
@@ -170,6 +203,8 @@ public class SimulationTests
         var type = simulation.World.BuildingTypes["logements"];
         var cost = type.Construction!;
         Assert.Equal(("materiaux-de-construction", 30), (cost.ProductId, cost.Days));
+        // Le camp de base a déjà fabriqué quelques matériaux : on compte à partir de son stock.
+        var produced = simulation.World.StateQuantityOf("commune-1", "materiaux-de-construction");
         GiveBuildingMaterials(simulation, cost.Quantity + 10);
         var completed = new List<Structure>();
         simulation.BuildingCompleted += completed.Add;
@@ -178,7 +213,7 @@ public class SimulationTests
         Assert.True(simulation.TryBuild(housing, PaymentMode.StockFirst));
 
         // Payé en entier au lancement ; le bâtiment n'existe pas encore.
-        Assert.Equal(10, simulation.World.StateQuantityOf("commune-1", "materiaux-de-construction"), precision: 6);
+        Assert.Equal(produced + 10, simulation.World.StateQuantityOf("commune-1", "materiaux-de-construction"), precision: 6);
         Assert.DoesNotContain("logements-neufs", simulation.World.Structures.Keys);
         Assert.Single(simulation.World.ConstructionSites);
         Assert.False(simulation.TryBuild(housing, PaymentMode.StockFirst));

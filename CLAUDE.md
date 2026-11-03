@@ -42,7 +42,7 @@ Jeu solo de construction de nation (Godot .NET 4.7, C#, .NET 10), en français. 
 | Éditeur de contenu | `editeur.bat` (fenêtre Windows, `tools/Demos.Editeur`) |
 
 Le tableur (`equilibrage demos.xlsx`) et le rapport (`rapport simulation.html`) sont **à côté** du dossier `demos/`,
-hors du dépôt. Référence actuelle de la simulation : trésor **217 647** la 3e année (`simuler`, 3 ans).
+hors du dépôt. Référence actuelle de la simulation : trésor **209 795** la 3e année (`simuler`, 3 ans).
 
 ## Architecture et données
 

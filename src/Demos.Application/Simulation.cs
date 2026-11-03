@@ -312,7 +312,9 @@ public sealed class Simulation(World world, GameClock clock)
 
     private void RunMonthlyCalculations()
     {
-        foreach (var building in Layoffs.RunMonthly(World.Structures, World.MarketOf, World.Wages, World.CompanyFundOf))
+        // Le camp de base ne licencie jamais : ses matériaux de construction servent à bâtir la commune, même invendus.
+        foreach (var building in Layoffs.RunMonthly(World.Structures, World.MarketOf, World.Wages, World.CompanyFundOf,
+                     keepsJobs: b => b.TypeId == BaseCampTypeId))
             World.UpdateStructure(building);
     }
 
