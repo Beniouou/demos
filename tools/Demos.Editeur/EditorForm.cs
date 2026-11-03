@@ -106,11 +106,11 @@ internal sealed class EditorForm : Form
         id.KeyPress += (_, _) => manual = true;
     }
 
-    /// <summary>Deux matières au plus : un menu (ou « aucune ») et une quantité par unité produite.</summary>
+    /// <summary>Autant de matières que de colonnes dans le tableur : un menu (ou « aucune ») et une quantité par unité produite.</summary>
     private static Func<List<(string ProductId, double Quantity)>> Materials(Fields fields, ContentCreator content)
     {
         var boxes = new List<(ComboBox Material, NumericUpDown Quantity)>();
-        for (var m = 1; m <= 2; m++)
+        for (var m = 1; m <= global::Layout.MaxMaterials; m++)
         {
             var material = fields.Choice($"Matière {m}", ProductItems(content, "(aucune)"));
             var quantity = fields.Number($"Quantité de matière {m} par unité produite", 1, 3);

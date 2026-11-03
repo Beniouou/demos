@@ -244,6 +244,20 @@ public static class BalanceApplier
                 yield return sheet.Row(row);
         }
 
+        /// <summary>
+        /// Vérifie que la colonne clé est à sa place : un tableur généré avant un changement de colonnes (plus de
+        /// matières par recette, par exemple) serait sinon lu de travers.
+        /// </summary>
+        private bool KeyColumnAt(IXLWorksheet sheet, int headerRow, string keyColumn)
+        {
+            if (Text(sheet.Cell(headerRow, keyColumn)) == KeyHeader)
+                return true;
+            Errors.Add($"{sheet.Name} : la colonne {keyColumn} n'est pas « {KeyHeader} » : le tableur date d'une ancienne version, régénérez-le.");
+            return false;
+        }
+
+        private const string KeyHeader = "Clé (ne pas modifier)";
+
         // Écriture dans les fichiers ----------------------------------------------------------------------------------
 
         private static bool Same(double a, double b) => Math.Abs(a - b) < 1e-9;
@@ -496,14 +510,17 @@ public static class BalanceApplier
 
             // Recettes déjà vues, par bâtiment : produit et matières (sans les quantités) → cellule de la ligne.
             var seen = new Dictionary<(string TypeId, string Signature), IXLCell>();
-            foreach (var row in Rows(sheet, 2, "T"))
+            var keyColumn = Layout.Letter(Layout.RecipeKey);
+            if (!KeyColumnAt(sheet, 1, keyColumn))
+                return;
+            foreach (var row in Rows(sheet, 2, keyColumn))
             {
-                var key = Text(row.Cell("T"));
+                var key = Text(row.Cell(keyColumn));
                 var parts = key.Split('#');
                 if (parts.Length != 2 || !_types.TryGetValue(parts[0], out var type) || !int.TryParse(parts[1], out var index)
                     || index < 0 || index >= type.AvailableRecipes.Count || BuildingJson(type.Id) is not { } building)
                 {
-                    Errors.Add($"{Where(row.Cell("T"))} : recette inconnue « {key} » : régénérez le tableur.");
+                    Errors.Add($"{Where(row.Cell(keyColumn))} : recette inconnue « {key} » : régénérez le tableur.");
                     continue;
                 }
 
@@ -517,13 +534,13 @@ public static class BalanceApplier
 
                 Set(json, "quantityPerWorker", Number(row.Cell("H")), recipe.QuantityPerWorker, $"{label} : production par travailleur");
 
-                // Matières : deux au plus dans le tableur ; les suivantes, s'il y en a, sont gardées.
+                // Matières : autant que de colonnes dans le tableur (Layout.MaxMaterials) ; les suivantes, s'il y en a, sont gardées.
                 var materials = new List<(string ProductId, double Quantity)>();
                 var valid = true;
-                for (var m = 0; m < 2; m++)
+                for (var m = 0; m < Layout.MaxMaterials; m++)
                 {
-                    var idCell = row.Cell(9 + 2 * m);
-                    var quantityCell = row.Cell(10 + 2 * m);
+                    var idCell = row.Cell(Layout.RecipeMaterial(m));
+                    var quantityCell = row.Cell(Layout.RecipeQuantity(m));
                     var materialId = Text(idCell);
                     if (materialId == "" && quantityCell.Value.IsBlank)
                         continue;
@@ -540,11 +557,11 @@ public static class BalanceApplier
                         valid = false;
                 }
 
-                var old = recipe.Materials.Take(2).Select(i => (i.ProductId, i.Quantity)).ToList();
+                var old = recipe.Materials.Take(Layout.MaxMaterials).Select(i => (i.ProductId, i.Quantity)).ToList();
 
                 // Deux recettes du même bâtiment ne peuvent pas faire le même produit avec les mêmes matières.
                 var finalMaterials = (valid ? materials.Select(m => m.ProductId) : old.Select(m => m.ProductId))
-                    .Concat(recipe.Materials.Skip(2).Select(m => m.ProductId)).Order();
+                    .Concat(recipe.Materials.Skip(Layout.MaxMaterials).Select(m => m.ProductId)).Order();
                 var signature = $"{recipe.ProductId} ← {string.Join(" + ", finalMaterials)}";
                 if (seen.TryGetValue((type.Id, signature), out var twin))
                 {
@@ -560,7 +577,7 @@ public static class BalanceApplier
                 var inputs = new JsonArray();
                 foreach (var (materialId, quantity) in materials)
                     inputs.Add(new JsonObject { ["productId"] = materialId, ["quantity"] = Json(quantity) });
-                foreach (var extra in (json["inputs"] as JsonArray)?.Skip(2).ToList() ?? [])
+                foreach (var extra in (json["inputs"] as JsonArray)?.Skip(Layout.MaxMaterials).ToList() ?? [])
                     inputs.Add(extra!.DeepClone());
                 if (inputs.Count == 0)
                     json.Remove("inputs");
@@ -648,16 +665,20 @@ public static class BalanceApplier
                 Changes.Add($"partie de départ : population des {RankLabel(rank)} : {Show(current)} → {Show(total)}");
             }
 
-            // Emplois productifs des bâtiments de départ, retrouvés par leur identifiant (colonne AD).
+            // Emplois productifs des bâtiments de départ, retrouvés par leur identifiant (colonne de la clé).
+            var keyColumn = Layout.Letter(Layout.StartKey);
+            var ownerColumn = Layout.Letter(Layout.StartOwnerClass);
+            if (!KeyColumnAt(sheet, 7, keyColumn))
+                return;
             var buildingsJsonList = scenarioJson["buildings"]!.AsArray().OfType<JsonObject>().ToList();
-            foreach (var row in Rows(sheet, 8, "AD"))
+            foreach (var row in Rows(sheet, 8, keyColumn))
             {
-                var id = Text(row.Cell("AD"));
+                var id = Text(row.Cell(keyColumn));
                 var building = _scenario.Buildings.FirstOrDefault(b => b.Id == id);
                 var json = buildingsJsonList.FirstOrDefault(b => b["id"]?.GetValue<string>() == id);
                 if (building is null || json is null || !_types.TryGetValue(building.Type, out var type))
                 {
-                    Errors.Add($"{Where(row.Cell("AD"))} : bâtiment de départ inconnu « {id} ».");
+                    Errors.Add($"{Where(row.Cell(keyColumn))} : bâtiment de départ inconnu « {id} ».");
                     continue;
                 }
 
@@ -682,7 +703,7 @@ public static class BalanceApplier
                 // Propriétaire : l'État, ou une coopérative ou une entreprise privée et sa classe propriétaire.
                 if (Pick(row.Cell("C"), Labels.OwnershipOf) is not { } ownership)
                     continue;
-                var ownerName = Text(row.Cell("AE"));
+                var ownerName = Text(row.Cell(ownerColumn));
                 string? ownerId = null;
                 if (ownership != Ownership.Public)
                 {
@@ -690,8 +711,8 @@ public static class BalanceApplier
                     if (ownerId is null)
                     {
                         Errors.Add(ownerName == ""
-                            ? $"{Where(row.Cell("AE"))} : un bâtiment {(ownership == Ownership.Private ? "privé" : "coopératif")} doit avoir une classe propriétaire."
-                            : $"{Where(row.Cell("AE"))} : classe inconnue « {ownerName} ».");
+                            ? $"{Where(row.Cell(ownerColumn))} : un bâtiment {(ownership == Ownership.Private ? "privé" : "coopératif")} doit avoir une classe propriétaire."
+                            : $"{Where(row.Cell(ownerColumn))} : classe inconnue « {ownerName} ».");
                         continue;
                     }
                 }

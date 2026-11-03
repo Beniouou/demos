@@ -227,6 +227,8 @@ public sealed class ContentCreator
 
         if (draft.Materials.Select(m => m.ProductId).Distinct().Count() != draft.Materials.Count)
             errors.Add("La même matière est donnée deux fois.");
+        if (draft.Materials.Count > Layout.MaxMaterials)
+            errors.Add($"Une recette a {Layout.MaxMaterials} matières au plus (le tableur n'a pas de colonnes pour les suivantes).");
 
         // Deux recettes d'un même bâtiment ne font pas le même produit avec les mêmes matières.
         var signature = Signature(draft.ProductId, draft.Materials.Select(m => m.ProductId));
