@@ -19,18 +19,17 @@ public static class Migration
 
     public const double OppositePoleAttraction = 0.5;
 
-    /// <summary>Attrait d'une commune pour une classe, d'après les chartes de fondation de la commune.</summary>
-    public static double AttractionOf(string communeId, SocialClass socialClass, IReadOnlyList<Law> laws) => laws
-        .Where(law => law.StructureId == communeId && law.Has(LawRule.FoundingCharter))
-        .SelectMany(law => law.Orientations)
-        .Aggregate(1.0, (attraction, pole) =>
-            attraction * (socialClass.Ideology[pole.Axis] == pole.Pole ? SamePoleAttraction : OppositePoleAttraction));
+    /// <summary>Attrait d'une commune pour une classe, d'après sa charte de fondation (1 sans charte).</summary>
+    public static double AttractionOf(string communeId, SocialClass socialClass, Func<string, Orientation?>? charterOf) =>
+        charterOf?.Invoke(communeId) is not { } pole ? 1
+        : socialClass.Ideology[pole.Axis] == pole.Pole ? SamePoleAttraction
+        : OppositePoleAttraction;
 
     /// <summary>Calcul saisonnier. Renvoie les groupes locaux nés dans les communes d'arrivée.</summary>
     public static List<SocialClass> RunSeasonal(
         IReadOnlyDictionary<string, Structure> structures,
         IReadOnlyList<SocialClass> classes,
-        IReadOnlyList<Law>? laws = null)
+        Func<string, Orientation?>? charterOf = null)
     {
         var finder = new ClassFinder(classes);
         var communes = Communes.All(structures).ToList();
@@ -58,7 +57,7 @@ public static class Migration
             {
                 var target = communes
                     .Where(c => freeJobs[c.Id] > 0)
-                    .MaxBy(c => freeJobs[c.Id] * AttractionOf(c.Id, socialClass, laws ?? []))!.Id;
+                    .MaxBy(c => freeJobs[c.Id] * AttractionOf(c.Id, socialClass, charterOf))!.Id;
                 foreach (var commune in communes.Where(c => c.Id != target))
                 {
                     var employed = workplacesByCommune[commune.Id].Sum(s => socialClass.MembersWorkingIn(s.Id));

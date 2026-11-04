@@ -32,7 +32,8 @@ public sealed class Simulation(World world, GameClock clock)
     {
         var change = Clock.AdvanceDay();
 
-        // Au changement de mois, les entreprises licencient ou réembauchent avant la journée de travail.
+        // Au changement de mois, les lois votées entrent en vigueur, puis les entreprises licencient ou réembauchent,
+        // avant la journée de travail.
         if (change.HasFlag(CalendarChange.NewMonth))
             RunMonthlyCalculations();
 
@@ -103,9 +104,8 @@ public sealed class Simulation(World world, GameClock clock)
     /// <summary>
     /// Action du joueur : vendre un bâtiment public à une classe de sa commune, au prix choisi. L'argent va au trésor,
     /// la classe devient propriétaire (privé ou coopérative), et l'entreprise ouvre sa propre caisse, vide au départ :
-    /// ses ventes la remplissent et elle paie désormais les salaires. La vente coûte de la légitimité LI, et reste dans
-    /// la commune comme une loi libérale : les habitants libéraux l'acceptent, les protectionnistes la rejettent.
-    /// Ne change rien si la vente est impossible.
+    /// ses ventes la remplissent et elle paie désormais les salaires. La vente coûte de la légitimité LI ; ce
+    /// n'est pas une loi. Ne change rien si la vente est impossible.
     /// </summary>
     public SaleOutcome TrySellBuilding(string buildingId, string buyerClassId, double price)
     {
@@ -123,8 +123,6 @@ public sealed class Simulation(World world, GameClock clock)
         World.Treasury.Deposit(price);
         World.UpdateStructure(building with { Ownership = Privatization.OwnershipFor(buyer), OwnerClassId = buyer.Id });
         World.Wages.Forget(building.Id);
-        World.RemoveLaw($"nationalisation-{building.Id}");
-        World.AddLaw(new Law($"privatisation-{building.Id}", $"Privatisation : {building.Name}", communeId!, [SalePole]));
         return SaleOutcome.Sold;
     }
 
@@ -142,10 +140,9 @@ public sealed class Simulation(World world, GameClock clock)
 
     /// <summary>
     /// Action du joueur : reprendre un bâtiment privé ou coopératif, par rachat (le trésor paie le propriétaire) ou
-    /// par expropriation (sans payer). Le propriétaire ne peut pas refuser. Le bâtiment redevient public, et la
-    /// nationalisation reste dans la commune comme une loi protectionniste ; la loi de privatisation, s'il y en avait
-    /// une, disparaît. La caisse de l'entreprise ferme : en cas de rachat, ce qu'il y restait revient aux
-    /// propriétaires ; en cas d'expropriation, à la caisse de la commune. Ne change rien si c'est impossible.
+    /// par expropriation (sans payer). Le propriétaire ne peut pas refuser. Le bâtiment redevient public ; ce n'est pas une loi.
+    /// La caisse de l'entreprise ferme : en cas de rachat, ce qu'il y restait revient aux propriétaires ; en cas
+    /// d'expropriation, à la caisse de la commune. Ne change rien si c'est impossible.
     /// </summary>
     public NationalizationOutcome TryNationalize(string buildingId, NationalizationMode mode)
     {
@@ -174,9 +171,6 @@ public sealed class Simulation(World world, GameClock clock)
 
         World.UpdateStructure(building with { Ownership = Ownership.Public, OwnerClassId = null });
         World.Wages.Forget(building.Id);
-        World.RemoveLaw($"privatisation-{building.Id}");
-        World.RemoveLaw($"nationalisation-{building.Id}");
-        World.AddLaw(new Law($"nationalisation-{building.Id}", $"Nationalisation : {building.Name}", communeId, [NationalizationPole]));
         return NationalizationOutcome.Done;
     }
 
@@ -185,8 +179,8 @@ public sealed class Simulation(World world, GameClock clock)
     /// Il coûte son coût de construction (celui du type camp de base), pris dans la commune qui l'envoie, de la
     /// légitimité (dans le pôle choisi), et la dotation que l'État verse du trésor à la caisse de la nouvelle commune.
     /// La commune est fondée tout de suite ; son camp de base est en chantier. Elle reçoit sa réserve de chantier de
-    /// fondation. Le pôle choisi devient la charte de fondation de la commune : une loi de ce pôle, qui attire les
-    /// classes du même pôle et repousse celles du pôle opposé.
+    /// fondation. Le pôle choisi devient la charte de fondation de la commune : il attire les classes du même pôle
+    /// et repousse celles du pôle opposé.
     /// Renvoie la nouvelle commune, ou null, sans rien dépenser, si c'est impossible.
     /// </summary>
     public Structure? TryFoundCommune(
@@ -221,7 +215,7 @@ public sealed class Simulation(World world, GameClock clock)
         World.AddStructure(commune);
         World.AddConstructionSite(new ConstructionSite(camp, campType.Construction.Days));
         GiveFoundingMaterials(commune.Id);
-        World.AddLaw(new Law($"charte-{commune.Id}", $"Charte de fondation : {name}", commune.Id, [legitimacyPole], [LawRule.FoundingCharter]));
+        World.SetCharter(commune.Id, legitimacyPole);
         return commune;
     }
 
@@ -230,6 +224,157 @@ public sealed class Simulation(World world, GameClock clock)
     public Structure? TryFoundCommune(string name, string payingCommuneId, IReadOnlyList<MaterialCost> cost, PaymentMode mode,
         Orientation legitimacyPole, double legitimacyCost) =>
         TryFoundCommune(name, payingCommuneId, mode, legitimacyPole, legitimacyCost);
+
+    /// <summary>
+    /// Les changements de lois entrés en vigueur au 1er du mois. Le jeu se met alors en pause et les montre au joueur
+    /// (lois votées, changées ou abrogées).
+    /// </summary>
+    public event Action<IReadOnlyList<LawDraft>>? LawsEnacted;
+
+    /// <summary>
+    /// Commission des lois : copie un modèle dans un nouveau brouillon, à son niveau par défaut ou à celui donné.
+    /// Renvoie l'identifiant du brouillon, ou null si le modèle n'existe pas.
+    /// </summary>
+    public string? DraftFromTemplate(string templateId, string? level = null)
+    {
+        if (World.LawCatalogue.TemplateOf(templateId) is not { } template)
+            return null;
+
+        var draft = new LawDraft(World.LawCommission.NewId("brouillon"), LawChangeKind.Enact,
+            template.ToLaw(World.LawCommission.NewId("loi"), level));
+        World.LawCommission.Add(draft);
+        return draft.Id;
+    }
+
+    /// <summary>Commission des lois : un brouillon qui change les curseurs d'une loi en vigueur (au départ, les mêmes).</summary>
+    public string? DraftAmendment(string lawId) => DraftChange(lawId, LawChangeKind.Amend);
+
+    /// <summary>Commission des lois : un brouillon qui abroge une loi en vigueur.</summary>
+    public string? DraftRepeal(string lawId) => DraftChange(lawId, LawChangeKind.Repeal);
+
+    private string? DraftChange(string lawId, LawChangeKind kind)
+    {
+        if (World.Laws.FirstOrDefault(l => l.Id == lawId) is not { } law)
+            return null;
+
+        var draft = new LawDraft(World.LawCommission.NewId("brouillon"), kind, law);
+        World.LawCommission.Add(draft);
+        return draft.Id;
+    }
+
+    /// <summary>
+    /// Commission des lois : remplace la loi d'un brouillon (curseurs, sujets, cases « verrouillée », niveau d'une
+    /// nouvelle loi). Une loi en vigueur garde son niveau et son domaine. Renvoie false si le brouillon n'existe pas.
+    /// </summary>
+    public bool UpdateDraft(string draftId, Law law)
+    {
+        if (World.LawCommission.DraftOf(draftId) is not { } draft)
+            return false;
+
+        if (draft.Kind != LawChangeKind.Enact)
+            law = law with { StructureId = draft.Law.StructureId, Domain = draft.Law.Domain };
+        return World.LawCommission.Update(draftId, law);
+    }
+
+    public bool DeleteDraft(string draftId) => World.LawCommission.Remove(draftId);
+
+    /// <summary>Coût d'un brouillon s'il était voté maintenant, par pôle : il suit les membres concernés du moment.</summary>
+    public IReadOnlyDictionary<Orientation, double> CostOf(string draftId) =>
+        World.LawCommission.DraftOf(draftId) is { } draft ? CostOf(draft) : new Dictionary<Orientation, double>();
+
+    private Dictionary<Orientation, double> CostOf(LawDraft draft)
+    {
+        var current = World.Laws.FirstOrDefault(l => l.Id == draft.Law.Id);
+        return draft.Kind switch
+        {
+            LawChangeKind.Enact => LawCost.Of(World.LawBook, World.Classes, null, draft.Law),
+            LawChangeKind.Amend => LawCost.Of(World.LawBook, World.Classes, current, draft.Law),
+            _ => LawCost.Of(World.LawBook, World.Classes, current, null),
+        };
+    }
+
+    /// <summary>
+    /// Commission des lois : vote un brouillon. La légitimité est payée tout de suite et le coût est figé ; le changement
+    /// entre en vigueur le 1er du mois suivant. Rien ne change si le vote est impossible (loi non valable, niveau inconnu,
+    /// brique verrouillée plus haut, loi déjà en attente, légitimité insuffisante).
+    /// </summary>
+    public LawVoteOutcome TryVote(string draftId)
+    {
+        if (World.LawCommission.DraftOf(draftId) is not { } draft)
+            return LawVoteOutcome.UnknownDraft;
+        if (!World.Structures.ContainsKey(draft.Law.StructureId))
+            return LawVoteOutcome.UnknownLevel;
+        if (draft.Kind != LawChangeKind.Repeal && World.LawCatalogue.ProblemWith(draft.Law) is not null)
+            return LawVoteOutcome.Invalid;
+        if (draft.Kind != LawChangeKind.Enact && World.Laws.All(l => l.Id != draft.Law.Id))
+            return LawVoteOutcome.UnknownDraft;
+        if (World.LawCommission.Voted.Any(v => v.Draft.Law.Id == draft.Law.Id))
+            return LawVoteOutcome.AlreadyVoted;
+
+        var book = World.LawBook;
+        if (draft.Kind != LawChangeKind.Repeal && draft.Law.Bricks.Any(s => book.IsLockedAbove(draft.Law, s)))
+            return LawVoteOutcome.LockedAbove;
+
+        var cost = CostOf(draft);
+        if (cost.Any(c => World.Legitimacy[c.Key] < c.Value))
+            return LawVoteOutcome.NotEnoughLegitimacy;
+
+        foreach (var (pole, amount) in cost)
+            World.Legitimacy.TrySpend(pole, amount);
+        World.LawCommission.MarkVoted(draft, cost);
+        return LawVoteOutcome.Voted;
+    }
+
+    /// <summary>Commission des lois : annule un vote avant le 1er du mois. La légitimité est rendue et la loi redevient un brouillon.</summary>
+    public bool CancelVote(string draftId)
+    {
+        if (World.LawCommission.Unvote(draftId) is not { } voted)
+            return false;
+
+        foreach (var (pole, amount) in voted.Paid)
+            World.Legitimacy.Add(pole, amount);
+        return true;
+    }
+
+    /// <summary>
+    /// Met en vigueur une loi tout de suite, sans la payer : les lois choisies au début de la partie. Renvoie false si
+    /// la loi n'est pas valable.
+    /// </summary>
+    public bool EnactAtStart(Law law)
+    {
+        if (!World.Structures.ContainsKey(law.StructureId) || World.LawCatalogue.ProblemWith(law) is not null)
+            return false;
+
+        World.AddLaw(law);
+        return true;
+    }
+
+    /// <summary>Au 1er du mois : les changements votés entrent en vigueur, avant les licenciements et les embauches.</summary>
+    private void EnactVotedLaws()
+    {
+        var enacted = new List<LawDraft>();
+        foreach (var voted in World.LawCommission.TakeVoted())
+        {
+            var draft = voted.Draft;
+            switch (draft.Kind)
+            {
+                case LawChangeKind.Enact:
+                    World.AddLaw(draft.Law);
+                    break;
+                case LawChangeKind.Amend:
+                    World.ReplaceLaw(draft.Law);
+                    break;
+                default:
+                    World.RemoveLaw(draft.Law.Id);
+                    break;
+            }
+
+            enacted.Add(draft);
+        }
+
+        if (enacted.Count > 0)
+            LawsEnacted?.Invoke(enacted);
+    }
 
     /// <summary>
     /// Donne à une commune sa réserve de chantier de fondation : des matériaux de construction (ceux du camp de base),
@@ -258,7 +403,7 @@ public sealed class Simulation(World world, GameClock clock)
         World.PollutionByCommune = Pollution.PerResidentByCommune(World.Structures, World.Workers, World.Classes);
         // La caisse de chaque entreprise au début de la journée : son bénéfice du jour décide de ce qu'elle verse.
         var fundsAtDayStart = World.Structures.Values.Where(Companies.HasCompanyFund).ToDictionary(b => b.Id, b => World.CompanyFundOf(b).Balance);
-        World.Produced = WorkDay.Run(World.Structures, World.Workers, World.Classes, World.Laws, World.Treasury, World.MarketOf, World.CommuneFundOf, World.Wages,
+        World.Produced = WorkDay.Run(World.Structures, World.Workers, World.Classes, World.LawBook, World.Treasury, World.MarketOf, World.CommuneFundOf, World.Wages,
             World.CompanyFundOf, World.EnergyEffectOf);
         World.EnergyShares = Energy.RunDaily(World.Structures, World.TierOf, Clock.Season, World.MarketOf, World.Treasury, World.CommuneFundOf,
             World.CompanyFundOf, World.ClassesById, World.FuelStockOf, World.HeatsAllYear);
@@ -272,8 +417,8 @@ public sealed class Simulation(World world, GameClock clock)
 
         PaySellers();
         Companies.PayDividends(World.Structures, World.ClassesById, World.CompanyFundOf, World.PriceOf, b => fundsAtDayStart.GetValueOrDefault(b.Id));
-        Taxation.CollectDaily(World.Classes, World.StateTaxRate, World.CommuneTaxRateOf, World.Treasury, World.CommuneFundOf, World.Laws, World.Structures);
-        LawEffects.ApplyDaily(World.Classes, World.Laws, World.Structures, World.Legitimacy);
+        Taxation.CollectDaily(World.Classes, World.StateTaxRate, World.CommuneTaxRateOf, World.Treasury, World.CommuneFundOf);
+        LawEffects.ApplyDaily(World.Classes, World.LawBook, World.Legitimacy);
         Storage.ApplyDaily(communeIds, World.Structures, World.Products, World.MarketOf);
 
         // Les chantiers finis en fin de journée : leurs bâtiments travaillent dès le lendemain.
@@ -326,6 +471,8 @@ public sealed class Simulation(World world, GameClock clock)
 
     private void RunMonthlyCalculations()
     {
+        EnactVotedLaws();
+
         foreach (var building in Layoffs.RunMonthly(World.Structures, World.MarketOf, World.Wages, World.CompanyFundOf))
             World.UpdateStructure(building);
     }
@@ -339,7 +486,7 @@ public sealed class Simulation(World world, GameClock clock)
         foreach (var created in ClassTransitions.RunSeasonal(World.Classes, World.Structures, World.PollutionByCommune))
             World.AddClass(created);
 
-        foreach (var created in Migration.RunSeasonal(World.Structures, World.Classes, World.Laws))
+        foreach (var created in Migration.RunSeasonal(World.Structures, World.Classes, World.CharterOf))
             World.AddClass(created);
 
         SeasonPassed?.Invoke();

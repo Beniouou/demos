@@ -57,8 +57,8 @@ public class NationalizationTests
         // Les cadres touchent le prix, plus ce qui restait dans la caisse de l'atelier.
         Assert.Equal(cadresBefore + expected + fundBefore, simulation.World.ClassesById["cadres"].Wealth, precision: 6);
         Assert.Equal(legitimacyBefore - Nationalization.StrugglingLegitimacyCost, simulation.World.Legitimacy[Simulation.NationalizationPole], precision: 6);
-        var law = Assert.Single(simulation.World.Laws, l => l.Id == "nationalisation-atelier");
-        Assert.Equal([Simulation.NationalizationPole], law.Orientations);
+        // Nationaliser ne crée pas de loi.
+        Assert.DoesNotContain(simulation.World.Laws, l => l.Id.Contains("atelier"));
     }
 
     [Fact]
@@ -113,7 +113,7 @@ public class NationalizationTests
     }
 
     [Fact]
-    public void Nationaliser_un_batiment_vendu_retire_la_loi_de_privatisation()
+    public void Vendre_puis_nationaliser_ne_cree_aucune_loi()
     {
         var simulation = Prototype();
         simulation.World.Legitimacy.Add(Simulation.SalePole, 100);
@@ -121,8 +121,7 @@ public class NationalizationTests
 
         Assert.Equal(NationalizationOutcome.Done, simulation.TryNationalize("logements-etat", NationalizationMode.Expropriation));
 
-        Assert.DoesNotContain(simulation.World.Laws, l => l.Id == "privatisation-logements-etat");
-        Assert.Contains(simulation.World.Laws, l => l.Id == "nationalisation-logements-etat");
+        Assert.DoesNotContain(simulation.World.Laws, l => l.Id.Contains("logements-etat"));
     }
 
     [Fact]

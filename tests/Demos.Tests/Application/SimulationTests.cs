@@ -10,6 +10,10 @@ public class SimulationTests
 {
     private static Simulation CreatePrototype() => PrototypeScenario.Create(GameData.Content());
 
+    /// <summary>Une partie sans autre loi que la liberté d'entreprendre, à l'État (LI).</summary>
+    private static Simulation WithLiberalStateLaw() =>
+        PrototypeScenario.Create(GameData.Content(), new StartingLaws(StartingLawsMode.Chosen, [new ScenarioLaw("liberte-entreprendre")]));
+
     /// <summary>Réserve de chantier de la première commune, en matériaux de construction.</summary>
     private static double ReserveOf(Simulation simulation, string communeId = "commune-1") =>
         simulation.World.ConstructionReserveOf(communeId).QuantityOf("materiaux-de-construction");
@@ -56,16 +60,17 @@ public class SimulationTests
     [Fact]
     public void Les_classes_produisent_chaque_jour_la_legitimite_des_lois_qu_elles_acceptent()
     {
-        var simulation = CreatePrototype();
+        var simulation = WithLiberalStateLaw();
         var libertarian = new Orientation(IdeologicalAxis.Property, Pole.B);
 
         simulation.AdvanceDay();
         var afterOneDay = simulation.World.Legitimacy[libertarian];
         simulation.AdvanceDay();
 
-        // Professions intermédiaires et cadres (LI) acceptent la liberté d'entreprendre, loi de l'État : 500 × 0,001 par jour.
-        Assert.Equal(0.5, afterOneDay, precision: 6);
-        Assert.Equal(1, simulation.World.Legitimacy[libertarian], precision: 6);
+        // Professions intermédiaires et cadres (LI) acceptent la liberté d'entreprendre, loi de l'État (autorisation,
+        // intensité 1, poids 0,5) : 500 × 0,5 × 0,001 par jour.
+        Assert.Equal(0.25, afterOneDay, precision: 6);
+        Assert.Equal(0.5, simulation.World.Legitimacy[libertarian], precision: 6);
     }
 
     [Fact]
@@ -87,6 +92,7 @@ public class SimulationTests
         var simulation = CreatePrototype();
         AdvanceDays(simulation, 10);
         var pole = new Orientation(IdeologicalAxis.Property, Pole.B);
+        simulation.World.Legitimacy.Add(pole, 20);
         var reserveBefore = ReserveOf(simulation);
 
         var commune = simulation.TryFoundCommune("Nouvelle commune", "commune-1", PaymentMode.StockFirst, pole, 2);
@@ -94,10 +100,9 @@ public class SimulationTests
         Assert.NotNull(commune);
         Assert.True(simulation.World.IsGhostTown(commune.Id));
 
-        // Le pôle payé devient la charte de fondation de la commune.
-        var charter = Assert.Single(simulation.World.Laws, l => l.StructureId == commune.Id);
-        Assert.True(charter.Has(LawRule.FoundingCharter));
-        Assert.Equal([pole], charter.Orientations);
+        // Le pôle payé devient la charte de fondation de la commune ; ce n'est pas une loi.
+        Assert.Equal(pole, simulation.World.CharterOf(commune.Id));
+        Assert.DoesNotContain(simulation.World.Laws, l => l.StructureId == commune.Id);
         // Le camp de base est en chantier 30 jours : pas encore de logements.
         var camp = simulation.World.BuildingTypes[Simulation.BaseCampTypeId];
         Assert.Equal(0, simulation.World.HousingPlaces(commune.Id));
@@ -129,6 +134,7 @@ public class SimulationTests
     {
         var simulation = CreatePrototype();
         AdvanceDays(simulation, 10);
+        simulation.World.Legitimacy.Add(new Orientation(IdeologicalAxis.Property, Pole.B), 20);
         var grant = Simulation.FoundingGrantOf(simulation.World.BuildingTypes[Simulation.BaseCampTypeId]);
         var treasuryBefore = simulation.World.Treasury.Balance;
 
@@ -275,7 +281,7 @@ public class SimulationTests
     [Fact]
     public void Les_ouvriers_communistes_rejettent_la_liberte_d_entreprendre()
     {
-        var simulation = CreatePrototype();
+        var simulation = WithLiberalStateLaw();
         var workers = simulation.World.Classes.Single(c => c.Id == "ouvriers");
 
         simulation.AdvanceDay();

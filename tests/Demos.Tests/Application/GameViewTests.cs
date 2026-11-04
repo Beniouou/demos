@@ -55,27 +55,39 @@ public class GameViewTests
     [Fact]
     public void L_arbre_des_structures_part_de_l_Etat_et_porte_les_lois_de_chaque_niveau()
     {
-        var view = new GameView(PrototypeScenario.Create(GameData.Content()));
+        var view = new GameView(WithLawAtEachLevel());
 
         var state = Assert.Single(view.StructureTree());
         Assert.Equal(StructureNodeKind.State, state.Kind);
-        Assert.Contains(state.Laws, l => l.Id == "liberte-entreprendre");
+        Assert.Contains(state.Laws, l => l.Id == "loi-etat");
 
         var commune = Assert.Single(state.Children, c => c.Id == PrototypeScenario.FirstCommuneId);
         Assert.Equal(StructureNodeKind.Commune, commune.Kind);
         var quarry = Assert.Single(commune.Children, c => c.Id == "carriere");
         Assert.Equal(StructureNodeKind.Building, quarry.Kind);
-        Assert.Contains(quarry.Laws, l => l.Id == "quotas-extraction");
+        Assert.Contains(quarry.Laws, l => l.Id == "loi-carriere");
     }
 
     [Fact]
     public void Une_structure_subit_les_lois_de_tout_ce_qui_la_contient_de_l_Etat_a_elle_meme()
     {
-        var view = new GameView(PrototypeScenario.Create(GameData.Content()));
+        var view = new GameView(WithLawAtEachLevel());
 
         var laws = view.LawsApplyingTo("carriere").Select(l => l.Id).ToList();
 
-        Assert.Equal(["liberte-entreprendre", "impot-progressif", "quotas-extraction"], laws);
-        Assert.DoesNotContain("quotas-extraction", view.LawsApplyingTo(PrototypeScenario.FirstCommuneId).Select(l => l.Id));
+        Assert.Equal(["loi-etat", "loi-commune", "loi-carriere"], laws);
+        Assert.DoesNotContain("loi-carriere", view.LawsApplyingTo(PrototypeScenario.FirstCommuneId).Select(l => l.Id));
+    }
+
+    /// <summary>Une partie sans loi de départ, avec une loi à l'État, à la commune et à la carrière.</summary>
+    private static Simulation WithLawAtEachLevel()
+    {
+        var simulation = PrototypeScenario.Create(GameData.Content(), StartingLaws.None);
+        Law Production(string id, string level, double value) =>
+            new(id, id, "environnement", level, [new BrickSetting("production", LawSubject.Everyone, value)]);
+        simulation.World.AddLaw(Production("loi-etat", PrototypeScenario.StateId, 0.1));
+        simulation.World.AddLaw(Production("loi-commune", PrototypeScenario.FirstCommuneId, 0.1));
+        simulation.World.AddLaw(Production("loi-carriere", "carriere", -0.2));
+        return simulation;
     }
 }

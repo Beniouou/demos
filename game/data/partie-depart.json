@@ -34,9 +34,10 @@
     { "id": "intermediaires", "name": "Professions intermédiaires libertaires", "rank": "Intermediate", "hierarchy": "A", "production": "A", "property": "B", "population": 450, "wealth": 135000, "commune": "commune-1" },
     { "id": "cadres", "name": "Cadres capitalistes", "rank": "Executives", "hierarchy": "B", "production": "A", "property": "B", "population": 50, "wealth": 100000, "commune": "commune-1" }
   ],
-  "laws": [
-    { "id": "liberte-entreprendre", "name": "Liberté d'entreprendre", "structure": "etat", "orientations": [ { "axis": "Property", "pole": "B" } ] },
-    { "id": "impot-progressif", "name": "Impôt progressif", "structure": "commune-1", "orientations": [ { "axis": "Hierarchy", "pole": "A" }, { "axis": "Property", "pole": "A" } ] },
-    { "id": "quotas-extraction", "name": "Quotas d'extraction", "structure": "carriere", "orientations": [ { "axis": "Production", "pole": "B" } ] }
+  "presetLaws": [
+    { "template": "liberte-entreprendre" },
+    { "template": "economie-cooperative" },
+    { "template": "salaire-minimum-ouvrier" },
+    { "template": "quotas-extraction" }
   ]
 }

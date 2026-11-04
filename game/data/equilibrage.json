@@ -30,5 +30,10 @@
   "hireUnsoldDays": 10,
   "jobChangePerMonth": { "Public": 0.02, "Cooperative": 0.05, "Private": 0.15 },
   "cooperativeWageCutStep": 0.05,
-  "cooperativeWageCutMax": 0.2
+  "cooperativeWageCutMax": 0.2,
+  "lawPaybackDays": 30,
+  "untargetedMemberWeight": 0.5,
+  "lockedBrickCostFactor": 1.5,
+  "regalianCostFactor": 2,
+  "minimumBrickCost": 1
 }

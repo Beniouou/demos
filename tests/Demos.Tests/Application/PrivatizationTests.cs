@@ -39,10 +39,8 @@ public class PrivatizationTests
         Assert.Equal(cadresBefore - 10_000, world.ClassesById["cadres"].Wealth, precision: 6);
         Assert.Equal(legitimacyBefore - Simulation.SaleLegitimacyCost, world.Legitimacy[Simulation.SalePole], precision: 6);
 
-        // La vente reste dans la commune comme une loi libérale.
-        var law = Assert.Single(world.Laws, l => l.Id == "privatisation-camp-forestier");
-        Assert.Equal("commune-1", law.StructureId);
-        Assert.Equal([Simulation.SalePole], law.Orientations);
+        // Vendre ne crée pas de loi.
+        Assert.DoesNotContain(world.Laws, l => l.Id.Contains("camp-forestier"));
     }
 
     [Fact]

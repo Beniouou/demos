@@ -21,7 +21,8 @@ public sealed class World
         IReadOnlyList<BuildingType> buildingTypes,
         IReadOnlyList<Structure> structures,
         IReadOnlyList<SocialClass> classes,
-        IReadOnlyList<Law> laws)
+        IReadOnlyList<Law> laws,
+        LawCatalogue? lawCatalogue = null)
     {
         Products = products;
         BuildingTypes = buildingTypes.ToDictionary(t => t.Id);
@@ -29,6 +30,8 @@ public sealed class World
         _classes = classes.ToList();
         _classesById = _classes.ToDictionary(c => c.Id);
         _laws = laws.ToList();
+        LawCatalogue = lawCatalogue ?? LawCatalogue.Empty;
+        _needOfProduct = products.ToDictionary(p => p.Id, p => p.Need?.Id);
     }
 
     public IReadOnlyList<ProductDefinition> Products { get; }
@@ -46,6 +49,37 @@ public sealed class World
     public void AddLaw(Law law) => _laws.Add(law);
 
     public void RemoveLaw(string lawId) => _laws.RemoveAll(l => l.Id == lawId);
+
+    /// <summary>Remplace une loi en vigueur par sa nouvelle version (mêmes identifiant et niveau).</summary>
+    public void ReplaceLaw(Law law)
+    {
+        var index = _laws.FindIndex(l => l.Id == law.Id);
+        if (index >= 0)
+            _laws[index] = law;
+    }
+
+    /// <summary>Le catalogue des lois : domaines, briques et modèles.</summary>
+    public LawCatalogue LawCatalogue { get; }
+
+    /// <summary>La commission des lois : brouillons et changements votés en attente du 1er du mois.</summary>
+    public LawCommission LawCommission { get; } = new();
+
+    /// <summary>Les lois en vigueur, lues avec le catalogue : valeur d'une brique à un endroit, valeur héritée, membres touchés.</summary>
+    public LawBook LawBook => new(LawCatalogue, _laws, _structures,
+        building => building.TypeId is { } typeId ? BuildingTypes.GetValueOrDefault(typeId)?.Category : null,
+        building => building.Production is { } production ? _needOfProduct.GetValueOrDefault(production.ProductId) : null);
+
+    private readonly Dictionary<string, string?> _needOfProduct;
+
+    /// <summary>
+    /// Charte de fondation d'une commune : le pôle payé pour la fonder. Elle attire les classes de ce pôle et repousse
+    /// celles du pôle opposé dans la migration ; ce n'est pas une loi.
+    /// </summary>
+    public Orientation? CharterOf(string communeId) => _charters.TryGetValue(communeId, out var pole) ? pole : null;
+
+    public void SetCharter(string communeId, Orientation pole) => _charters[communeId] = pole;
+
+    private readonly Dictionary<string, Orientation> _charters = [];
 
     /// <summary>Salaires dus et versés par chaque bâtiment sur les derniers jours.</summary>
     public WageLedger Wages { get; } = new();

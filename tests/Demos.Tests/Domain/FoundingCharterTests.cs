@@ -16,11 +16,13 @@ public class FoundingCharterTests
         new("camp-grise", "Camp de base", StructureKind.Building, "grise", Jobs: 400),
     }.ToDictionary(s => s.Id);
 
-    private static readonly Law[] Charters =
-    [
-        new("charte-verte", "Charte", "verte", [new Orientation(IdeologicalAxis.Production, Pole.B)], [LawRule.FoundingCharter]),
-        new("charte-grise", "Charte", "grise", [new Orientation(IdeologicalAxis.Production, Pole.A)], [LawRule.FoundingCharter]),
-    ];
+    private static readonly Dictionary<string, Orientation> CharterPoles = new()
+    {
+        ["verte"] = new Orientation(IdeologicalAxis.Production, Pole.B),
+        ["grise"] = new Orientation(IdeologicalAxis.Production, Pole.A),
+    };
+
+    private static Orientation? Charters(string communeId) => CharterPoles.TryGetValue(communeId, out var pole) ? pole : null;
 
     private static SocialClass Unemployed(string id, Pole production)
     {

@@ -48,7 +48,7 @@ public class StaffingTests
         var treasury = new Treasury();
         treasury.Deposit(10_000);
 
-        WorkDay.Run(structures, Employment.Assign(structures, classes), classes, [], treasury, _ => new Market([]));
+        WorkDay.Run(structures, Employment.Assign(structures, classes), classes, null, treasury, _ => new Market([]));
 
         // 100 × 3 + 20 × 5 + 5 × 12 = 460, payés par le trésor (bâtiment public).
         Assert.Equal(300, workers.Wealth, precision: 6);

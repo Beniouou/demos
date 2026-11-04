@@ -158,6 +158,24 @@ public sealed record BalanceSettings
 
     /// <summary>Baisse maximale des salaires d'une SCOP ; au-delà, elle licencie.</summary>
     public double CooperativeWageCutMax { get; init; } = 0.2;
+
+    /// <summary>
+    /// Une brique de loi coûte de quoi être remboursée en ce nombre de jours si tous les membres qu'elle touche
+    /// l'acceptaient.
+    /// </summary>
+    public double LawPaybackDays { get; init; } = 30;
+
+    /// <summary>Poids des membres du niveau d'une loi que le sujet d'une brique ne vise pas (ceux qu'il vise comptent pour 1).</summary>
+    public double UntargetedMemberWeight { get; init; } = 0.5;
+
+    /// <summary>Coût d'une brique verrouillée, par rapport à la même brique sans verrou.</summary>
+    public double LockedBrickCostFactor { get; init; } = 1.5;
+
+    /// <summary>Coût d'une loi d'un domaine régalien votée sous l'État, par rapport à la même loi votée par l'État.</summary>
+    public double RegalianCostFactor { get; init; } = 2;
+
+    /// <summary>Coût minimal d'une brique qui change, en points de légitimité.</summary>
+    public double MinimumBrickCost { get; init; } = 1;
 }
 
 /// <summary>Les réglages d'équilibrage en vigueur dans la partie.</summary>

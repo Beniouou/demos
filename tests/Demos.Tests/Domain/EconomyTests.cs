@@ -43,7 +43,7 @@ public class EconomyTests
         Market market, params Law[] laws)
     {
         var workers = Employment.Assign(structures, classes);
-        WorkDay.Run(structures, workers, classes, laws, treasury, _ => market);
+        WorkDay.Run(structures, workers, classes, laws.Length == 0 ? null : TestLaws.Book(structures, laws), treasury, _ => market);
     }
 
     [Fact]
@@ -119,7 +119,7 @@ public class EconomyTests
         var treasury = new Treasury();
         treasury.Deposit(100);
 
-        WorkDay.Run(structures, Employment.Assign(structures, classes), classes, [], treasury, _ => new Market(Products), _ => fund);
+        WorkDay.Run(structures, Employment.Assign(structures, classes), classes, null, treasury, _ => new Market(Products), _ => fund);
 
         // 20 de salaires : 15 de la caisse, 5 du trésor.
         Assert.Equal(0, fund.Balance, precision: 6);
@@ -142,13 +142,13 @@ public class EconomyTests
     }
 
     [Fact]
-    public void Une_loi_de_paiement_en_nature_paie_les_travailleurs_en_produits()
+    public void Une_loi_qui_autorise_le_paiement_en_nature_paie_les_travailleurs_en_produits()
     {
         var market = new Market(Products);
         var structures = Town(new Structure("ferme", "Ferme", StructureKind.Building, "commune",
             Ownership.Cooperative, "ouvriers", new Production("pain", 3), Jobs: 10, DailyWage: 2));
         var workers = Workers(10, wealth: 100);
-        var law = new Law("rations", "Rations", "commune", [], [LawRule.PaymentInKind]);
+        var law = TestLaws.Law("rations", "commune", "travail", TestLaws.Brick(TestLaws.PaymentInKind, LawSubject.Everyone, 1));
 
         RunWorkDay(structures, [workers], new Treasury(), market, law);
 
@@ -261,52 +261,13 @@ public class EconomyTests
         Assert.Equal(9_970, workers.Wealth, precision: 6);
     }
 
-    [Fact]
-    public void Une_loi_peut_augmenter_l_impot_communal()
-    {
-        var law = new Law("taxe", "Taxe communale", "commune", [], TaxAdjustments: [new(TaxLevel.Commune, TaxAdjustmentKind.Surcharge, 0.002)]);
-
-        var (treasury, fund, _) = CollectTaxes(law);
-
-        Assert.Equal(20, treasury.Balance, precision: 6);
-        Assert.Equal(30, fund.Balance, precision: 6);
-    }
-
-    [Fact]
-    public void Une_loi_d_Etat_peut_plafonner_l_impot_d_Etat_meme_avec_un_supplement()
-    {
-        var surcharge = new Law("hausse", "Hausse", "commune", [], TaxAdjustments: [new(TaxLevel.State, TaxAdjustmentKind.Surcharge, 0.005)]);
-        var maximum = new Law("plafond", "Plafond", "etat", [], TaxAdjustments: [new(TaxLevel.State, TaxAdjustmentKind.Maximum, 0.001)]);
-
-        var (treasury, fund, _) = CollectTaxes(surcharge, maximum);
-
-        Assert.Equal(10, treasury.Balance, precision: 6);
-        Assert.Equal(10, fund.Balance, precision: 6);
-    }
-
-    [Fact]
-    public void Une_loi_d_une_autre_commune_ne_change_pas_l_impot()
-    {
-        var structures = new Dictionary<string, Structure>(Town())
-        {
-            ["commune-2"] = new("commune-2", "Commune 2", StructureKind.PoliticalEntity, "etat"),
-        };
-        var law = new Law("taxe", "Taxe", "commune-2", [], TaxAdjustments: [new(TaxLevel.Commune, TaxAdjustmentKind.Surcharge, 0.01)]);
-
-        var (_, fund, _) = CollectTaxes(structures, law);
-
-        Assert.Equal(10, fund.Balance, precision: 6);
-    }
-
-    private static (Treasury Treasury, Treasury Fund, SocialClass Workers) CollectTaxes(params Law[] laws) => CollectTaxes(Town(), laws);
-
-    private static (Treasury Treasury, Treasury Fund, SocialClass Workers) CollectTaxes(Dictionary<string, Structure> structures, params Law[] laws)
+    private static (Treasury Treasury, Treasury Fund, SocialClass Workers) CollectTaxes()
     {
         var treasury = new Treasury();
         var fund = new Treasury();
         var workers = Workers(100, wealth: 10_000);
 
-        Taxation.CollectDaily([workers], 0.002, _ => 0.001, treasury, _ => fund, laws, structures);
+        Taxation.CollectDaily([workers], 0.002, _ => 0.001, treasury, _ => fund);
 
         return (treasury, fund, workers);
     }

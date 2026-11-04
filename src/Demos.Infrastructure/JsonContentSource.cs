@@ -17,7 +17,7 @@ public sealed class JsonContentSource(Func<string, string> readText) : IContentS
     private static readonly JsonSerializerOptions Options = new()
     {
         PropertyNameCaseInsensitive = true,
-        Converters = { new JsonStringEnumConverter(), new NeedCategoryConverter() },
+        Converters = { new JsonStringEnumConverter(), new NeedCategoryConverter(), new OrientationConverter() },
     };
 
     public IReadOnlyList<ProductDefinition> LoadProducts() => Load<ProductDefinition>("products.json");
@@ -42,6 +42,24 @@ public sealed class JsonContentSource(Func<string, string> readText) : IContentS
         return string.IsNullOrWhiteSpace(text)
             ? new BalanceSettings()
             : JsonSerializer.Deserialize<BalanceSettings>(text, Options) ?? new BalanceSettings();
+    }
+
+    /// <summary>Catalogue des lois (lois.json) ; vide si le fichier manque.</summary>
+    public LawCatalogue LoadLawCatalogue()
+    {
+        string text;
+        try
+        {
+            text = readText("lois.json");
+        }
+        catch (FileNotFoundException)
+        {
+            return LawCatalogue.Empty;
+        }
+
+        return string.IsNullOrWhiteSpace(text)
+            ? LawCatalogue.Empty
+            : JsonSerializer.Deserialize<LawCatalogue>(text, Options) ?? LawCatalogue.Empty;
     }
 
     public ScenarioDefinition LoadScenario() =>

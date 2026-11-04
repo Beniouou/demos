@@ -85,12 +85,50 @@ public sealed class GameView(Simulation simulation)
         return chain.SelectMany(id => World.Laws.Where(l => l.StructureId == id)).Select(DescribeLaw).ToList();
     }
 
-    private LawView DescribeLaw(Law law) => new(
-        law.Id,
-        law.Name,
-        law.StructureId,
-        World.Structures.TryGetValue(law.StructureId, out var structure) ? structure.Name : law.StructureId,
-        law.Orientations.ToList());
+    private LawView DescribeLaw(Law law)
+    {
+        var book = World.LawBook;
+        var bricks = law.Bricks.Select(setting => DescribeBrick(book, law, setting)).ToList();
+        return new LawView(
+            law.Id,
+            law.Name,
+            law.StructureId,
+            World.Structures.TryGetValue(law.StructureId, out var structure) ? structure.Name : law.StructureId,
+            bricks.SelectMany(b => b.Poles).Distinct().ToList(),
+            law.Domain,
+            World.LawCatalogue.DomainOf(law.Domain)?.Regalian == true && structure is { IsNational: false },
+            bricks);
+    }
+
+    private static BrickView DescribeBrick(LawBook book, Law law, BrickSetting setting)
+    {
+        var movement = book.MovementOf(law, setting);
+        return new BrickView(
+            setting.Brick,
+            movement?.Brick.Name ?? setting.Brick,
+            setting.Subject,
+            setting.Value,
+            movement?.Reference ?? setting.Value,
+            movement?.Intensity ?? 0,
+            setting.Locked,
+            movement is { Intensity: > 0 } m ? m.Poles.ToList() : []);
+    }
+
+    /// <summary>Les modèles de lois du catalogue, à proposer dans le menu des modèles.</summary>
+    public IReadOnlyList<LawTemplate> LawTemplates() => World.LawCatalogue.Templates.ToList();
+
+    /// <summary>Les domaines du droit, avec ceux qui sont régaliens.</summary>
+    public IReadOnlyList<LawDomain> LawDomains() => World.LawCatalogue.Domains.ToList();
+
+    /// <summary>Les brouillons de la commission des lois, avec leur coût s'ils étaient votés maintenant.</summary>
+    public IReadOnlyList<LawDraftView> LawDrafts() => World.LawCommission.Drafts
+        .Select(d => new LawDraftView(d.Id, d.Kind, DescribeLaw(d.Law), new Dictionary<Orientation, double>(simulation.CostOf(d.Id)), false))
+        .ToList();
+
+    /// <summary>Les changements votés, en attente du 1er du mois, avec ce qu'ils ont coûté.</summary>
+    public IReadOnlyList<LawDraftView> VotedLawChanges() => World.LawCommission.Voted
+        .Select(v => new LawDraftView(v.Draft.Id, v.Draft.Kind, DescribeLaw(v.Draft.Law), new Dictionary<Orientation, double>(v.Paid), true))
+        .ToList();
 }
 
 public enum StructureNodeKind
@@ -110,13 +148,38 @@ public sealed record StructureNode(
     IReadOnlyList<StructureNode> Children,
     Ownership Ownership);
 
-/// <summary>Une loi vue par le joueur : où elle a été créée, et ses pôles idéologiques.</summary>
+/// <summary>
+/// Une loi vue par le joueur : où elle a été créée, ses pôles idéologiques (ceux de ses briques, selon le sens de leurs
+/// curseurs), son domaine, la marque d'une loi régalienne votée sous l'État, et ses briques.
+/// </summary>
 public sealed record LawView(
     string Id,
     string Name,
     string StructureId,
     string StructureName,
-    IReadOnlyList<Orientation> Orientations);
+    IReadOnlyList<Orientation> Orientations,
+    string Domain = "",
+    bool RegalianBelowState = false,
+    IReadOnlyList<BrickView>? Bricks = null);
+
+/// <summary>Une brique d'une loi : son sujet, son curseur, la valeur héritée des niveaux au-dessus, son écart et ses pôles.</summary>
+public sealed record BrickView(
+    string Id,
+    string Name,
+    LawSubject Subject,
+    double Value,
+    double Reference,
+    double Intensity,
+    bool Locked,
+    IReadOnlyList<Orientation> Poles);
+
+/// <summary>Un brouillon de la commission, ou un changement voté en attente du 1er du mois, et son coût par pôle.</summary>
+public sealed record LawDraftView(
+    string Id,
+    LawChangeKind Kind,
+    LawView Law,
+    IReadOnlyDictionary<Orientation, double> Cost,
+    bool Voted);
 
 /// <summary>Une commune vue par le joueur, à un instant donné.</summary>
 public sealed record CommuneView(

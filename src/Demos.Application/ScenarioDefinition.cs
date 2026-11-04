@@ -5,7 +5,8 @@ namespace Demos.Application;
 
 /// <summary>
 /// Description d'une partie de départ, lue dans game/data/partie-depart.json : les communes, les bâtiments (tirés du
-/// catalogue, avec ce qui change par rapport à lui), les classes, les lois et le trésor de départ.
+/// catalogue, avec ce qui change par rapport à lui), les classes, le trésor de départ et les lois du départ
+/// préréglé (quelques lois qui régulent déjà un peu).
 /// </summary>
 /// <param name="HeatingFuel">Combustible de tous les bâtiments de départ (le charbon) ; celui du catalogue si absent.</param>
 public sealed record ScenarioDefinition(
@@ -14,7 +15,7 @@ public sealed record ScenarioDefinition(
     IReadOnlyList<ScenarioCommune> Communes,
     IReadOnlyList<ScenarioBuilding> Buildings,
     IReadOnlyList<ScenarioClass> Classes,
-    IReadOnlyList<ScenarioLaw> Laws);
+    IReadOnlyList<ScenarioLaw>? PresetLaws = null);
 
 public sealed record ScenarioCommune(string Id, string Name);
 
@@ -46,4 +47,24 @@ public sealed record ScenarioClass(
     double Wealth,
     string Commune);
 
-public sealed record ScenarioLaw(string Id, string Name, string Structure, IReadOnlyList<Orientation> Orientations);
+/// <summary>Une loi de départ : un modèle du catalogue des lois, à son niveau par défaut ou à celui donné.</summary>
+public sealed record ScenarioLaw(string Template, string? Level = null);
+
+/// <summary>Les lois en vigueur au début de la partie, choisies à sa création.</summary>
+public enum StartingLawsMode
+{
+    /// <summary>Aucune loi.</summary>
+    None,
+
+    /// <summary>Le départ préréglé de la partie : quelques lois qui régulent déjà un peu (celui des simulations).</summary>
+    Preset,
+
+    /// <summary>Les modèles cochés par le joueur.</summary>
+    Chosen,
+}
+
+public sealed record StartingLaws(StartingLawsMode Mode, IReadOnlyList<ScenarioLaw>? Chosen = null)
+{
+    public static readonly StartingLaws None = new(StartingLawsMode.None);
+    public static readonly StartingLaws Preset = new(StartingLawsMode.Preset);
+}

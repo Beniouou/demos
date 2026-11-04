@@ -92,7 +92,10 @@ public sealed class ContentCreator
     /// <summary>Ce qui a été créé depuis l'ouverture, pour le journal.</summary>
     public List<string> Changes { get; } = [];
 
-    private JsonContentSource Source() => new(file => _json.TryGetValue(file, out var node) ? JsonFormat.Write(node, _texts[file]) : _texts[file]);
+    private JsonContentSource Source() => new(file => _json.TryGetValue(file, out var node) ? JsonFormat.Write(node, _texts[file]) : ReadOther(file));
+
+    /// <summary>Un fichier de données que l'outil ne modifie pas (le catalogue des lois…), lu tel quel.</summary>
+    private string ReadOther(string file) => File.ReadAllText(Path.Combine(_dataDirectory, file));
 
     private void Reload()
     {
@@ -488,7 +491,7 @@ public sealed class ContentCreator
         var written = _json.ToDictionary(j => j.Key, j => JsonFormat.Write(j.Value, _texts[j.Key]));
 
         // Chaque besoin d'un produit doit être dans la liste des besoins.
-        var source = new JsonContentSource(file => written[file]);
+        var source = new JsonContentSource(file => written.TryGetValue(file, out var text) ? text : ReadOther(file));
         var needIds = source.LoadNeeds().Select(n => n.Id).ToHashSet();
         var unknown = source.LoadProducts().Where(p => p.Need is { } need && !needIds.Contains(need.Id)).ToList();
         if (unknown.Count > 0)

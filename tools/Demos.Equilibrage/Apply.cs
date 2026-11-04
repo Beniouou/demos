@@ -59,6 +59,11 @@ public static class BalanceApplier
         ("VitessePrive", ["jobChangePerMonth", "Private"], b => b.JobChangePerMonth[Ownership.Private]),
         ("BaisseSalaireScop", ["cooperativeWageCutStep"], b => b.CooperativeWageCutStep),
         ("BaisseSalaireScopMax", ["cooperativeWageCutMax"], b => b.CooperativeWageCutMax),
+        ("LoiRemboursement", ["lawPaybackDays"], b => b.LawPaybackDays),
+        ("LoiNonVises", ["untargetedMemberWeight"], b => b.UntargetedMemberWeight),
+        ("LoiVerrou", ["lockedBrickCostFactor"], b => b.LockedBrickCostFactor),
+        ("LoiRegalien", ["regalianCostFactor"], b => b.RegalianCostFactor),
+        ("LoiMinimum", ["minimumBrickCost"], b => b.MinimumBrickCost),
     ];
 
     public static int Apply(string workbookPath, string dataDirectory, IContentSource content)
@@ -119,7 +124,8 @@ public static class BalanceApplier
         var saved = Balance.Current;
         try
         {
-            PrototypeScenario.Create(new JsonContentSource(file => written[file]));
+            PrototypeScenario.Create(new JsonContentSource(file =>
+                written.TryGetValue(file, out var text) ? text : File.ReadAllText(Path.Combine(dataDirectory, file))));
         }
         catch (Exception e)
         {

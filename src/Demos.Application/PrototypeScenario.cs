@@ -8,7 +8,7 @@ namespace Demos.Application;
 
 /// <summary>
 /// Partie de départ, décrite dans game/data/partie-depart.json : un État, ses communes, des bâtiments tirés du
-/// catalogue (buildings.json), des classes et des lois. Les propriétaires sont arbitraires, pour tester les trois
+/// catalogue (buildings.json), des classes, et les lois de départ choisies à la création de la partie. Les propriétaires sont arbitraires, pour tester les trois
 /// circuits d'argent, et se changent dans le menu d'administration.
 /// </summary>
 public static class PrototypeScenario
@@ -17,7 +17,8 @@ public static class PrototypeScenario
 
     public const string StateId = "etat";
 
-    public static Simulation Create(IContentSource content)
+    /// <param name="startingLaws">Les lois de départ : celles du départ préréglé si rien n'est donné.</param>
+    public static Simulation Create(IContentSource content, StartingLaws? startingLaws = null)
     {
         // Les réglages d'équilibrage d'abord : le catalogue, les prix et le monde en dépendent.
         Balance.Current = content.LoadBalance();
@@ -39,11 +40,10 @@ public static class PrototypeScenario
             return socialClass;
         }).ToList();
 
-        var laws = scenario.Laws.Select(l => new Law(l.Id, l.Name, l.Structure, l.Orientations)).ToList();
-
         // Prix de départ : 30 % de bénéfice pour le bâtiment de référence de chaque produit, à plein régime.
         var catalogue = types.Values.ToList();
-        var world = new World(Pricing.WithReferencePrices(content.LoadProducts(), catalogue), catalogue, structures, classes, laws);
+        var world = new World(Pricing.WithReferencePrices(content.LoadProducts(), catalogue), catalogue, structures, classes, [],
+            content.LoadLawCatalogue());
 
         // Trésor de départ gonflé à la main, en attendant de régler les recettes de l'État : il permet de payer la
         // dotation d'une première nouvelle commune.
@@ -70,6 +70,20 @@ public static class PrototypeScenario
         // Les communes de départ reçoivent la même réserve de chantier qu'une commune fondée en cours de partie.
         foreach (var commune in world.Communes)
             simulation.GiveFoundingMaterials(commune.Id);
+
+        var chosen = (startingLaws ?? StartingLaws.Preset) switch
+        {
+            { Mode: StartingLawsMode.Preset } => scenario.PresetLaws ?? [],
+            { Mode: StartingLawsMode.Chosen, Chosen: { } laws } => laws,
+            _ => [],
+        };
+        foreach (var law in chosen)
+        {
+            if (world.LawCatalogue.TemplateOf(law.Template) is not { } template
+                || !simulation.EnactAtStart(template.ToLaw(world.LawCommission.NewId("loi"), law.Level)))
+                throw new InvalidDataException($"Loi de départ impossible : « {law.Template} ».");
+        }
+
         return simulation;
     }
 

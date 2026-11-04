@@ -51,7 +51,8 @@ hors du dépôt. Référence actuelle de la simulation : trésor **209 643** la 
   `tools/Demos.Equilibrage` : tableur, appliquer, simuler, création de contenu (`ContentCreator`).
   `tools/Demos.Editeur` : fenêtre de l'éditeur. `tests/Demos.Tests` : xUnit.
 - Contenu dans `game/data/` : `products.json`, `buildings.json`, `besoins.json`, `equilibrage.json` (réglages de
-  l'économie, `BalanceSettings`, lus via `Balance.Current`), `partie-depart.json` (partie de départ).
+  l'économie, `BalanceSettings`, lus via `Balance.Current`), `partie-depart.json` (partie de départ et lois du départ
+  préréglé), `lois.json` (catalogue des lois : domaines, briques, modèles ; voir `Politics/LawBook.cs`).
 - **Ne pas coder de réglage en dur** : un chiffre d'équilibrage va dans `BalanceSettings` et `equilibrage.json`, et
   dans la feuille Constantes du tableur (clé dans `AppliedConstants`, ligne dans `WriteConstants`, chemin JSON dans
   `BalanceApplier.Constants`). Les formules du tableur doivent suivre le jeu : la colonne « Écart » de la feuille
