@@ -64,10 +64,10 @@ public partial class MainMenu : HBoxContainer
             ], Wide: true),
             new("Production",
             [
-                new("Unités de production", () => new BuildingsPage(desk)),
+                new("Unités de production", () => new BuildingsPage(view, desk)),
                 Coming("Chaîne de production", "Des matières premières aux produits : quelles recettes, quels bâtiments."),
                 Coming("Statistiques", "La production et la consommation de chaque produit dans le temps."),
-            ]),
+            ], Wide: true),
             new("Recherche",
             [
                 Coming("Projets de recherche", "Viser un objectif précis, plus cher et plus lent."),

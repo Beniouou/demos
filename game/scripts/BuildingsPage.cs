@@ -6,14 +6,18 @@ using Godot;
 namespace Demos.Game;
 
 /// <summary>
-/// Production → Unités de production : la liste des bâtiments, et pour celui choisi sa fiche en direct et les décisions
-/// du joueur (postes ouverts d'un bâtiment public, recette, chauffage, vente au privé, nationalisation).
+/// Production → Unités de production, en deux boîtes comme le menu Structure. À gauche, les réglages : en haut le choix
+/// de la commune puis du bâtiment, et en dessous les décisions du joueur sur ce bâtiment (postes ouverts d'un bâtiment
+/// public, recette, chauffage, vente au privé, nationalisation). À droite, les informations du bâtiment, en direct.
 /// </summary>
-public partial class BuildingsPage : VBoxContainer, IMenuPage
+public partial class BuildingsPage : HBoxContainer, IMenuPage
 {
+    private readonly GameView _view = null!;
     private readonly PlayerDesk _desk = null!;
-    private readonly List<string> _ids = [];
-    private ItemList _list = null!;
+    private OptionButton _commune = null!;
+    private readonly List<string> _communeIds = [];
+    private OptionButton _building = null!;
+    private readonly List<string> _buildingIds = [];
     private Label _name = null!;
     private Label _info = null!;
     private Label _message = null!;
@@ -33,37 +37,41 @@ public partial class BuildingsPage : VBoxContainer, IMenuPage
     private readonly List<string> _buyerIds = [];
     private VBoxContainer _nationalizationSection = null!;
     private Label _nationalizationNote = null!;
+    private Label _noDecision = null!;
 
-    public BuildingsPage(PlayerDesk desk)
+    public BuildingsPage(GameView view, PlayerDesk desk)
     {
+        _view = view;
         _desk = desk;
-        AddThemeConstantOverride("separation", 8);
+        AddThemeConstantOverride("separation", 12);
 
-        _list = new ItemList { CustomMinimumSize = new Vector2(0, 170), FocusMode = FocusModeEnum.None };
-        _list.ItemSelected += index => ShowSheet(_ids[(int)index]);
-        AddChild(_list);
-
-        var scroll = new ScrollContainer { SizeFlagsVertical = SizeFlags.ExpandFill, HorizontalScrollMode = ScrollContainer.ScrollMode.Disabled };
-        AddChild(scroll);
-        var margin = UiTheme.Margin(8);
-        scroll.AddChild(margin);
-        var sheet = new VBoxContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill };
-        sheet.AddThemeConstantOverride("separation", 8);
-        margin.AddChild(sheet);
-
-        _name = UiTheme.Title("");
-        sheet.AddChild(_name);
-        _message = new Label { AutowrapMode = TextServer.AutowrapMode.WordSmart };
+        // Boîte de gauche : le choix de la commune et du bâtiment, puis les réglages.
+        var settings = Column(this);
+        _commune = Choice(settings, "Commune");
+        _commune.ItemSelected += _ => FillBuildings();
+        _building = Choice(settings, "Bâtiment");
+        _building.ItemSelected += _ => ShowSheet();
+        _message = new Label { AutowrapMode = TextServer.AutowrapMode.WordSmart, Visible = false };
         _message.AddThemeColorOverride("font_color", UiTheme.Accent);
-        sheet.AddChild(_message);
-        _info = new Label { AutowrapMode = TextServer.AutowrapMode.WordSmart };
-        sheet.AddChild(_info);
+        settings.AddChild(_message);
 
-        BuildJobs(sheet);
-        BuildRecipe(sheet);
-        BuildHeating(sheet);
-        BuildSale(sheet);
-        BuildNationalization(sheet);
+        BuildJobs(settings);
+        BuildRecipe(settings);
+        BuildHeating(settings);
+        BuildSale(settings);
+        BuildNationalization(settings);
+        _noDecision = new Label { Text = "Aucun réglage pour ce bâtiment.", AutowrapMode = TextServer.AutowrapMode.WordSmart };
+        _noDecision.AddThemeColorOverride("font_color", UiTheme.Muted);
+        settings.AddChild(_noDecision);
+
+        AddChild(new VSeparator());
+
+        // Boîte de droite : les informations du bâtiment choisi.
+        var information = Column(this);
+        _name = UiTheme.Title("");
+        information.AddChild(_name);
+        _info = new Label { AutowrapMode = TextServer.AutowrapMode.WordSmart };
+        information.AddChild(_info);
     }
 
     // Godot recrée les nœuds C# par ce constructeur sans paramètre (rechargement des scripts).
@@ -71,12 +79,19 @@ public partial class BuildingsPage : VBoxContainer, IMenuPage
 
     public void Refresh()
     {
-        var buildings = _desk.Buildings();
-        if (!buildings.Select(b => b.Id).SequenceEqual(_ids))
-            FillList(buildings);
+        // Une commune fondée ou un bâtiment construit : les menus déroulants sont refaits, le choix en cours gardé.
+        var communes = _view.Communes();
+        if (!communes.Select(c => c.Id).SequenceEqual(_communeIds))
+            FillCommunes(communes);
+        else if (!BuildingsOfCommune().Select(b => b.Id).SequenceEqual(_buildingIds))
+            FillBuildings();
 
         if (SelectedId() is not { } id || _desk.SheetOf(id) is not { } sheet)
+        {
+            _name.Text = "";
+            _info.Text = "Aucun bâtiment dans cette commune.";
             return;
+        }
 
         // Seules les informations suivent la partie ; les réglages en cours de saisie ne bougent pas.
         _info.Text = string.Join("\n", sheet.Info);
@@ -94,99 +109,101 @@ public partial class BuildingsPage : VBoxContainer, IMenuPage
                 $"(Légitimité PR disponible : {sheet.NationalizationLegitimacyAvailable:F1})";
     }
 
-    private void FillList(IReadOnlyList<BuildingEntry> buildings)
+    private void FillCommunes(IReadOnlyList<CommuneView> communes)
+    {
+        var selected = SelectedCommuneId();
+        _communeIds.Clear();
+        _communeIds.AddRange(communes.Select(c => c.Id));
+        Fill(_commune, communes.Select(c => c.Name).ToList(), selected is null ? 0 : _communeIds.IndexOf(selected));
+        FillBuildings();
+    }
+
+    private void FillBuildings()
     {
         var selected = SelectedId();
-        _ids.Clear();
-        _list.Clear();
-        foreach (var building in buildings)
-        {
-            _ids.Add(building.Id);
-            _list.AddItem($"{building.Name}   —   {building.CommuneName}");
-        }
-
-        var index = selected is null ? 0 : System.Math.Max(0, _ids.IndexOf(selected));
-        if (_ids.Count > 0)
-        {
-            _list.Select(index);
-            ShowSheet(_ids[index]);
-        }
+        var buildings = BuildingsOfCommune();
+        _buildingIds.Clear();
+        _buildingIds.AddRange(buildings.Select(b => b.Id));
+        Fill(_building, buildings.Select(b => b.Name).ToList(), selected is null ? 0 : _buildingIds.IndexOf(selected));
+        ShowSheet();
     }
 
-    private string? SelectedId()
-    {
-        var selected = _list.GetSelectedItems();
-        return selected.Length > 0 && selected[0] < _ids.Count ? _ids[selected[0]] : null;
-    }
+    private IReadOnlyList<BuildingEntry> BuildingsOfCommune() =>
+        _desk.Buildings().Where(b => b.CommuneId == SelectedCommuneId()).ToList();
 
-    /// <summary>Remplit les réglages de la fiche pour le bâtiment choisi (à la sélection, et après chaque décision).</summary>
-    private void ShowSheet(string id)
+    private string? SelectedCommuneId() =>
+        _commune.Selected >= 0 && _commune.Selected < _communeIds.Count ? _communeIds[_commune.Selected] : null;
+
+    private string? SelectedId() =>
+        _building.Selected >= 0 && _building.Selected < _buildingIds.Count ? _buildingIds[_building.Selected] : null;
+
+    /// <summary>Remplit les réglages pour le bâtiment choisi (à la sélection, et après chaque décision).</summary>
+    private void ShowSheet()
     {
-        if (_desk.SheetOf(id) is not { } sheet)
+        _message.Visible = false;
+        var sheet = SelectedId() is { } id ? _desk.SheetOf(id) : null;
+        _name.Text = sheet?.Name ?? "";
+
+        _jobsSection.Visible = sheet is { IsPublic: true, JobCapacity: > 0 };
+        _recipeSection.Visible = sheet?.Recipes.Count > 1;
+        _heatingSection.Visible = sheet?.HeatingFuels.Count > 0;
+        _saleSection.Visible = sheet?.IsPublic == true;
+        _nationalizationSection.Visible = sheet?.IsPublic == false;
+        _noDecision.Visible = sheet is not null && !_jobsSection.Visible && !_recipeSection.Visible
+            && !_heatingSection.Visible && !_saleSection.Visible && !_nationalizationSection.Visible;
+        if (sheet is null)
             return;
 
-        _name.Text = sheet.Name;
-        _message.Visible = false;
-
-        _jobsSection.Visible = sheet.IsPublic && sheet.JobCapacity > 0;
         _jobs.MaxValue = sheet.JobCapacity;
         _jobs.Value = sheet.Jobs;
-
-        _recipeSection.Visible = sheet.Recipes.Count > 1;
         Fill(_recipe, sheet.Recipes, sheet.RecipeIndex);
-
-        _heatingSection.Visible = sheet.HeatingFuels.Count > 0;
         Fill(_heating, sheet.HeatingFuels, sheet.HeatingIndex);
-
-        _saleSection.Visible = sheet.IsPublic;
         _buyerIds.Clear();
         _buyerIds.AddRange(sheet.Buyers.Select(b => b.ClassId));
         Fill(_buyer, sheet.Buyers.Select(b => b.Label).ToList(), 0);
         _salePrice.MaxValue = System.Math.Max(0, sheet.MaximumSalePrice);
         _salePrice.Value = sheet.MaximumSalePrice;
-
-        _nationalizationSection.Visible = !sheet.IsPublic;
         Refresh();
     }
 
-    /// <summary>Après une décision : la fiche reprend l'état du bâtiment, et le résultat s'affiche en haut.</summary>
-    private void Report(string id, string message)
+    /// <summary>Après une décision : la fiche reprend l'état du bâtiment, et le résultat s'affiche sous le choix.</summary>
+    private void Report(string message)
     {
-        ShowSheet(id);
+        ShowSheet();
         _message.Text = message;
         _message.Visible = true;
     }
 
-    private void BuildJobs(VBoxContainer sheet)
+    private void BuildJobs(VBoxContainer settings)
     {
-        _jobsSection = Section(sheet, "Postes ouverts (bâtiment public)");
+        _jobsSection = Section(settings, "Postes ouverts (bâtiment public)");
         _jobsNote = Note(_jobsSection);
         var row = Row(_jobsSection);
         _jobs = new SpinBox { MinValue = 0, Step = 10, SizeFlagsHorizontal = SizeFlags.ExpandFill };
         row.AddChild(_jobs);
-        row.AddChild(Action("Fixer à la main", () => SelectedId() is { } id ? _desk.SetJobs(id, (int)_jobs.Value) : null));
-        row.AddChild(Action("Revenir à l'automatique", () => SelectedId() is { } id ? _desk.AutomaticJobs(id) : null));
+        row.AddChild(Action("Fixer à la main", id => _desk.SetJobs(id, (int)_jobs.Value)));
+        row.AddChild(Action("Revenir à l'automatique", _desk.AutomaticJobs));
     }
 
-    private void BuildRecipe(VBoxContainer sheet)
+    private void BuildRecipe(VBoxContainer settings)
     {
-        _recipeSection = Section(sheet, "Recette");
+        _recipeSection = Section(settings, "Recette");
         var row = Row(_recipeSection);
         _recipe = Option(row);
-        row.AddChild(Action("Changer de recette", () => SelectedId() is { } id ? _desk.SetRecipe(id, _recipe.Selected) : null));
+        row.AddChild(Action("Changer de recette", id => _desk.SetRecipe(id, _recipe.Selected)));
     }
 
-    private void BuildHeating(VBoxContainer sheet)
+    private void BuildHeating(VBoxContainer settings)
     {
-        _heatingSection = Section(sheet, "Chauffage");
+        _heatingSection = Section(settings, "Chauffage");
         var row = Row(_heatingSection);
         _heating = Option(row);
-        row.AddChild(Action("Changer de combustible", () => SelectedId() is { } id ? _desk.SetHeating(id, _heating.Selected) : null));
+        row.AddChild(Action("Changer de combustible", id => _desk.SetHeating(id, _heating.Selected)));
     }
 
-    private void BuildSale(VBoxContainer sheet)
+    private void BuildSale(VBoxContainer settings)
     {
-        _saleSection = Section(sheet, "Vente au privé");
+        _saleSection = Section(settings, "Vente au privé");
         _saleNote = Note(_saleSection);
         var buyerRow = Row(_saleSection);
         buyerRow.AddChild(new Label { Text = "Acheteur", CustomMinimumSize = new Vector2(80, 0) });
@@ -195,45 +212,69 @@ public partial class BuildingsPage : VBoxContainer, IMenuPage
         priceRow.AddChild(new Label { Text = "Prix", CustomMinimumSize = new Vector2(80, 0) });
         _salePrice = new SpinBox { MinValue = 0, Step = 100, SizeFlagsHorizontal = SizeFlags.ExpandFill };
         priceRow.AddChild(_salePrice);
-        _sell = Action("Vendre", () =>
-            SelectedId() is { } id && _buyer.Selected >= 0 && _buyer.Selected < _buyerIds.Count
-                ? _desk.Sell(id, _buyerIds[_buyer.Selected], _salePrice.Value)
-                : null);
+        _sell = Action("Vendre", id =>
+            _buyer.Selected >= 0 && _buyer.Selected < _buyerIds.Count ? _desk.Sell(id, _buyerIds[_buyer.Selected], _salePrice.Value) : null);
         priceRow.AddChild(_sell);
     }
 
-    private void BuildNationalization(VBoxContainer sheet)
+    private void BuildNationalization(VBoxContainer settings)
     {
-        _nationalizationSection = Section(sheet, "Nationalisation");
+        _nationalizationSection = Section(settings, "Nationalisation");
         _nationalizationNote = Note(_nationalizationSection);
         var row = Row(_nationalizationSection);
-        var buyout = Action("Racheter", () => SelectedId() is { } id ? _desk.Nationalize(id, expropriate: false) : null);
-        var expropriate = Action("Exproprier", () => SelectedId() is { } id ? _desk.Nationalize(id, expropriate: true) : null);
+        var buyout = Action("Racheter", id => _desk.Nationalize(id, expropriate: false));
+        var expropriate = Action("Exproprier", id => _desk.Nationalize(id, expropriate: true));
         buyout.SizeFlagsHorizontal = expropriate.SizeFlagsHorizontal = SizeFlags.ExpandFill;
         row.AddChild(buyout);
         row.AddChild(expropriate);
     }
 
-    /// <summary>Un bouton de décision : il appelle le bureau du joueur, puis affiche le résultat.</summary>
-    private Button Action(string text, System.Func<string?> decide)
+    /// <summary>Un bouton de décision sur le bâtiment choisi : il appelle le bureau du joueur, puis affiche le résultat.</summary>
+    private Button Action(string text, System.Func<string, string?> decide)
     {
         var button = new Button { Text = text, FocusMode = FocusModeEnum.None };
         button.Pressed += () =>
         {
-            if (SelectedId() is { } id && decide() is { } message)
-                Report(id, message);
+            if (SelectedId() is { } id && decide(id) is { } message)
+                Report(message);
         };
         return button;
     }
 
-    private static VBoxContainer Section(VBoxContainer sheet, string title)
+    /// <summary>Une des deux boîtes : elle défile si son contenu dépasse la hauteur du menu.</summary>
+    private static VBoxContainer Column(HBoxContainer page)
+    {
+        var scroll = new ScrollContainer
+        {
+            SizeFlagsHorizontal = SizeFlags.ExpandFill,
+            SizeFlagsVertical = SizeFlags.ExpandFill,
+            HorizontalScrollMode = ScrollContainer.ScrollMode.Disabled,
+        };
+        page.AddChild(scroll);
+        var margin = UiTheme.Margin(8);
+        scroll.AddChild(margin);
+        var column = new VBoxContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill };
+        column.AddThemeConstantOverride("separation", 8);
+        margin.AddChild(column);
+        return column;
+    }
+
+    /// <summary>Un menu déroulant de choix, avec son intitulé à gauche.</summary>
+    private static OptionButton Choice(VBoxContainer column, string label)
+    {
+        var row = Row(column);
+        row.AddChild(new Label { Text = label, CustomMinimumSize = new Vector2(80, 0) });
+        return Option(row);
+    }
+
+    private static VBoxContainer Section(VBoxContainer column, string title)
     {
         // Le séparateur est dans la section : il disparaît avec elle.
         var section = new VBoxContainer();
         section.AddThemeConstantOverride("separation", 6);
         section.AddChild(new HSeparator());
         section.AddChild(UiTheme.Section(title));
-        sheet.AddChild(section);
+        column.AddChild(section);
         return section;
     }
 
@@ -255,7 +296,15 @@ public partial class BuildingsPage : VBoxContainer, IMenuPage
 
     private static OptionButton Option(HBoxContainer row)
     {
-        var option = new OptionButton { SizeFlagsHorizontal = SizeFlags.ExpandFill, FocusMode = FocusModeEnum.None };
+        // Le menu ne prend pas la largeur de son plus long choix, et coupe le texte s'il le faut : sinon un long nom de
+        // recette élargirait sa boîte aux dépens de l'autre.
+        var option = new OptionButton
+        {
+            SizeFlagsHorizontal = SizeFlags.ExpandFill,
+            FocusMode = FocusModeEnum.None,
+            FitToLongestItem = false,
+            ClipText = true,
+        };
         row.AddChild(option);
         return option;
     }
