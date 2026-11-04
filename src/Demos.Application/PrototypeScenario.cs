@@ -84,6 +84,9 @@ public static class PrototypeScenario
                 throw new InvalidDataException($"Loi de départ impossible : « {law.Template} ».");
         }
 
+        // Sans loi qui les autorise, les entreprises privées de départ sont nationalisées dès le début.
+        simulation.NationalizeForbiddenCompanies();
+
         return simulation;
     }
 

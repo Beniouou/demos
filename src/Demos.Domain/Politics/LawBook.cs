@@ -124,6 +124,12 @@ public sealed class LawBook(
             Factor(Bricks.CompanyTax));
     }
 
+    /// <summary>Vrai si les lois de la commune d'une classe réservent des logements à son rang : elle est logée d'abord.</summary>
+    public bool HasHousingPriority(SocialClass socialClass) =>
+        socialClass.CommuneId is { } communeId
+        && LegislatedValue(Bricks.ReservedHousing, communeId,
+            subject => subject.Kind == SubjectKind.Rank && subject.Values.Contains(socialClass.Rank.ToString())) >= 0.5;
+
     /// <summary>Impôt d'une classe, par rapport au taux de base : 1 + le modificateur des lois de sa commune pour son rang.</summary>
     public double TaxFactorOf(SocialClass socialClass)
     {

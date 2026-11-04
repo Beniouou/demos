@@ -9,7 +9,8 @@ namespace Demos.Domain.Economy;
 /// habitants ; un membre peut occuper plusieurs places (les logements plus grands des rangs supérieurs). Chaque
 /// place occupée coûte des frais quotidiens versés au propriétaire (le trésor pour un bâtiment public, la caisse de
 /// l'entreprise sinon, ou la classe propriétaire quand il n'y a pas de caisse) ; une classe qui ne peut pas payer
-/// n'est servie qu'à hauteur de ce qu'elle paie.
+/// n'est servie qu'à hauteur de ce qu'elle paie. Les classes prioritaires (un rang auquel les lois réservent des
+/// logements) sont servies d'abord ; les autres se partagent les places qui restent.
 /// </summary>
 public static class PlaceAllocation
 {
@@ -28,7 +29,8 @@ public static class PlaceAllocation
         Func<SocialClass, bool>? admits = null,
         Func<Structure, double>? valuePerPlaceOf = null,
         Func<Structure, Treasury>? companyFundOf = null,
-        Func<SocialClass, double>? placesPerMemberOf = null)
+        Func<SocialClass, double>? placesPerMemberOf = null,
+        Func<SocialClass, bool>? priorityOf = null)
     {
         admits ??= _ => true;
         placesPerMemberOf ??= _ => 1;
@@ -42,36 +44,42 @@ public static class PlaceAllocation
                 .Where(s => placesOf(s) > 0 && Communes.CommuneOf(s, structures) == commune.Id)
                 .ToList();
             double places = providers.Sum(placesOf);
-            // Places demandées : un membre peut occuper plus d'une place (un logement plus grand).
-            var residents = admitted.Sum(c => c.MembersLivingIn(commune.Id) * placesPerMemberOf(c));
-            if (residents <= 0)
-                continue;
-
-            var fillRate = places > 0 ? Math.Min(1, places / residents) : 0;
+            var free = places;
             var totalFees = providers.Sum(s => placesOf(s) * dailyFeeOf(s));
             var averageFee = places > 0 ? totalFees / places : 0;
             var averageValue = places > 0 ? providers.Sum(s => placesOf(s) * valuePerPlaceOf(s)) / places : 0;
 
-            foreach (var socialClass in admitted)
+            // Les classes prioritaires d'abord, puis les autres sur les places qui restent.
+            foreach (var group in admitted.GroupBy(c => priorityOf?.Invoke(c) == true).OrderByDescending(g => g.Key))
             {
-                var living = socialClass.MembersLivingIn(commune.Id);
-                var wanted = living * fillRate;
-                var fee = wanted * placesPerMemberOf(socialClass) * averageFee;
-                var paidShare = fee > 0 ? Math.Min(1, Math.Max(0, socialClass.Wealth) / fee) : 1;
-                var members = wanted * paidShare;
-                var previous = served[socialClass];
-                served[socialClass] = new Served(
-                    previous.Members + members,
-                    previous.Value + members * averageValue,
-                    previous.LackingPlaces + living - wanted);
-
-                if (fee <= 0)
+                // Places demandées : un membre peut occuper plus d'une place (un logement plus grand).
+                var residents = group.Sum(c => c.MembersLivingIn(commune.Id) * placesPerMemberOf(c));
+                if (residents <= 0)
                     continue;
 
-                var paid = fee * paidShare;
-                socialClass.Wealth -= paid;
-                foreach (var provider in providers)
-                    PayOwner(provider, paid * placesOf(provider) * dailyFeeOf(provider) / totalFees, classes, treasury, companyFundOf);
+                var fillRate = free > 0 ? Math.Min(1, free / residents) : 0;
+                foreach (var socialClass in group)
+                {
+                    var living = socialClass.MembersLivingIn(commune.Id);
+                    var wanted = living * fillRate;
+                    var fee = wanted * placesPerMemberOf(socialClass) * averageFee;
+                    var paidShare = fee > 0 ? Math.Min(1, Math.Max(0, socialClass.Wealth) / fee) : 1;
+                    var members = wanted * paidShare;
+                    var previous = served[socialClass];
+                    served[socialClass] = new Served(
+                        previous.Members + members,
+                        previous.Value + members * averageValue,
+                        previous.LackingPlaces + living - wanted);
+                    free -= members * placesPerMemberOf(socialClass);
+
+                    if (fee <= 0)
+                        continue;
+
+                    var paid = fee * paidShare;
+                    socialClass.Wealth -= paid;
+                    foreach (var provider in providers)
+                        PayOwner(provider, paid * placesOf(provider) * dailyFeeOf(provider) / totalFees, classes, treasury, companyFundOf);
+                }
             }
         }
 

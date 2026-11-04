@@ -12,6 +12,9 @@ public enum SaleOutcome
     BuyerTooPoor,
     PriceAboveProfit,
     NotEnoughLegitimacy,
+
+    /// <summary>L'acheteur en ferait une entreprise privée, et aucune loi n'y autorise le privé.</summary>
+    PrivateForbidden,
 }
 
 /// <summary>

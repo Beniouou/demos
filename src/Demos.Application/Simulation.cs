@@ -116,6 +116,9 @@ public sealed class Simulation(World world, GameClock clock)
         var outcome = Privatization.Check(building, communeId, buyer, price, DailyProfitOf(building));
         if (outcome != SaleOutcome.Sold)
             return outcome;
+        // Sans loi qui autorise le privé à cet endroit, on ne vend qu'à des ouvriers (en SCOP).
+        if (Privatization.OwnershipFor(buyer) == Ownership.Private && !PrivateCompaniesAllowed(building))
+            return SaleOutcome.PrivateForbidden;
         if (!World.Legitimacy.TrySpend(SalePole, SaleLegitimacyCost))
             return SaleOutcome.NotEnoughLegitimacy;
 
@@ -124,6 +127,42 @@ public sealed class Simulation(World world, GameClock clock)
         World.UpdateStructure(building with { Ownership = Privatization.OwnershipFor(buyer), OwnerClassId = buyer.Id });
         World.Wages.Forget(building.Id);
         return SaleOutcome.Sold;
+    }
+
+    /// <summary>Vrai si les lois qui couvrent ce bâtiment y autorisent les entreprises privées (interdites par défaut).</summary>
+    public bool PrivateCompaniesAllowed(Structure building) => World.LawBook.ValueFor(Bricks.PrivateCompanies, building) >= 0.5;
+
+    /// <summary>
+    /// Les entreprises privées que les lois n'autorisent plus sont nationalisées sans indemnité, comme une expropriation :
+    /// au début de la partie et quand des lois entrent en vigueur. Renvoie les bâtiments repris.
+    /// </summary>
+    public IReadOnlyList<Structure> NationalizeForbiddenCompanies()
+    {
+        var taken = World.Structures.Values
+            .Where(b => b.Kind == StructureKind.Building && b.Ownership == Ownership.Private && !PrivateCompaniesAllowed(b))
+            .ToList();
+        foreach (var building in taken)
+            TakeIntoPublicHands(building, NationalizationMode.Expropriation);
+        if (taken.Count > 0)
+            CompaniesNationalizedByLaw?.Invoke(taken);
+        return taken;
+    }
+
+    /// <summary>Les entreprises privées nationalisées parce qu'aucune loi ne les autorise plus.</summary>
+    public event Action<IReadOnlyList<Structure>>? CompaniesNationalizedByLaw;
+
+    /// <summary>Le bâtiment devient public. Sa caisse ferme : rachetée, son argent revient aux propriétaires ; expropriée, à la commune.</summary>
+    private void TakeIntoPublicHands(Structure building, NationalizationMode mode)
+    {
+        var owner = building.OwnerClassId is { } ownerId ? World.ClassesById.GetValueOrDefault(ownerId) : null;
+        var remaining = World.CloseCompanyFund(building.Id);
+        if (mode == NationalizationMode.Buyout && owner is not null)
+            owner.Wealth += remaining;
+        else if (World.CommuneOf(building) is { } communeId)
+            World.CommuneFundOf(communeId).Deposit(remaining);
+
+        World.UpdateStructure(building with { Ownership = Ownership.Public, OwnerClassId = null });
+        World.Wages.Forget(building.Id);
     }
 
     /// <summary>Pôle d'une nationalisation : protectionniste (PR).</summary>
@@ -158,19 +197,10 @@ public sealed class Simulation(World world, GameClock clock)
             return NationalizationOutcome.NotEnoughLegitimacy;
 
         World.Treasury.TrySpend(price);
-        var owner = building.OwnerClassId is { } ownerId ? World.ClassesById.GetValueOrDefault(ownerId) : null;
-        if (owner is not null)
+        if (building.OwnerClassId is { } ownerId && World.ClassesById.TryGetValue(ownerId, out var owner))
             owner.Wealth += price;
 
-        // La caisse de l'entreprise ferme : rachetée, son argent revient aux propriétaires ; expropriée, à la commune.
-        var remaining = World.CloseCompanyFund(building.Id);
-        if (mode == NationalizationMode.Buyout && owner is not null)
-            owner.Wealth += remaining;
-        else
-            World.CommuneFundOf(communeId).Deposit(remaining);
-
-        World.UpdateStructure(building with { Ownership = Ownership.Public, OwnerClassId = null });
-        World.Wages.Forget(building.Id);
+        TakeIntoPublicHands(building, mode);
         return NationalizationOutcome.Done;
     }
 
@@ -372,8 +402,11 @@ public sealed class Simulation(World world, GameClock clock)
             enacted.Add(draft);
         }
 
-        if (enacted.Count > 0)
-            LawsEnacted?.Invoke(enacted);
+        if (enacted.Count == 0)
+            return;
+
+        LawsEnacted?.Invoke(enacted);
+        NationalizeForbiddenCompanies();
     }
 
     /// <summary>
@@ -413,7 +446,7 @@ public sealed class Simulation(World world, GameClock clock)
             World.CompanyFundOf, World.ClassesById, World.FuelStockOf, World.HeatsAllYear);
         Trade.RunDaily(communeIds, World.Classes, World.Products, World.MarketOf,
             (communeId, productId) => World.StorageOf(communeId).FreeFor(productId));
-        Housing.RunDaily(World.Structures, World.Classes, World.Treasury, World.CompanyFundOf, World.EnergyEffectOf);
+        Housing.RunDaily(World.Structures, World.Classes, World.Treasury, World.CompanyFundOf, World.EnergyEffectOf, laws.HasHousingPriority);
         Education.RunDaily(World.Structures, World.Classes, World.Treasury, World.CompanyFundOf, World.EnergyEffectOf);
 
         foreach (var communeId in communeIds)

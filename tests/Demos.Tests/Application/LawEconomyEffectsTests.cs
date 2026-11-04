@@ -82,7 +82,7 @@ public class LawEconomyEffectsTests
     [Fact]
     public void Le_plafond_des_loyers_baisse_le_loyer_des_logements_prives()
     {
-        var simulation = With("plafond-loyers");
+        var simulation = With("liberte-entreprendre", "plafond-loyers");
 
         Assert.Equal(0.25, Building(simulation, "logements-prives").RentDue, precision: 9);
         Assert.Equal(Building(simulation, "logements-etat").DailyRent, Building(simulation, "logements-etat").RentDue);
@@ -91,7 +91,7 @@ public class LawEconomyEffectsTests
     [Fact]
     public void La_liberte_de_licencier_double_le_pas_des_licenciements_du_prive()
     {
-        var simulation = With("liberte-licencier");
+        var simulation = With("liberte-entreprendre", "liberte-licencier");
 
         Assert.Equal(2, Building(simulation, "distillerie").Rules.LayoffFactor, precision: 9);
         Assert.Equal(1, Building(simulation, "ferme").Rules.LayoffFactor);
