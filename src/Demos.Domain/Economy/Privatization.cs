@@ -35,11 +35,11 @@ public static class Privatization
         IReadOnlyList<SocialClass> classes,
         Func<string, double> priceOf)
     {
-        var output = building.Production is { } p ? p.QuantityPerWorker * productionWorkers : 0;
+        var output = building.Production is { } p ? p.QuantityPerWorker * productionWorkers * building.Rules.ProductionFactor : 0;
         var production = building.Production is { } recipe
             ? output * (priceOf(recipe.ProductId) - recipe.Materials.Sum(m => m.Quantity * priceOf(m.ProductId)))
             : 0;
-        var places = building.HousingPlaces * building.DailyRent + building.SchoolPlaces * building.DailyTuition;
+        var places = building.HousingPlaces * building.RentDue + building.SchoolPlaces * building.DailyTuition;
         var wages = classes.Sum(c => c.MembersWorkingIn(building.Id) * Staffing.WageOf(building, c.Rank));
         return production + places - wages;
     }

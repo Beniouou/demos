@@ -32,7 +32,7 @@ public class CompaniesTests
         var market = new Market(Products);
         SocialClass[] classes = [workers];
 
-        WorkDay.Run(Structures, Employment.Assign(Structures, classes), classes, null, new Treasury(), _ => market, companyFundOf: _ => fund);
+        WorkDay.Run(Structures, Employment.Assign(Structures, classes), classes, new Treasury(), _ => market, companyFundOf: _ => fund);
 
         // 100 ouvriers × 2 = 200 de salaires, pris dans la caisse ; le pain est en vente au nom de l'entreprise.
         Assert.Equal(800, fund.Balance, precision: 6);

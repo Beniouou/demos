@@ -31,7 +31,7 @@ public class ProductionChainTests
     }
 
     private static Dictionary<string, double> Run(Dictionary<string, Structure> structures, SocialClass workers, Market market, Treasury fund, Treasury? treasury = null) =>
-        WorkDay.Run(structures, Employment.Assign(structures, [workers]), [workers], null, treasury ?? new Treasury(), _ => market,
+        WorkDay.Run(structures, Employment.Assign(structures, [workers]), [workers], treasury ?? new Treasury(), _ => market,
             companyFundOf: _ => fund);
 
     [Fact]

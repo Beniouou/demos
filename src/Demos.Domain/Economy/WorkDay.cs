@@ -9,7 +9,7 @@ public static class WorkDay
     /// Pour chaque lieu de travail : il prend ses matières (voir <see cref="Supply"/>), produit selon ses travailleurs
     /// de production et ses matières, paie ses emplois, puis livre le reste au stockage de sa commune, en vente au nom
     /// de l'État s'il est public, de l'entreprise sinon.
-    /// Le travail est payé en salaire, sauf si les lois qui couvrent le bâtiment autorisent le paiement en nature :
+    /// Le travail est payé en salaire, sauf si les lois qui couvrent le bâtiment autorisent le paiement en nature (voir <see cref="AppliedLaws"/>) :
     /// les travailleurs reçoivent alors des produits du bâtiment, au prix du marché.
     /// Le salaire en argent vient de la caisse de la commune puis du trésor (public), ou de la caisse de l'entreprise
     /// (privé, coopératif), et est versé en partie si l'argent manque.
@@ -19,7 +19,6 @@ public static class WorkDay
         IReadOnlyDictionary<string, Structure> structures,
         IReadOnlyDictionary<string, double> productionWorkers,
         IReadOnlyList<SocialClass> classes,
-        LawBook? laws,
         Treasury treasury,
         Func<string, Market> marketOf,
         Func<string, Treasury>? communeFundOf = null,
@@ -64,6 +63,9 @@ public static class WorkDay
                 ? production.QuantityPerWorker * productionWorkers.GetValueOrDefault(workplace.Id)
                 : 0;
 
+            // Les lois peuvent augmenter ou baisser la production (quotas, priorité à la production).
+            produced *= workplace.Rules.ProductionFactor;
+
             // Sans assez d'énergie la veille (chauffage, eau), le bâtiment produit moins.
             produced *= energyShareOf?.Invoke(workplace) ?? 1;
 
@@ -73,7 +75,7 @@ public static class WorkDay
 
             output[workplace.Id] = produced;
 
-            if (totalDue > 0 && produced > 0 && IsPaidInKind(workplace, laws))
+            if (totalDue > 0 && produced > 0 && workplace.Rules.PaidInKind)
             {
                 var productId = workplace.Production!.Value.ProductId;
                 var price = market.PriceOf(productId);
@@ -105,9 +107,6 @@ public static class WorkDay
 
         return output;
     }
-
-    private static bool IsPaidInKind(Structure workplace, LawBook? laws) =>
-        laws is not null && laws.ValueFor(Bricks.PaymentInKind, workplace) >= 0.5;
 
     /// <summary>Verse les salaires en argent ; renvoie ce qui a été versé.</summary>
     private static double PayInMoney(

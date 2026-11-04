@@ -8,6 +8,15 @@ public static class Bricks
 {
     public const string PaymentInKind = "paiement-en-nature";
     public const string PrivateCompanies = "entreprises-privees";
+    public const string Tax = "impot";
+    public const string CompanyTax = "impot-entreprises";
+    public const string MinimumWage = "salaire-minimum";
+    public const string Wages = "salaires";
+    public const string Layoffs = "facilite-licenciement";
+    public const string MaximumRent = "loyer-maximum";
+    public const string ReservedHousing = "logements-reserves";
+    public const string Production = "production";
+    public const string Pollution = "pollution";
 }
 
 /// <summary>
@@ -72,11 +81,63 @@ public sealed class LawBook(
     }
 
     /// <summary>Valeur d'une brique pour un bâtiment, d'après les lois qui le couvrent et dont le sujet le vise.</summary>
-    public double ValueFor(string brickId, Structure building)
+    public double ValueFor(string brickId, Structure building) =>
+        Catalogue.BrickOf(brickId) is { } brick ? Resolve(brick, ChainOf(building.Id), subject => Targets(subject, building), excluded: null).Value : 0;
+
+    /// <summary>
+    /// Valeur qu'une loi fixe pour une brique dans une structure, pour les sujets que <paramref name="applies"/> retient ;
+    /// null si aucune loi n'y règle cette brique (un modificateur sans loi vaut alors 0, un paramètre sa valeur par défaut).
+    /// </summary>
+    public double? LegislatedValue(string brickId, string structureId, Func<LawSubject, bool> applies) =>
+        Catalogue.BrickOf(brickId) is { } brick && Resolve(brick, ChainOf(structureId), applies, excluded: null) is { Legislated: true } result
+            ? result.Value
+            : null;
+
+    /// <summary>
+    /// Ce que les lois imposent à un bâtiment : salaire minimum et niveau des salaires de chaque rang, production,
+    /// pollution, facilité de licencier, loyer maximum, paiement en nature, impôt des entreprises.
+    /// </summary>
+    public AppliedLaws RulesFor(Structure building)
     {
-        if (Catalogue.BrickOf(brickId) is not { } brick)
-            return 0;
-        return Resolve(brick, ChainOf(building.Id), subject => Targets(subject, building), excluded: null);
+        bool Targeted(LawSubject subject) => Targets(subject, building);
+        double Factor(string brickId) => Math.Max(0, 1 + (LegislatedValue(brickId, building.Id, Targeted) ?? 0));
+
+        Dictionary<Rank, double>? minimumWages = null;
+        Dictionary<Rank, double>? wageFactors = null;
+        foreach (var rank in Enum.GetValues<Rank>())
+        {
+            bool ForRank(LawSubject subject) => subject.Kind == SubjectKind.Rank ? subject.Values.Contains(rank.ToString()) : Targeted(subject);
+            if (LegislatedValue(Bricks.MinimumWage, building.Id, ForRank) is { } minimum)
+                (minimumWages ??= [])[rank] = minimum;
+            if (LegislatedValue(Bricks.Wages, building.Id, ForRank) is { } change && change != 0)
+                (wageFactors ??= [])[rank] = Math.Max(0, 1 + change);
+        }
+
+        return new AppliedLaws(
+            minimumWages,
+            wageFactors,
+            Factor(Bricks.Production),
+            Factor(Bricks.Pollution),
+            Factor(Bricks.Layoffs),
+            LegislatedValue(Bricks.MaximumRent, building.Id, Targeted),
+            ValueFor(Bricks.PaymentInKind, building) >= 0.5,
+            Factor(Bricks.CompanyTax));
+    }
+
+    /// <summary>Impôt d'une classe, par rapport au taux de base : 1 + le modificateur des lois de sa commune pour son rang.</summary>
+    public double TaxFactorOf(SocialClass socialClass)
+    {
+        var place = socialClass.CommuneId ?? Structures.Values.FirstOrDefault(s => s.IsNational)?.Id;
+        if (place is null)
+            return 1;
+
+        bool ForClass(LawSubject subject) => subject.Kind switch
+        {
+            SubjectKind.Everyone => true,
+            SubjectKind.Rank => subject.Values.Contains(socialClass.Rank.ToString()),
+            _ => false,
+        };
+        return Math.Max(0, 1 + (LegislatedValue(Bricks.Tax, place, ForClass) ?? 0));
     }
 
     /// <summary>
@@ -93,7 +154,7 @@ public sealed class LawBook(
         var above = ChainOf(law.StructureId);
         if (above.Count > 0)
             above.RemoveAt(above.Count - 1);
-        return Resolve(brick, above, subject => subject.Covers(setting.Subject), excluded: law.Id);
+        return Resolve(brick, above, subject => subject.Covers(setting.Subject), excluded: law.Id).Value;
     }
 
     /// <summary>Vrai si un niveau au-dessus de la loi a verrouillé cette brique pour un sujet qui recoupe le sien.</summary>
@@ -150,9 +211,10 @@ public sealed class LawBook(
             .Sum(job => job.Value),
     };
 
-    private double Resolve(BrickDefinition brick, IReadOnlyList<string> levels, Func<LawSubject, bool> applies, string? excluded)
+    private (double Value, bool Legislated) Resolve(BrickDefinition brick, IReadOnlyList<string> levels, Func<LawSubject, bool> applies, string? excluded)
     {
         var value = brick.Family == BrickFamily.Modifier ? 0 : brick.Default;
+        var legislated = false;
         foreach (var level in levels)
         {
             var settings = Laws
@@ -164,10 +226,11 @@ public sealed class LawBook(
                 continue;
 
             value = brick.Family == BrickFamily.Modifier ? value + settings.Sum(s => s.Value) : settings[^1].Value;
+            legislated = true;
             if (settings.Any(s => s.Locked))
                 break;
         }
 
-        return value;
+        return (value, legislated);
     }
 }

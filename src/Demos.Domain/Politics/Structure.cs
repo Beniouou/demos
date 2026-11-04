@@ -75,6 +75,7 @@ public readonly record struct Production(string ProductId, double QuantityPerWor
 /// </param>
 /// <param name="JobsSetByPlayer">Postes ouverts fixés à la main par le joueur (bâtiment public) : ils ne bougent plus seuls.</param>
 /// <param name="WageCut">Baisse des salaires d'une SCOP en difficulté (0,2 pour −20 %).</param>
+/// <param name="Laws">Ce que les lois en vigueur imposent au bâtiment (salaires, production, loyer…), recalculé chaque jour.</param>
 public sealed record Structure(
     string Id,
     string Name,
@@ -104,9 +105,16 @@ public sealed record Structure(
     IReadOnlyDictionary<Population.Rank, double>? Wages = null,
     int? Capacity = null,
     bool JobsSetByPlayer = false,
-    double WageCut = 0)
+    double WageCut = 0,
+    AppliedLaws? Laws = null)
 {
     public bool IsNational => ParentId is null;
+
+    /// <summary>Ce que les lois imposent au bâtiment ; rien sans loi.</summary>
+    public AppliedLaws Rules => Laws ?? AppliedLaws.None;
+
+    /// <summary>Loyer d'une place par jour, une fois le loyer maximum des lois appliqué.</summary>
+    public double RentDue => Rules.RentFor(DailyRent);
 
     /// <summary>Le plus grand nombre de postes que le bâtiment peut ouvrir.</summary>
     public int JobCapacity => Math.Max(Capacity ?? Jobs, Jobs);

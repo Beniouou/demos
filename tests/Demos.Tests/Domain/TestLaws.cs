@@ -41,6 +41,14 @@ internal static class TestLaws
 
     public static LawBook Book(IReadOnlyDictionary<string, Structure> structures, params Law[] laws) => new(Catalogue, laws, structures);
 
+    /// <summary>Applique les lois aux bâtiments, comme la simulation le fait chaque jour.</summary>
+    public static void Apply(Dictionary<string, Structure> structures, params Law[] laws)
+    {
+        var book = Book(structures, laws);
+        foreach (var building in structures.Values.Where(s => s.Kind == StructureKind.Building).ToList())
+            structures[building.Id] = building with { Laws = book.RulesFor(building) };
+    }
+
     public static Law Law(string id, string structureId, string domain, params BrickSetting[] bricks) => new(id, id, domain, structureId, bricks);
 
     public static BrickSetting Brick(BrickDefinition brick, LawSubject subject, double value, bool locked = false) =>

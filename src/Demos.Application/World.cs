@@ -71,6 +71,16 @@ public sealed class World
 
     private readonly Dictionary<string, string?> _needOfProduct;
 
+    /// <summary>Recalcule ce que les lois en vigueur imposent à chaque bâtiment (salaires, production, loyer…).</summary>
+    public void ApplyLaws(LawBook laws)
+    {
+        foreach (var building in _structures.Values.Where(s => s.Kind == StructureKind.Building).ToList())
+        {
+            var rules = laws.RulesFor(building);
+            _structures[building.Id] = building with { Laws = rules == AppliedLaws.None ? null : rules };
+        }
+    }
+
     /// <summary>
     /// Charte de fondation d'une commune : le pôle payé pour la fonder. Elle attire les classes de ce pôle et repousse
     /// celles du pôle opposé dans la migration ; ce n'est pas une loi.

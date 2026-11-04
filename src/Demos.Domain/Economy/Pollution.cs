@@ -30,7 +30,7 @@ public static class Pollution
         foreach (var structure in structures.Values.Where(s => s.PollutionPerWorker > 0))
         {
             if (Communes.CommuneOf(structure, structures) is { } communeId && produced.ContainsKey(communeId))
-                produced[communeId] += structure.PollutionPerWorker * productionWorkers.GetValueOrDefault(structure.Id);
+                produced[communeId] += structure.PollutionPerWorker * structure.Rules.PollutionFactor * productionWorkers.GetValueOrDefault(structure.Id);
         }
 
         var residents = communes.ToDictionary(c => c.Id, c => classes.Sum(s => s.MembersLivingIn(c.Id)));

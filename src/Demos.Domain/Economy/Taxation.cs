@@ -6,7 +6,8 @@ namespace Demos.Domain.Economy;
 /// <summary>
 /// Deux impôts prélevés chaque jour sur la richesse de chaque groupe local : l'impôt d'État va au trésor, l'impôt
 /// communal à la caisse de la commune où vit le groupe. Chacun a son taux, réglé indépendamment (l'impôt communal
-/// commune par commune).
+/// commune par commune). Les lois peuvent les augmenter ou les baisser pour un rang ou pour tous
+/// (1,5 = +50 %).
 /// </summary>
 public static class Taxation
 {
@@ -29,12 +30,13 @@ public static class Taxation
         double stateRate,
         Func<string, double> communeRateOf,
         Treasury treasury,
-        Func<string, Treasury> communeFundOf)
+        Func<string, Treasury> communeFundOf,
+        Func<SocialClass, double>? taxFactorOf = null)
     {
         foreach (var socialClass in classes)
         {
             var communeId = socialClass.CommuneId;
-            var wealth = socialClass.Wealth;
+            var wealth = socialClass.Wealth * (taxFactorOf?.Invoke(socialClass) ?? 1);
 
             var stateTax = wealth * stateRate;
             socialClass.PayTax(stateTax);

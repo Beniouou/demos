@@ -398,12 +398,16 @@ public sealed class Simulation(World world, GameClock clock)
     private void RunDailyCalculations()
     {
         var communeIds = World.Communes.Select(c => c.Id).ToList();
+        // Ce que les lois imposent à chaque bâtiment, lu une fois pour la journée.
+        var laws = World.LawBook;
+        World.ApplyLaws(laws);
+
 
         World.Workers = Employment.Assign(World.Structures, World.Classes);
         World.PollutionByCommune = Pollution.PerResidentByCommune(World.Structures, World.Workers, World.Classes);
         // La caisse de chaque entreprise au début de la journée : son bénéfice du jour décide de ce qu'elle verse.
         var fundsAtDayStart = World.Structures.Values.Where(Companies.HasCompanyFund).ToDictionary(b => b.Id, b => World.CompanyFundOf(b).Balance);
-        World.Produced = WorkDay.Run(World.Structures, World.Workers, World.Classes, World.LawBook, World.Treasury, World.MarketOf, World.CommuneFundOf, World.Wages,
+        World.Produced = WorkDay.Run(World.Structures, World.Workers, World.Classes, World.Treasury, World.MarketOf, World.CommuneFundOf, World.Wages,
             World.CompanyFundOf, World.EnergyEffectOf);
         World.EnergyShares = Energy.RunDaily(World.Structures, World.TierOf, Clock.Season, World.MarketOf, World.Treasury, World.CommuneFundOf,
             World.CompanyFundOf, World.ClassesById, World.FuelStockOf, World.HeatsAllYear);
@@ -417,8 +421,8 @@ public sealed class Simulation(World world, GameClock clock)
 
         PaySellers();
         Companies.PayDividends(World.Structures, World.ClassesById, World.CompanyFundOf, World.PriceOf, b => fundsAtDayStart.GetValueOrDefault(b.Id));
-        Taxation.CollectDaily(World.Classes, World.StateTaxRate, World.CommuneTaxRateOf, World.Treasury, World.CommuneFundOf);
-        LawEffects.ApplyDaily(World.Classes, World.LawBook, World.Legitimacy);
+        Taxation.CollectDaily(World.Classes, World.StateTaxRate, World.CommuneTaxRateOf, World.Treasury, World.CommuneFundOf, laws.TaxFactorOf);
+        LawEffects.ApplyDaily(World.Classes, laws, World.Legitimacy);
         Storage.ApplyDaily(communeIds, World.Structures, World.Products, World.MarketOf);
 
         // Les chantiers finis en fin de journée : leurs bâtiments travaillent dès le lendemain.
@@ -441,9 +445,10 @@ public sealed class Simulation(World world, GameClock clock)
                 {
                     if (Companies.HasCompanyFund(building))
                     {
-                        // La TVA sur sa valeur ajoutée part d'abord, à l'État et à la commune ; le reste entre dans la caisse.
+                        // La TVA sur sa valeur ajoutée part d'abord, à l'État et à la commune (les lois peuvent la baisser ou en
+                        // exonérer) ; le reste entre dans la caisse.
                         var commune = World.CommuneOf(building);
-                        var valueAdded = amount * Taxation.ValueAddedShare(building, World.PriceOf);
+                        var valueAdded = amount * Taxation.ValueAddedShare(building, World.PriceOf) * building.Rules.CompanyTaxFactor;
                         var toState = valueAdded * Balance.Current.VatStateRate;
                         var toCommune = commune is null ? 0 : valueAdded * Balance.Current.VatCommuneRate;
                         World.Treasury.Deposit(toState);

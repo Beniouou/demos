@@ -48,8 +48,12 @@ public static class Staffing
     public static double WageOf(double baseWage, IReadOnlyDictionary<Rank, double>? wages, Rank rank) =>
         wages is not null && wages.TryGetValue(rank, out var wage) ? wage : baseWage * WageMultiplier(rank);
 
-    /// <summary>Salaire d'un rang dans un bâtiment, après la baisse des salaires d'une SCOP en difficulté.</summary>
-    public static double WageOf(Structure structure, Rank rank) => WageOf(structure.DailyWage, structure.Wages, rank) * (1 - structure.WageCut);
+    /// <summary>
+    /// Salaire d'un rang dans un bâtiment : son salaire, au niveau fixé par les lois, après la baisse des salaires d'une
+    /// SCOP en difficulté, et jamais sous le salaire minimum des lois.
+    /// </summary>
+    public static double WageOf(Structure structure, Rank rank) =>
+        structure.Rules.WageFor(rank, WageOf(structure.DailyWage, structure.Wages, rank) * (1 - structure.WageCut));
 
     /// <summary>Salaires d'un emploi productif, avec l'encadrement et la direction qui l'accompagnent.</summary>
     public static double WageBillPerJob(Rank mainRank, IReadOnlyDictionary<Rank, double>? ratios, double baseWage,
@@ -57,7 +61,7 @@ public static class Staffing
         Enum.GetValues<Rank>().Sum(rank => RatioOf(mainRank, ratios, rank) * WageOf(baseWage, wages, rank));
 
     public static double WageBillPerJob(Structure structure) =>
-        WageBillPerJob(structure.MainRank, structure.StaffRatios, structure.DailyWage, structure.Wages) * (1 - structure.WageCut);
+        Enum.GetValues<Rank>().Sum(rank => RatioOf(structure.MainRank, structure.StaffRatios, rank) * WageOf(structure, rank));
 
     public static double WageBillPerJob(BuildingType type) =>
         WageBillPerJob(type.MainRank, type.StaffRatios, type.DailyWage, type.Wages);

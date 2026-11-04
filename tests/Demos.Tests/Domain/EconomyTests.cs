@@ -43,7 +43,8 @@ public class EconomyTests
         Market market, params Law[] laws)
     {
         var workers = Employment.Assign(structures, classes);
-        WorkDay.Run(structures, workers, classes, laws.Length == 0 ? null : TestLaws.Book(structures, laws), treasury, _ => market);
+        TestLaws.Apply(structures, laws);
+        WorkDay.Run(structures, workers, classes, treasury, _ => market);
     }
 
     [Fact]
@@ -119,7 +120,7 @@ public class EconomyTests
         var treasury = new Treasury();
         treasury.Deposit(100);
 
-        WorkDay.Run(structures, Employment.Assign(structures, classes), classes, null, treasury, _ => new Market(Products), _ => fund);
+        WorkDay.Run(structures, Employment.Assign(structures, classes), classes, treasury, _ => new Market(Products), _ => fund);
 
         // 20 de salaires : 15 de la caisse, 5 du trésor.
         Assert.Equal(0, fund.Balance, precision: 6);

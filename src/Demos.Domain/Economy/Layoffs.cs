@@ -17,6 +17,9 @@ public static class Layoffs
     /// <summary>Part des salaires payés en dessous de laquelle une entreprise est en difficulté.</summary>
     public const double StrugglingPaidShare = WageLedger.StrugglingThreshold;
 
+    /// <summary>Postes supprimés d'un coup : le pas du mois, que les lois peuvent rendre plus grand ou plus petit (au moins un).</summary>
+    private static int LayoffStep(Structure building, int step) => Math.Max(1, (int)Math.Round(step * building.Rules.LayoffFactor));
+
     /// <summary>Part des salaires payés à partir de laquelle une entreprise peut réembaucher (tous payés).</summary>
     public const double HealthyPaidShare = 0.999;
 
@@ -43,7 +46,7 @@ public static class Layoffs
             {
                 updated = cooperative && building.WageCut < balance.CooperativeWageCutMax - 1e-9
                     ? building with { WageCut = Math.Min(balance.CooperativeWageCutMax, building.WageCut + balance.CooperativeWageCutStep) }
-                    : building with { Jobs = Math.Max(0, building.Jobs - step), Capacity = capacity };
+                    : building with { Jobs = Math.Max(0, building.Jobs - LayoffStep(building, step)), Capacity = capacity };
             }
             else if (healthy)
             {

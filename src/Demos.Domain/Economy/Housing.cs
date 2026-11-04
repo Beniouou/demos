@@ -22,7 +22,7 @@ public static class Housing
     {
         // Un logement mal chauffé ou sans eau n'offre qu'une partie de ses places.
         var housed = PlaceAllocation.Allocate(
-            structures, classes, treasury, s => s.HousingPlaces * (energyShareOf?.Invoke(s) ?? 1), s => s.DailyRent,
+            structures, classes, treasury, s => s.HousingPlaces * (energyShareOf?.Invoke(s) ?? 1), s => s.RentDue,
             companyFundOf: companyFundOf, placesPerMemberOf: c => PlacesPerPerson(c.Rank));
 
         foreach (var (socialClass, served) in housed)
