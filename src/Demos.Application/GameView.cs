@@ -68,7 +68,8 @@ public sealed class GameView(Simulation simulation)
             _ => StructureNodeKind.Building,
         },
         World.Laws.Where(l => l.StructureId == structure.Id).Select(DescribeLaw).ToList(),
-        World.Structures.Values.Where(s => s.ParentId == structure.Id).Select(DescribeNode).ToList());
+        World.Structures.Values.Where(s => s.ParentId == structure.Id).Select(DescribeNode).ToList(),
+        structure.Ownership);
 
     /// <summary>
     /// Les lois qui s'appliquent à une structure : une loi créée dans une structure s'applique à tout ce qu'elle
@@ -100,13 +101,14 @@ public enum StructureNodeKind
     Building,
 }
 
-/// <summary>Une structure dans l'arbre de l'État, ses lois et ce qu'elle contient.</summary>
+/// <summary>Une structure dans l'arbre de l'État, ses lois, ce qu'elle contient et son propriétaire (État, SCOP ou privé).</summary>
 public sealed record StructureNode(
     string Id,
     string Name,
     StructureNodeKind Kind,
     IReadOnlyList<LawView> Laws,
-    IReadOnlyList<StructureNode> Children);
+    IReadOnlyList<StructureNode> Children,
+    Ownership Ownership);
 
 /// <summary>Une loi vue par le joueur : où elle a été créée, et ses pôles idéologiques.</summary>
 public sealed record LawView(

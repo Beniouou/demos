@@ -14,7 +14,8 @@ namespace Demos.Game;
 /// </summary>
 public partial class StructurePage : HBoxContainer, IMenuPage
 {
-    // Couleurs des titres du canevas : rouge pour les entités politiques, orange pour les organismes et les bâtiments.
+    // Couleurs des titres du canevas : rouge pour les entités politiques, orange pour les organismes. Un bâtiment porte
+    // le carré de couleur de son propriétaire (État, SCOP ou privé), comme dans le menu Production.
     private static readonly Color EntityColor = new("#d9534f");
     private static readonly Color UnitColor = new("#e8913a");
     private static readonly Color GroupColor = new("#6b7280");
@@ -26,7 +27,6 @@ public partial class StructurePage : HBoxContainer, IMenuPage
     private readonly HashSet<string> _expanded = [];
     private string? _selected;
     private string _shape = "";
-    private readonly Dictionary<(Color, int, int), Texture2D> _squares = [];
 
     public StructurePage(GameView view, PlayerDesk desk)
     {
@@ -55,7 +55,11 @@ public partial class StructurePage : HBoxContainer, IMenuPage
             else
                 _expanded.Add(key);
         };
-        AddChild(_tree);
+        // Le schéma, avec au-dessus la légende des carrés de couleur des bâtiments.
+        var diagram = new VBoxContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill, SizeFlagsVertical = SizeFlags.ExpandFill };
+        diagram.AddChild(UiTheme.OwnershipLegend());
+        diagram.AddChild(_tree);
+        AddChild(diagram);
 
         AddChild(new VSeparator());
 
@@ -118,7 +122,7 @@ public partial class StructurePage : HBoxContainer, IMenuPage
 
     /// <summary>Ce qui oblige à refaire le schéma : une structure ou une loi en plus, en moins ou renommée.</summary>
     private static string Shape(IEnumerable<StructureNode> nodes) =>
-        string.Join(";", nodes.Select(n => $"{n.Id}:{n.Name}[{string.Join(",", n.Laws.Select(l => l.Id))}]({Shape(n.Children)})"));
+        string.Join(";", nodes.Select(n => $"{n.Id}:{n.Name}:{n.Ownership}[{string.Join(",", n.Laws.Select(l => l.Id))}]({Shape(n.Children)})"));
 
     private void Build(IReadOnlyList<StructureNode> roots)
     {
@@ -132,6 +136,8 @@ public partial class StructurePage : HBoxContainer, IMenuPage
     {
         var item = Item(parent, node.Id, node.Kind == StructureNodeKind.State ? node.Name.ToUpperInvariant() : node.Name,
             node.Kind is StructureNodeKind.State or StructureNodeKind.Commune ? EntityColor : UnitColor);
+        if (node.Kind == StructureNodeKind.Building)
+            item.SetIcon(0, UiTheme.Square(UiTheme.OwnershipColor(node.Ownership), 12, 12));
         AddLawChips(item, node.Laws);
 
         // Déroulée, une boîte montre d'abord ses lois en toutes lettres, puis ce qu'elle contient.
@@ -172,7 +178,7 @@ public partial class StructurePage : HBoxContainer, IMenuPage
         item.SetText(0, text);
         item.SetMetadata(0, key);
         if (color is { } marker)
-            item.SetIcon(0, Square(marker, 6, 18));
+            item.SetIcon(0, UiTheme.Square(marker, 6, 18));
         item.Collapsed = !_expanded.Contains(key);
         if (key == _selected)
             item.Select(0);
@@ -186,19 +192,8 @@ public partial class StructurePage : HBoxContainer, IMenuPage
         foreach (var law in laws)
             foreach (var pole in law.Orientations)
                 // Un bouton actif garde sa vraie couleur (désactivé, il serait terni) ; un clic dessus ne fait rien.
-                item.AddButton(0, Square(UiTheme.PoleColor(pole), 12, 12), id++, disabled: false,
+                item.AddButton(0, UiTheme.Square(UiTheme.PoleColor(pole), 12, 12), id++, disabled: false,
                     tooltipText: $"{law.Name} : {WorldText.PoleName(pole)} ({pole.Code})");
-    }
-
-    private Texture2D Square(Color color, int width, int height)
-    {
-        var key = (color, width, height);
-        if (_squares.TryGetValue(key, out var texture))
-            return texture;
-
-        var image = Image.CreateEmpty(width, height, false, Image.Format.Rgba8);
-        image.Fill(color);
-        return _squares[key] = ImageTexture.CreateFromImage(image);
     }
 
     // ---- La fiche --------------------------------------------------------------------------------------------------

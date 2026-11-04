@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using Godot;
 using Orientation = Demos.Domain.Politics.Orientation;
+using Ownership = Demos.Domain.Politics.Ownership;
 
 namespace Demos.Game;
 
@@ -35,6 +36,47 @@ public static class UiTheme
     public const int TitleSize = 19;
 
     public static Color PoleColor(Orientation pole) => PoleColors.GetValueOrDefault(pole.Code, Muted);
+
+    // Couleurs du propriétaire d'un bâtiment : rouge pour l'État, jaune pour une SCOP, bleu pour le privé, dans des
+    // teintes plus sombres que celles des pôles (EG, LI, SE) pour ne pas les confondre.
+    private static readonly Color StateOwned = new("#a33a2c");
+    private static readonly Color CooperativeOwned = new("#c09a2a");
+    private static readonly Color PrivatelyOwned = new("#3a5fa8");
+
+    public static Color OwnershipColor(Ownership ownership) => ownership switch
+    {
+        Ownership.Public => StateOwned,
+        Ownership.Cooperative => CooperativeOwned,
+        _ => PrivatelyOwned,
+    };
+
+    /// <summary>La légende des propriétaires : « ■ État  ■ SCOP  ■ Privé ».</summary>
+    public static HBoxContainer OwnershipLegend()
+    {
+        var legend = new HBoxContainer();
+        legend.AddThemeConstantOverride("separation", 6);
+        foreach (var (ownership, name) in new[] { (Ownership.Public, "État"), (Ownership.Cooperative, "SCOP"), (Ownership.Private, "Privé") })
+        {
+            legend.AddChild(new TextureRect { Texture = Square(OwnershipColor(ownership), 12, 12), StretchMode = TextureRect.StretchModeEnum.KeepCentered });
+            legend.AddChild(Caption(name));
+            legend.AddChild(new Control { CustomMinimumSize = new Vector2(8, 0) });
+        }
+        return legend;
+    }
+
+    private static readonly Dictionary<(Color, int, int), Texture2D> Squares = [];
+
+    /// <summary>Un rectangle plein d'une couleur, à mettre en icône (menus déroulants, schémas) ; gardé en mémoire.</summary>
+    public static Texture2D Square(Color color, int width, int height)
+    {
+        var key = (color, width, height);
+        if (Squares.TryGetValue(key, out var texture))
+            return texture;
+
+        var image = Image.CreateEmpty(width, height, false, Image.Format.Rgba8);
+        image.Fill(color);
+        return Squares[key] = ImageTexture.CreateFromImage(image);
+    }
 
     public static Theme Create()
     {

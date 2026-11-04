@@ -18,6 +18,7 @@ public partial class BuildingsPage : HBoxContainer, IMenuPage
     private readonly List<string> _communeIds = [];
     private OptionButton _building = null!;
     private readonly List<string> _buildingIds = [];
+    private readonly List<Demos.Domain.Politics.Ownership> _buildingOwnerships = [];
     private Label _name = null!;
     private Label _info = null!;
     private Label _message = null!;
@@ -51,6 +52,10 @@ public partial class BuildingsPage : HBoxContainer, IMenuPage
         _commune.ItemSelected += _ => FillBuildings();
         _building = Choice(settings, "Bâtiment");
         _building.ItemSelected += _ => ShowSheet();
+        // Sous le choix du bâtiment, la légende des carrés de couleur de son propriétaire.
+        var legendRow = Row(settings);
+        legendRow.AddChild(new Control { CustomMinimumSize = new Vector2(80, 0) });
+        legendRow.AddChild(UiTheme.OwnershipLegend());
         _message = new Label { AutowrapMode = TextServer.AutowrapMode.WordSmart, Visible = false };
         _message.AddThemeColorOverride("font_color", UiTheme.Accent);
         settings.AddChild(_message);
@@ -83,7 +88,7 @@ public partial class BuildingsPage : HBoxContainer, IMenuPage
         var communes = _view.Communes();
         if (!communes.Select(c => c.Id).SequenceEqual(_communeIds))
             FillCommunes(communes);
-        else if (!BuildingsOfCommune().Select(b => b.Id).SequenceEqual(_buildingIds))
+        else if (!BuildingsOfCommune().Select(b => (b.Id, b.Ownership)).SequenceEqual(_buildingIds.Zip(_buildingOwnerships)))
             FillBuildings();
 
         if (SelectedId() is not { } id || _desk.SheetOf(id) is not { } sheet)
@@ -124,7 +129,15 @@ public partial class BuildingsPage : HBoxContainer, IMenuPage
         var buildings = BuildingsOfCommune();
         _buildingIds.Clear();
         _buildingIds.AddRange(buildings.Select(b => b.Id));
-        Fill(_building, buildings.Select(b => b.Name).ToList(), selected is null ? 0 : _buildingIds.IndexOf(selected));
+        _buildingOwnerships.Clear();
+        _buildingOwnerships.AddRange(buildings.Select(b => b.Ownership));
+
+        // Chaque bâtiment a devant son nom le carré de couleur de son propriétaire (État, SCOP ou privé).
+        _building.Clear();
+        foreach (var building in buildings)
+            _building.AddIconItem(UiTheme.Square(UiTheme.OwnershipColor(building.Ownership), 12, 12), building.Name);
+        if (buildings.Count > 0)
+            _building.Select(System.Math.Max(0, selected is null ? 0 : _buildingIds.IndexOf(selected)));
         ShowSheet();
     }
 

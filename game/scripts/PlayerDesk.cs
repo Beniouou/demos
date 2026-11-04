@@ -20,7 +20,7 @@ public sealed class PlayerDesk(Simulation simulation)
     public IReadOnlyList<BuildingEntry> Buildings() =>
         World.Structures.Values
             .Where(s => s.Kind == StructureKind.Building)
-            .Select(s => new BuildingEntry(s.Id, s.Name, World.CommuneOf(s) ?? "", CommuneName(World.CommuneOf(s))))
+            .Select(s => new BuildingEntry(s.Id, s.Name, World.CommuneOf(s) ?? "", CommuneName(World.CommuneOf(s)), s.Ownership))
             .OrderBy(b => b.CommuneName)
             .ToList();
 
@@ -222,7 +222,7 @@ public sealed class PlayerDesk(Simulation simulation)
     }
 }
 
-public sealed record BuildingEntry(string Id, string Name, string CommuneId, string CommuneName);
+public sealed record BuildingEntry(string Id, string Name, string CommuneId, string CommuneName, Ownership Ownership);
 
 /// <summary>Fiche d'un bâtiment à un instant donné : ses informations et ce que le joueur peut y décider.</summary>
 public sealed record BuildingSheet(
