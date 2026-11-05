@@ -54,9 +54,9 @@ public partial class MainMenu : HBoxContainer
             ]),
             new("Lois",
             [
-                Coming("Code civil", "Les lois en vigueur, leur domaine d'application et leurs effets."),
-                Coming("Éditeur de lois", "Écrire une loi : type, domaine d'application, règle."),
-            ]),
+                new("Code civil", () => new CivilCodePage(view)),
+                new("Éditeur de lois", () => new LawCommissionPage(view)),
+            ], Wide: true),
             new("Structure",
             [
                 new("Entité politique", () => new StructurePage(view, desk)),

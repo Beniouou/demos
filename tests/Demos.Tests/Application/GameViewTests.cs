@@ -53,6 +53,16 @@ public class GameViewTests
     }
 
     [Fact]
+    public void Le_code_civil_liste_toutes_les_lois_en_vigueur_et_le_catalogue_ses_briques()
+    {
+        var simulation = PrototypeScenario.Create(GameData.Content());
+        var view = new GameView(simulation);
+
+        Assert.Equal(simulation.World.Laws.Select(l => l.Id), view.Laws().Select(l => l.Id));
+        Assert.Equal(simulation.World.LawCatalogue.Bricks.Count, view.LawBricks().Count);
+    }
+
+    [Fact]
     public void L_arbre_des_structures_part_de_l_Etat_et_porte_les_lois_de_chaque_niveau()
     {
         var view = new GameView(WithLawAtEachLevel());

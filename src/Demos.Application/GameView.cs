@@ -117,6 +117,12 @@ public sealed class GameView(Simulation simulation)
     /// <summary>Les modèles de lois du catalogue, à proposer dans le menu des modèles.</summary>
     public IReadOnlyList<LawTemplate> LawTemplates() => World.LawCatalogue.Templates.ToList();
 
+    /// <summary>Toutes les lois en vigueur, de tous les niveaux (le code civil).</summary>
+    public IReadOnlyList<LawView> Laws() => World.Laws.Select(DescribeLaw).ToList();
+
+    /// <summary>Les briques du catalogue : famille, bornes, valeur par défaut, poids et description de chaque curseur.</summary>
+    public IReadOnlyList<BrickDefinition> LawBricks() => World.LawCatalogue.Bricks.ToList();
+
     /// <summary>Les domaines du droit, avec ceux qui sont régaliens.</summary>
     public IReadOnlyList<LawDomain> LawDomains() => World.LawCatalogue.Domains.ToList();
 
