@@ -159,8 +159,13 @@ public partial class StructurePage : HBoxContainer, IMenuPage
 
             var buildings = node.Children.Where(c => c.Kind == StructureNodeKind.Building).ToList();
             var buildingsItem = Item(item, $"batiments:{node.Id}", $"Bâtiments ({buildings.Count})", GroupColor);
-            foreach (var child in buildings)
-                AddNode(buildingsItem, child);
+            // Les bâtiments sont rangés par catégorie (Extraction, Production…), chacune repliable.
+            foreach (var category in buildings.GroupBy(b => b.Category ?? "Autres"))
+            {
+                var categoryItem = Item(buildingsItem, $"categorie:{node.Id}:{category.Key}", $"{category.Key} ({category.Count()})", GroupColor);
+                foreach (var child in category)
+                    AddNode(categoryItem, child);
+            }
 
             foreach (var child in node.Children.Where(c => c.Kind is StructureNodeKind.Commune or StructureNodeKind.State))
                 AddNode(item, child);
@@ -207,7 +212,10 @@ public partial class StructurePage : HBoxContainer, IMenuPage
         if (key.StartsWith("loi:"))
             DescribeLaw(text, key[4..], roots);
         else if (key.StartsWith("batiments:") && Find(roots, key["batiments:".Length..]) is { } buildingsOf)
-            DescribeBuildings(text, buildingsOf);
+            DescribeBuildings(text, buildingsOf, null);
+        else if (key.StartsWith("categorie:") && key["categorie:".Length..].Split(':', 2) is [var communeId, var category]
+                 && Find(roots, communeId) is { } communeOf)
+            DescribeBuildings(text, communeOf, category);
         else if (key.StartsWith("organismes:"))
             text.Append(Heading("ORGANISMES")).Append(Muted(
                 "À venir. Les organismes : domaine d'application, pouvoir, postes et fonctionnement."));
@@ -251,10 +259,15 @@ public partial class StructurePage : HBoxContainer, IMenuPage
                 + Muted(law.StructureId == node.Id ? "(créée ici)" : $"(de {law.StructureName})"));
     }
 
-    private static void DescribeBuildings(StringBuilder text, StructureNode commune)
+    /// <summary>Les bâtiments d'une commune, tous ou ceux d'une catégorie.</summary>
+    private static void DescribeBuildings(StringBuilder text, StructureNode commune, string? category)
     {
-        var buildings = commune.Children.Where(c => c.Kind == StructureNodeKind.Building).ToList();
-        text.Append(Heading($"BÂTIMENTS DE {commune.Name.ToUpperInvariant()}"));
+        var buildings = commune.Children
+            .Where(c => c.Kind == StructureNodeKind.Building && (category is null || (c.Category ?? "Autres") == category))
+            .ToList();
+        text.Append(Heading(category is null
+            ? $"BÂTIMENTS DE {commune.Name.ToUpperInvariant()}"
+            : $"{category.ToUpperInvariant()} — {commune.Name.ToUpperInvariant()}"));
         text.AppendLine($"{buildings.Count} bâtiment(s). Cliquez sur l'un d'eux pour sa fiche.");
         text.AppendLine();
         foreach (var building in buildings)

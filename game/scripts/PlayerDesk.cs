@@ -16,14 +16,6 @@ public sealed class PlayerDesk(Simulation simulation)
 {
     private World World => simulation.World;
 
-    /// <summary>Les bâtiments de la partie, commune par commune.</summary>
-    public IReadOnlyList<BuildingEntry> Buildings() =>
-        World.Structures.Values
-            .Where(s => s.Kind == StructureKind.Building)
-            .Select(s => new BuildingEntry(s.Id, s.Name, World.CommuneOf(s) ?? "", CommuneName(World.CommuneOf(s)), s.Ownership))
-            .OrderBy(b => b.CommuneName)
-            .ToList();
-
     public BuildingSheet? SheetOf(string buildingId)
     {
         if (!World.Structures.TryGetValue(buildingId, out var building))
@@ -221,8 +213,6 @@ public sealed class PlayerDesk(Simulation simulation)
             + (detail.Any() ? $"  [{string.Join(", ", detail)}]" : "");
     }
 }
-
-public sealed record BuildingEntry(string Id, string Name, string CommuneId, string CommuneName, Ownership Ownership);
 
 /// <summary>Fiche d'un bâtiment à un instant donné : ses informations et ce que le joueur peut y décider.</summary>
 public sealed record BuildingSheet(

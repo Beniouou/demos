@@ -69,7 +69,8 @@ public sealed class GameView(Simulation simulation)
         },
         World.Laws.Where(l => l.StructureId == structure.Id).Select(DescribeLaw).ToList(),
         World.Structures.Values.Where(s => s.ParentId == structure.Id).Select(DescribeNode).ToList(),
-        structure.Ownership);
+        structure.Ownership,
+        structure.TypeId is { } typeId && World.BuildingTypes.TryGetValue(typeId, out var type) ? type.Category : null);
 
     /// <summary>
     /// Les lois qui s'appliquent à une structure : une loi créée dans une structure s'applique à tout ce qu'elle
@@ -145,14 +146,18 @@ public enum StructureNodeKind
     Building,
 }
 
-/// <summary>Une structure dans l'arbre de l'État, ses lois, ce qu'elle contient et son propriétaire (État, SCOP ou privé).</summary>
+/// <summary>
+/// Une structure dans l'arbre de l'État, ses lois, ce qu'elle contient, son propriétaire (État, SCOP ou privé) et, pour
+/// un bâtiment, la catégorie de son type (Extraction, Production…).
+/// </summary>
 public sealed record StructureNode(
     string Id,
     string Name,
     StructureNodeKind Kind,
     IReadOnlyList<LawView> Laws,
     IReadOnlyList<StructureNode> Children,
-    Ownership Ownership);
+    Ownership Ownership,
+    string? Category = null);
 
 /// <summary>
 /// Une loi vue par le joueur : où elle a été créée, ses pôles idéologiques (ceux de ses briques, selon le sens de leurs

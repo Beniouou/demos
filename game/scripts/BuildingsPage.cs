@@ -7,18 +7,17 @@ namespace Demos.Game;
 
 /// <summary>
 /// Production → Unités de production, en deux boîtes comme le menu Structure. À gauche, les réglages : en haut le choix
-/// de la commune puis du bâtiment, et en dessous les décisions du joueur sur ce bâtiment (postes ouverts d'un bâtiment
-/// public, recette, chauffage, vente au privé, nationalisation). À droite, les informations du bâtiment, en direct.
+/// du bâtiment en descendant la hiérarchie (entité politique → organisme → bâtiment), et en dessous les décisions du
+/// joueur sur ce bâtiment (postes ouverts d'un bâtiment public, recette, chauffage, vente au privé, nationalisation).
+/// À droite, les informations du bâtiment, en direct.
 /// </summary>
 public partial class BuildingsPage : HBoxContainer, IMenuPage
 {
     private readonly GameView _view = null!;
     private readonly PlayerDesk _desk = null!;
-    private OptionButton _commune = null!;
-    private readonly List<string> _communeIds = [];
-    private OptionButton _building = null!;
-    private readonly List<string> _buildingIds = [];
-    private readonly List<Demos.Domain.Politics.Ownership> _buildingOwnerships = [];
+    private readonly StructurePicker _picker = null!;
+    // Le bâtiment dont les réglages sont remplis ; au départ, aucun (même pas « aucun bâtiment »).
+    private string? _shownId = "\0";
     private Label _name = null!;
     private Label _info = null!;
     private Label _message = null!;
@@ -46,15 +45,13 @@ public partial class BuildingsPage : HBoxContainer, IMenuPage
         _desk = desk;
         AddThemeConstantOverride("separation", 12);
 
-        // Boîte de gauche : le choix de la commune et du bâtiment, puis les réglages.
+        // Boîte de gauche : le choix du bâtiment, de l'entité politique au bâtiment, puis les réglages.
         var settings = Column(this);
-        _commune = Choice(settings, "Commune");
-        _commune.ItemSelected += _ => FillBuildings();
-        _building = Choice(settings, "Bâtiment");
-        _building.ItemSelected += _ => ShowSheet();
+        _picker = new StructurePicker(settings, allowAll: false);
+        _picker.Changed += ShowSheet;
         // Sous le choix du bâtiment, la légende des carrés de couleur de son propriétaire.
         var legendRow = Row(settings);
-        legendRow.AddChild(new Control { CustomMinimumSize = new Vector2(80, 0) });
+        legendRow.AddChild(new Control { CustomMinimumSize = new Vector2(90, 0) });
         legendRow.AddChild(UiTheme.OwnershipLegend());
         _message = new Label { AutowrapMode = TextServer.AutowrapMode.WordSmart, Visible = false };
         _message.AddThemeColorOverride("font_color", UiTheme.Accent);
@@ -85,16 +82,14 @@ public partial class BuildingsPage : HBoxContainer, IMenuPage
     public void Refresh()
     {
         // Une commune fondée ou un bâtiment construit : les menus déroulants sont refaits, le choix en cours gardé.
-        var communes = _view.Communes();
-        if (!communes.Select(c => c.Id).SequenceEqual(_communeIds))
-            FillCommunes(communes);
-        else if (!BuildingsOfCommune().Select(b => (b.Id, b.Ownership)).SequenceEqual(_buildingIds.Zip(_buildingOwnerships)))
-            FillBuildings();
+        _picker.Refresh(_view.StructureTree());
+        if (SelectedId() != _shownId)
+            ShowSheet();
 
         if (SelectedId() is not { } id || _desk.SheetOf(id) is not { } sheet)
         {
             _name.Text = "";
-            _info.Text = "Aucun bâtiment dans cette commune.";
+            _info.Text = "Aucun bâtiment ici.";
             return;
         }
 
@@ -114,47 +109,14 @@ public partial class BuildingsPage : HBoxContainer, IMenuPage
                 $"(Légitimité PR disponible : {sheet.NationalizationLegitimacyAvailable:F1})";
     }
 
-    private void FillCommunes(IReadOnlyList<CommuneView> communes)
-    {
-        var selected = SelectedCommuneId();
-        _communeIds.Clear();
-        _communeIds.AddRange(communes.Select(c => c.Id));
-        Fill(_commune, communes.Select(c => c.Name).ToList(), selected is null ? 0 : _communeIds.IndexOf(selected));
-        FillBuildings();
-    }
-
-    private void FillBuildings()
-    {
-        var selected = SelectedId();
-        var buildings = BuildingsOfCommune();
-        _buildingIds.Clear();
-        _buildingIds.AddRange(buildings.Select(b => b.Id));
-        _buildingOwnerships.Clear();
-        _buildingOwnerships.AddRange(buildings.Select(b => b.Ownership));
-
-        // Chaque bâtiment a devant son nom le carré de couleur de son propriétaire (État, SCOP ou privé).
-        _building.Clear();
-        foreach (var building in buildings)
-            _building.AddIconItem(UiTheme.Square(UiTheme.OwnershipColor(building.Ownership), 12, 12), building.Name);
-        if (buildings.Count > 0)
-            _building.Select(System.Math.Max(0, selected is null ? 0 : _buildingIds.IndexOf(selected)));
-        ShowSheet();
-    }
-
-    private IReadOnlyList<BuildingEntry> BuildingsOfCommune() =>
-        _desk.Buildings().Where(b => b.CommuneId == SelectedCommuneId()).ToList();
-
-    private string? SelectedCommuneId() =>
-        _commune.Selected >= 0 && _commune.Selected < _communeIds.Count ? _communeIds[_commune.Selected] : null;
-
-    private string? SelectedId() =>
-        _building.Selected >= 0 && _building.Selected < _buildingIds.Count ? _buildingIds[_building.Selected] : null;
+    private string? SelectedId() => _picker.BuildingId;
 
     /// <summary>Remplit les réglages pour le bâtiment choisi (à la sélection, et après chaque décision).</summary>
     private void ShowSheet()
     {
         _message.Visible = false;
-        var sheet = SelectedId() is { } id ? _desk.SheetOf(id) : null;
+        _shownId = SelectedId();
+        var sheet = _shownId is { } id ? _desk.SheetOf(id) : null;
         _name.Text = sheet?.Name ?? "";
 
         _jobsSection.Visible = sheet is { IsPublic: true, JobCapacity: > 0 };

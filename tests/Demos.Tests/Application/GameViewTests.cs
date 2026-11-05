@@ -75,6 +75,7 @@ public class GameViewTests
         Assert.Equal(StructureNodeKind.Commune, commune.Kind);
         var quarry = Assert.Single(commune.Children, c => c.Id == "carriere");
         Assert.Equal(StructureNodeKind.Building, quarry.Kind);
+        Assert.Equal("Extraction", quarry.Category);
         Assert.Contains(quarry.Laws, l => l.Id == "loi-carriere");
     }
 

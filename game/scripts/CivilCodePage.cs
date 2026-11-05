@@ -9,28 +9,16 @@ using Orientation = Demos.Domain.Politics.Orientation;
 namespace Demos.Game;
 
 /// <summary>
-/// Lois → Code civil : les lois en vigueur. À gauche, rangées par domaine du droit dans des boîtes repliables, avec deux
-/// filtres : le niveau de structure (État, commune, organisme, bâtiment), puis laquelle à ce niveau ; à droite, la fiche
-/// de la loi choisie : domaine, niveau, et chaque brique avec son sujet, son curseur, la valeur héritée des niveaux
-/// au-dessus, ses bornes et ses pôles.
+/// Lois → Code civil : les lois en vigueur. À gauche, rangées par domaine du droit dans des boîtes repliables, avec un
+/// filtre qui descend la hiérarchie : entité politique → organisme → bâtiment ; on voit les lois votées au niveau le
+/// plus précis choisi. À droite, la fiche de la loi choisie : domaine, niveau, et chaque brique avec son sujet, son
+/// curseur, la valeur héritée des niveaux au-dessus, ses bornes et ses pôles.
 /// </summary>
 public partial class CivilCodePage : HBoxContainer, IMenuPage
 {
-    /// <summary>Les niveaux du premier filtre ; null pour tous les niveaux. Le second filtre commence par « tous ».</summary>
-    private static readonly (StructureNodeKind? Kind, string Name, string All)[] Levels =
-    [
-        (null, "Tous les niveaux", ""),
-        (StructureNodeKind.State, "État", ""),
-        (StructureNodeKind.Commune, "Commune", "Toutes les communes"),
-        (StructureNodeKind.Organization, "Organisme", "Tous les organismes"),
-        (StructureNodeKind.Building, "Bâtiment", "Tous les bâtiments"),
-    ];
-
     private readonly GameView _view = null!;
     private readonly TreeSheet _schema = null!;
-    private OptionButton _level = null!;
-    private OptionButton _name = null!;
-    private readonly List<string?> _nameIds = [];
+    private readonly StructurePicker _picker = null!;
 
     public CivilCodePage(GameView view)
     {
@@ -40,17 +28,8 @@ public partial class CivilCodePage : HBoxContainer, IMenuPage
 
         var left = new VBoxContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill, SizeFlagsVertical = SizeFlags.ExpandFill };
         left.AddThemeConstantOverride("separation", 8);
-        _level = Filter(left, "Niveau");
-        foreach (var level in Levels)
-            _level.AddItem(level.Name);
-        _level.Select(0);
-        _level.ItemSelected += _ =>
-        {
-            _nameIds.Clear();
-            _schema.Invalidate();
-        };
-        _name = Filter(left, "Nom");
-        _name.ItemSelected += _ => _schema.Invalidate();
+        _picker = new StructurePicker(left, allowAll: true);
+        _picker.Changed += _schema.Invalidate;
         left.AddChild(_schema.Tree);
         AddChild(left);
 
@@ -63,9 +42,8 @@ public partial class CivilCodePage : HBoxContainer, IMenuPage
 
     public void Refresh()
     {
-        var structures = StructuresOfLevel();
-        FillNames(structures);
-        var laws = ShownLaws(structures);
+        _picker.Refresh(_view.StructureTree());
+        var laws = ShownLaws();
         if (_schema.Selected is null)
         {
             // Au premier affichage, les domaines qui ont des lois sont déroulés et la première loi est choisie.
@@ -74,86 +52,12 @@ public partial class CivilCodePage : HBoxContainer, IMenuPage
             _schema.Selected = laws.Count > 0 ? $"loi:{laws[0].Id}" : null;
         }
 
-        _schema.Refresh($"{_level.Selected}:{SelectedName()}|{string.Join(";", laws.Select(l => $"{l.Id}:{string.Join(",", l.Orientations.Select(o => o.Code))}"))}");
+        _schema.Refresh($"{_picker.MostPrecise}|{string.Join(";", laws.Select(l => $"{l.Id}:{string.Join(",", l.Orientations.Select(o => o.Code))}"))}");
     }
 
-    private static OptionButton Filter(VBoxContainer column, string label)
-    {
-        var row = new HBoxContainer();
-        row.AddThemeConstantOverride("separation", 8);
-        row.AddChild(new Label { Text = label, CustomMinimumSize = new Vector2(80, 0) });
-        var option = new OptionButton
-        {
-            SizeFlagsHorizontal = SizeFlags.ExpandFill,
-            FocusMode = FocusModeEnum.None,
-            FitToLongestItem = false,
-            ClipText = true,
-        };
-        row.AddChild(option);
-        column.AddChild(row);
-        return option;
-    }
-
-    /// <summary>
-    /// Les structures du niveau choisi, avec leur nom dans le second filtre (un bâtiment ou un organisme suivi de sa
-    /// commune) ; aucune pour tous les niveaux.
-    /// </summary>
-    private List<(string Id, string Name)> StructuresOfLevel()
-    {
-        var kind = Levels[System.Math.Max(0, _level.Selected)].Kind;
-        var found = new List<(string Id, string Name)>();
-        void Visit(StructureNode node, string? commune)
-        {
-            if (node.Kind == kind)
-                found.Add((node.Id, commune is null || node.Kind is StructureNodeKind.State or StructureNodeKind.Commune
-                    ? node.Name : $"{node.Name} ({commune})"));
-            foreach (var child in node.Children)
-                Visit(child, node.Kind == StructureNodeKind.Commune ? node.Name : commune);
-        }
-        if (kind is not null)
-            foreach (var root in _view.StructureTree())
-                Visit(root, null);
-        return found;
-    }
-
-    /// <summary>
-    /// Le second filtre : « tous » puis chaque structure du niveau, refait quand le niveau change ou qu'une structure
-    /// apparaît. Grisé pour tous les niveaux et pour l'État, qui est seul de son niveau.
-    /// </summary>
-    private void FillNames(List<(string Id, string Name)> structures)
-    {
-        var level = Levels[System.Math.Max(0, _level.Selected)];
-        var ids = new List<string?> { null };
-        ids.AddRange(structures.Select(s => s.Id));
-        if (ids.SequenceEqual(_nameIds))
-            return;
-
-        var selected = SelectedName();
-        _nameIds.Clear();
-        _nameIds.AddRange(ids);
-        _name.Clear();
-        _name.AddItem(level.Kind is null or StructureNodeKind.State ? level.Name : level.All);
-        foreach (var (_, name) in structures)
-            _name.AddItem(name);
-        _name.Select(System.Math.Max(0, _nameIds.IndexOf(selected)));
-        _name.Disabled = level.Kind is null or StructureNodeKind.State;
-        _schema.Invalidate();
-    }
-
-    private string? SelectedName() => _name.Selected > 0 && _name.Selected < _nameIds.Count ? _nameIds[_name.Selected] : null;
-
-    /// <summary>Les lois du filtre : celles de la structure choisie, ou de toutes les structures du niveau.</summary>
-    private IReadOnlyList<LawView> ShownLaws(List<(string Id, string Name)> structures)
-    {
-        var laws = _view.Laws();
-        if (Levels[System.Math.Max(0, _level.Selected)].Kind is null)
-            return laws;
-
-        var allowed = SelectedName() is { } one ? [one] : structures.Select(s => s.Id).ToHashSet();
-        return laws.Where(l => allowed.Contains(l.StructureId)).ToList();
-    }
-
-    private IReadOnlyList<LawView> ShownLaws() => ShownLaws(StructuresOfLevel());
+    /// <summary>Les lois votées dans la structure la plus précise choisie, ou toutes les lois sans choix.</summary>
+    private IReadOnlyList<LawView> ShownLaws() =>
+        _picker.MostPrecise is { } structureId ? _view.Laws().Where(l => l.StructureId == structureId).ToList() : _view.Laws();
 
     private void Build(TreeItem root)
     {
