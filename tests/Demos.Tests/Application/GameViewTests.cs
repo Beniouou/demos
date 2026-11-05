@@ -53,6 +53,25 @@ public class GameViewTests
     }
 
     [Fact]
+    public void Chaque_classe_montre_son_impot_selon_les_lois_et_ce_qu_elle_a_paye_cette_saison()
+    {
+        var simulation = PrototypeScenario.Create(GameData.Content());
+        var view = new GameView(simulation);
+        for (var day = 0; day < 10; day++)
+            simulation.AdvanceDay();
+
+        var commune = view.Communes().Single(c => c.Id == PrototypeScenario.FirstCommuneId);
+        foreach (var socialClass in commune.Classes)
+        {
+            var engine = simulation.World.ClassesById[socialClass.Id];
+            Assert.Equal(engine.Rank, socialClass.Rank);
+            Assert.Equal(simulation.World.LawBook.TaxFactorOf(engine), socialClass.TaxFactor);
+            Assert.Equal(engine.SeasonTaxes, socialClass.SeasonTaxes);
+        }
+        Assert.Contains(commune.Classes, c => c.SeasonTaxes > 0);
+    }
+
+    [Fact]
     public void Le_code_civil_liste_toutes_les_lois_en_vigueur_et_le_catalogue_ses_briques()
     {
         var simulation = PrototypeScenario.Create(GameData.Content());

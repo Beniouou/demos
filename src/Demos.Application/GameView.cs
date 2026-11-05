@@ -1,5 +1,6 @@
 using Demos.Domain.Economy;
 using Demos.Domain.Politics;
+using Demos.Domain.Population;
 using Demos.Domain.Shared;
 
 namespace Demos.Application;
@@ -30,6 +31,7 @@ public sealed class GameView(Simulation simulation)
             .Where(s => s.Jobs > 0 && World.CommuneOf(s) == commune.Id)
             .ToList();
         var storage = World.StorageOf(commune.Id);
+        var laws = World.LawBook;
 
         return new CommuneView(
             commune.Id,
@@ -48,7 +50,7 @@ public sealed class GameView(Simulation simulation)
             new Dictionary<string, double>(World.StateHoldingsOf(commune.Id)),
             World.Classes.Where(c => c.CommuneId == commune.Id && c.Population > 0).Select(c => new SocialClassView(
                 c.Id, c.Name, c.Population, c.Wealth, c.NeedsSatisfaction, c.HousingCoverage, c.Adhesion,
-                c.EducationPoints, c.AdvancedEducationPoints)).ToList());
+                c.EducationPoints, c.AdvancedEducationPoints, c.Rank, laws.TaxFactorOf(c), c.SeasonTaxes)).ToList());
     }
 
     /// <summary>
@@ -210,7 +212,10 @@ public sealed record CommuneView(
     IReadOnlyDictionary<string, double> StateStock,
     IReadOnlyList<SocialClassView> Classes);
 
-/// <summary>Un groupe local (une classe dans sa commune) vu par le joueur, à un instant donné.</summary>
+/// <summary>
+/// Un groupe local (une classe dans sa commune) vu par le joueur, à un instant donné : son rang, le multiplicateur de
+/// son impôt fixé par les lois (1,5 = +50 %), et les impôts (État et commune) payés depuis le début de la saison.
+/// </summary>
 public sealed record SocialClassView(
     string Id,
     string Name,
@@ -220,4 +225,7 @@ public sealed record SocialClassView(
     double HousingCoverage,
     double Adhesion,
     double EducationPoints,
-    double AdvancedEducationPoints);
+    double AdvancedEducationPoints,
+    Rank Rank = Rank.Workers,
+    double TaxFactor = 1,
+    double SeasonTaxes = 0);

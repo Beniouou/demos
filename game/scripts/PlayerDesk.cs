@@ -122,11 +122,6 @@ public sealed class PlayerDesk(Simulation simulation)
         return $"Chauffage au {fuel}.";
     }
 
-    /// <summary>Impôt d'État, en part de la richesse par jour (0,003 pour 0,3 %).</summary>
-    public void SetStateTaxRate(double rate) => simulation.SetStateTaxRate(System.Math.Max(0, rate));
-
-    public void SetCommuneTaxRate(string communeId, double rate) => simulation.SetCommuneTaxRate(communeId, System.Math.Max(0, rate));
-
     private NationalizationOffer OfferOf(Structure building, NationalizationMode mode) =>
         new(simulation.NationalizationPriceOf(building, mode), simulation.NationalizationLegitimacyCostOf(building, mode));
 

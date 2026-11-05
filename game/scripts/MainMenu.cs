@@ -29,7 +29,8 @@ public partial class MainMenu : HBoxContainer
         "C : bâtir un camp de base, qui fonde une nouvelle commune\n" +
         "Échap : fermer le menu ouvert\n\n" +
         "Un bâtiment se gère depuis Production → Unités de production : vente au privé, nationalisation, " +
-        "postes ouverts, recette et chauffage. Les impôts se règlent dans Ressources → Impôts.";
+        "postes ouverts, recette et chauffage. Les impôts se changent par une loi (menu Lois) ; " +
+        "Ressources → Revenus montre ce qu'ils rapportent.";
 
     private const float PanelWidth = 640;
 
@@ -76,8 +77,8 @@ public partial class MainMenu : HBoxContainer
             new("Ressources",
             [
                 Text("Stocks", () => WorldText.Stocks(view)),
-                new("Impôts", () => new TaxesPage(view, desk)),
-            ]),
+                new("Revenus", () => new RevenuePage(view)),
+            ], Wide: true),
             new("Aide", [Text("Commandes", () => HelpText)]),
         ];
 
