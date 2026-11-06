@@ -67,9 +67,41 @@ public sealed class World
     /// <summary>Les lois en vigueur, lues avec le catalogue : valeur d'une brique à un endroit, valeur héritée, membres touchés.</summary>
     public LawBook LawBook => new(LawCatalogue, _laws, _structures,
         building => building.TypeId is { } typeId ? BuildingTypes.GetValueOrDefault(typeId)?.Category : null,
-        building => building.Production is { } production ? _needOfProduct.GetValueOrDefault(production.ProductId) : null);
+        building => building.Production is { } production ? _needOfProduct.GetValueOrDefault(production.ProductId) : null,
+        Extension);
 
     private readonly Dictionary<string, string?> _needOfProduct;
+
+    private Extension? _extension;
+
+    /// <summary>
+    /// Charge et efficacité de chaque entité politique (extension et bureaucratie), recalculées chaque jour ;
+    /// calculées à la première lecture avant la première journée.
+    /// </summary>
+    public Extension Extension => _extension ??= ComputeExtension();
+
+    /// <summary>Recalcule la charge et l'efficacité de chaque entité politique.</summary>
+    public void UpdateExtension() => _extension = ComputeExtension();
+
+    private Extension ComputeExtension() => Extension.Compute(_structures, Residents, Balance.Current);
+
+    /// <summary>Part de l'impôt d'État collectée dans une commune : efficacité de l'État et préfectures traversées.</summary>
+    public double StateCollectionIn(string communeId) =>
+        _structures.TryGetValue(communeId, out var commune) && _structures.Values.FirstOrDefault(s => s.IsNational) is { } state
+            ? Extension.EfficiencyFor(state.Id, commune)
+            : 1;
+
+    /// <summary>Part de l'impôt communal collectée : efficacité de la commune.</summary>
+    public double CommuneCollectionIn(string communeId) => Extension.EfficiencyOf(communeId);
+
+    /// <summary>
+    /// Efficacité d'un bâtiment public : celle de l'entité qui le gère en direct ; 1 pour un bâtiment autonome
+    /// (SCOP, privé), qui se gère lui-même.
+    /// </summary>
+    public double PublicEfficiencyOf(Structure building) =>
+        building.Ownership == Ownership.Public && Extension.ManagerOf(building, _structures) is { } managerId
+            ? Extension.EfficiencyOf(managerId)
+            : 1;
 
     /// <summary>Recalcule ce que les lois en vigueur imposent à chaque bâtiment (salaires, production, loyer…).</summary>
     public void ApplyLaws(LawBook laws)

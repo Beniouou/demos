@@ -24,7 +24,8 @@ public static class WorkDay
         Func<string, Treasury>? communeFundOf = null,
         WageLedger? wageLedger = null,
         Func<Structure, Treasury>? companyFundOf = null,
-        Func<Structure, double>? energyShareOf = null)
+        Func<Structure, double>? energyShareOf = null,
+        Func<Structure, double>? publicEfficiencyOf = null)
     {
         // Qui travaille où, rangé une fois par bâtiment, et les classes par identifiant : on ne parcourt pas toutes les
         // classes du pays pour chaque bâtiment.
@@ -69,6 +70,9 @@ public static class WorkDay
             // Sans assez d'énergie la veille (chauffage, eau), le bâtiment produit moins.
             produced *= energyShareOf?.Invoke(workplace) ?? 1;
 
+            // Un bâtiment public produit moins quand l'entité qui le gère est débordée (extension).
+            produced *= publicEfficiencyOf?.Invoke(workplace) ?? 1;
+
             // Les matières viennent du stockage de la commune ; sans elles, le bâtiment produit moins.
             if (workplace.Production is { } recipe)
                 produced *= Supply.Acquire(workplace, recipe, produced, market, communeId, treasury, communeFundOf?.Invoke(communeId), companyFundOf, classesById);
@@ -93,7 +97,11 @@ public static class WorkDay
                 totalDue *= 1 - settled;
             }
 
-            var paidInMoney = PayInMoney(workplace, dues, totalDue, classesById, treasury, communeFundOf?.Invoke(communeId), companyFundOf);
+            // Les bâtiments d'une préfecture sont payés par le trésor de l'État, pas par la caisse de leur chef-lieu.
+            var managedByPrefecture = Extension.ManagerOf(workplace, structures) is { } managerId
+                && structures.GetValueOrDefault(managerId)?.IsPrefecture == true;
+            var communeFund = managedByPrefecture ? null : communeFundOf?.Invoke(communeId);
+            var paidInMoney = PayInMoney(workplace, dues, totalDue, classesById, treasury, communeFund, companyFundOf);
             wageLedger?.Record(workplace.Id, initialDue, initialDue - totalDue + paidInMoney);
 
             if (produced > 0 && workplace.Production is { } delivered)

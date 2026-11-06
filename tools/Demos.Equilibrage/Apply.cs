@@ -64,6 +64,16 @@ public static class BalanceApplier
         ("LoiVerrou", ["lockedBrickCostFactor"], b => b.LockedBrickCostFactor),
         ("LoiRegalien", ["regalianCostFactor"], b => b.RegalianCostFactor),
         ("LoiMinimum", ["minimumBrickCost"], b => b.MinimumBrickCost),
+        ("ExtensionPopulation", ["extensionPopulationCapacity"], b => b.ExtensionPopulationCapacity),
+        ("ExtensionBatiments", ["extensionBuildingCapacity"], b => b.ExtensionBuildingCapacity),
+        ("ExtensionAutonomes", ["extensionAutonomousWeight"], b => b.ExtensionAutonomousWeight),
+        ("ExtensionContenues", ["extensionChildWeight"], b => b.ExtensionChildWeight),
+        ("ExtensionPartComptee", ["extensionCountedShare"], b => b.ExtensionCountedShare),
+        ("BureaucratieEchelon", ["bureaucracyLossPerLevel"], b => b.BureaucracyLossPerLevel),
+        ("PrefectureEmplois", ["prefectureJobsPerEntity"], b => b.PrefectureJobsPerEntity),
+        ("PrefectureLegitimite", ["prefectureLegitimacyCost"], b => b.PrefectureLegitimacyCost),
+        ("RattachementLegitimite", ["attachLegitimacyCost"], b => b.AttachLegitimacyCost),
+        ("PrefectureMinimum", ["prefectureMinimumMembers"], b => b.PrefectureMinimumMembers),
     ];
 
     public static int Apply(string workbookPath, string dataDirectory, IContentSource content)

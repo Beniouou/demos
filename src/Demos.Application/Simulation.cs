@@ -16,6 +16,9 @@ public sealed class Simulation(World world, GameClock clock)
     /// <summary>Type du catalogue qui fonde une commune : ses emplois et ses places attirent les premiers habitants.</summary>
     public const string BaseCampTypeId = "camp-de-base";
 
+    /// <summary>Type du bâtiment qui sert de siège à une préfecture.</summary>
+    public const string PrefectureTypeId = "prefecture";
+
     /// <summary>
     /// Proposition : la dotation d'une nouvelle commune couvre 60 jours de salaires de son camp de base, le temps
     /// que ses premiers bâtiments de production produisent.
@@ -61,6 +64,8 @@ public sealed class Simulation(World world, GameClock clock)
             || structure.TypeId is not { } typeId
             || !World.BuildingTypes.TryGetValue(typeId, out var type)
             || !type.CanBeBuilt
+            // Le bâtiment de la préfecture ne se construit qu'en fondant une préfecture (TryFoundPrefecture).
+            || typeId == PrefectureTypeId
             || structure.ParentId is not { } parentId
             || !World.Structures.TryGetValue(parentId, out var parent)
             || World.CommuneOf(parent) is not { } communeId
@@ -249,6 +254,134 @@ public sealed class Simulation(World world, GameClock clock)
         return commune;
     }
 
+    /// <summary>
+    /// Action du joueur : fonder une préfecture dans <paramref name="parentId"/> (l'État ou une préfecture), qui regroupe
+    /// les entités choisies (communes ou préfectures, au moins 2), gratuitement rattachées. Son bâtiment se construit dans
+    /// le chef-lieu, une commune contenue dans ces entités, qui paie le chantier ; ses emplois sont ceux du type plus 5 par
+    /// entité contenue, payés par le trésor de l'État. Elle coûte de la légitimité dans le pôle choisi, sans charte.
+    /// Renvoie null, sans rien dépenser, si c'est impossible.
+    /// </summary>
+    public Structure? TryFoundPrefecture(
+        string name,
+        string parentId,
+        IReadOnlyList<string> memberIds,
+        string seatCommuneId,
+        PaymentMode mode,
+        Orientation legitimacyPole)
+    {
+        var settings = Balance.Current;
+        var structures = World.Structures;
+        var members = memberIds.Distinct().Select(id => structures.GetValueOrDefault(id)).ToList();
+        if (!structures.TryGetValue(parentId, out var parent)
+            || parent.Level is not (EntityLevel.State or EntityLevel.Prefecture)
+            || members.Count < settings.PrefectureMinimumMembers
+            || members.Any(m => m is not { Level: EntityLevel.Commune or EntityLevel.Prefecture }
+                // Pas de boucle : une entité ne peut pas regrouper ce qui la contient.
+                || StructureTree.IsWithin(parent, m.Id, structures)
+                // Une commune ne quitte pas une préfecture dont elle est le chef-lieu.
+                || LeavesSeat(m, parentId))
+            || !structures.TryGetValue(seatCommuneId, out var seat)
+            || !seat.IsCommune
+            || !members.Any(m => StructureTree.IsWithin(seat, m!.Id, structures))
+            || !World.BuildingTypes.TryGetValue(PrefectureTypeId, out var type)
+            || !type.CanBeBuilt
+            || World.Legitimacy[legitimacyPole] < settings.PrefectureLegitimacyCost)
+            return null;
+
+        var number = 1;
+        while (World.IsIdTaken($"prefecture-{number}"))
+            number++;
+        var prefecture = new Structure($"prefecture-{number}", name, StructureKind.PoliticalEntity, parentId,
+            EntityType: EntityLevel.Prefecture, SeatId: seatCommuneId);
+        var jobs = PrefectureJobsFor(type, members.Count);
+        var building = type.Build($"{prefecture.Id}-siege", prefecture.Id, name: $"{type.Name} ({name})") with { Jobs = jobs, Capacity = jobs };
+        if (World.IsIdTaken(building.Id)
+            || !Construction.TryPay(type.Construction!.Materials, mode, Market.StateSellerId(seatCommuneId), World.Treasury,
+                World.MarketOf(seatCommuneId), World.ConstructionReserveOf(seatCommuneId)))
+            return null;
+
+        World.Legitimacy.TrySpend(legitimacyPole, settings.PrefectureLegitimacyCost);
+        World.AddStructure(prefecture);
+        foreach (var member in members)
+            World.UpdateStructure(member! with { ParentId = prefecture.Id });
+        World.AddConstructionSite(new ConstructionSite(building, type.Construction.Days));
+        RefreshPrefectureJobs();
+        return prefecture;
+    }
+
+    /// <summary>
+    /// Action du joueur : rattacher une commune ou une préfecture à une autre entité (l'État ou une préfecture), contre de
+    /// la légitimité dans le pôle choisi. Refusé si cela crée une boucle, si l'entité y est déjà, ou si une commune
+    /// quitterait une préfecture dont elle est le chef-lieu.
+    /// </summary>
+    public bool TryAttach(string entityId, string newParentId, Orientation legitimacyPole)
+    {
+        if (!CanAttach(entityId, newParentId)
+            || !World.Legitimacy.TrySpend(legitimacyPole, Balance.Current.AttachLegitimacyCost))
+            return false;
+
+        World.UpdateStructure(World.Structures[entityId] with { ParentId = newParentId });
+        RefreshPrefectureJobs();
+        return true;
+    }
+
+    /// <summary>
+    /// Vrai si l'entité (commune ou préfecture) peut être rattachée à <paramref name="newParentId"/> (l'État ou une
+    /// préfecture), sans compter la légitimité : pas de boucle, pas déjà là, et pas de chef-lieu qui quitte sa préfecture.
+    /// </summary>
+    public bool CanAttach(string entityId, string newParentId)
+    {
+        var structures = World.Structures;
+        return structures.TryGetValue(entityId, out var entity)
+            && entity.Level is EntityLevel.Commune or EntityLevel.Prefecture
+            && structures.TryGetValue(newParentId, out var parent)
+            && parent.Level is EntityLevel.State or EntityLevel.Prefecture
+            && entity.ParentId != newParentId
+            && !StructureTree.IsWithin(parent, entity.Id, structures)
+            && !LeavesSeat(entity, newParentId);
+    }
+
+    /// <summary>Emplois du bâtiment d'une préfecture : ceux du type, plus quelques-uns par entité contenue.</summary>
+    public static int PrefectureJobsFor(BuildingType type, int entities) => type.Jobs + Balance.Current.PrefectureJobsPerEntity * entities;
+
+    /// <summary>
+    /// Remet les emplois du bâtiment de chaque préfecture à la taille de ce qu'elle contient (après une fondation, un
+    /// rattachement ou la fin du chantier). Un bâtiment dont le joueur a fixé les emplois à la main n'est pas touché.
+    /// </summary>
+    public void RefreshPrefectureJobs()
+    {
+        if (!World.BuildingTypes.TryGetValue(PrefectureTypeId, out var type))
+            return;
+
+        foreach (var prefecture in World.Structures.Values.Where(s => s.IsPrefecture).ToList())
+        {
+            var entities = World.Structures.Values.Count(s => s.ParentId == prefecture.Id && s.Kind == StructureKind.PoliticalEntity);
+            var jobs = PrefectureJobsFor(type, entities);
+            foreach (var building in World.Structures.Values
+                         .Where(s => s.ParentId == prefecture.Id && s.TypeId == PrefectureTypeId && !s.JobsSetByPlayer && s.JobCapacity != jobs)
+                         .ToList())
+                World.UpdateStructure(building with { Jobs = jobs, Capacity = jobs });
+        }
+    }
+
+    /// <summary>Vrai si l'entité, placée dans <paramref name="newParentId"/>, sortirait d'une préfecture dont elle contient le chef-lieu.</summary>
+    private bool LeavesSeat(Structure entity, string newParentId)
+    {
+        var structures = World.Structures;
+        for (var current = entity.ParentId is { } p ? structures.GetValueOrDefault(p) : null; current is not null;
+             current = current.ParentId is { } parentId ? structures.GetValueOrDefault(parentId) : null)
+        {
+            if (!current.IsPrefecture || current.SeatId is not { } seatId || !structures.TryGetValue(seatId, out var seat))
+                continue;
+            var stillInside = newParentId == current.Id
+                || (structures.TryGetValue(newParentId, out var target) && StructureTree.IsWithin(target, current.Id, structures));
+            if (!stillInside && StructureTree.IsWithin(seat, entity.Id, structures))
+                return true;
+        }
+
+        return false;
+    }
+
     /// <summary>Ancienne signature, gardée pour l'interface : le coût passé n'est plus utilisé, c'est celui du camp de base.</summary>
     [Obsolete("Le coût de construction vient du type camp de base : utiliser TryFoundCommune(name, payingCommuneId, mode, pole, legitimacyCost).")]
     public Structure? TryFoundCommune(string name, string payingCommuneId, IReadOnlyList<MaterialCost> cost, PaymentMode mode,
@@ -431,6 +564,8 @@ public sealed class Simulation(World world, GameClock clock)
     private void RunDailyCalculations()
     {
         var communeIds = World.Communes.Select(c => c.Id).ToList();
+        // Charge et efficacité de chaque entité politique, d'après les habitants et les bâtiments du matin.
+        World.UpdateExtension();
         // Ce que les lois imposent à chaque bâtiment, lu une fois pour la journée.
         var laws = World.LawBook;
         World.ApplyLaws(laws);
@@ -441,7 +576,7 @@ public sealed class Simulation(World world, GameClock clock)
         // La caisse de chaque entreprise au début de la journée : son bénéfice du jour décide de ce qu'elle verse.
         var fundsAtDayStart = World.Structures.Values.Where(Companies.HasCompanyFund).ToDictionary(b => b.Id, b => World.CompanyFundOf(b).Balance);
         World.Produced = WorkDay.Run(World.Structures, World.Workers, World.Classes, World.Treasury, World.MarketOf, World.CommuneFundOf, World.Wages,
-            World.CompanyFundOf, World.EnergyEffectOf);
+            World.CompanyFundOf, World.EnergyEffectOf, World.PublicEfficiencyOf);
         World.EnergyShares = Energy.RunDaily(World.Structures, World.TierOf, Clock.Season, World.MarketOf, World.Treasury, World.CommuneFundOf,
             World.CompanyFundOf, World.ClassesById, World.FuelStockOf, World.HeatsAllYear);
         Trade.RunDaily(communeIds, World.Classes, World.Products, World.MarketOf,
@@ -454,12 +589,17 @@ public sealed class Simulation(World world, GameClock clock)
 
         PaySellers();
         Companies.PayDividends(World.Structures, World.ClassesById, World.CompanyFundOf, World.PriceOf, b => fundsAtDayStart.GetValueOrDefault(b.Id));
-        Taxation.CollectDaily(World.Classes, World.StateTaxRate, World.CommuneTaxRateOf, World.Treasury, World.CommuneFundOf, laws.TaxFactorOf);
+        Taxation.CollectDaily(World.Classes, World.StateTaxRate, World.CommuneTaxRateOf, World.Treasury, World.CommuneFundOf, laws.TaxFactorOf,
+            World.StateCollectionIn, World.CommuneCollectionIn);
         LawEffects.ApplyDaily(World.Classes, laws, World.Legitimacy);
         Storage.ApplyDaily(communeIds, World.Structures, World.Products, World.MarketOf);
 
         // Les chantiers finis en fin de journée : leurs bâtiments travaillent dès le lendemain.
-        foreach (var building in World.AdvanceConstructionSites())
+        var completed = World.AdvanceConstructionSites();
+        // Un rattachement pendant le chantier d'une préfecture a pu changer ce qu'elle contient.
+        if (completed.Any(b => b.TypeId == PrefectureTypeId))
+            RefreshPrefectureJobs();
+        foreach (var building in completed)
             BuildingCompleted?.Invoke(building);
     }
 

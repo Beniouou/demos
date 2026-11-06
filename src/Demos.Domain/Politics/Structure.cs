@@ -21,6 +21,17 @@ public enum Ownership
     Cooperative,
 }
 
+/// <summary>
+/// Type d'une entité politique. L'État et la commune sont les unités de base ; la préfecture est la seule entité
+/// intermédiaire, que le joueur crée et imbrique comme il veut (des communes ou des préfectures dans une préfecture).
+/// </summary>
+public enum EntityLevel
+{
+    State,
+    Prefecture,
+    Commune,
+}
+
 /// <summary>Matière consommée par une recette : quantité par unité produite.</summary>
 public readonly record struct RecipeInput(string ProductId, double Quantity);
 
@@ -76,6 +87,12 @@ public readonly record struct Production(string ProductId, double QuantityPerWor
 /// <param name="JobsSetByPlayer">Postes ouverts fixés à la main par le joueur (bâtiment public) : ils ne bougent plus seuls.</param>
 /// <param name="WageCut">Baisse des salaires d'une SCOP en difficulté (0,2 pour −20 %).</param>
 /// <param name="Laws">Ce que les lois en vigueur imposent au bâtiment (salaires, production, loyer…), recalculé chaque jour.</param>
+/// <param name="EntityType">
+/// Type d'une entité politique ; null vaut commune pour une entité qui a un parent (l'entité sans parent est l'État).
+/// </param>
+/// <param name="SeatId">
+/// Chef-lieu d'une préfecture : la commune où se trouvent ses bâtiments et où vivent leurs employés.
+/// </param>
 public sealed record Structure(
     string Id,
     string Name,
@@ -106,9 +123,20 @@ public sealed record Structure(
     int? Capacity = null,
     bool JobsSetByPlayer = false,
     double WageCut = 0,
-    AppliedLaws? Laws = null)
+    AppliedLaws? Laws = null,
+    EntityLevel? EntityType = null,
+    string? SeatId = null)
 {
     public bool IsNational => ParentId is null;
+
+    /// <summary>Type de l'entité politique (État, préfecture, commune) ; null pour un organisme ou un bâtiment.</summary>
+    public EntityLevel? Level => Kind != StructureKind.PoliticalEntity ? null
+        : IsNational ? EntityLevel.State
+        : EntityType ?? EntityLevel.Commune;
+
+    public bool IsCommune => Level == EntityLevel.Commune;
+
+    public bool IsPrefecture => Level == EntityLevel.Prefecture;
 
     /// <summary>Ce que les lois imposent au bâtiment ; rien sans loi.</summary>
     public AppliedLaws Rules => Laws ?? AppliedLaws.None;

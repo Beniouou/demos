@@ -31,21 +31,24 @@ public static class Taxation
         Func<string, double> communeRateOf,
         Treasury treasury,
         Func<string, Treasury> communeFundOf,
-        Func<SocialClass, double>? taxFactorOf = null)
+        Func<SocialClass, double>? taxFactorOf = null,
+        Func<string, double>? stateCollectionOf = null,
+        Func<string, double>? communeCollectionOf = null)
     {
         foreach (var socialClass in classes)
         {
             var communeId = socialClass.CommuneId;
             var wealth = socialClass.Wealth * (taxFactorOf?.Invoke(socialClass) ?? 1);
 
-            var stateTax = wealth * stateRate;
+            // L'impôt que l'entité n'arrive pas à collecter (extension, bureaucratie) reste à l'habitant.
+            var stateTax = wealth * stateRate * (communeId is null ? 1 : stateCollectionOf?.Invoke(communeId) ?? 1);
             socialClass.PayTax(stateTax);
             treasury.Deposit(stateTax);
 
             if (communeId is null)
                 continue;
 
-            var communeTax = wealth * communeRateOf(communeId);
+            var communeTax = wealth * communeRateOf(communeId) * (communeCollectionOf?.Invoke(communeId) ?? 1);
             socialClass.PayTax(communeTax);
             communeFundOf(communeId).Deposit(communeTax);
         }

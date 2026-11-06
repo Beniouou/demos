@@ -11,7 +11,8 @@ public static class LawEffects
     /// <summary>
     /// Calcul quotidien. Chaque classe juge chaque brique des lois en vigueur sur ses pôles, selon le sens du curseur.
     /// Le poids de son jugement est la part de ses membres touchée (les membres visés par le sujet comptent pour 1, les
-    /// autres membres du niveau pour moitié), multipliée par l'intensité et le poids de la brique. Une brique acceptée
+    /// autres membres du niveau pour moitié), multipliée par l'intensité et le poids de la brique, et par l'efficacité de
+    /// la loi là où vit la classe (extension et bureaucratie). Une brique acceptée
     /// produit de la légitimité de son pôle ; l'adhésion est la part acceptée de ce que la classe juge.
     /// </summary>
     public static void ApplyDaily(IEnumerable<SocialClass> classes, LawBook book, LegitimacyPool legitimacy)
@@ -28,13 +29,17 @@ public static class LawEffects
                 if (!book.Structures.TryGetValue(law.StructureId, out var level))
                     continue;
 
+                // Une loi mal appliquée (entité débordée, préfectures traversées) produit moins de légitimité et de rejet.
+                var place = socialClass.CommuneId is { } communeId && book.Structures.TryGetValue(communeId, out var commune) ? commune : level;
+                var efficiency = book.EfficiencyFor(level.Id, place);
+
                 foreach (var setting in law.Bricks)
                 {
                     if (book.MovementOf(law, setting) is not { } movement || movement.Intensity <= 0)
                         continue;
 
                     var share = book.WeightedShare(socialClass, setting.Subject, level, untargetedWeight);
-                    var weight = share * movement.Intensity * movement.Brick.Weight;
+                    var weight = share * movement.Intensity * movement.Brick.Weight * efficiency;
                     if (weight <= 0)
                         continue;
 

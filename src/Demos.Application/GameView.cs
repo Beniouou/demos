@@ -25,6 +25,83 @@ public sealed class GameView(Simulation simulation)
 
     public IReadOnlyList<CommuneView> Communes() => World.Communes.Select(DescribeCommune).ToList();
 
+    /// <summary>
+    /// Extension et bureaucratie : la charge et l'efficacité de chaque entité politique (État, préfectures, communes),
+    /// calculées le matin de la journée, de la plus large à la plus étroite.
+    /// </summary>
+    public IReadOnlyList<EntityLoadView> EntityLoads()
+    {
+        var extension = World.Extension;
+        var state = World.Structures.Values.FirstOrDefault(s => s.IsNational);
+        return World.Structures.Values
+            .Where(s => s.Kind == StructureKind.PoliticalEntity)
+            .OrderBy(s => s.Level)
+            .ThenBy(s => s.Name)
+            .Select(entity =>
+            {
+                var load = extension.Loads.GetValueOrDefault(entity.Id);
+                return new EntityLoadView(
+                    entity.Id,
+                    entity.Name,
+                    entity.Level!.Value,
+                    entity.ParentId,
+                    load?.CountedPopulation ?? 0,
+                    load?.DirectBuildings ?? 0,
+                    load?.AutonomousBuildings ?? 0,
+                    load?.Charge ?? 0,
+                    load?.Efficiency ?? 1,
+                    state is null ? 0 : extension.LevelsBetween(state.Id, entity),
+                    state is null ? 1 : extension.EfficiencyFor(state.Id, entity));
+            })
+            .ToList();
+    }
+
+    /// <summary>Les préfectures : ce qu'elles regroupent, leur chef-lieu, leur bâtiment (ou son chantier) et ce qu'il coûte.</summary>
+    public IReadOnlyList<PrefectureView> Prefectures() => World.Structures.Values
+        .Where(s => s.IsPrefecture)
+        .OrderBy(s => s.Name)
+        .Select(prefecture =>
+        {
+            var building = World.Structures.Values.FirstOrDefault(s => s.ParentId == prefecture.Id && s.TypeId == Simulation.PrefectureTypeId);
+            var site = World.ConstructionSites.FirstOrDefault(s => s.Building.ParentId == prefecture.Id && s.Building.TypeId == Simulation.PrefectureTypeId);
+            var seat = prefecture.SeatId is { } seatId ? World.Structures.GetValueOrDefault(seatId) : null;
+            var jobs = building?.JobCapacity ?? site?.Building.JobCapacity ?? 0;
+            var wageBill = building is not null ? Staffing.WageBillPerJob(building) * building.Jobs : 0;
+            return new PrefectureView(
+                prefecture.Id,
+                prefecture.Name,
+                prefecture.ParentId,
+                prefecture.SeatId,
+                seat?.Name,
+                World.Structures.Values.Where(s => s.ParentId == prefecture.Id && s.Kind == StructureKind.PoliticalEntity)
+                    .Select(s => s.Id).ToList(),
+                building?.Id,
+                site?.DaysLeft ?? 0,
+                jobs,
+                wageBill);
+        })
+        .ToList();
+
+    /// <summary>Ce que coûte une préfecture : sa fondation, ses emplois, et le rattachement d'une entité.</summary>
+    public PrefectureCostView PrefectureCost()
+    {
+        var settings = Balance.Current;
+        var type = World.BuildingTypes.GetValueOrDefault(Simulation.PrefectureTypeId);
+        return new PrefectureCostView(
+            type?.Construction?.ProductId,
+            type?.Construction?.Quantity ?? 0,
+            type?.Construction?.Days ?? 0,
+            settings.PrefectureLegitimacyCost,
+            settings.AttachLegitimacyCost,
+            settings.PrefectureMinimumMembers,
+            type?.Jobs ?? 0,
+            settings.PrefectureJobsPerEntity,
+            type is null ? 0 : Staffing.WageBillPerJob(type));
+    }
+
+    /// <summary>Vrai si l'entité peut être rattachée là, sans compter la légitimité (voir <see cref="Simulation.CanAttach"/>).</summary>
+    public bool CanAttach(string entityId, string newParentId) => simulation.CanAttach(entityId, newParentId);
+
     private CommuneView DescribeCommune(Structure commune)
     {
         var jobs = World.Structures.Values
@@ -65,7 +142,12 @@ public sealed class GameView(Simulation simulation)
         structure.Name,
         structure.Kind switch
         {
-            StructureKind.PoliticalEntity => structure.IsNational ? StructureNodeKind.State : StructureNodeKind.Commune,
+            StructureKind.PoliticalEntity => structure.Level switch
+            {
+                EntityLevel.State => StructureNodeKind.State,
+                EntityLevel.Prefecture => StructureNodeKind.Prefecture,
+                _ => StructureNodeKind.Commune,
+            },
             StructureKind.Organization => StructureNodeKind.Organization,
             _ => StructureNodeKind.Building,
         },
@@ -146,6 +228,9 @@ public enum StructureNodeKind
     Commune,
     Organization,
     Building,
+
+    /// <summary>Entité intermédiaire entre l'État et les communes ; contient des communes ou des préfectures.</summary>
+    Prefecture,
 }
 
 /// <summary>
@@ -229,3 +314,52 @@ public sealed record SocialClassView(
     Rank Rank = Rank.Workers,
     double TaxFactor = 1,
     double SeasonTaxes = 0);
+
+/// <summary>
+/// Extension d'une entité politique vue par le joueur : ce qu'elle gère (population comptée, bâtiments publics en
+/// direct, bâtiments autonomes), sa charge (1 = la limite de ce qu'elle gère sans perte) et son efficacité propre ; puis
+/// les préfectures traversées depuis l'État et l'efficacité qu'ont ici les décisions de l'État.
+/// </summary>
+public sealed record EntityLoadView(
+    string Id,
+    string Name,
+    EntityLevel Level,
+    string? ParentId,
+    double CountedPopulation,
+    int DirectBuildings,
+    int AutonomousBuildings,
+    double Charge,
+    double Efficiency,
+    int PrefecturesFromState,
+    double StateEfficiencyHere);
+
+/// <summary>
+/// Une préfecture vue par le joueur : son parent, son chef-lieu, les entités qu'elle contient, son bâtiment (null tant
+/// qu'il est en chantier, avec les jours restants), ses emplois et ses salaires par jour (payés par le trésor).
+/// </summary>
+public sealed record PrefectureView(
+    string Id,
+    string Name,
+    string? ParentId,
+    string? SeatId,
+    string? SeatName,
+    IReadOnlyList<string> MemberIds,
+    string? BuildingId,
+    int ConstructionDaysLeft,
+    int Jobs,
+    double DailyWages);
+
+/// <summary>
+/// Coût d'une préfecture : matériaux et durée du chantier, légitimité de fondation et de rattachement, nombre minimal
+/// d'entités, emplois (de base et par entité contenue) et salaires par emploi productif et par jour.
+/// </summary>
+public sealed record PrefectureCostView(
+    string? MaterialProductId,
+    double MaterialQuantity,
+    int ConstructionDays,
+    double FoundingLegitimacy,
+    double AttachLegitimacy,
+    int MinimumMembers,
+    int BaseJobs,
+    int JobsPerEntity,
+    double WageBillPerJob);

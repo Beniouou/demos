@@ -35,5 +35,15 @@
   "untargetedMemberWeight": 0.5,
   "lockedBrickCostFactor": 1.5,
   "regalianCostFactor": 2,
-  "minimumBrickCost": 1
+  "minimumBrickCost": 1,
+  "extensionPopulationCapacity": 20000,
+  "extensionBuildingCapacity": 40,
+  "extensionAutonomousWeight": 0.25,
+  "extensionChildWeight": 0.1,
+  "extensionCountedShare": 0.25,
+  "bureaucracyLossPerLevel": 0.1,
+  "prefectureJobsPerEntity": 5,
+  "prefectureLegitimacyCost": 30,
+  "attachLegitimacyCost": 5,
+  "prefectureMinimumMembers": 2
 }

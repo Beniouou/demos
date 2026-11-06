@@ -176,6 +176,36 @@ public sealed record BalanceSettings
 
     /// <summary>Coût minimal d'une brique qui change, en points de légitimité.</summary>
     public double MinimumBrickCost { get; init; } = 1;
+
+    /// <summary>Extension : population comptée qu'une entité politique gère sans perte (charge 1).</summary>
+    public double ExtensionPopulationCapacity { get; init; } = 20_000;
+
+    /// <summary>Extension : bâtiments publics qu'une entité gère en direct sans perte (charge 1).</summary>
+    public double ExtensionBuildingCapacity { get; init; } = 40;
+
+    /// <summary>Extension : poids d'un bâtiment autonome (SCOP, privé) par rapport à un bâtiment public géré en direct.</summary>
+    public double ExtensionAutonomousWeight { get; init; } = 0.25;
+
+    /// <summary>Extension : part de la charge (hors population) d'une entité contenue qui s'ajoute à celle qui la contient.</summary>
+    public double ExtensionChildWeight { get; init; } = 0.1;
+
+    /// <summary>Extension : part de la population comptée par une entité contenue que compte une préfecture ou l'État.</summary>
+    public double ExtensionCountedShare { get; init; } = 0.25;
+
+    /// <summary>Bureaucratie : perte d'efficacité par préfecture traversée entre l'entité qui décide et la commune.</summary>
+    public double BureaucracyLossPerLevel { get; init; } = 0.1;
+
+    /// <summary>Préfecture : emplois ajoutés au bâtiment de la préfecture pour chaque entité qu'elle contient.</summary>
+    public int PrefectureJobsPerEntity { get; init; } = 5;
+
+    /// <summary>Préfecture : légitimité payée pour la fonder, dans un pôle choisi par le joueur.</summary>
+    public double PrefectureLegitimacyCost { get; init; } = 30;
+
+    /// <summary>Préfecture : légitimité payée pour rattacher une entité ailleurs (gratuit pour celles choisies à la fondation).</summary>
+    public double AttachLegitimacyCost { get; init; } = 5;
+
+    /// <summary>Préfecture : nombre minimal d'entités (communes ou préfectures) à regrouper pour la fonder.</summary>
+    public int PrefectureMinimumMembers { get; init; } = 2;
 }
 
 /// <summary>Les réglages d'équilibrage en vigueur dans la partie.</summary>

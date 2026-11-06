@@ -62,13 +62,23 @@ public sealed class LawBook(
     IReadOnlyList<Law> laws,
     IReadOnlyDictionary<string, Structure> structures,
     Func<Structure, string?>? categoryOf = null,
-    Func<Structure, string?>? needOf = null)
+    Func<Structure, string?>? needOf = null,
+    Extension? extension = null)
 {
     public static LawBook Empty(IReadOnlyDictionary<string, Structure> structures) => new(LawCatalogue.Empty, [], structures);
 
     public LawCatalogue Catalogue { get; } = catalogue;
     public IReadOnlyList<Law> Laws { get; } = laws;
     public IReadOnlyDictionary<string, Structure> Structures { get; } = structures;
+
+    /// <summary>
+    /// Efficacité des entités politiques (extension et bureaucratie) : une loi ne s'applique qu'en partie là où son
+    /// entité est débordée ou passe par des préfectures. Sans elle, les lois s'appliquent en entier.
+    /// </summary>
+    public Extension? Extension { get; } = extension;
+
+    /// <summary>Part d'une loi votée dans <paramref name="levelId"/> qui s'applique à <paramref name="target"/>.</summary>
+    public double EfficiencyFor(string levelId, Structure target) => Extension?.EfficiencyFor(levelId, target) ?? 1;
 
     /// <summary>Les structures qui contiennent celle-ci, de la plus large (l'État) à elle-même.</summary>
     public List<string> ChainOf(string structureId)
@@ -82,14 +92,14 @@ public sealed class LawBook(
 
     /// <summary>Valeur d'une brique pour un bâtiment, d'après les lois qui le couvrent et dont le sujet le vise.</summary>
     public double ValueFor(string brickId, Structure building) =>
-        Catalogue.BrickOf(brickId) is { } brick ? Resolve(brick, ChainOf(building.Id), subject => Targets(subject, building), excluded: null).Value : 0;
+        Catalogue.BrickOf(brickId) is { } brick ? Resolve(brick, ChainOf(building.Id), subject => Targets(subject, building), excluded: null, target: building).Value : 0;
 
     /// <summary>
     /// Valeur qu'une loi fixe pour une brique dans une structure, pour les sujets que <paramref name="applies"/> retient ;
     /// null si aucune loi n'y règle cette brique (un modificateur sans loi vaut alors 0, un paramètre sa valeur par défaut).
     /// </summary>
     public double? LegislatedValue(string brickId, string structureId, Func<LawSubject, bool> applies) =>
-        Catalogue.BrickOf(brickId) is { } brick && Resolve(brick, ChainOf(structureId), applies, excluded: null) is { Legislated: true } result
+        Catalogue.BrickOf(brickId) is { } brick && Resolve(brick, ChainOf(structureId), applies, excluded: null, target: Structures.GetValueOrDefault(structureId)) is { Legislated: true } result
             ? result.Value
             : null;
 
@@ -186,7 +196,11 @@ public sealed class LawBook(
     /// </summary>
     public double WeightedShare(SocialClass socialClass, LawSubject subject, Structure level, double untargetedWeight)
     {
-        var inLevel = socialClass.ShareSubjectTo(level);
+        var inLevel = level.IsPrefecture
+            ? Math.Min(1, socialClass.Residence
+                .Where(r => Structures.TryGetValue(r.Key, out var commune) && StructureTree.IsWithin(commune, level.Id, Structures))
+                .Sum(r => r.Value))
+            : socialClass.ShareSubjectTo(level);
         if (inLevel <= 0)
             return 0;
 
@@ -217,7 +231,15 @@ public sealed class LawBook(
             .Sum(job => job.Value),
     };
 
-    private (double Value, bool Legislated) Resolve(BrickDefinition brick, IReadOnlyList<string> levels, Func<LawSubject, bool> applies, string? excluded)
+    /// <summary>
+    /// Valeur d'une brique après les lois des niveaux donnés, du plus large au plus étroit. Avec une structure visée,
+    /// chaque loi ne s'applique qu'en proportion de l'efficacité de son niveau à cet endroit : un paramètre ne fait
+    /// qu'une part du chemin depuis la valeur précédente, un modificateur ne donne qu'une part de son pourcentage.
+    /// Les autorisations et interdictions ne sont pas touchées. Sans structure visée (valeur héritée, coût), la valeur
+    /// est celle que fixent les lois, sans perte.
+    /// </summary>
+    private (double Value, bool Legislated) Resolve(BrickDefinition brick, IReadOnlyList<string> levels, Func<LawSubject, bool> applies,
+        string? excluded, Structure? target = null)
     {
         var value = brick.Family == BrickFamily.Modifier ? 0 : brick.Default;
         var legislated = false;
@@ -231,7 +253,10 @@ public sealed class LawBook(
             if (settings.Count == 0)
                 continue;
 
-            value = brick.Family == BrickFamily.Modifier ? value + settings.Sum(s => s.Value) : settings[^1].Value;
+            var efficiency = target is null || brick.Family == BrickFamily.Permission ? 1 : EfficiencyFor(level, target);
+            value = brick.Family == BrickFamily.Modifier
+                ? value + efficiency * settings.Sum(s => s.Value)
+                : value + efficiency * (settings[^1].Value - value);
             legislated = true;
             if (settings.Any(s => s.Locked))
                 break;
