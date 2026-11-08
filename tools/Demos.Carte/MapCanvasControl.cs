@@ -997,7 +997,7 @@ public sealed class MapCanvasControl : Control
         // 3. Gisements & Zones de ressources
         foreach (var zone in map.AllResourceZones)
         {
-            if (IsPointInPolygon(wx, wy, zone.Boundary))
+            if (IsPointInPolygon(wx, wy, zone.Boundary) && !(zone.Holes?.Any(h => IsPointInPolygon(wx, wy, h)) ?? false))
             {
                 var icon = zone.Kind switch { "pierre" => "🪨", "charbon" => "⛏️", "fer" => "⛓️", "fertile" => "🌾", _ => "💎" };
                 return $"{icon} {zone.Name} ({zone.Kind})";
@@ -1028,7 +1028,7 @@ public sealed class MapCanvasControl : Control
         // 5. Biomes naturels
         foreach (var biome in map.AllBiomes)
         {
-            if (IsPointInPolygon(wx, wy, biome.Boundary))
+            if (IsPointInPolygon(wx, wy, biome.Boundary) && !(biome.Holes?.Any(h => IsPointInPolygon(wx, wy, h)) ?? false))
             {
                 var category = biome.Kind.ToLowerInvariant() switch
                 {

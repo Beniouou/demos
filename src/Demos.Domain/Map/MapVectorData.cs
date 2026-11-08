@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Text.Json.Serialization;
 
 namespace Demos.Domain.Map;
 
@@ -25,7 +26,9 @@ public sealed record RiverData(
 public sealed record PolygonArea(
     string Name,
     string Kind,
-    IReadOnlyList<Point2D> Boundary)
+    IReadOnlyList<Point2D> Boundary,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    IReadOnlyList<IReadOnlyList<Point2D>>? Holes = null)
 {
     /// <summary>
     /// Détecte si un polygone maritime est un artéfact erroné qui boucle anormalement sur les coins

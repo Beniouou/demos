@@ -1,5 +1,6 @@
 using System;
 using System.Drawing;
+using System.Drawing.Drawing2D;
 using System.Linq;
 using Demos.Domain.Map;
 
@@ -87,7 +88,22 @@ public static class CanvasMinimapRenderer
                 };
                 using var bBrush = new SolidBrush(color);
                 var pts = biome.Boundary.Select(p => new PointF((float)p.X, (float)p.Y)).ToArray();
-                g.FillPolygon(bBrush, pts);
+
+                if (biome.Holes is { Count: > 0 } holes)
+                {
+                    using var path = new GraphicsPath(FillMode.Alternate);
+                    path.AddPolygon(pts);
+                    foreach (var hole in holes)
+                    {
+                        if (hole.Count >= 3)
+                            path.AddPolygon(hole.Select(p => new PointF((float)p.X, (float)p.Y)).ToArray());
+                    }
+                    g.FillPath(bBrush, path);
+                }
+                else
+                {
+                    g.FillPolygon(bBrush, pts);
+                }
             }
         }
 

@@ -311,7 +311,7 @@ public sealed partial class MapEditorForm : Form
         }
         MoveCommuneForTesting(0, origX, origY);
 
-        // Test des règles de biomes (glacier, forêt, désert)
+        // Test des règles de biomes (glacier, forêt, falaise, fertile, désert)
         _currentHeightmap.ApplyBrush(1500, 1500, 50, -500);
         var lowAlt = _currentHeightmap.SampleElevation(1500, 1500);
         if (lowAlt > 0 && lowAlt < 2500)
@@ -320,6 +320,22 @@ public sealed partial class MapEditorForm : Form
             if (glacierApplied || glacierErr == null)
             {
                 report = "Failed: glacier brush should be rejected below 2500m";
+                return false;
+            }
+
+            // Falaise sur plaine plate doit être rejetée (pente insuffisante)
+            var cliffOnFlat = ApplyBiomeBrushForTesting(1500, 1500, 30, "falaise", true, out var cliffErr);
+            if (cliffOnFlat || cliffErr == null)
+            {
+                report = "Failed: cliff brush should be rejected on flat plain";
+                return false;
+            }
+
+            // Terre fertile en plaine doit réussir
+            var fertileOnPlain = ApplyBiomeBrushForTesting(1500, 1500, 30, "fertile", true, out var fertileErr);
+            if (!fertileOnPlain)
+            {
+                report = $"Failed: fertile brush should succeed on plain (< 600m) (err={fertileErr})";
                 return false;
             }
         }
@@ -344,9 +360,45 @@ public sealed partial class MapEditorForm : Form
                 report = $"Failed: glacier brush should succeed at altitude >= 2500m (alt={highAlt:F0}m, err={okErr})";
                 return false;
             }
+
+            // Falaise sur le flanc escarpé de la montagne doit réussir
+            var cliffHigh = ApplyBiomeBrushForTesting(1800, 1200, 40, "falaise", true, out var cliffHighErr);
+            if (!cliffHigh)
+            {
+                report = $"Failed: cliff brush should succeed on steep mountain slope (err={cliffHighErr})";
+                return false;
+            }
         }
 
-        report = $"All slider, hover, river, commune move, and 7-biome rule tests passed successfully! (River test: {riverPts.Count} points, Mountain peak: {highAlt:F0}m)";
+        // Test d'inversion des falaises / sommet (anneaux et trous Marching Squares)
+        var ringGrid = new ZoneMaskGrid(80, 80, 800, 800);
+        for (var ci = 0; ci < ringGrid.Columns; ci++)
+        {
+            var gx = ringGrid.GetWorldX(ci);
+            for (var cj = 0; cj < ringGrid.Rows; cj++)
+            {
+                var gy = ringGrid.GetWorldY(cj);
+                var dist = Math.Sqrt((gx - 400) * (gx - 400) + (gy - 400) * (gy - 400));
+                if (dist >= 80.0 && dist <= 200.0)
+                {
+                    ringGrid.SetCellForTesting(ci, cj, 5); // falaise id = 5
+                }
+            }
+        }
+        var extractedBiomes = ringGrid.ExtractBiomes();
+        var cliffBiomes = extractedBiomes.Where(b => b.Kind == "falaise").ToList();
+        if (cliffBiomes.Count != 1)
+        {
+            report = $"Failed: cliff ring should produce exactly 1 biome with hole, got {cliffBiomes.Count}";
+            return false;
+        }
+        if (cliffBiomes[0].Holes is not { Count: > 0 })
+        {
+            report = "Failed: cliff ring should contain at least 1 hole for summit";
+            return false;
+        }
+
+        report = $"All slider, hover, river, commune move, cliff hole extraction, and 7-biome rule tests passed successfully! (River test: {riverPts.Count} points, Mountain peak: {highAlt:F0}m)";
         return true;
     }
 

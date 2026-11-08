@@ -224,11 +224,24 @@ public static class VintageMapRenderer
                 _ => (Color.FromArgb(218, 226, 206), Color.FromArgb(130, 115, 85), Color.FromArgb(90, 80, 55))
             };
 
+            using var path = new GraphicsPath(FillMode.Alternate);
+            path.AddPolygon(pts);
+            if (biome.Holes is { Count: > 0 } holes)
+            {
+                foreach (var hole in holes)
+                {
+                    if (hole.Count >= 3)
+                    {
+                        path.AddPolygon(hole.Select(p => new PointF((float)p.X, (float)p.Y)).ToArray());
+                    }
+                }
+            }
+
             using (var brush = new SolidBrush(washColor))
             using (var pen = new Pen(strokeColor, 1.1f))
             {
-                g.FillPolygon(brush, pts);
-                g.DrawPolygon(pen, pts);
+                g.FillPath(brush, path);
+                g.DrawPath(pen, path);
             }
 
             var minX = pts.Min(p => p.X);
@@ -236,8 +249,6 @@ public static class VintageMapRenderer
             var minY = pts.Min(p => p.Y);
             var maxY = pts.Max(p => p.Y);
 
-            using var path = new GraphicsPath();
-            path.AddPolygon(pts);
             var state = g.Save();
             g.SetClip(path, CombineMode.Intersect);
 
@@ -263,7 +274,7 @@ public static class VintageMapRenderer
                     var jx = x + (float)(Math.Sin(x * 12.7 + y * 31.1) * 3.5);
                     var jy = y + (float)(Math.Cos(x * 23.3 + y * 17.9) * 3.0);
 
-                    if (CartoSymbols.IsPointInPolygon(jx, jy, pts))
+                    if (CartoSymbols.IsPointInPolygon(jx, jy, pts) && !IsPointInHoles(jx, jy, biome.Holes))
                     {
                         DrawBiomeSymbol(g, biome.Kind, inkBrush, inkPen, jx, jy);
                         symbolCount++;
@@ -278,10 +289,14 @@ public static class VintageMapRenderer
                 }
             }
 
-            if (symbolCount == 0 && CartoSymbols.IsPointInPolygon(cx, cy, pts))
+            if (symbolCount == 0)
             {
-                DrawBiomeSymbol(g, biome.Kind, inkBrush, inkPen, cx, cy);
-                labelCandidate = new PointF(cx, cy);
+                var candidate = FindInternalPoint(biome.Boundary, biome.Holes);
+                if (candidate.HasValue)
+                {
+                    DrawBiomeSymbol(g, biome.Kind, inkBrush, inkPen, candidate.Value.X, candidate.Value.Y);
+                    labelCandidate = candidate.Value;
+                }
             }
 
             g.Restore(state);
@@ -459,17 +474,29 @@ public static class VintageMapRenderer
                     _ => (Color.FromArgb(40, 130, 110, 80), Color.FromArgb(120, 90, 70, 50), "•")
                 };
 
+                using var zonePath = new GraphicsPath(FillMode.Alternate);
+                zonePath.AddPolygon(pts);
+                if (zone.Holes is { Count: > 0 } zHoles)
+                {
+                    foreach (var h in zHoles)
+                    {
+                        if (h.Count >= 3)
+                            zonePath.AddPolygon(h.Select(p => new PointF((float)p.X, (float)p.Y)).ToArray());
+                    }
+                }
+
                 using (var fillBrush = new SolidBrush(tint))
                 using (var antiquePen = new Pen(stroke, 1.2f) { DashStyle = DashStyle.Dash })
                 {
-                    g.FillPolygon(fillBrush, pts);
-                    g.DrawPolygon(antiquePen, pts);
+                    g.FillPath(fillBrush, zonePath);
+                    g.DrawPath(antiquePen, zonePath);
                 }
 
                 if (showLabels)
                 {
-                    var cx = pts.Average(p => p.X);
-                    var cy = pts.Average(p => p.Y);
+                    var labelPt = FindInternalPoint(zone.Boundary, zone.Holes) ?? new PointF(pts.Average(p => p.X), pts.Average(p => p.Y));
+                    var cx = labelPt.X;
+                    var cy = labelPt.Y;
                     g.DrawString($"{icon} {zone.Name}", font, inkBrush, cx, cy, new StringFormat { Alignment = StringAlignment.Center });
                 }
             }
@@ -643,5 +670,53 @@ public static class VintageMapRenderer
     private static void DrawScrollworkCorner(Graphics g, Pen pen, float x, float y, float dx, float dy)
     {
         g.DrawArc(pen, x - Math.Abs(dx), y - Math.Abs(dy), Math.Abs(dx) * 2, Math.Abs(dy) * 2, 0, 360);
+    }
+
+    private static bool IsPointInHoles(float x, float y, IReadOnlyList<IReadOnlyList<Point2D>>? holes)
+    {
+        if (holes is null || holes.Count == 0) return false;
+        foreach (var hole in holes)
+        {
+            if (hole.Count >= 3 && CartoSymbols.IsPointInPolygon(x, y, hole))
+                return true;
+        }
+        return false;
+    }
+
+    private static PointF? FindInternalPoint(IReadOnlyList<Point2D> outer, IReadOnlyList<IReadOnlyList<Point2D>>? holes)
+    {
+        if (outer.Count < 3) return null;
+        var avgX = outer.Average(p => p.X);
+        var avgY = outer.Average(p => p.Y);
+        if (CartoSymbols.IsPointInPolygon(avgX, avgY, outer) && !IsPointInHoles((float)avgX, (float)avgY, holes))
+        {
+            return new PointF((float)avgX, (float)avgY);
+        }
+
+        for (var i = 0; i < outer.Count - 1; i++)
+        {
+            var p1 = outer[i];
+            var p2 = outer[i + 1];
+            var mx = (p1.X + p2.X) * 0.5;
+            var my = (p1.Y + p2.Y) * 0.5;
+            var dx = p2.X - p1.X;
+            var dy = p2.Y - p1.Y;
+            var len = Math.Sqrt(dx * dx + dy * dy);
+            if (len < 1e-4) continue;
+            var nx = -dy / len;
+            var ny = dx / len;
+
+            foreach (var d in new[] { 4.0, 8.0, 14.0 })
+            {
+                var t1 = new Point2D(mx + nx * d, my + ny * d);
+                if (CartoSymbols.IsPointInPolygon(t1.X, t1.Y, outer) && !IsPointInHoles((float)t1.X, (float)t1.Y, holes))
+                    return new PointF((float)t1.X, (float)t1.Y);
+
+                var t2 = new Point2D(mx - nx * d, my - ny * d);
+                if (CartoSymbols.IsPointInPolygon(t2.X, t2.Y, outer) && !IsPointInHoles((float)t2.X, (float)t2.Y, holes))
+                    return new PointF((float)t2.X, (float)t2.Y);
+            }
+        }
+        return null;
     }
 }

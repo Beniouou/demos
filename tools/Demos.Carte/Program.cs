@@ -94,8 +94,11 @@ public static class Program
                     // 3. Terres fertiles en plaine (< 600m)
                     form.ApplyBiomeBrushForTesting(1450, 800, 120, "fertile", true, out _);
 
-                    // 4. Falaises sur le versant sud-ouest du massif montagneux
+                    // 4. Falaises sur le versant escarpé et en ceinture autour du massif
+                    form.ApplyBiomeBrushForTesting(1000, 420, 160, "falaise", true, out _);
                     form.ApplyBiomeBrushForTesting(820, 480, 90, "falaise", true, out _);
+                    // Rétablir le dôme sommital du glacier (alt >= 2500m)
+                    form.ApplyBiomeBrushForTesting(1000, 420, 75, "glacier", true, out _);
 
                     // 5. Marais
                     form.ApplyBiomeBrushForTesting(720, 740, 90, "marais", true, out _);

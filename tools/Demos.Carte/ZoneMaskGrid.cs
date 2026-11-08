@@ -31,10 +31,10 @@ public sealed class ZoneMaskGrid
     public static readonly (string Key, string Label, string DefaultName, string Rule)[] BiomeTypes =
     [
         ("foret", "🌲 Forêt", "Bois des Chênes", "Terre émergée sous les glaciers (< 2 500 m)"),
-        ("fertile", "🌾 Terre fertile", "Plaine fertile", "Terre émergée en plaine/plateau (< 600 m, pente douce)"),
+        ("fertile", "🌾 Terre fertile", "Plaine fertile", "Terre émergée en plaine ou coteaux (< 600 m, pente tolérée < 60 %)"),
         ("marais", "🌾💧 Marais", "Grand Marais", "Près de l'eau (littoral bas ou le long d'un fleuve)"),
         ("plage", "🏖️ Plage", "Plage dorée", "Interface immédiate terre/mer (littoral ≤ 30 m)"),
-        ("falaise", "🧗 Falaise", "Falaises rocheuses", "Forte pente (dénivelé marqué) ou rivage rocheux abrupt"),
+        ("falaise", "🧗 Falaise", "Falaises rocheuses", "Forte pente (dénivelé abrupt ≥ 60 %) ou rivage à-pic"),
         ("desert", "🏜️ Désert", "Désert aride", "Plaine aride (< 250 m, pente douce)"),
         ("glacier", "❄️ Glacier", "Glacier éternel", "Haute altitude (≥ 2 500 m)")
     ];
@@ -61,6 +61,14 @@ public sealed class ZoneMaskGrid
         Array.Copy(_biome, clone._biome, _biome.Length);
         Array.Copy(_resource, clone._resource, _resource.Length);
         return clone;
+    }
+
+    public void SetCellForTesting(int i, int j, byte biomeId)
+    {
+        if (i >= 0 && i < Columns && j >= 0 && j < Rows)
+        {
+            _biome[i, j] = biomeId;
+        }
     }
 
     public void ClearBiomes()
@@ -219,7 +227,7 @@ public sealed class ZoneMaskGrid
 
                     case "fertile" or "zone fertile":
                         var slopeF = ComputeSlope(gx, gy, heightmap);
-                        isValid = alt < 600.0 && slopeF < 0.20;
+                        isValid = alt < 600.0 && slopeF < 0.60;
                         break;
 
                     case "plage":
@@ -232,8 +240,8 @@ public sealed class ZoneMaskGrid
 
                     case "falaise":
                         var slopeC = ComputeSlope(gx, gy, heightmap);
-                        var isCoastal = IsNearSea(gx, gy, heightmap, 16.0) && alt >= 4.0;
-                        isValid = slopeC >= 0.12 || isCoastal;
+                        var isCoastalCliff = IsNearSea(gx, gy, heightmap, 16.0) && alt >= 20.0 && slopeC >= 0.40;
+                        isValid = slopeC >= 0.60 || isCoastalCliff;
                         break;
                 }
 
@@ -257,9 +265,9 @@ public sealed class ZoneMaskGrid
                 "foret" or "forest" => "🌲 La forêt s'arrête sous la ligne des glaciers (< 2 500 m).",
                 "plage" => "🏖️ Une plage doit border le littoral (interface terre/mer).",
                 "marais" => "🌾💧 Un marais doit border un littoral bas ou un cours d'eau.",
-                "falaise" => "🧗 Une falaise requiert une pente abrupte ou un rivage rocheux.",
+                "falaise" => "🧗 Une falaise requiert une pente abrupte (≥ 60 %) ou un rivage à-pic (alt. ≥ 20 m).",
                 "desert" => "🏜️ Un désert ne s'étend que dans les plaines (< 250 m, pente douce).",
-                "fertile" or "zone fertile" => "🌾 Les terres fertiles requièrent une plaine (< 600 m, pente douce).",
+                "fertile" or "zone fertile" => "🌾 Les terres fertiles requièrent un terrain cultivable (< 600 m, pente < 60 %).",
                 _ => null
             };
         }
@@ -352,24 +360,24 @@ public sealed class ZoneMaskGrid
             if (count == 0) continue;
 
             var smoothed = SmoothGrid(binary);
-            var loops = ExtractMarchingSquaresLoops(smoothed, 0.45);
+            var structured = ExtractStructuredBiomeLoops(smoothed, 0.45);
 
             var zoneIdx = 1;
-            foreach (var loop in loops)
+            foreach (var (outer, holes) in structured)
             {
-                if (loop.Count < 3) continue;
+                if (outer.Count < 3) continue;
 
                 string name;
                 if (!string.IsNullOrWhiteSpace(preferredName) && string.Equals(key, activeKey, StringComparison.OrdinalIgnoreCase))
                 {
-                    name = loops.Count == 1 ? preferredName : $"{preferredName} ({zoneIdx})";
+                    name = structured.Count == 1 ? preferredName : $"{preferredName} ({zoneIdx})";
                 }
                 else
                 {
-                    name = loops.Count == 1 ? defaultName : $"{defaultName} ({zoneIdx})";
+                    name = structured.Count == 1 ? defaultName : $"{defaultName} ({zoneIdx})";
                 }
 
-                biomes.Add(new PolygonArea(name, key, loop));
+                biomes.Add(new PolygonArea(name, key, outer, holes.Count > 0 ? holes : null));
                 zoneIdx++;
             }
         }
@@ -421,22 +429,21 @@ public sealed class ZoneMaskGrid
             if (count == 0) continue;
 
             var smoothed = SmoothGrid(binary);
-            var loops = ExtractMarchingSquaresLoops(smoothed, 0.45);
+            var structured = ExtractStructuredBiomeLoops(smoothed, 0.45);
 
             var zoneIdx = 1;
-            foreach (var loop in loops)
+            foreach (var (outer, holes) in structured)
             {
-                if (loop.Count < 3) continue;
+                if (outer.Count < 3) continue;
 
                 var name = !string.IsNullOrWhiteSpace(preferredName) && zones.Count == 0
                     ? preferredName
-                    : (loops.Count == 1 ? defaultName : $"{defaultName} {zoneIdx}");
+                    : (structured.Count == 1 ? defaultName : $"{defaultName} {zoneIdx}");
 
-                zones.Add(new PolygonArea(name, key, loop));
+                zones.Add(new PolygonArea(name, key, outer, holes.Count > 0 ? holes : null));
 
-                var cx = loop.Average(p => p.X);
-                var cy = loop.Average(p => p.Y);
-                deposits.Add(new ResourceDeposit(key, name, new Point2D(Math.Round(cx, 1), Math.Round(cy, 1))));
+                var depositPt = FindInternalPoint(outer, holes) ?? new Point2D(outer.Average(p => p.X), outer.Average(p => p.Y));
+                deposits.Add(new ResourceDeposit(key, name, new Point2D(Math.Round(depositPt.X, 1), Math.Round(depositPt.Y, 1))));
 
                 zoneIdx++;
             }
@@ -460,6 +467,14 @@ public sealed class ZoneMaskGrid
             if (biome.Boundary.Count < 3) continue;
             var biomeId = BiomeKeyToId(biome.Kind);
             RasterizePolygonIntoBiome(biome.Boundary, biomeId);
+            if (biome.Holes is { Count: > 0 } holes)
+            {
+                foreach (var hole in holes)
+                {
+                    if (hole.Count >= 3)
+                        RasterizePolygonIntoBiome(hole, 0);
+                }
+            }
         }
 
         // 2. Zones de gisements existantes (pierre, charbon, fer)
@@ -472,11 +487,27 @@ public sealed class ZoneMaskGrid
                 if (zone.Kind.Equals("fertile", StringComparison.OrdinalIgnoreCase) || zone.Kind.Equals("zone fertile", StringComparison.OrdinalIgnoreCase))
                 {
                     RasterizePolygonIntoBiome(zone.Boundary, 2);
+                    if (zone.Holes is { Count: > 0 } holes)
+                    {
+                        foreach (var hole in holes)
+                        {
+                            if (hole.Count >= 3)
+                                RasterizePolygonIntoBiome(hole, 0);
+                        }
+                    }
                 }
                 else
                 {
                     var resId = ResourceKeyToId(zone.Kind);
                     RasterizePolygonIntoResource(zone.Boundary, resId);
+                    if (zone.Holes is { Count: > 0 } holes)
+                    {
+                        foreach (var hole in holes)
+                        {
+                            if (hole.Count >= 3)
+                                RasterizePolygonIntoResource(hole, 0);
+                        }
+                    }
                 }
             }
         }
@@ -746,5 +777,237 @@ public sealed class ZoneMaskGrid
         var dx = a.X - b.X;
         var dy = a.Y - b.Y;
         return Math.Sqrt(dx * dx + dy * dy);
+    }
+
+    /// <summary>
+    /// Échantillonne la grille matricielle continue par interpolation bilinéaire.
+    /// </summary>
+    private double SampleGrid(double[,] grid, double wx, double wy)
+    {
+        var u = (wx / CellWidth) - 0.5;
+        var v = (wy / CellHeight) - 0.5;
+        var i0 = Math.Clamp((int)Math.Floor(u), 0, Columns - 1);
+        var i1 = Math.Clamp(i0 + 1, 0, Columns - 1);
+        var j0 = Math.Clamp((int)Math.Floor(v), 0, Rows - 1);
+        var j1 = Math.Clamp(j0 + 1, 0, Rows - 1);
+        var fx = Math.Clamp(u - i0, 0.0, 1.0);
+        var fy = Math.Clamp(v - j0, 0.0, 1.0);
+
+        var z00 = grid[i0, j0];
+        var z10 = grid[i1, j0];
+        var z01 = grid[i0, j1];
+        var z11 = grid[i1, j1];
+
+        var top = z00 + fx * (z10 - z00);
+        var bot = z01 + fx * (z11 - z01);
+        return top + fy * (bot - top);
+    }
+
+    /// <summary>
+    /// Détermine si une boucle Marching Squares est un trou intérieur (vide/sommet où grid &lt; threshold)
+    /// ou un contour extérieur (biome où grid &gt;= threshold).
+    /// </summary>
+    private bool IsHoleLoop(IReadOnlyList<Point2D> loop, double[,] grid, double threshold)
+    {
+        if (loop.Count < 3) return false;
+
+        var votesBiome = 0;
+        var votesVoid = 0;
+
+        var step = Math.Max(1, loop.Count / 16);
+        for (var i = 0; i < loop.Count - 1; i += step)
+        {
+            var p1 = loop[i];
+            var p2 = loop[i + 1];
+            var dx = p2.X - p1.X;
+            var dy = p2.Y - p1.Y;
+            var len = Math.Sqrt(dx * dx + dy * dy);
+            if (len < 1e-4) continue;
+
+            var mx = (p1.X + p2.X) * 0.5;
+            var my = (p1.Y + p2.Y) * 0.5;
+            var nx = -dy / len;
+            var ny = dx / len;
+
+            for (var dist = 2.0; dist <= 8.0; dist += 2.0)
+            {
+                var s1 = new Point2D(mx + nx * dist, my + ny * dist);
+                var s2 = new Point2D(mx - nx * dist, my - ny * dist);
+
+                var in1 = IsPointInPolygon(s1.X, s1.Y, loop);
+                var in2 = IsPointInPolygon(s2.X, s2.Y, loop);
+
+                if (in1 != in2)
+                {
+                    var insidePt = in1 ? s1 : s2;
+                    var val = SampleGrid(grid, insidePt.X, insidePt.Y);
+                    if (val >= threshold)
+                        votesBiome++;
+                    else
+                        votesVoid++;
+                }
+            }
+        }
+
+        if (votesBiome + votesVoid > 0)
+        {
+            return votesVoid > votesBiome;
+        }
+
+        var minX = loop.Min(p => p.X);
+        var maxX = loop.Max(p => p.X);
+        var minY = loop.Min(p => p.Y);
+        var maxY = loop.Max(p => p.Y);
+
+        var sx = Math.Max(CellWidth, (maxX - minX) / 8.0);
+        var sy = Math.Max(CellHeight, (maxY - minY) / 8.0);
+
+        for (var x = minX + sx * 0.5; x < maxX; x += sx)
+        {
+            for (var y = minY + sy * 0.5; y < maxY; y += sy)
+            {
+                if (IsPointInPolygon(x, y, loop))
+                {
+                    var val = SampleGrid(grid, x, y);
+                    if (val >= threshold) votesBiome++;
+                    else votesVoid++;
+                }
+            }
+        }
+
+        if (votesBiome + votesVoid > 0)
+        {
+            return votesVoid > votesBiome;
+        }
+
+        var avgX = loop.Average(p => p.X);
+        var avgY = loop.Average(p => p.Y);
+        return SampleGrid(grid, avgX, avgY) < threshold;
+    }
+
+    private static double ComputePolygonArea(IReadOnlyList<Point2D> pts)
+    {
+        var area = 0.0;
+        for (var k = 0; k < pts.Count - 1; k++)
+        {
+            area += pts[k].X * pts[k + 1].Y - pts[k + 1].X * pts[k].Y;
+        }
+        return Math.Abs(area * 0.5);
+    }
+
+    private static bool IsHoleInsideOuter(IReadOnlyList<Point2D> hole, IReadOnlyList<Point2D> outer)
+    {
+        if (hole.Count < 3 || outer.Count < 3) return false;
+
+        var step = Math.Max(1, hole.Count / 5);
+        var insideCount = 0;
+        var totalTested = 0;
+
+        for (var i = 0; i < hole.Count - 1 && totalTested < 5; i += step)
+        {
+            totalTested++;
+            if (IsPointInPolygon(hole[i].X, hole[i].Y, outer))
+            {
+                insideCount++;
+            }
+        }
+
+        return insideCount > totalTested / 2;
+    }
+
+    private static Point2D? FindInternalPoint(IReadOnlyList<Point2D> outer, IReadOnlyList<List<Point2D>> holes)
+    {
+        var avgX = outer.Average(p => p.X);
+        var avgY = outer.Average(p => p.Y);
+        if (IsPointInPolygon(avgX, avgY, outer) && !holes.Any(h => IsPointInPolygon(avgX, avgY, h)))
+        {
+            return new Point2D(avgX, avgY);
+        }
+
+        for (var i = 0; i < outer.Count - 1; i++)
+        {
+            var p1 = outer[i];
+            var p2 = outer[i + 1];
+            var mx = (p1.X + p2.X) * 0.5;
+            var my = (p1.Y + p2.Y) * 0.5;
+            var dx = p2.X - p1.X;
+            var dy = p2.Y - p1.Y;
+            var len = Math.Sqrt(dx * dx + dy * dy);
+            if (len < 1e-4) continue;
+            var nx = -dy / len;
+            var ny = dx / len;
+
+            foreach (var d in new[] { 5.0, 10.0, 15.0 })
+            {
+                var s1 = new Point2D(mx + nx * d, my + ny * d);
+                if (IsPointInPolygon(s1.X, s1.Y, outer) && !holes.Any(h => IsPointInPolygon(s1.X, s1.Y, h)))
+                    return s1;
+
+                var s2 = new Point2D(mx - nx * d, my - ny * d);
+                if (IsPointInPolygon(s2.X, s2.Y, outer) && !holes.Any(h => IsPointInPolygon(s2.X, s2.Y, h)))
+                    return s2;
+            }
+        }
+        return null;
+    }
+
+    /// <summary>
+    /// Extrait les boucles Marching Squares pour une grille binaire lissée,
+    /// puis classe et hiérarchise les boucles en contours extérieurs (positives)
+    /// et trous intérieurs (négatifs), en associant chaque trou à son contour parent.
+    /// Élimine définitivement le bug d'inversion des falaises / sommets.
+    /// </summary>
+    private List<(List<Point2D> Outer, List<List<Point2D>> Holes)> ExtractStructuredBiomeLoops(double[,] grid, double threshold)
+    {
+        var allLoops = ExtractMarchingSquaresLoops(grid, threshold);
+        if (allLoops.Count == 0) return [];
+
+        var outerLoops = new List<List<Point2D>>();
+        var holeLoops = new List<List<Point2D>>();
+
+        foreach (var loop in allLoops)
+        {
+            if (loop.Count < 3) continue;
+
+            if (IsHoleLoop(loop, grid, threshold))
+            {
+                holeLoops.Add(loop);
+            }
+            else
+            {
+                outerLoops.Add(loop);
+            }
+        }
+
+        if (outerLoops.Count == 0) return [];
+
+        var structured = outerLoops.Select(outer => (Outer: outer, Holes: new List<List<Point2D>>())).ToList();
+
+        foreach (var hole in holeLoops)
+        {
+            var bestIdx = -1;
+            var bestArea = double.MaxValue;
+
+            for (var i = 0; i < structured.Count; i++)
+            {
+                var outer = structured[i].Outer;
+                if (IsHoleInsideOuter(hole, outer))
+                {
+                    var area = ComputePolygonArea(outer);
+                    if (area < bestArea)
+                    {
+                        bestArea = area;
+                        bestIdx = i;
+                    }
+                }
+            }
+
+            if (bestIdx >= 0)
+            {
+                structured[bestIdx].Holes.Add(hole);
+            }
+        }
+
+        return structured;
     }
 }

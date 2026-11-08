@@ -1,6 +1,8 @@
 using System;
+using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Drawing2D;
+using Demos.Domain.Map;
 
 namespace Demos.Carte.Rendering;
 
@@ -26,6 +28,27 @@ public static class CartoSymbols
         }
         return inside;
     }
+
+    /// <summary>
+    /// Test d'inclusion d'un point dans un polygone vectoriel Point2D (algorithme Ray Casting).
+    /// </summary>
+    public static bool IsPointInPolygon(double x, double y, IReadOnlyList<Point2D> poly)
+    {
+        var inside = false;
+        var count = poly.Count;
+        for (int i = 0, j = count - 1; i < count; j = i++)
+        {
+            if (((poly[i].Y > y) != (poly[j].Y > y)) &&
+                (x < (poly[j].X - poly[i].X) * (y - poly[i].Y) / (poly[j].Y - poly[i].Y) + poly[i].X))
+            {
+                inside = !inside;
+            }
+        }
+        return inside;
+    }
+
+    public static bool IsPointInPolygon(float x, float y, IReadOnlyList<Point2D> poly) =>
+        IsPointInPolygon((double)x, (double)y, poly);
 
     /// <summary>
     /// Bosquet stylisé doux (style IGN).

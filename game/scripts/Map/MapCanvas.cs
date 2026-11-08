@@ -307,8 +307,52 @@ public partial class MapCanvas : Control
                     _ => (MapPalette.Forest, MapPalette.ForestStroke)
                 };
 
-                DrawColoredPolygon(screenPoints, fill);
-                DrawPolyline(screenPoints, stroke, 1.2f, antialiased: true);
+                if (biome.Holes is { Count: > 0 } holes)
+                {
+                    var pieces = new List<Vector2[]> { screenPoints };
+                    foreach (var hole in holes)
+                    {
+                        if (hole.Count < 3) continue;
+                        var holePoints = hole.Select(p => ToScreen(new Vector2((float)p.X, (float)p.Y))).ToArray();
+                        var nextPieces = new List<Vector2[]>();
+                        foreach (var piece in pieces)
+                        {
+                            var clipped = Geometry2D.ClipPolygons(piece, holePoints);
+                            if (clipped != null && clipped.Count > 0)
+                            {
+                                foreach (var cp in clipped) nextPieces.Add(cp);
+                            }
+                            else
+                            {
+                                nextPieces.Add(piece);
+                            }
+                        }
+                        pieces = nextPieces;
+                    }
+
+                    foreach (var piece in pieces)
+                    {
+                        if (piece.Length >= 3)
+                        {
+                            DrawColoredPolygon(piece, fill);
+                        }
+                    }
+
+                    DrawPolyline(screenPoints, stroke, 1.2f, antialiased: true);
+                    foreach (var hole in holes)
+                    {
+                        if (hole.Count >= 3)
+                        {
+                            var holePoints = hole.Select(p => ToScreen(new Vector2((float)p.X, (float)p.Y))).ToArray();
+                            DrawPolyline(holePoints, stroke, 1.2f, antialiased: true);
+                        }
+                    }
+                }
+                else
+                {
+                    DrawColoredPolygon(screenPoints, fill);
+                    DrawPolyline(screenPoints, stroke, 1.2f, antialiased: true);
+                }
 
                 if (biome.Kind is "foret" or "forest")
                 {
@@ -327,7 +371,7 @@ public partial class MapCanvas : Control
                         for (var x = minX + step * 0.5f; x <= maxX; x += step)
                         {
                             var pt = new Vector2(x, y);
-                            if (Geometry2D.IsPointInPolygon(pt, screenPoints))
+                            if (Geometry2D.IsPointInPolygon(pt, screenPoints) && !(biome.Holes?.Any(h => Geometry2D.IsPointInPolygon(pt, h.Select(p => ToScreen(new Vector2((float)p.X, (float)p.Y))).ToArray())) ?? false))
                             {
                                 DrawTreeCluster(pt);
                                 treeCount++;
@@ -338,7 +382,7 @@ public partial class MapCanvas : Control
                     if (treeCount == 0)
                     {
                         var center = screenPoints.Aggregate(Vector2.Zero, (acc, p) => acc + p) / screenPoints.Length;
-                        if (Geometry2D.IsPointInPolygon(center, screenPoints))
+                        if (Geometry2D.IsPointInPolygon(center, screenPoints) && !(biome.Holes?.Any(h => Geometry2D.IsPointInPolygon(center, h.Select(p => ToScreen(new Vector2((float)p.X, (float)p.Y))).ToArray())) ?? false))
                         {
                             DrawTreeCluster(center);
                         }

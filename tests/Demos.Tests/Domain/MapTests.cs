@@ -272,4 +272,50 @@ public class MapTests
         Assert.Equal("Peak", spotDefault.Category);
         Assert.True(spotDefault.ShowAltitude);
     }
+
+    [Fact]
+    public void PolygonArea_Avec_Trous_Serialise_Et_Deserialise_Fidelement()
+    {
+        var outer = new List<Point2D> { new(0, 0), new(100, 0), new(100, 100), new(0, 100), new(0, 0) };
+        var hole = new List<Point2D> { new(20, 20), new(80, 20), new(80, 80), new(20, 80), new(20, 20) };
+        var poly = new PolygonArea("Falaises du Pic", "falaise", outer, Holes: [hole]);
+
+        var options = new System.Text.Json.JsonSerializerOptions
+        {
+            PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase,
+            PropertyNameCaseInsensitive = true
+        };
+
+        var json = System.Text.Json.JsonSerializer.Serialize(poly, options);
+        Assert.Contains("\"holes\"", json);
+
+        var deserialized = System.Text.Json.JsonSerializer.Deserialize<PolygonArea>(json, options);
+        Assert.NotNull(deserialized);
+        Assert.Equal("Falaises du Pic", deserialized.Name);
+        Assert.Equal("falaise", deserialized.Kind);
+        Assert.Equal(5, deserialized.Boundary.Count);
+        Assert.NotNull(deserialized.Holes);
+        Assert.Single(deserialized.Holes);
+        Assert.Equal(5, deserialized.Holes[0].Count);
+    }
+
+    [Fact]
+    public void PolygonArea_Sans_Trous_Ne_Serialise_Pas_De_Propriete_Holes()
+    {
+        var outer = new List<Point2D> { new(0, 0), new(50, 0), new(50, 50), new(0, 50), new(0, 0) };
+        var poly = new PolygonArea("Bois Simple", "foret", outer);
+
+        var options = new System.Text.Json.JsonSerializerOptions
+        {
+            PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase,
+            PropertyNameCaseInsensitive = true
+        };
+
+        var json = System.Text.Json.JsonSerializer.Serialize(poly, options);
+        Assert.DoesNotContain("\"holes\"", json);
+
+        var deserialized = System.Text.Json.JsonSerializer.Deserialize<PolygonArea>(json, options);
+        Assert.NotNull(deserialized);
+        Assert.Null(deserialized.Holes);
+    }
 }

@@ -135,11 +135,24 @@ public static class IgnMapRenderer
                 _ => (Color.FromArgb(197, 214, 191), Color.FromArgb(142, 164, 135), Color.FromArgb(127, 153, 118))
             };
 
+            using var path = new GraphicsPath(FillMode.Alternate);
+            path.AddPolygon(pts);
+            if (biome.Holes is { Count: > 0 } holes)
+            {
+                foreach (var hole in holes)
+                {
+                    if (hole.Count >= 3)
+                    {
+                        path.AddPolygon(hole.Select(p => new PointF((float)p.X, (float)p.Y)).ToArray());
+                    }
+                }
+            }
+
             using (var brush = new SolidBrush(washColor))
             using (var pen = new Pen(strokeColor, 1.2f))
             {
-                g.FillPolygon(brush, pts);
-                g.DrawPolygon(pen, pts);
+                g.FillPath(brush, path);
+                g.DrawPath(pen, path);
             }
 
             var minX = pts.Min(p => p.X);
@@ -147,8 +160,6 @@ public static class IgnMapRenderer
             var minY = pts.Min(p => p.Y);
             var maxY = pts.Max(p => p.Y);
 
-            using var path = new GraphicsPath();
-            path.AddPolygon(pts);
             var state = g.Save();
             g.SetClip(path, CombineMode.Intersect);
 
@@ -170,7 +181,7 @@ public static class IgnMapRenderer
                     var jx = x + (float)(Math.Sin(x * 11.3 + y * 27.7) * 4.0);
                     var jy = y + (float)(Math.Cos(x * 19.1 + y * 13.9) * 4.0);
 
-                    if (CartoSymbols.IsPointInPolygon(jx, jy, pts))
+                    if (CartoSymbols.IsPointInPolygon(jx, jy, pts) && !IsPointInHoles(jx, jy, biome.Holes))
                     {
                         DrawBiomeSymbol(g, biome.Kind, patternBrush, patternPen, jx, jy);
                         symbolCount++;
@@ -180,11 +191,10 @@ public static class IgnMapRenderer
 
             if (symbolCount == 0)
             {
-                var cx = pts.Average(p => p.X);
-                var cy = pts.Average(p => p.Y);
-                if (CartoSymbols.IsPointInPolygon(cx, cy, pts))
+                var candidate = FindInternalPoint(biome.Boundary, biome.Holes);
+                if (candidate.HasValue)
                 {
-                    DrawBiomeSymbol(g, biome.Kind, patternBrush, patternPen, cx, cy);
+                    DrawBiomeSymbol(g, biome.Kind, patternBrush, patternPen, candidate.Value.X, candidate.Value.Y);
                 }
             }
 
@@ -376,17 +386,29 @@ public static class IgnMapRenderer
                     _ => (Color.FromArgb(60, 150, 150, 150), Color.FromArgb(160, 100, 100, 100), "💎")
                 };
 
+                using var zonePath = new GraphicsPath(FillMode.Alternate);
+                zonePath.AddPolygon(pts);
+                if (zone.Holes is { Count: > 0 } zHoles)
+                {
+                    foreach (var h in zHoles)
+                    {
+                        if (h.Count >= 3)
+                            zonePath.AddPolygon(h.Select(p => new PointF((float)p.X, (float)p.Y)).ToArray());
+                    }
+                }
+
                 using (var fillBrush = new SolidBrush(fillColor))
                 using (var strokePen = new Pen(strokeColor, 1.4f))
                 {
-                    g.FillPolygon(fillBrush, pts);
-                    g.DrawPolygon(strokePen, pts);
+                    g.FillPath(fillBrush, zonePath);
+                    g.DrawPath(strokePen, zonePath);
                 }
 
                 if (showLabels)
                 {
-                    var cx = pts.Average(p => p.X);
-                    var cy = pts.Average(p => p.Y);
+                    var labelPt = FindInternalPoint(zone.Boundary, zone.Holes) ?? new PointF(pts.Average(p => p.X), pts.Average(p => p.Y));
+                    var cx = labelPt.X;
+                    var cy = labelPt.Y;
                     var label = $"{icon} {zone.Name}";
                     var sz = g.MeasureString(label, font);
                     var rect = new RectangleF(cx - sz.Width * 0.5f - 4, cy - sz.Height * 0.5f - 2, sz.Width + 8, sz.Height + 4);
@@ -470,5 +492,53 @@ public static class IgnMapRenderer
             g.DrawRectangle(cartoucheBorder, labelRect.X, labelRect.Y, labelRect.Width, labelRect.Height);
             g.DrawString(c.Name, fontCommune, textBrush, labelRect, sf);
         }
+    }
+
+    private static bool IsPointInHoles(float x, float y, IReadOnlyList<IReadOnlyList<Point2D>>? holes)
+    {
+        if (holes is null || holes.Count == 0) return false;
+        foreach (var hole in holes)
+        {
+            if (hole.Count >= 3 && CartoSymbols.IsPointInPolygon(x, y, hole))
+                return true;
+        }
+        return false;
+    }
+
+    private static PointF? FindInternalPoint(IReadOnlyList<Point2D> outer, IReadOnlyList<IReadOnlyList<Point2D>>? holes)
+    {
+        if (outer.Count < 3) return null;
+        var avgX = outer.Average(p => p.X);
+        var avgY = outer.Average(p => p.Y);
+        if (CartoSymbols.IsPointInPolygon(avgX, avgY, outer) && !IsPointInHoles((float)avgX, (float)avgY, holes))
+        {
+            return new PointF((float)avgX, (float)avgY);
+        }
+
+        for (var i = 0; i < outer.Count - 1; i++)
+        {
+            var p1 = outer[i];
+            var p2 = outer[i + 1];
+            var mx = (p1.X + p2.X) * 0.5;
+            var my = (p1.Y + p2.Y) * 0.5;
+            var dx = p2.X - p1.X;
+            var dy = p2.Y - p1.Y;
+            var len = Math.Sqrt(dx * dx + dy * dy);
+            if (len < 1e-4) continue;
+            var nx = -dy / len;
+            var ny = dx / len;
+
+            foreach (var d in new[] { 4.0, 8.0, 14.0 })
+            {
+                var t1 = new Point2D(mx + nx * d, my + ny * d);
+                if (CartoSymbols.IsPointInPolygon(t1.X, t1.Y, outer) && !IsPointInHoles((float)t1.X, (float)t1.Y, holes))
+                    return new PointF((float)t1.X, (float)t1.Y);
+
+                var t2 = new Point2D(mx - nx * d, my - ny * d);
+                if (CartoSymbols.IsPointInPolygon(t2.X, t2.Y, outer) && !IsPointInHoles((float)t2.X, (float)t2.Y, holes))
+                    return new PointF((float)t2.X, (float)t2.Y);
+            }
+        }
+        return null;
     }
 }
