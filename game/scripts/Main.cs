@@ -130,9 +130,15 @@ public partial class Main : Node
 
         var commune = _simulation.TryFoundCommune(
             name, PrototypeScenario.FirstCommuneId, BaseCampCost, PaymentMode.StockFirst, pole, BaseCampLegitimacyCost);
-        _hud.ShowMessage(commune is null
-            ? $"Camp de base impossible : il faut 100 pierre, 100 bois, {BaseCampLegitimacyCost} de légitimité " +
-              $"et {Simulation.FoundingGrantOf(_simulation.World.BuildingTypes[Simulation.BaseCampTypeId]):N0} de dotation au trésor."
-            : $"{commune.Name} fondée, charte {WorldText.PoleName(pole)} ({pole.Code}), caisse de {_simulation.World.CommuneFundOf(commune.Id).Balance:N0}.");
+        if (commune is not null)
+        {
+            _hud.Map.AddCommune(commune.Id, commune.Name, _hud.Map.HoveredCell);
+            _hud.ShowMessage($"{commune.Name} fondée, charte {WorldText.PoleName(pole)} ({pole.Code}), caisse de {_simulation.World.CommuneFundOf(commune.Id).Balance:N0}.");
+        }
+        else
+        {
+            _hud.ShowMessage($"Camp de base impossible : il faut 100 pierre, 100 bois, {BaseCampLegitimacyCost} de légitimité " +
+              $"et {Simulation.FoundingGrantOf(_simulation.World.BuildingTypes[Simulation.BaseCampTypeId]):N0} de dotation au trésor.");
+        }
     }
 }

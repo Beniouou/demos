@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using Demos.Application;
+using Demos.Game.Map;
 using Godot;
 
 namespace Demos.Game;
@@ -41,17 +42,17 @@ public partial class MainMenu : HBoxContainer
     private TabContainer _tabs = null!;
     private int _open = -1;
 
-    public void Init(GameView view, PlayerDesk desk)
+    public void Init(GameView view, PlayerDesk desk, MapCanvas map)
     {
         _menus =
         [
             new("Carte",
             [
-                Coming("Géographie", "La carte en régions : relief, climat et ressources de chaque région."),
-                Coming("Géopolitique", "Les entités politiques sur la carte et leurs frontières."),
-                Coming("Production", "Où l'on produit quoi, région par région."),
-                Coming("Transit", "Le transport des produits entre les régions."),
-                Coming("Ressources nat.", "Les ressources naturelles de chaque région."),
+                new("Géographie", () => new MapPage(map, MapViewMode.Geography, "Géographie physique", "Relief, hydrographie, altitude et courbes de niveau.")),
+                new("Géopolitique", () => new MapPage(map, MapViewMode.Geopolitics, "Géopolitique & Souveraineté", "Frontières de juridiction, zone d'influence et communes.")),
+                new("Production", () => new MapPage(map, MapViewMode.Production, "Unités & Bassins de production", "Sites d'extraction de matières premières et ateliers.")),
+                new("Transit", () => new MapPage(map, MapViewMode.Transit, "Voies de communication & Transit", "Corridors navigables et friction de transport.")),
+                new("Ressources nat.", () => new MapPage(map, MapViewMode.NaturalResources, "Ressources du sol", "Gisements de pierre, charbon, bois, blé et lin.")),
             ]),
             new("Lois",
             [

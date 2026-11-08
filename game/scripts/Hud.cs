@@ -14,6 +14,7 @@ public partial class Hud : Control
 
     public TopBar TopBar { get; private set; } = null!;
     public MainMenu Menu { get; private set; } = null!;
+    public Demos.Game.Map.MapCanvas Map { get; private set; } = null!;
     private Label _message = null!;
 
     public void Init(GameView view, PlayerDesk desk, string[] speedLabels)
@@ -36,14 +37,16 @@ public partial class Hud : Control
         middle.AddThemeConstantOverride("separation", 0);
         layout.AddChild(middle);
 
-        Menu = new MainMenu();
-        Menu.Init(view, desk);
-        middle.AddChild(Menu);
+        Map = new Demos.Game.Map.MapCanvas
+        {
+            SizeFlagsHorizontal = SizeFlags.ExpandFill,
+            SizeFlagsVertical = SizeFlags.ExpandFill,
+        };
 
-        // La carte viendra ici ; en attendant, la place reste vide.
-        var map = new CenterContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill, MouseFilter = MouseFilterEnum.Ignore };
-        map.AddChild(UiTheme.Caption("Carte en régions — à venir"));
-        middle.AddChild(map);
+        Menu = new MainMenu();
+        Menu.Init(view, desk, Map);
+        middle.AddChild(Menu);
+        middle.AddChild(Map);
 
         layout.AddChild(BuildBottomBar());
     }
