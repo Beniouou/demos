@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Linq;
 using System.Text.Json;
 using System.Windows.Forms;
 using Demos.Domain.Map;
@@ -58,6 +59,20 @@ public static class Program
             form.WindowState = FormWindowState.Normal;
             form.ClientSize = new System.Drawing.Size(1440, 900);
 
+            var seedVal = 42;
+            var morphVal = IslandMorphology.Natural;
+            var maxAltVal = 2800.0;
+            for (int i = 0; i < args.Length; i++)
+            {
+                if (args[i].Equals("--seed", StringComparison.OrdinalIgnoreCase) && i + 1 < args.Length && int.TryParse(args[i + 1], out var s))
+                    seedVal = s;
+                if (args[i].Equals("--morph", StringComparison.OrdinalIgnoreCase) && i + 1 < args.Length && Enum.TryParse<IslandMorphology>(args[i + 1], true, out var m))
+                    morphVal = m;
+                if (args[i].Equals("--maxalt", StringComparison.OrdinalIgnoreCase) && i + 1 < args.Length && double.TryParse(args[i + 1], out var a))
+                    maxAltVal = a;
+            }
+            form.SetIslandParametersForTesting(seedVal, morphVal, maxAltVal);
+
             if (args.Length > 3 && args[3].Equals("--island", StringComparison.OrdinalIgnoreCase))
             {
                 form.CreateIslandMap();
@@ -67,7 +82,7 @@ public static class Program
                 form.LoadExistingMap();
             }
 
-            if (args.Length > 4 && args[4].Equals("--vintage", StringComparison.OrdinalIgnoreCase))
+            if (args.Any(a => a.Equals("--vintage", StringComparison.OrdinalIgnoreCase)))
             {
                 form.SetStyleForTesting(MapRenderStyle.VintageParchment1874);
             }

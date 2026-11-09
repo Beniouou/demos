@@ -34,11 +34,8 @@ public static class IgnMapRenderer
         // 3. Biomes naturels (Forêts, Marais, Terres fertiles, Plages, Falaises, Déserts, Glaciers)
         DrawBiomes(g, map);
 
-        // 4. Estompage topographique (maquette historique sans courbes réelles)
-        if (map.Width <= 1100.0 && map.Height <= 750.0 && map.Contours.Count == 0)
-        {
-            DrawHillshading(g, map);
-        }
+        // 4. Estompage topographique physique continu (Hillshading Nord-Ouest 3D)
+        DrawHillshading(g, heightmap, map.Width, map.Height);
 
         // 5. Courbes de niveau IGN continues
         if (showContours)
@@ -86,9 +83,18 @@ public static class IgnMapRenderer
 
         if (heightmap is not null && heightmap.MinElevation < 0)
         {
+            // 1. Hauts-fonds côtiers (eau peu profonde / estran turquoise)
+            var shallowSegments = ContourExtractor.ExtractSegmentsForLevel(heightmap, -8.0);
+            using var shallowPen = new Pen(Color.FromArgb(60, 205, 230, 245), 7.0f) { LineJoin = LineJoin.Round, StartCap = LineCap.Round, EndCap = LineCap.Round };
+            foreach (var seg in shallowSegments)
+            {
+                g.DrawLine(shallowPen, (float)seg.P1.X, (float)seg.P1.Y, (float)seg.P2.X, (float)seg.P2.Y);
+            }
+
+            // 2. Trait de côte (0 m) avec écume marine / brisants
             var coastSegments = ContourExtractor.ExtractSegmentsForLevel(heightmap, 0.0);
-            using var shallowPen = new Pen(Color.FromArgb(90, 255, 255, 255), 5.0f) { LineJoin = LineJoin.Round, StartCap = LineCap.Round, EndCap = LineCap.Round };
-            using var coastPen = new Pen(Color.FromArgb(105, 145, 170), 2.2f) { LineJoin = LineJoin.Round, StartCap = LineCap.Round, EndCap = LineCap.Round };
+            using var foamPen = new Pen(Color.FromArgb(130, 255, 255, 255), 3.8f) { LineJoin = LineJoin.Round, StartCap = LineCap.Round, EndCap = LineCap.Round };
+            using var coastPen = new Pen(Color.FromArgb(85, 125, 155), 2.2f) { LineJoin = LineJoin.Round, StartCap = LineCap.Round, EndCap = LineCap.Round };
 
             foreach (var seg in coastSegments)
             {
@@ -96,13 +102,13 @@ public static class IgnMapRenderer
                 var y1 = (float)seg.P1.Y;
                 var x2 = (float)seg.P2.X;
                 var y2 = (float)seg.P2.Y;
-                g.DrawLine(shallowPen, x1, y1, x2, y2);
+                g.DrawLine(foamPen, x1, y1, x2, y2);
                 g.DrawLine(coastPen, x1, y1, x2, y2);
             }
         }
         else
         {
-            using var coastPen = new Pen(Color.FromArgb(105, 145, 170), 2.2f) { LineJoin = LineJoin.Round };
+            using var coastPen = new Pen(Color.FromArgb(85, 125, 155), 2.2f) { LineJoin = LineJoin.Round };
             foreach (var body in map.WaterBodies)
             {
                 if (body.Boundary.Count < 3) continue;
@@ -178,12 +184,13 @@ public static class IgnMapRenderer
 
                 for (var x = minX + 16f + rowOffset; x <= maxX - 8f; x += stepX)
                 {
-                    var jx = x + (float)(Math.Sin(x * 11.3 + y * 27.7) * 4.0);
-                    var jy = y + (float)(Math.Cos(x * 19.1 + y * 13.9) * 4.0);
+                    var jx = x + (float)(Math.Sin(x * 11.3 + y * 27.7) * 6.5);
+                    var jy = y + (float)(Math.Cos(x * 19.1 + y * 13.9) * 5.5);
 
                     if (CartoSymbols.IsPointInPolygon(jx, jy, pts) && !IsPointInHoles(jx, jy, biome.Holes))
                     {
-                        DrawBiomeSymbol(g, biome.Kind, patternBrush, patternPen, jx, jy);
+                        var varRadius = 8.0f + (float)(Math.Sin(x * 5.3 + y * 7.9) * 1.8);
+                        DrawBiomeSymbol(g, biome.Kind, patternBrush, patternPen, jx, jy, varRadius);
                         symbolCount++;
                     }
                 }
@@ -202,56 +209,45 @@ public static class IgnMapRenderer
         }
     }
 
-    private static void DrawBiomeSymbol(Graphics g, string kind, Brush brush, Pen pen, float x, float y)
+    private static void DrawBiomeSymbol(Graphics g, string kind, Brush brush, Pen pen, float x, float y, float r = 8.5f)
     {
         switch (kind.ToLowerInvariant())
         {
             case "foret" or "forest":
-                CartoSymbols.DrawTreeCluster(g, brush, x, y, 8.5f);
+                CartoSymbols.DrawTreeCluster(g, brush, x, y, r);
                 break;
             case "fertile" or "zone fertile":
-                CartoSymbols.DrawWheatStalk(g, pen, x, y, 7.5f);
+                CartoSymbols.DrawWheatStalk(g, pen, x, y, r * 0.9f);
                 break;
             case "marais":
-                CartoSymbols.DrawReedTuft(g, pen, x, y, 8.0f);
+                CartoSymbols.DrawReedTuft(g, pen, x, y, r * 0.95f);
                 break;
             case "plage":
-                CartoSymbols.DrawSandStipples(g, brush, x, y, 6.0f);
+                CartoSymbols.DrawSandStipples(g, brush, x, y, r * 0.7f);
                 break;
             case "falaise":
-                CartoSymbols.DrawCliffRock(g, pen, x, y, 8.0f);
+                CartoSymbols.DrawCliffRock(g, pen, x, y, r * 0.95f);
                 break;
             case "desert":
-                CartoSymbols.DrawDuneRipple(g, pen, x, y, 8.0f);
+                CartoSymbols.DrawDuneRipple(g, pen, x, y, r * 0.95f);
                 break;
             case "glacier":
-                CartoSymbols.DrawGlacierCrevasse(g, pen, x, y, 8.0f);
+                CartoSymbols.DrawGlacierCrevasse(g, pen, x, y, r * 0.95f);
                 break;
             default:
-                CartoSymbols.DrawTreeCluster(g, brush, x, y, 8.5f);
+                CartoSymbols.DrawTreeCluster(g, brush, x, y, r);
                 break;
         }
     }
 
-    private static void DrawHillshading(Graphics g, VectorMapDefinition map)
+    private static void DrawHillshading(Graphics g, Heightmap? heightmap, double width, double height)
     {
-        var sx = (float)(map.Width / 1000.0);
-        var sy = (float)(map.Height / 640.0);
-
-        using var penShade = new Pen(Color.FromArgb(20, 70, 50, 30), 8.0f)
-        {
-            StartCap = LineCap.Round,
-            EndCap = LineCap.Round,
-            LineJoin = LineJoin.Round
-        };
-
-        var ridge1 = new PointF[] { new(680 * sx, 55 * sy), new(760 * sx, 42 * sy), new(820 * sx, 45 * sy), new(890 * sx, 78 * sy) };
-        var ridge2 = new PointF[] { new(700 * sx, 105 * sy), new(780 * sx, 95 * sy), new(850 * sx, 120 * sy) };
-        var ridge3 = new PointF[] { new(760 * sx, 140 * sy), new(820 * sx, 160 * sy), new(890 * sx, 175 * sy) };
-
-        g.DrawCurve(penShade, ridge1, 0.4f);
-        g.DrawCurve(penShade, ridge2, 0.4f);
-        g.DrawCurve(penShade, ridge3, 0.4f);
+        if (heightmap is null) return;
+        var bmp = heightmap.GetOrCreateHillshadeBitmap(MapRenderStyle.IgnPastel);
+        var oldMode = g.InterpolationMode;
+        g.InterpolationMode = InterpolationMode.HighQualityBilinear;
+        g.DrawImage(bmp, new RectangleF(0, 0, (float)width, (float)height));
+        g.InterpolationMode = oldMode;
     }
 
     private static void DrawContours(Graphics g, VectorMapDefinition map, bool showLabels)
@@ -286,7 +282,9 @@ public static class IgnMapRenderer
             {
                 var mid = pts[pts.Length / 2];
                 var label = $"{c.Altitude:F0}";
-                g.DrawString(label, font, isGlacierAlt ? textGlacierBrush : textBrush, mid.X + 2, mid.Y - 12);
+                var haloColor = isGlacierAlt ? Color.FromArgb(220, 240, 252) : Color.FromArgb(235, 250, 246, 237);
+                using var haloBrush = new SolidBrush(haloColor);
+                CartoSymbols.DrawTextWithHalo(g, label, font, isGlacierAlt ? textGlacierBrush : textBrush, haloBrush, mid.X + 2, mid.Y - 12);
             }
         }
     }
@@ -340,7 +338,8 @@ public static class IgnMapRenderer
                 ? $"{cat.Icon} {s.Name} ({s.Altitude:F0} m)"
                 : $"{cat.Icon} {s.Name}";
 
-            g.DrawString(label, font, brush, x + 6, y - 6);
+            using var haloBrush = new SolidBrush(Color.FromArgb(220, 250, 246, 237));
+            CartoSymbols.DrawTextWithHalo(g, label, font, brush, haloBrush, x + 6, y - 6);
         }
     }
 

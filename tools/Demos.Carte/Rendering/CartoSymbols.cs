@@ -135,4 +135,20 @@ public static class CartoSymbols
         var p4 = new PointF(x + r, y + r * 0.6f);
         g.DrawLines(pen, new[] { p1, p2, p3, p4 });
     }
+
+    /// <summary>
+    /// Dessine un texte avec détourage / halo cartographique discret pour garantir sa lisibilité sur tout fond.
+    /// </summary>
+    public static void DrawTextWithHalo(Graphics g, string text, Font font, Brush textBrush, Brush haloBrush, float x, float y, float radius = 1.4f)
+    {
+        g.DrawString(text, font, haloBrush, x - radius, y);
+        g.DrawString(text, font, haloBrush, x + radius, y);
+        g.DrawString(text, font, haloBrush, x, y - radius);
+        g.DrawString(text, font, haloBrush, x, y + radius);
+        g.DrawString(text, font, haloBrush, x - radius, y - radius);
+        g.DrawString(text, font, haloBrush, x + radius, y - radius);
+        g.DrawString(text, font, haloBrush, x - radius, y + radius);
+        g.DrawString(text, font, haloBrush, x + radius, y + radius);
+        g.DrawString(text, font, textBrush, x, y);
+    }
 }

@@ -32,7 +32,10 @@ public static class VintageMapRenderer
         // 3. Biomes naturels avec aquarelles et motifs gravés à la plume
         DrawBiomes(g, map);
 
-        // 4. Courbes de niveau gravées à l'encre bistre avec dégradé bleu glacier au-delà de 2 500 m
+        // 4. Estompage topographique à la sanguine / sépia (Hillshading 1874)
+        DrawHillshading(g, heightmap, map.Width, map.Height);
+
+        // 5. Courbes de niveau gravées à l'encre bistre avec dégradé bleu glacier au-delà de 2 500 m
         if (showContours)
         {
             DrawContours(g, map, showLabels);
@@ -127,6 +130,16 @@ public static class VintageMapRenderer
         g.FillPath(pgb, path);
     }
 
+    private static void DrawHillshading(Graphics g, Heightmap? heightmap, double width, double height)
+    {
+        if (heightmap is null) return;
+        var bmp = heightmap.GetOrCreateHillshadeBitmap(MapRenderStyle.VintageParchment1874);
+        var oldMode = g.InterpolationMode;
+        g.InterpolationMode = InterpolationMode.HighQualityBilinear;
+        g.DrawImage(bmp, new RectangleF(0, 0, (float)width, (float)height));
+        g.InterpolationMode = oldMode;
+    }
+
     private static void DrawSea(Graphics g, VectorMapDefinition map, Heightmap? heightmap)
     {
         using (var brush = new SolidBrush(Color.FromArgb(215, 226, 224)))
@@ -145,9 +158,36 @@ public static class VintageMapRenderer
             if (heightmap is not null && heightmap.MinElevation < 0)
             {
                 var coastSegments = ContourExtractor.ExtractSegmentsForLevel(heightmap, 0.0);
+                using var shallowPen = new Pen(Color.FromArgb(45, 160, 145, 120), 6.0f) { LineJoin = LineJoin.Round, StartCap = LineCap.Round, EndCap = LineCap.Round };
+                using var foamPen = new Pen(Color.FromArgb(90, 255, 250, 235), 3.5f) { LineJoin = LineJoin.Round, StartCap = LineCap.Round, EndCap = LineCap.Round };
+
                 foreach (var seg in coastSegments)
                 {
-                    g.DrawLine(pen, (float)seg.P1.X, (float)seg.P1.Y, (float)seg.P2.X, (float)seg.P2.Y);
+                    var x1 = (float)seg.P1.X;
+                    var y1 = (float)seg.P1.Y;
+                    var x2 = (float)seg.P2.X;
+                    var y2 = (float)seg.P2.Y;
+                    g.DrawLine(shallowPen, x1, y1, x2, y2);
+                    g.DrawLine(foamPen, x1, y1, x2, y2);
+                    g.DrawLine(pen, x1, y1, x2, y2);
+                }
+
+                // Hachures d'estran côtières d'époque (perpendiculaires à la côte)
+                using var hatchPen = new Pen(Color.FromArgb(85, 130, 110, 85), 0.9f);
+                for (var i = 0; i < coastSegments.Count; i += 3)
+                {
+                    var seg = coastSegments[i];
+                    var mx = (float)(seg.P1.X + seg.P2.X) * 0.5f;
+                    var my = (float)(seg.P1.Y + seg.P2.Y) * 0.5f;
+                    var dx = (float)(seg.P2.X - seg.P1.X);
+                    var dy = (float)(seg.P2.Y - seg.P1.Y);
+                    var len = (float)Math.Sqrt(dx * dx + dy * dy);
+                    if (len > 0.5f)
+                    {
+                        var nx = -dy / len * 6.5f;
+                        var ny = dx / len * 6.5f;
+                        g.DrawLine(hatchPen, mx, my, mx + nx, my + ny);
+                    }
                 }
             }
             else
@@ -271,12 +311,13 @@ public static class VintageMapRenderer
 
                 for (var x = minX + 14f + rowOffset; x <= maxX - 8f; x += stepX)
                 {
-                    var jx = x + (float)(Math.Sin(x * 12.7 + y * 31.1) * 3.5);
-                    var jy = y + (float)(Math.Cos(x * 23.3 + y * 17.9) * 3.0);
+                    var jx = x + (float)(Math.Sin(x * 12.7 + y * 31.1) * 5.5);
+                    var jy = y + (float)(Math.Cos(x * 23.3 + y * 17.9) * 4.8);
 
                     if (CartoSymbols.IsPointInPolygon(jx, jy, pts) && !IsPointInHoles(jx, jy, biome.Holes))
                     {
-                        DrawBiomeSymbol(g, biome.Kind, inkBrush, inkPen, jx, jy);
+                        var varRadius = 6.5f + (float)(Math.Sin(x * 4.3 + y * 6.7) * 1.5);
+                        DrawBiomeSymbol(g, biome.Kind, inkBrush, inkPen, jx, jy, varRadius);
                         symbolCount++;
 
                         var d = (jx - cx) * (jx - cx) + (jy - cy) * (jy - cy);
@@ -309,33 +350,33 @@ public static class VintageMapRenderer
         }
     }
 
-    private static void DrawBiomeSymbol(Graphics g, string kind, Brush brush, Pen pen, float x, float y)
+    private static void DrawBiomeSymbol(Graphics g, string kind, Brush brush, Pen pen, float x, float y, float r = 6.5f)
     {
         switch (kind.ToLowerInvariant())
         {
             case "foret" or "forest":
-                CartoSymbols.DrawHandDrawnTree(g, pen, x, y, 6.5f);
+                CartoSymbols.DrawHandDrawnTree(g, pen, x, y, r);
                 break;
             case "fertile" or "zone fertile":
-                CartoSymbols.DrawWheatStalk(g, pen, x, y, 6.0f);
+                CartoSymbols.DrawWheatStalk(g, pen, x, y, r * 0.9f);
                 break;
             case "marais":
-                CartoSymbols.DrawReedTuft(g, pen, x, y, 6.5f);
+                CartoSymbols.DrawReedTuft(g, pen, x, y, r * 1.0f);
                 break;
             case "plage":
-                CartoSymbols.DrawSandStipples(g, brush, x, y, 5.0f);
+                CartoSymbols.DrawSandStipples(g, brush, x, y, r * 0.75f);
                 break;
             case "falaise":
-                CartoSymbols.DrawCliffRock(g, pen, x, y, 7.0f);
+                CartoSymbols.DrawCliffRock(g, pen, x, y, r * 1.05f);
                 break;
             case "desert":
-                CartoSymbols.DrawDuneRipple(g, pen, x, y, 7.0f);
+                CartoSymbols.DrawDuneRipple(g, pen, x, y, r * 1.1f);
                 break;
             case "glacier":
-                CartoSymbols.DrawGlacierCrevasse(g, pen, x, y, 7.0f);
+                CartoSymbols.DrawGlacierCrevasse(g, pen, x, y, r * 1.05f);
                 break;
             default:
-                CartoSymbols.DrawHandDrawnTree(g, pen, x, y, 6.5f);
+                CartoSymbols.DrawHandDrawnTree(g, pen, x, y, r);
                 break;
         }
     }
@@ -371,7 +412,10 @@ public static class VintageMapRenderer
             if (c.IsIndex && showLabels && pts.Length >= 6)
             {
                 var mid = pts[pts.Length / 2];
-                g.DrawString($"{c.Altitude:F0} m", font, isGlacierAlt ? textGlacierBrush : textBrush, mid.X + 2, mid.Y - 10);
+                var label = $"{c.Altitude:F0} m";
+                var haloColor = isGlacierAlt ? Color.FromArgb(220, 235, 245) : Color.FromArgb(225, 245, 238, 222);
+                using var haloBrush = new SolidBrush(haloColor);
+                CartoSymbols.DrawTextWithHalo(g, label, font, isGlacierAlt ? textGlacierBrush : textBrush, haloBrush, mid.X + 2, mid.Y - 10);
             }
         }
     }
@@ -539,7 +583,8 @@ public static class VintageMapRenderer
                 ? $"{cat.Icon} {s.Name} ({s.Altitude:F0} m)"
                 : $"{cat.Icon} {s.Name}";
 
-            g.DrawString(label, font, brush, x + 6, y - 6);
+            using var haloBrush = new SolidBrush(Color.FromArgb(220, 245, 238, 222));
+            CartoSymbols.DrawTextWithHalo(g, label, font, brush, haloBrush, x + 6, y - 6);
         }
     }
 

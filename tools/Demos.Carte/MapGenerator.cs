@@ -60,15 +60,26 @@ public static class MapGenerator
     /// <summary>
     /// Crée une carte d'île naturelle avec des côtes découpées, un relief central, et un océan enveloppant.
     /// </summary>
-    public static VectorMapDefinition CreateIsland(double worldWidth, double worldHeight, out Heightmap heightmap)
+    public static VectorMapDefinition CreateIsland(
+        double worldWidth,
+        double worldHeight,
+        out Heightmap heightmap,
+        int seed = 42,
+        IslandMorphology morphology = IslandMorphology.Natural,
+        double maxAltitude = 2800.0)
     {
         var cols = Math.Clamp((int)Math.Round(worldWidth / 6.25), 100, 360);
         var rows = Math.Clamp((int)Math.Round(worldHeight / 6.25), 64, 230);
 
-        heightmap = Heightmap.CreateIsland(cols, rows, worldWidth, worldHeight);
+        heightmap = Heightmap.CreateIsland(cols, rows, worldWidth, worldHeight, seed, morphology, maxAltitude);
 
-        // Isohypses positives sur l'île
-        var levels = new List<double> { 20.0, 40.0, 60.0, 80.0, 100.0, 120.0 };
+        // Isohypses adaptatives positives sur l'île
+        var interval = heightmap.MaxElevation > 1500.0 ? 50.0 : 25.0;
+        var levels = new List<double>();
+        for (var alt = interval; alt <= heightmap.MaxElevation; alt += interval)
+        {
+            levels.Add(alt);
+        }
         var contours = ContourExtractor.ExtractContours(heightmap, levels);
 
         var cx = Math.Round(worldWidth * 0.5, 1);
@@ -79,7 +90,7 @@ public static class MapGenerator
 
         var spotElevations = new List<SpotElevation>
         {
-            new(Math.Round(heightmap.SampleElevation(cx, cy)), "Pic de l'Île", new Point2D(cx, cy - 25))
+            new(Math.Round(heightmap.MaxElevation), "Pic de l'Île", new Point2D(cx, cy - 25), "sommet", true)
         };
 
         var river = new RiverData("Fleuve", [], Width: 5.0);

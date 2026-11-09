@@ -1,8 +1,32 @@
 using System;
 using System.Collections.Generic;
+using System.Drawing;
+using System.Drawing.Imaging;
+using System.Runtime.InteropServices;
 using Demos.Domain.Map;
 
 namespace Demos.Carte;
+
+/// <summary>
+/// Morphologies procédurales pour la création d'îles naturelles.
+/// </summary>
+public enum IslandMorphology
+{
+    Natural,     // Île naturelle équilibrée
+    AlpineRidge, // Massif alpin & Crêtes escarpées
+    Archipelago, // Archipel & Îlots côtiers
+    Fjords       // Fjords & Baies profondes
+}
+
+/// <summary>
+/// Profils d'atténuation radiale pour le pinceau de relief.
+/// </summary>
+public enum BrushProfile
+{
+    DomeCos,    // Dôme doux (décroissance cosinus)
+    ConeLinear, // Cône acéré (décroissance linéaire)
+    PlateauFlat // Plateau abrupt (sommet plat puis tombée franche)
+}
 
 /// <summary>
 /// Modèle altimétrique continu (Heightmap) : calcule l'élévation Z(x, y) en tout point,
@@ -44,13 +68,48 @@ public sealed class Heightmap
     /// <summary>
     /// Crée une carte d'élévation insulaire naturelle avec côtes festonnées et bords découpés (caps, baies, péninsules).
     /// </summary>
-    public static Heightmap CreateIsland(int columns, int rows, double worldWidth, double worldHeight)
+    public static Heightmap CreateIsland(int columns, int rows, double worldWidth, double worldHeight) =>
+        CreateIsland(columns, rows, worldWidth, worldHeight, seed: 42, IslandMorphology.Natural, maxAltitude: 2800.0);
+
+    /// <summary>
+    /// Crée une carte d'élévation insulaire paramétrée avec graine procédurale, morphologie de relief et altitude max.
+    /// </summary>
+    public static Heightmap CreateIsland(
+        int columns,
+        int rows,
+        double worldWidth,
+        double worldHeight,
+        int seed,
+        IslandMorphology morphology,
+        double maxAltitude)
     {
         var hm = new Heightmap(columns, rows, worldWidth, worldHeight, isFlat: true, baseElevation: -20.0);
         var cx = worldWidth * 0.5;
         var cy = worldHeight * 0.5;
         var rx = worldWidth * 0.38;
         var ry = worldHeight * 0.38;
+
+        var rng = new Random(seed);
+        var phi1 = rng.NextDouble() * Math.PI * 2.0;
+        var phi2 = rng.NextDouble() * Math.PI * 2.0;
+        var phi3 = rng.NextDouble() * Math.PI * 2.0;
+        var phi4 = rng.NextDouble() * Math.PI * 2.0;
+
+        // Décalage du centre orographique / massif central (±10% de rx, ry)
+        var mcx = cx + (rng.NextDouble() - 0.5) * rx * 0.25;
+        var mcy = cy + (rng.NextDouble() - 0.5) * ry * 0.25;
+
+        // Angle d'orientation de la crête pour les morphologies avec échine montagneuse
+        var ridgeAngle = rng.NextDouble() * Math.PI;
+        var cosRidge = Math.Cos(ridgeAngle);
+        var sinRidge = Math.Sin(ridgeAngle);
+
+        // Centres des îlots satellites pour l'archipel
+        var sat1X = cx + rx * 0.88 * Math.Cos(phi1);
+        var sat1Y = cy + ry * 0.88 * Math.Sin(phi1);
+        var sat2X = cx + rx * 0.92 * Math.Cos(phi2);
+        var sat2Y = cy + ry * 0.92 * Math.Sin(phi2);
+        var satRadius = rx * 0.20;
 
         for (var i = 0; i < columns; i++)
         {
@@ -62,33 +121,96 @@ public sealed class Heightmap
                 var dy = (y - cy) / ry;
 
                 var angle = Math.Atan2(dy, dx);
-                // Harmoniques de Fourier pour générer des côtes découpées, détroits, caps et fjords naturels
-                var radiusMod = 1.0
-                    + 0.18 * Math.Sin(3.0 * angle + 0.4)
-                    + 0.12 * Math.Cos(5.0 * angle - 0.7)
-                    + 0.08 * Math.Sin(8.0 * angle + 1.2)
-                    + 0.05 * Math.Cos(13.0 * angle);
 
-                var normalizedDist = Math.Sqrt(dx * dx + dy * dy) / radiusMod;
+                // Modulateur de rayon de la côte selon la morphologie et la graine
+                double radiusMod;
+                switch (morphology)
+                {
+                    case IslandMorphology.Archipelago:
+                        radiusMod = 0.92
+                            + 0.16 * Math.Sin(3.0 * angle + phi1)
+                            + 0.14 * Math.Cos(6.0 * angle + phi2)
+                            + 0.10 * Math.Sin(10.0 * angle + phi3)
+                            + 0.08 * Math.Cos(15.0 * angle + phi4);
+                        break;
+
+                    case IslandMorphology.AlpineRidge:
+                        var alongRidge = dx * cosRidge + dy * sinRidge;
+                        var perpRidge = -dx * sinRidge + dy * cosRidge;
+                        var ridgeDist = Math.Sqrt(alongRidge * alongRidge * 0.65 + perpRidge * perpRidge * 1.55);
+                        radiusMod = 1.05 / Math.Max(0.5, ridgeDist / Math.Max(0.1, Math.Sqrt(dx * dx + dy * dy)))
+                            + 0.12 * Math.Sin(4.0 * angle + phi1)
+                            + 0.08 * Math.Cos(7.0 * angle + phi2);
+                        radiusMod = Math.Clamp(radiusMod, 0.75, 1.35);
+                        break;
+
+                    case IslandMorphology.Fjords:
+                        radiusMod = 0.96
+                            + 0.26 * Math.Sin(4.0 * angle + phi1)
+                            + 0.18 * Math.Cos(8.0 * angle + phi2)
+                            + 0.12 * Math.Sin(12.0 * angle + phi3)
+                            + 0.06 * Math.Cos(17.0 * angle + phi4);
+                        break;
+
+                    default: // Natural
+                        radiusMod = 1.0
+                            + 0.18 * Math.Sin(3.0 * angle + phi1)
+                            + 0.12 * Math.Cos(5.0 * angle + phi2)
+                            + 0.08 * Math.Sin(8.0 * angle + phi3)
+                            + 0.05 * Math.Cos(13.0 * angle + phi4);
+                        break;
+                }
+
+                var normalizedDist = Math.Sqrt(dx * dx + dy * dy) / Math.Max(0.1, radiusMod);
+
+                // Pour l'archipel, vérifier la proximité d'un îlot satellite
+                if (morphology == IslandMorphology.Archipelago && normalizedDist >= 1.0)
+                {
+                    var dSat1 = Math.Sqrt((x - sat1X) * (x - sat1X) + (y - sat1Y) * (y - sat1Y)) / satRadius;
+                    var dSat2 = Math.Sqrt((x - sat2X) * (x - sat2X) + (y - sat2Y) * (y - sat2Y)) / satRadius;
+                    var minSat = Math.Min(dSat1, dSat2);
+                    if (minSat < 1.0)
+                    {
+                        normalizedDist = minSat;
+                    }
+                }
 
                 double elev;
-                if (normalizedDist < 0.25)
+                if (normalizedDist < 0.28)
                 {
-                    // Massif central de l'île (crête et collines intérieures)
-                    var inner = 1.0 - (normalizedDist / 0.25);
-                    elev = 60.0 + 70.0 * inner * inner + 15.0 * Math.Sin(x * 0.03) * Math.Cos(y * 0.03);
+                    // Massif central culminant vers maxAltitude
+                    var inner = 1.0 - (normalizedDist / 0.28);
+
+                    double peakProfile;
+                    if (morphology == IslandMorphology.AlpineRidge)
+                    {
+                        var dAlong = (x - mcx) * cosRidge + (y - mcy) * sinRidge;
+                        var dPerp = -(x - mcx) * sinRidge + (y - mcy) * cosRidge;
+                        var spineDist = Math.Abs(dPerp) / (rx * 0.16);
+                        var alongDist = Math.Abs(dAlong) / (rx * 0.40);
+                        peakProfile = Math.Max(0.0, 1.0 - spineDist) * Math.Max(0.0, 1.0 - alongDist);
+                    }
+                    else
+                    {
+                        peakProfile = Math.Pow(inner, 1.4);
+                    }
+
+                    var noise = Math.Sin((x + phi1 * 100) * 0.02) * Math.Cos((y + phi2 * 100) * 0.02);
+                    var baseMassif = 80.0 + (maxAltitude - 80.0) * peakProfile;
+                    elev = baseMassif + 25.0 * noise;
                 }
                 else if (normalizedDist < 1.0)
                 {
-                    // Versant côtier en pente douce descendant vers la plage (0 m)
-                    var t = (1.0 - normalizedDist) / 0.75;
-                    elev = 60.0 * Math.Pow(t, 1.3) + 8.0 * Math.Sin(x * 0.04) * Math.Cos(y * 0.04) * t;
+                    // Versant côtier descendant vers la plage (0 m)
+                    var t = (1.0 - normalizedDist) / 0.72;
+                    var noise = Math.Sin((x + phi3 * 100) * 0.035) * Math.Cos((y + phi4 * 100) * 0.035);
+                    elev = 80.0 * Math.Pow(t, 1.25) + 12.0 * noise * t;
                 }
                 else
                 {
-                    // Plateforme marine et océan profond entourant l'île
+                    // Plateforme marine et océan profond
                     var t = Math.Min(1.0, (normalizedDist - 1.0) / 0.35);
-                    elev = -4.0 - 22.0 * t;
+                    elev = -4.0 - 24.0 * t;
                 }
 
                 hm._grid[i, j] = Math.Round(elev, 1);
@@ -144,11 +266,11 @@ public sealed class Heightmap
     }
 
     /// <summary>
-    /// Applique le pinceau de terrain continu :
+    /// Applique le pinceau de terrain continu selon un profil d'atténuation (dôme cosinus, cône ou plateau) :
     /// - deltaElevation > 0 : surélève le terrain (+ altitude, fait émerger de la terre si sous l'eau).
     /// - deltaElevation < 0 : creuse le terrain (- altitude, crée de la mer dès qu'on passe sous 0 m).
     /// </summary>
-    public void ApplyBrush(double worldX, double worldY, double radius, double deltaElevation)
+    public void ApplyBrush(double worldX, double worldY, double radius, double deltaElevation, BrushProfile profile = BrushProfile.DomeCos)
     {
         if (radius <= 0) return;
 
@@ -169,7 +291,13 @@ public sealed class Heightmap
                 var dist = Math.Sqrt((gx - worldX) * (gx - worldX) + (gy - worldY) * (gy - worldY));
                 if (dist < radius)
                 {
-                    var falloff = Math.Cos((dist / radius) * (Math.PI * 0.5));
+                    var t = dist / radius;
+                    var falloff = profile switch
+                    {
+                        BrushProfile.ConeLinear => 1.0 - t,
+                        BrushProfile.PlateauFlat => t < 0.65 ? 1.0 : (1.0 - (t - 0.65) / 0.35),
+                        _ => Math.Cos(t * (Math.PI * 0.5))
+                    };
                     var newVal = Math.Clamp(_grid[i, j] + deltaElevation * falloff, -40.0, 5000.0);
                     _grid[i, j] = Math.Round(newVal, 1);
                 }
@@ -308,8 +436,148 @@ public sealed class Heightmap
         UpdateMinMax();
     }
 
+    private Bitmap? _cachedHillshadeIgn;
+    private Bitmap? _cachedHillshadeVintage;
+
+    public void InvalidateHillshadeCache()
+    {
+        _cachedHillshadeIgn?.Dispose();
+        _cachedHillshadeIgn = null;
+        _cachedHillshadeVintage?.Dispose();
+        _cachedHillshadeVintage = null;
+    }
+
+    /// <summary>
+    /// Génère ou retourne l'image d'estompage topographique (Hillshading continu 3D)
+    /// calculée par illumination physique Nord-Ouest (azimut 315°, zénith 45°).
+    /// </summary>
+    public Bitmap GetOrCreateHillshadeBitmap(MapRenderStyle style)
+    {
+        if (style == MapRenderStyle.IgnPastel && _cachedHillshadeIgn is not null)
+            return _cachedHillshadeIgn;
+        if (style == MapRenderStyle.VintageParchment1874 && _cachedHillshadeVintage is not null)
+            return _cachedHillshadeVintage;
+
+        var bmp = ComputeHillshadeBitmap(style);
+        if (style == MapRenderStyle.IgnPastel)
+            _cachedHillshadeIgn = bmp;
+        else
+            _cachedHillshadeVintage = bmp;
+
+        return bmp;
+    }
+
+    private Bitmap ComputeHillshadeBitmap(MapRenderStyle style)
+    {
+        var bmp = new Bitmap(Columns, Rows, PixelFormat.Format32bppArgb);
+        var rect = new Rectangle(0, 0, Columns, Rows);
+        var data = bmp.LockBits(rect, ImageLockMode.WriteOnly, PixelFormat.Format32bppArgb);
+
+        try
+        {
+            var dx = WorldWidth / Math.Max(1, Columns - 1);
+            var dy = WorldHeight / Math.Max(1, Rows - 1);
+
+            // Facteur de relief équilibré pour un estompage naturel et harmonieux
+            const double zFactor = 0.75;
+
+            var isVintage = style == MapRenderStyle.VintageParchment1874;
+
+            // Palette d'ombre et de lumière
+            var shadowR = isVintage ? (byte)55 : (byte)40;
+            var shadowG = isVintage ? (byte)38 : (byte)35;
+            var shadowB = isVintage ? (byte)24 : (byte)50;
+            var maxShadowAlpha = isVintage ? 100 : 85;
+
+            var sunR = (byte)255;
+            var sunG = isVintage ? (byte)250 : (byte)255;
+            var sunB = isVintage ? (byte)230 : (byte)245;
+            var maxSunAlpha = isVintage ? 55 : 45;
+
+            // Illumination Nord-Ouest (Azimut 315°, Zénith 45°)
+            const double sunZenithRad = 45.0 * Math.PI / 180.0;
+            const double sunAzimuthRad = 315.0 * Math.PI / 180.0; // NW
+
+            var cosZenith = Math.Cos(sunZenithRad);
+            var sinZenith = Math.Sin(sunZenithRad);
+
+            var pixels = new int[Columns * Rows];
+
+            for (var j = 0; j < Rows; j++)
+            {
+                var j0 = Math.Max(0, j - 1);
+                var j1 = Math.Min(Rows - 1, j + 1);
+                var stepY = (j1 - j0) * dy;
+                if (stepY <= 0) stepY = 1.0;
+
+                var rowOffset = j * Columns;
+
+                for (var i = 0; i < Columns; i++)
+                {
+                    var elev = _grid[i, j];
+
+                    // Pas d'estompage sur l'eau (altitude <= 0)
+                    if (elev <= 0)
+                    {
+                        pixels[rowOffset + i] = 0;
+                        continue;
+                    }
+
+                    var i0 = Math.Max(0, i - 1);
+                    var i1 = Math.Min(Columns - 1, i + 1);
+                    var stepX = (i1 - i0) * dx;
+                    if (stepX <= 0) stepX = 1.0;
+
+                    // Dérivées partielles
+                    var dzdx = ((_grid[i1, j] - _grid[i0, j]) / stepX) * zFactor;
+                    // Y écran descend vers le bas, donc Y mathématique (Nord) est inversé
+                    var dzdy = -((_grid[i, j1] - _grid[i, j0]) / stepY) * zFactor;
+
+                    var slopeRad = Math.Atan(Math.Sqrt(dzdx * dzdx + dzdy * dzdy));
+                    var aspectRad = Math.Atan2(dzdy, -dzdx);
+                    if (aspectRad < 0) aspectRad += 2.0 * Math.PI;
+
+                    // Formule standard de Hillshade Lambertian (valeur entre 0 et 1)
+                    var hillshade = (cosZenith * Math.Cos(slopeRad)) + (sinZenith * Math.Sin(slopeRad) * Math.Cos(sunAzimuthRad - aspectRad));
+                    hillshade = Math.Clamp(hillshade, 0.0, 1.0);
+
+                    // Valeur sur terrain plat (slope = 0) : hillshade = cosZenith * 1 = 0.7071
+                    var diff = hillshade - cosZenith;
+
+                    if (diff > 0.01)
+                    {
+                        // Versant éclairé (Adret)
+                        var intensity = Math.Min(1.0, diff / (1.0 - cosZenith));
+                        var alpha = (int)(intensity * maxSunAlpha);
+                        pixels[rowOffset + i] = (alpha << 24) | (sunR << 16) | (sunG << 8) | sunB;
+                    }
+                    else if (diff < -0.01)
+                    {
+                        // Versant à l'ombre (Ubac)
+                        var intensity = Math.Min(1.0, -diff / cosZenith);
+                        var alpha = (int)(intensity * maxShadowAlpha);
+                        pixels[rowOffset + i] = (alpha << 24) | (shadowR << 16) | (shadowG << 8) | shadowB;
+                    }
+                    else
+                    {
+                        pixels[rowOffset + i] = 0;
+                    }
+                }
+            }
+
+            Marshal.Copy(pixels, 0, data.Scan0, pixels.Length);
+        }
+        finally
+        {
+            bmp.UnlockBits(data);
+        }
+
+        return bmp;
+    }
+
     private void UpdateMinMax()
     {
+        InvalidateHillshadeCache();
         var min = double.MaxValue;
         var max = double.MinValue;
         for (var i = 0; i < Columns; i++)

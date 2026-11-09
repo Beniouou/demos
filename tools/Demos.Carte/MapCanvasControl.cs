@@ -56,6 +56,9 @@ public sealed class MapCanvasControl : Control
     public double BrushPower { get; set; } = 30.0; // Force d'élévation / dénivelé
 
     [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
+    public BrushProfile BrushProfile { get; set; } = BrushProfile.DomeCos;
+
+    [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
     public double BiomeBrushRadius { get; set; } = 50.0;
 
     [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
@@ -633,7 +636,7 @@ public sealed class MapCanvasControl : Control
             {
                 _isBrushing = true;
                 var delta = e.Button == MouseButtons.Left ? Math.Abs(BrushPower) : -Math.Abs(BrushPower);
-                _heightmap.ApplyBrush(wx, wy, BrushRadius, delta);
+                _heightmap.ApplyBrush(wx, wy, BrushRadius, delta, BrushProfile);
                 var updatedWater = ContourExtractor.ExtractWaterBodies(_heightmap);
                 _map = _map with { WaterBodies = updatedWater };
                 Invalidate();
@@ -831,7 +834,7 @@ public sealed class MapCanvasControl : Control
             if (_currentTool == EditorTool.ElevateBrush)
             {
                 var delta = (e.Button & MouseButtons.Left) != 0 ? Math.Abs(BrushPower) : -Math.Abs(BrushPower);
-                heightmap.ApplyBrush(wx, wy, BrushRadius, delta * 0.4);
+                heightmap.ApplyBrush(wx, wy, BrushRadius, delta * 0.4, BrushProfile);
                 var updatedWater = ContourExtractor.ExtractWaterBodies(heightmap);
                 map = map with { WaterBodies = updatedWater };
                 _map = map;
