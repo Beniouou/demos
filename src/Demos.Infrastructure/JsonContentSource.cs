@@ -3,6 +3,7 @@ using System.Text.Json.Serialization;
 using Demos.Application;
 using Demos.Application.Ports;
 using Demos.Domain.Economy;
+using Demos.Domain.Map;
 using Demos.Domain.Politics;
 
 namespace Demos.Infrastructure;
@@ -65,6 +66,24 @@ public sealed class JsonContentSource(Func<string, string> readText) : IContentS
     public ScenarioDefinition LoadScenario() =>
         JsonSerializer.Deserialize<ScenarioDefinition>(readText("partie-depart.json"), Options)
         ?? throw new InvalidDataException("partie-depart.json est vide.");
+
+    /// <summary>La carte géographique vectorielle (carte.json) ; nulle si absente ou invalide.</summary>
+    public VectorMapDefinition? LoadMap()
+    {
+        string text;
+        try
+        {
+            text = readText("carte.json");
+        }
+        catch (FileNotFoundException)
+        {
+            return null;
+        }
+
+        return string.IsNullOrWhiteSpace(text)
+            ? null
+            : JsonSerializer.Deserialize<VectorMapDefinition>(text, Options);
+    }
 
     private List<T> Load<T>(string fileName) =>
         JsonSerializer.Deserialize<List<T>>(readText(fileName), Options) ?? [];

@@ -127,9 +127,11 @@ public partial class Main : Node
     private void FoundCommune(Orientation pole)
     {
         var name = $"Commune {_simulation.World.Communes.Count() + 1}";
+        var pos = _hud.Map.HoveredWorldPos;
+        var mapPos = pos.HasValue ? new Demos.Domain.Map.Point2D(pos.Value.X, pos.Value.Y) : (Demos.Domain.Map.Point2D?)null;
 
         var commune = _simulation.TryFoundCommune(
-            name, PrototypeScenario.FirstCommuneId, BaseCampCost, PaymentMode.StockFirst, pole, BaseCampLegitimacyCost);
+            name, PrototypeScenario.FirstCommuneId, PaymentMode.StockFirst, pole, BaseCampLegitimacyCost, mapPos);
         if (commune is not null)
         {
             _hud.Map.AddCommune(commune.Id, commune.Name, _hud.Map.HoveredCell);

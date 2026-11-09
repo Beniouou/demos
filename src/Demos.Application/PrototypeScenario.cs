@@ -66,6 +66,13 @@ public static class PrototypeScenario
             world.CompanyFundOf(building).Deposit(reserve);
         }
 
+        var map = content.LoadMap();
+        if (map is not null)
+        {
+            foreach (var commune in map.AllCommunes)
+                world.SetCommunePosition(commune.Id, commune.Position);
+        }
+
         var simulation = new Simulation(world, new GameClock(new DateOnly(1900, 1, 1)));
         // Les communes de départ reçoivent la même réserve de chantier qu'une commune fondée en cours de partie.
         foreach (var commune in world.Communes)

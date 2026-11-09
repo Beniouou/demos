@@ -275,7 +275,7 @@ public partial class MapCanvas : Control
             if (screenPoints.Length >= 3)
             {
                 var color = body.Kind is "Island" or "Land" ? MapPalette.Parchment : MapPalette.Water;
-                DrawColoredPolygon(screenPoints, color);
+                SafeDrawColoredPolygon(screenPoints, color);
                 DrawPolyline(screenPoints, MapPalette.WaterShallow, 2.0f, antialiased: true);
             }
         }
@@ -334,7 +334,7 @@ public partial class MapCanvas : Control
                     {
                         if (piece.Length >= 3)
                         {
-                            DrawColoredPolygon(piece, fill);
+                            SafeDrawColoredPolygon(piece, fill);
                         }
                     }
 
@@ -350,7 +350,7 @@ public partial class MapCanvas : Control
                 }
                 else
                 {
-                    DrawColoredPolygon(screenPoints, fill);
+                    SafeDrawColoredPolygon(screenPoints, fill);
                     DrawPolyline(screenPoints, stroke, 1.2f, antialiased: true);
                 }
 
@@ -532,7 +532,7 @@ public partial class MapCanvas : Control
                     _ => (new Color(0.6f, 0.6f, 0.6f, 0.35f), new Color(0.4f, 0.4f, 0.4f, 0.8f), "💎")
                 };
 
-                DrawColoredPolygon(screenPoints, fill);
+                SafeDrawColoredPolygon(screenPoints, fill);
                 DrawPolyline(screenPoints, stroke, 1.4f * _zoom, antialiased: true);
 
                 if (_zoom >= 0.75f)
@@ -689,4 +689,97 @@ public partial class MapCanvas : Control
     }
 
     private Vector2 ToScreen(Vector2 worldPos) => _panOffset + worldPos * _zoom;
+
+    private void SafeDrawColoredPolygon(Vector2[] points, Color color)
+    {
+        if (points == null || points.Length < 3) return;
+
+        var cleaned = CleanPolygonVertices(points);
+        if (cleaned.Length < 3) return;
+
+        if (Geometry2D.IsPolygonClockwise(cleaned))
+        {
+            Array.Reverse(cleaned);
+        }
+
+        if (cleaned.Length == 3)
+        {
+            var area = Math.Abs((cleaned[1].X - cleaned[0].X) * (cleaned[2].Y - cleaned[0].Y) - (cleaned[1].Y - cleaned[0].Y) * (cleaned[2].X - cleaned[0].X));
+            if (area > 1.0f)
+            {
+                if (Geometry2D.IsPolygonClockwise(cleaned)) Array.Reverse(cleaned);
+                DrawColoredPolygon(cleaned, color);
+            }
+            return;
+        }
+
+        var indices = Geometry2D.TriangulatePolygon(cleaned);
+        if (indices != null && indices.Length >= 3)
+        {
+            for (var i = 0; i < indices.Length; i += 3)
+            {
+                var tri = new[] { cleaned[indices[i]], cleaned[indices[i + 1]], cleaned[indices[i + 2]] };
+                var cross = (tri[1].X - tri[0].X) * (tri[2].Y - tri[0].Y) - (tri[1].Y - tri[0].Y) * (tri[2].X - tri[0].X);
+                if (Math.Abs(cross) > 1.0f)
+                {
+                    if (Geometry2D.IsPolygonClockwise(tri))
+                    {
+                        Array.Reverse(tri);
+                    }
+                    DrawColoredPolygon(tri, color);
+                }
+            }
+            return;
+        }
+
+        var convexParts = Geometry2D.DecomposePolygonInConvex(cleaned);
+        if (convexParts != null && convexParts.Count > 0)
+        {
+            foreach (var part in convexParts)
+            {
+                if (part.Length >= 3)
+                {
+                    var p = part;
+                    if (Geometry2D.IsPolygonClockwise(p))
+                    {
+                        var rev = (Vector2[])p.Clone();
+                        Array.Reverse(rev);
+                        p = rev;
+                    }
+                    var partIndices = Geometry2D.TriangulatePolygon(p);
+                    if (partIndices != null && partIndices.Length >= 3)
+                    {
+                        for (var i = 0; i < partIndices.Length; i += 3)
+                        {
+                            var tri = new[] { p[partIndices[i]], p[partIndices[i + 1]], p[partIndices[i + 2]] };
+                            if (Geometry2D.IsPolygonClockwise(tri))
+                            {
+                                Array.Reverse(tri);
+                            }
+                            DrawColoredPolygon(tri, color);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private static Vector2[] CleanPolygonVertices(Vector2[] pts)
+    {
+        if (pts.Length < 3) return pts;
+        var list = new List<Vector2>(pts.Length);
+        for (var i = 0; i < pts.Length; i++)
+        {
+            var curr = pts[i];
+            if (list.Count == 0 || curr.DistanceSquaredTo(list[^1]) > 0.5f)
+            {
+                list.Add(curr);
+            }
+        }
+        if (list.Count >= 3 && list[0].DistanceSquaredTo(list[^1]) <= 0.5f)
+        {
+            list.RemoveAt(list.Count - 1);
+        }
+        return list.ToArray();
+    }
 }

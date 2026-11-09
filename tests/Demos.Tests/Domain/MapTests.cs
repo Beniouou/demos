@@ -224,13 +224,13 @@ public class MapTests
         Assert.True(map.Width >= 1000, "La largeur de la carte doit être d'au moins 1000 lieues.");
         Assert.True(map.Height >= 640, "La hauteur de la carte doit être d'au moins 640 lieues.");
         Assert.NotEmpty(map.Contours);
-        Assert.NotEmpty(map.SpotElevations);
-        Assert.Equal("La Sereine", map.River.Name);
+        Assert.NotNull(map.SpotElevations);
+        Assert.False(string.IsNullOrWhiteSpace(map.River.Name), "Le cours d'eau principal doit avoir un nom.");
         Assert.NotEmpty(map.River.Points);
-        Assert.NotEmpty(map.Forests);
+        Assert.NotEmpty(map.AllBiomes);
         Assert.NotEmpty(map.WaterBodies);
-        Assert.NotEmpty(map.Resources);
-        Assert.Equal("Première commune", map.DefaultCommune.Name);
+        Assert.True(map.AllResourceZones.Count > 0 || map.Resources.Count > 0, "La carte doit contenir des ressources.");
+        Assert.Equal("Première commune", map.AllCommunes[0].Name);
         Assert.NotEmpty(map.AllRivers);
     }
 

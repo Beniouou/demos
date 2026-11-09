@@ -1,4 +1,5 @@
 using Demos.Domain.Economy;
+using Demos.Domain.Map;
 using Demos.Domain.Politics;
 using Demos.Domain.Population;
 
@@ -73,6 +74,17 @@ public sealed class World
     private readonly Dictionary<string, string?> _needOfProduct;
 
     private Extension? _extension;
+    private readonly Dictionary<string, Point2D> _communePositions = [];
+
+    /// <summary>Coordonnées cartographiques des communes.</summary>
+    public IReadOnlyDictionary<string, Point2D> CommunePositions => _communePositions;
+
+    /// <summary>Enregistre ou met à jour la position géographique d'une commune.</summary>
+    public void SetCommunePosition(string communeId, Point2D position)
+    {
+        _communePositions[communeId] = position;
+        UpdateExtension();
+    }
 
     /// <summary>
     /// Charge et efficacité de chaque entité politique (extension et bureaucratie), recalculées chaque jour ;
@@ -83,7 +95,9 @@ public sealed class World
     /// <summary>Recalcule la charge et l'efficacité de chaque entité politique.</summary>
     public void UpdateExtension() => _extension = ComputeExtension();
 
-    private Extension ComputeExtension() => Extension.Compute(_structures, Residents, Balance.Current);
+    private Extension ComputeExtension() =>
+        Extension.Compute(_structures, Residents, Balance.Current,
+            _communePositions.Count > 0 ? entityId => AdministrativeDistance.LoadOf(entityId, _structures, _communePositions) : null);
 
     /// <summary>Part de l'impôt d'État collectée dans une commune : efficacité de l'État et préfectures traversées.</summary>
     public double StateCollectionIn(string communeId) =>

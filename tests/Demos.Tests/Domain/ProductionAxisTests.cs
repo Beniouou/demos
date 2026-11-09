@@ -57,6 +57,30 @@ public class ProductionAxisTests
     }
 
     [Fact]
+    public void La_dispersion_de_la_pollution_est_attenuee_par_la_distance()
+    {
+        var structures = new Dictionary<string, Structure>(TestTown.Structures)
+        {
+            ["carriere"] = new("carriere", "Carrière", StructureKind.Building, "commune", PollutionPerWorker: 1),
+        };
+        var residents = SpreadOverTwoCommunes(Communist);
+
+        var positions = new Dictionary<string, Demos.Domain.Map.Point2D>
+        {
+            ["commune"] = new(0, 0),
+            ["commune-2"] = new(250, 0), // d = 250 lieues = d_disp -> part divisée par 2 = 5 %
+        };
+
+        var shareOf = (string src, string dst) => Demos.Domain.Map.GeographicEconomics.DistantPollutionShare(src, dst, positions);
+        var pollution = Pollution.PerResidentByCommune(structures, new Dictionary<string, double> { ["carriere"] = 120 }, [residents], shareOf);
+
+        // 120 de pollution produite dans commune (600 hab) = 0.2 local.
+        // commune-2 reçoit 5 % de 120 = 6 / 400 hab = 0.015 distant.
+        Assert.Equal(0.2, pollution["commune"], precision: 6);
+        Assert.Equal(0.015, pollution["commune-2"], precision: 6);
+    }
+
+    [Fact]
     public void Seuls_les_habitants_de_la_commune_polluee_deviennent_ecologistes()
     {
         var workers = SpreadOverTwoCommunes(Communist);

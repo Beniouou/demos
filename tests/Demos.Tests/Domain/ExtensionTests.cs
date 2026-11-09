@@ -126,4 +126,50 @@ public class ExtensionTests
         Assert.Equal(1, extension.EfficiencyFor("etat", structures["directe"]), 6);
         Assert.Equal(1, extension.EfficiencyFor("a", structures["ferme"]), 6);
     }
+
+    [Fact]
+    public void Le_terme_distance_est_inclus_dans_la_charge_d_une_entite()
+    {
+        var structures = new[] { State(), Commune("commune") }.ToDictionary(s => s.Id);
+        var extension = Extension.Compute(structures, _ => 0, Settings, id => id == "etat" ? 0.5 : 0);
+
+        Assert.Equal(0.5, extension.Loads["etat"].Distance);
+        Assert.Equal(0.5, extension.Loads["etat"].ChargeWithoutPopulation);
+        Assert.Equal(0.5, extension.Loads["etat"].Charge);
+        Assert.Equal(1, extension.Loads["etat"].Efficiency);
+        Assert.Equal(0, extension.Loads["commune"].Distance);
+    }
+
+    [Fact]
+    public void Une_prefecture_calcule_sa_charge_selon_la_distance_reelle_a_ses_communes()
+    {
+        var structures = new[]
+        {
+            State(),
+            Prefecture("pref", "etat", "chef-lieu"),
+            Commune("chef-lieu", "pref"),
+            Commune("commune-eloignee", "pref"),
+        }.ToDictionary(s => s.Id);
+
+        var positions = new Dictionary<string, Demos.Domain.Map.Point2D>
+        {
+            ["chef-lieu"] = new(100, 100),
+            ["commune-eloignee"] = new(400, 500), // Distance euclidienne = sqrt(300^2 + 400^2) = 500 lieues
+        };
+
+        var distOf = (string id) => Demos.Domain.Map.AdministrativeDistance.LoadOf(id, structures, positions);
+        var extension = Extension.Compute(structures, _ => 0, Settings, distOf);
+
+        // Chef-lieu à 0 lieue, commune-éloignée à 500 lieues / 500 = 1.0 de charge distance
+        Assert.Equal(1.0, extension.Loads["pref"].Distance, 6);
+        Assert.Equal(1.0, extension.Loads["pref"].Charge, 6);
+        Assert.Equal(1.0, extension.Loads["pref"].Efficiency);
+
+        // Les communes ne souffrent d'aucune distance administrative directe
+        Assert.Equal(0.0, extension.Loads["chef-lieu"].Distance);
+        Assert.Equal(0.0, extension.Loads["commune-eloignee"].Distance);
+
+        // L'État hérite de 10% de la charge hors population de la préfecture (0.1 * 1.0 = 0.1)
+        Assert.Equal(0.1, extension.Loads["etat"].Charge, 6);
+    }
 }

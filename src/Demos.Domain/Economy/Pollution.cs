@@ -22,7 +22,8 @@ public static class Pollution
     public static Dictionary<string, double> PerResidentByCommune(
         IReadOnlyDictionary<string, Structure> structures,
         IReadOnlyDictionary<string, double> productionWorkers,
-        IReadOnlyList<SocialClass> classes)
+        IReadOnlyList<SocialClass> classes,
+        Func<string, string, double>? distantShareOf = null)
     {
         var communes = Communes.All(structures).ToList();
         var produced = communes.ToDictionary(c => c.Id, _ => 0.0);
@@ -49,7 +50,8 @@ public static class Pollution
                 .Where(o => o.Id != commune.Id && produced[o.Id] > 0)
                 .Sum(o =>
                 {
-                    var perResident = DistantShare * produced[o.Id] / residents[commune.Id];
+                    var share = distantShareOf?.Invoke(o.Id, commune.Id) ?? DistantShare;
+                    var perResident = share * produced[o.Id] / residents[commune.Id];
                     return residents[o.Id] > 0 ? Math.Min(perResident, local[o.Id]) : perResident;
                 });
             result[commune.Id] = local[commune.Id] + distant;

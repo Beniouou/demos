@@ -14,6 +14,7 @@ namespace Demos.Domain.Politics;
 /// <param name="ChargeWithoutPopulation">Charge sans le terme population : c'est elle qui remonte à l'entité qui la contient.</param>
 /// <param name="Charge">Charge totale ; à 1, l'entité est à la limite de ce qu'elle peut gérer en direct.</param>
 /// <param name="Efficiency">Part des décisions bien appliquées : 1 jusqu'à une charge de 1, puis 1 / charge.</param>
+/// <param name="Distance">Terme de distance : charge bureaucratique liée à l'éloignement géographique des entités administrées.</param>
 public sealed record EntityLoad(
     string EntityId,
     double CountedPopulation,
@@ -21,7 +22,8 @@ public sealed record EntityLoad(
     int AutonomousBuildings,
     double ChargeWithoutPopulation,
     double Charge,
-    double Efficiency);
+    double Efficiency,
+    double Distance = 0);
 
 /// <summary>
 /// L'extension : plus une entité gère de choses en direct, moins elle les gère bien. Elle se mesure dans chaque entité
@@ -46,11 +48,12 @@ public sealed class Extension
 
     public IReadOnlyDictionary<string, EntityLoad> Loads => _loads;
 
-    /// <summary>Calcule la charge de chaque entité politique, d'après les habitants de chaque commune.</summary>
+    /// <summary>Calcule la charge de chaque entité politique, d'après les habitants de chaque commune et les distances.</summary>
     public static Extension Compute(
         IReadOnlyDictionary<string, Structure> structures,
         Func<string, double> residentsOf,
-        BalanceSettings settings)
+        BalanceSettings settings,
+        Func<string, double>? distanceOf = null)
     {
         var extension = new Extension(structures, settings.BureaucracyLossPerLevel);
         var children = structures.Values
@@ -64,7 +67,7 @@ public sealed class Extension
             .ToDictionary(g => g.Key!, g => g.ToList());
 
         foreach (var root in structures.Values.Where(s => s.IsNational && s.Kind == StructureKind.PoliticalEntity))
-            extension.ComputeLoad(root, children, buildingsByManager, residentsOf, settings);
+            extension.ComputeLoad(root, children, buildingsByManager, residentsOf, settings, distanceOf);
 
         return extension;
     }
@@ -114,11 +117,12 @@ public sealed class Extension
         IReadOnlyDictionary<string, List<Structure>> children,
         IReadOnlyDictionary<string, List<Structure>> buildingsByManager,
         Func<string, double> residentsOf,
-        BalanceSettings settings)
+        BalanceSettings settings,
+        Func<string, double>? distanceOf)
     {
         var subEntities = children.GetValueOrDefault(entity.Id, [])
             .Where(c => c.Kind == StructureKind.PoliticalEntity)
-            .Select(c => ComputeLoad(c, children, buildingsByManager, residentsOf, settings))
+            .Select(c => ComputeLoad(c, children, buildingsByManager, residentsOf, settings, distanceOf))
             .ToList();
 
         var population = entity.IsCommune
@@ -129,15 +133,14 @@ public sealed class Extension
         var direct = buildings.Count(b => b.Ownership == Ownership.Public);
         var autonomous = buildings.Count - direct;
 
-        // Les distances comptent pour 0 en attendant la carte : à remplir par le chantier de la carte.
-        const double distance = 0;
+        var distance = distanceOf?.Invoke(entity.Id) ?? 0;
         var withoutPopulation = Ratio(direct, settings.ExtensionBuildingCapacity)
             + settings.ExtensionAutonomousWeight * Ratio(autonomous, settings.ExtensionBuildingCapacity)
             + settings.ExtensionChildWeight * subEntities.Sum(l => l.ChargeWithoutPopulation)
             + distance;
         var charge = Ratio(population, settings.ExtensionPopulationCapacity) + withoutPopulation;
         var load = new EntityLoad(entity.Id, population, direct, autonomous, withoutPopulation, charge,
-            charge <= 1 ? 1 : 1 / charge);
+            charge <= 1 ? 1 : 1 / charge, distance);
         _loads[entity.Id] = load;
         return load;
     }

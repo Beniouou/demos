@@ -1,4 +1,5 @@
 using Demos.Domain.Economy;
+using Demos.Domain.Map;
 using Demos.Domain.Politics;
 using Demos.Domain.Population;
 using Demos.Domain.Shared;
@@ -223,7 +224,8 @@ public sealed class Simulation(World world, GameClock clock)
         string payingCommuneId,
         PaymentMode mode,
         Orientation legitimacyPole,
-        double legitimacyCost)
+        double legitimacyCost,
+        Point2D? position = null)
     {
         var state = World.Structures.Values.Single(s => s.IsNational);
         var number = World.Communes.Count() + 1;
@@ -248,6 +250,8 @@ public sealed class Simulation(World world, GameClock clock)
         World.Legitimacy.TrySpend(legitimacyPole, legitimacyCost);
         World.CommuneFundOf(commune.Id).Deposit(grant);
         World.AddStructure(commune);
+        if (position.HasValue)
+            World.SetCommunePosition(commune.Id, position.Value);
         World.AddConstructionSite(new ConstructionSite(camp, campType.Construction.Days));
         GiveFoundingMaterials(commune.Id);
         World.SetCharter(commune.Id, legitimacyPole);
@@ -572,15 +576,23 @@ public sealed class Simulation(World world, GameClock clock)
 
 
         World.Workers = Employment.Assign(World.Structures, World.Classes);
-        World.PollutionByCommune = Pollution.PerResidentByCommune(World.Structures, World.Workers, World.Classes);
+        World.PollutionByCommune = Pollution.PerResidentByCommune(
+            World.Structures, World.Workers, World.Classes,
+            World.CommunePositions.Count > 0
+                ? (from, to) => GeographicEconomics.DistantPollutionShare(from, to, World.CommunePositions, Balance.Current.DistantPollutionShare)
+                : null);
         // La caisse de chaque entreprise au début de la journée : son bénéfice du jour décide de ce qu'elle verse.
         var fundsAtDayStart = World.Structures.Values.Where(Companies.HasCompanyFund).ToDictionary(b => b.Id, b => World.CompanyFundOf(b).Balance);
         World.Produced = WorkDay.Run(World.Structures, World.Workers, World.Classes, World.Treasury, World.MarketOf, World.CommuneFundOf, World.Wages,
             World.CompanyFundOf, World.EnergyEffectOf, World.PublicEfficiencyOf);
         World.EnergyShares = Energy.RunDaily(World.Structures, World.TierOf, Clock.Season, World.MarketOf, World.Treasury, World.CommuneFundOf,
             World.CompanyFundOf, World.ClassesById, World.FuelStockOf, World.HeatsAllYear);
-        Trade.RunDaily(communeIds, World.Classes, World.Products, World.MarketOf,
-            (communeId, productId) => World.StorageOf(communeId).FreeFor(productId));
+        Trade.RunDaily(
+            communeIds, World.Classes, World.Products, World.MarketOf,
+            (communeId, productId) => World.StorageOf(communeId).FreeFor(productId),
+            World.CommunePositions.Count > 0
+                ? (from, to) => GeographicEconomics.TransportLoss(from, to, World.CommunePositions, Balance.Current.TransportLoss)
+                : null);
         Housing.RunDaily(World.Structures, World.Classes, World.Treasury, World.CompanyFundOf, World.EnergyEffectOf, laws.HasHousingPriority);
         Education.RunDaily(World.Structures, World.Classes, World.Treasury, World.CompanyFundOf, World.EnergyEffectOf);
 

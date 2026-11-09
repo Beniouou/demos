@@ -40,19 +40,25 @@ Jeu solo de construction de nation (Godot .NET 4.7, C#, .NET 10), en français. 
 | Tableur vers le jeu | `appliquer-equilibrage.bat` (`-- appliquer`) |
 | Simulation et rapport | `simuler.bat [années] [commune]` (`-- simuler`) |
 | Éditeur de contenu | `editeur.bat` (fenêtre Windows, `tools/Demos.Editeur`) |
+| Éditeur de carte | `carte.bat` (fenêtre Windows, `tools/Demos.Carte`) |
+| Test auto de la carte | `dotnet run --project tools/Demos.Carte -- --test-sliders` |
 
 Le tableur (`equilibrage demos.xlsx`) et le rapport (`rapport simulation.html`) sont **à côté** du dossier `demos/`,
 hors du dépôt. Référence actuelle de la simulation : trésor **258 846** la 3e année (`simuler`, 3 ans, départ préréglé ; sans loi, où le privé est nationalisé : 410 815).
 
 ## Architecture et données
 
-- `src/Demos.Domain` : règles, sans dépendance. `src/Demos.Application` : `Simulation` (journée, mois, saison, année),
-  `World`, `PrototypeScenario`, ports. `src/Demos.Infrastructure` : `JsonContentSource`. `game/` : Godot.
+- `src/Demos.Domain` : règles, sans dépendance (`Economy/`, `Politics/`, `Population/`, `Map/` avec `MapVectorData.cs`).
+  `src/Demos.Application` : `Simulation` (journée, mois, saison, année), `World`, `PrototypeScenario`, ports.
+  `src/Demos.Infrastructure` : `JsonContentSource`. `game/` : Godot.
   `tools/Demos.Equilibrage` : tableur, appliquer, simuler, création de contenu (`ContentCreator`).
-  `tools/Demos.Editeur` : fenêtre de l'éditeur. `tests/Demos.Tests` : xUnit.
+  `tools/Demos.Editeur` : fenêtre de l'éditeur de contenu.
+  `tools/Demos.Carte` : éditeur cartographique vectoriel (classes partielles `MapEditorForm`, `Tools`, `IO`, `Testing`).
+  `tests/Demos.Tests` : xUnit.
 - Contenu dans `game/data/` : `products.json`, `buildings.json`, `besoins.json`, `equilibrage.json` (réglages de
   l'économie, `BalanceSettings`, lus via `Balance.Current`), `partie-depart.json` (partie de départ et lois du départ
-  préréglé), `lois.json` (catalogue des lois : domaines, briques, modèles ; voir `Politics/LawBook.cs`).
+  préréglé), `lois.json` (catalogue des lois : domaines, briques, modèles ; voir `Politics/LawBook.cs`),
+  `carte.json` (définition vectorielle du monde : `VectorMapDefinition`).
 - **Ne pas coder de réglage en dur** : un chiffre d'équilibrage va dans `BalanceSettings` et `equilibrage.json`, et
   dans la feuille Constantes du tableur (clé dans `AppliedConstants`, ligne dans `WriteConstants`, chemin JSON dans
   `BalanceApplier.Constants`). Les formules du tableur doivent suivre le jeu : la colonne « Écart » de la feuille
@@ -69,3 +75,13 @@ SCOP 5 % après une baisse de salaire jusqu'à −20 %, privé 15 %), faillite s
 par chaque bâtiment ; impôt sur la richesse des habitants (État 0,3 %, commune 0,2 % par jour). Écrits mais
 désactivés : TVA sur la valeur ajoutée, épargne progressive des entreprises. Questions ouvertes principales :
 à quoi sert le trésor (l'État ne redépense pas ce qu'il encaisse), prix dynamiques.
+
+## Carte & Géographie : état actuel (résumé)
+
+- Données produites dans `game/data/carte.json` (`VectorMapDefinition` dans `src/Demos.Domain/Map/MapVectorData.cs`) :
+  contours d'isohypses Marching Squares, réseau hydrographique thalweg (`AllRivers`), 7 biomes naturels avec trous polygonaux
+  intérieurs (`Biomes` et `Forests`), gisements (`ResourceZones`, `Resources`), communes et toponymie.
+- Le moteur Godot peut charger `carte.json` pour afficher la carte au centre de l'écran (`game/scripts/Hud.cs` et menu Carte `game/scripts/MainMenu.cs`).
+- Terme distance de l'extension : dans `src/Demos.Domain/Politics/Extension.cs`, la variable `const double distance = 0;`
+  est prête à recevoir une fonction de distance basée sur les coordonnées réelles $(X, Y)$ des communes et préfectures
+  définies dans la carte.

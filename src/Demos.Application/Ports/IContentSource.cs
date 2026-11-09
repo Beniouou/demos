@@ -1,4 +1,5 @@
 using Demos.Domain.Economy;
+using Demos.Domain.Map;
 using Demos.Domain.Politics;
 
 namespace Demos.Application.Ports;
@@ -24,4 +25,7 @@ public interface IContentSource
 
     /// <summary>La partie de départ : communes, bâtiments, classes, trésor et lois du départ préréglé.</summary>
     ScenarioDefinition LoadScenario();
+
+    /// <summary>La carte vectorielle géographique du monde ; nulle si le fichier n'existe pas.</summary>
+    VectorMapDefinition? LoadMap() => null;
 }

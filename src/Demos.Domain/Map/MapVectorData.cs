@@ -3,7 +3,15 @@ using System.Text.Json.Serialization;
 
 namespace Demos.Domain.Map;
 
-public readonly record struct Point2D(double X, double Y);
+public readonly record struct Point2D(double X, double Y)
+{
+    public double DistanceTo(Point2D other)
+    {
+        var dx = X - other.X;
+        var dy = Y - other.Y;
+        return System.Math.Sqrt(dx * dx + dy * dy);
+    }
+}
 
 public sealed record ContourLine(
     double Altitude,

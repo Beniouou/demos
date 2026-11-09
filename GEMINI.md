@@ -41,19 +41,30 @@ Tu peux créer tes propres fichiers : par exemple un dossier `src/Demos.Domain/M
 
 Le document de règles de référence est dans Claude Docs, et tu n'y as pas accès. Voici ce qu'il dit d'utile pour toi.
 
-**Carte (proposition, rien n'est décidé)**
-- Une carte en **régions**, pas en cases : chaque région a ses ressources naturelles, ses bâtiments et la part de
-  chaque classe qui y vit.
-- Des vues se superposent : géographie, géopolitique, production, transit, ressources. Le menu Carte du jeu les
-  annonce déjà ; aucune n'est faite.
-- Le prototype tournerait sur **3 régions codées à la main**. L'éditeur de carte viendrait après.
+**Carte géographique vectorielle continue (implémentée et opérationnelle)**
+- Une carte vectorielle continue en coordonnées réelles (lieues), sans cases ni hexagones, enregistrée dans `game/data/carte.json` (`VectorMapDefinition` dans `src/Demos.Domain/Map/MapVectorData.cs`).
+- Rendu vectoriel sous deux styles : **IGN Pastel Moderne** et **Parchemin Ancien 1874**.
+- Relief ombré physique continu (*Hillshading 3D* Azimut 315° NW, Zénith 45°, méthode de Horn) avec adret crème chaud et ubac bistre/sépia.
+- Réseau hydrographique thalweg (creusement de vallées naturelles) et trait de côte avec hauts-fonds/estran et écume marine blanche.
+- Les 7 biomes géomorphologiques naturels : Glacier ($\ge 2\,500\text{ m}$), Falaise (pente $\ge 150\%$), Marais ($< 400\text{ m}$, pente $< 30\%$, bord d'eau), Terre fertile ($< 600\text{ m}$, pente $< 60\%$), Plage ($\le 30\text{ m}$, pente $< 40\%$), Désert ($< 250\text{ m}$, pente $< 20\%$), Forêt ($< 2\,500\text{ m}$, pente $< 150\%$).
+- Gestion topologique stricte des trous polygonaux intérieurs (`PolygonArea.Holes`) : les sommets intérieurs ceinturés de falaises sont préservés.
+
+**Éditeur de carte (`tools/Demos.Carte`)**
+- Lancé par `carte.bat` ou `dotnet run --project tools/Demos.Carte`.
+- Découpé en classes partielles :
+  - `MapEditorForm.cs` (base, layout Ligne 1/2, journal),
+  - `MapEditorForm.Tools.cs` (gestionnaires des 8 outils),
+  - `MapEditorForm.IO.cs` (Mode Île, carte vierge, chargement `carte.json`, export PNG, Undo/Redo),
+  - `MapEditorForm.Testing.cs` (harnais de validation automatique).
+- Palette des 8 outils : Navigation (`🔍`), Terrain (`⛰️`), Adoucir & Aplanir (`〰️`), Fleuves (`💧`), Biomes (`🗺️`), Gisements (`⛏️`), Communes (`🏛️`), Toponymie (`📍`).
+- Paramètres procéduraux : Graine (`seed`), 4 morphologies d'îles (`Natural`, `AlpineRidge`, `Archipelago`, `Fjords`), plafond d'altitude, 3 profils de pinceau (`DomeCos`, `ConeLinear`, `PlateauFlat`).
+- Test automatisé complet : `dotnet run --project tools/Demos.Carte -- --test-sliders`.
 
 **Questions encore ouvertes (à faire trancher par l'utilisateur)**
-- Une carte en régions ou en cases (hexagones) ?
+- Le découpage en régions politiques et administratives au-dessus du fond vectoriel.
 - Où se bâtit un camp de base : n'importe où, ou sur une région libre ? Faut-il une distance minimale entre communes ?
-- Les distances : la pollution venue de loin et la logistique seront reprises avec la carte.
-- La logistique : quels bâtiments (route, voie ferrée, gare, port…) réduisent la perte de 20 % entre communes, et de
-  combien ? Faut-il des lignes d'approvisionnement créées par le joueur, avec des délais ?
+- Les distances : la formule exacte du terme distance dans `Extension.cs` basée sur les coordonnées de la carte.
+- La logistique : quels bâtiments (route, voie ferrée, gare, port…) réduisent la perte de 20 % entre communes, et de combien ? Lignes d'approvisionnement avec délais.
 
 **Structures politiques (décidé et codé)**
 - L'État contient des communes et des **préfectures**. Une préfecture contient des communes ou d'autres préfectures,

@@ -144,4 +144,47 @@ public class TradeTests
         Assert.Equal(200, allocation.FreeFor("bois"), precision: 6);
         Assert.Equal(100, allocation.In("depot")["bois"], precision: 6);
     }
+
+    [Fact]
+    public void La_perte_de_transport_peut_etre_modulee_par_un_delegue()
+    {
+        var markets = new Dictionary<string, Market> { ["a"] = new(Products), ["b"] = new(Products) };
+        markets["a"].Offer("pain", 1_000, "ferme");
+        SocialClass[] classes = [Residents("a", 200), Residents("b", 90)];
+
+        // Perte personnalisée de 10 % (au lieu de 20 %)
+        Trade.RunDaily(["a", "b"], classes, Products, c => markets[c], (_, _) => 10_000, (_, _) => 0.10);
+
+        // La commune b manque de 90 pains : avec 10 % de perte, il en part 100 de a, 90 arrivent.
+        Assert.Equal(90, markets["b"].QuantityOf("pain"), precision: 6);
+        Assert.Equal(900, markets["a"].QuantityOf("pain"), precision: 6);
+    }
+
+    [Fact]
+    public void GeographicEconomics_Calcule_La_Perte_Selon_La_Distance()
+    {
+        var positions = new Dictionary<string, Demos.Domain.Map.Point2D>
+        {
+            ["c1"] = new(0, 0),
+            ["c2"] = new(500, 0), // d = 500 lieues
+            ["c3"] = new(1000, 0), // d = 1000 lieues
+            ["c_proche"] = new(50, 0), // d = 50 lieues
+            ["c_tres_loin"] = new(3000, 0), // d = 3000 lieues
+        };
+
+        // Même commune : 0 %
+        Assert.Equal(0.0, Demos.Domain.Map.GeographicEconomics.TransportLoss("c1", "c1", positions));
+
+        // Distance de référence (500 lieues) : 20 % de perte
+        Assert.Equal(0.20, Demos.Domain.Map.GeographicEconomics.TransportLoss("c1", "c2", positions), precision: 6);
+
+        // Distance proche (50 lieues) : 20% * (0.5 + 0.5 * 0.1) = 11 %
+        Assert.Equal(0.11, Demos.Domain.Map.GeographicEconomics.TransportLoss("c1", "c_proche", positions), precision: 6);
+
+        // Distance double (1000 lieues) : 20% * (0.5 + 0.5 * 2) = 30 %
+        Assert.Equal(0.30, Demos.Domain.Map.GeographicEconomics.TransportLoss("c1", "c3", positions), precision: 6);
+
+        // Très lointain : plafonné à 60 %
+        Assert.Equal(0.60, Demos.Domain.Map.GeographicEconomics.TransportLoss("c1", "c_tres_loin", positions), precision: 6);
+    }
 }

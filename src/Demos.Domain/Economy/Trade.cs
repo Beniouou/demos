@@ -18,7 +18,8 @@ public static class Trade
         IReadOnlyList<SocialClass> classes,
         IReadOnlyList<ProductDefinition> products,
         Func<string, Market> marketOf,
-        Func<string, string, double> freeStorageOf)
+        Func<string, string, double> freeStorageOf,
+        Func<string, string, double>? transportLossOf = null)
     {
         foreach (var product in products)
         {
@@ -49,7 +50,13 @@ public static class Trade
             // Ce qu'il faut envoyer pour couvrir chaque manque, une fois la perte en route comptée.
             var toSend = balance
                 .Where(b => b.Value < 0)
-                .ToDictionary(b => b.Key, b => Math.Min(-b.Value, freeStorage[b.Key]) / (1 - TransportLoss));
+                .ToDictionary(b => b.Key, b =>
+                {
+                    var lossEstimate = transportLossOf is not null && surplus.Count > 0
+                        ? surplus.Keys.Average(o => transportLossOf(o, b.Key))
+                        : TransportLoss;
+                    return Math.Min(-b.Value, freeStorage[b.Key]) / Math.Max(0.01, 1 - lossEstimate);
+                });
             var totalToSend = toSend.Values.Sum();
             if (totalToSend <= 0)
                 continue;
@@ -60,9 +67,10 @@ public static class Trade
                 var sent = wanted * scale;
                 foreach (var (origin, available) in surplus)
                 {
+                    var loss = transportLossOf?.Invoke(origin, destination) ?? TransportLoss;
                     foreach (var (sellerId, quantity) in marketOf(origin).Take(product.Id, sent * available / totalSurplus))
                     {
-                        var arrived = quantity * (1 - TransportLoss);
+                        var arrived = quantity * (1 - loss);
                         marketOf(destination).Offer(product.Id, arrived, sellerId);
                         freeStorage[destination] -= arrived;
                     }
