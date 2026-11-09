@@ -62,6 +62,7 @@ public partial class MainMenu : HBoxContainer
             new("Structure",
             [
                 new("Entité politique", () => new StructurePage(view, desk)),
+                new("Préfectures", () => new PrefecturesPage(view, desk)),
                 Coming("Organisme", "Les organismes : domaine d'application, pouvoir, postes et fonctionnement."),
             ], Wide: true),
             new("Production",

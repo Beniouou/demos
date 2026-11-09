@@ -122,6 +122,36 @@ public sealed class PlayerDesk(Simulation simulation)
         return $"Chauffage au {fuel}.";
     }
 
+    /// <summary>
+    /// Fonde une préfecture qui regroupe les entités choisies, dans l'État ou une préfecture ; son bâtiment est payé par
+    /// le chef-lieu (sa réserve de chantier, le stock de l'État, puis le marché), la légitimité dans le pôle choisi.
+    /// </summary>
+    public string FoundPrefecture(string name, string parentId, IReadOnlyList<string> memberIds, string seatCommuneId, Orientation pole)
+    {
+        var settings = Balance.Current;
+        if (string.IsNullOrWhiteSpace(name))
+            return "Donnez un nom à la préfecture.";
+        if (memberIds.Count < settings.PrefectureMinimumMembers)
+            return $"Une préfecture regroupe au moins {settings.PrefectureMinimumMembers} entités.";
+        if (World.Legitimacy[pole] < settings.PrefectureLegitimacyCost)
+            return $"Pas assez de légitimité {pole.Code} (il en faut {settings.PrefectureLegitimacyCost:0.#}).";
+
+        return simulation.TryFoundPrefecture(name.Trim(), parentId, memberIds, seatCommuneId, PaymentMode.StockFirst, pole) is { } prefecture
+            ? $"{prefecture.Name} fondée : son bâtiment est en chantier dans le chef-lieu."
+            : "Fondation impossible : le chef-lieu doit être une commune regroupée, aucune entité ne peut regrouper ce qui la "
+              + "contient, et le chef-lieu doit pouvoir payer le chantier (réserve, stock de l'État ou marché).";
+    }
+
+    /// <summary>Rattache une commune ou une préfecture à l'État ou à une préfecture, contre de la légitimité.</summary>
+    public string Attach(string entityId, string newParentId, Orientation pole)
+    {
+        if (!simulation.CanAttach(entityId, newParentId))
+            return "Rattachement impossible : déjà là, boucle, ou chef-lieu qui quitterait sa préfecture.";
+        return simulation.TryAttach(entityId, newParentId, pole)
+            ? "Rattachement fait."
+            : $"Pas assez de légitimité {pole.Code} (il en faut {Balance.Current.AttachLegitimacyCost:0.#}).";
+    }
+
     private NationalizationOffer OfferOf(Structure building, NationalizationMode mode) =>
         new(simulation.NationalizationPriceOf(building, mode), simulation.NationalizationLegitimacyCostOf(building, mode));
 

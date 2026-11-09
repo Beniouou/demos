@@ -6,8 +6,8 @@ using Godot;
 namespace Demos.Game;
 
 /// <summary>
-/// Choisir une structure en descendant la hiérarchie du jeu, en trois menus déroulants : entité politique (l'État ou
-/// une commune) → organisme → bâtiment. Les bâtiments sont rangés sous des intertitres par catégorie (Extraction,
+/// Choisir une structure en descendant la hiérarchie du jeu, en trois menus déroulants : entité politique (l'État, une
+/// préfecture ou une commune, en retrait sous ce qui la contient) → organisme → bâtiment. Les bâtiments sont rangés sous des intertitres par catégorie (Extraction,
 /// Production…), avec le carré de couleur de leur propriétaire. Avec « tous » permis (filtre du code civil), chaque
 /// menu commence par « Toutes » ou « Tous » ; sinon (Production), on choisit toujours une entité et un bâtiment.
 /// Les organismes n'existent pas encore dans le jeu : leur menu reste grisé tant qu'une entité n'en a pas.
@@ -107,13 +107,15 @@ public sealed class StructurePicker
 
     private void FillEntities(string? selected)
     {
-        var entities = Entities();
+        var entities = EntitiesWithDepth();
         // Sans « toutes », on commence par la première entité qui a des bâtiments (l'État n'en a pas d'ordinaire).
         if (!_allowAll && selected is null)
-            selected = entities.FirstOrDefault(e => e.Children.Any(c => c.Kind is StructureNodeKind.Building or StructureNodeKind.Organization))?.Id;
+            selected = entities.FirstOrDefault(e => e.Node.Children.Any(c => c.Kind is StructureNodeKind.Building or StructureNodeKind.Organization)).Node?.Id;
+        // Le retrait montre la hiérarchie : une commune sous sa préfecture, une préfecture sous l'État.
         Fill(_entity, _entityIds, selected,
             _allowAll ? new (string?, string)[] { (null, "Toutes les entités") } : [],
-            entities.Select(e => ((string?)e.Id, e.Name)));
+            entities.Select(e => ((string?)e.Node.Id, new string(' ', 4 * e.Depth) + e.Node.Name
+                + (e.Node.Kind == StructureNodeKind.Prefecture ? " (préfecture)" : ""))));
     }
 
     private void FillOrganizations(string? selected)
@@ -162,9 +164,28 @@ public sealed class StructurePicker
         _building.Disabled = _allowAll && EntityId is null;
     }
 
-    /// <summary>L'État puis ses communes : les entités politiques.</summary>
-    private List<StructureNode> Entities() =>
-        _roots.SelectMany(root => root.Children.Where(c => c.Kind == StructureNodeKind.Commune).Prepend(root)).ToList();
+    /// <summary>
+    /// Les entités politiques, de l'État aux communes en passant par les préfectures, dans l'ordre de la hiérarchie : une
+    /// commune peut être dans une préfecture, elle-même dans une autre préfecture.
+    /// </summary>
+    private List<StructureNode> Entities() => EntitiesWithDepth().Select(e => e.Node).ToList();
+
+    private List<(StructureNode Node, int Depth)> EntitiesWithDepth()
+    {
+        var found = new List<(StructureNode, int)>();
+        void Visit(StructureNode node, int depth)
+        {
+            found.Add((node, depth));
+            foreach (var child in node.Children.Where(IsEntity))
+                Visit(child, depth + 1);
+        }
+        foreach (var root in _roots.Where(IsEntity))
+            Visit(root, 0);
+        return found;
+    }
+
+    private static bool IsEntity(StructureNode node) =>
+        node.Kind is StructureNodeKind.State or StructureNodeKind.Prefecture or StructureNodeKind.Commune;
 
     private StructureNode? SelectedEntity() => EntityId is { } id ? Entities().FirstOrDefault(e => e.Id == id) : null;
 

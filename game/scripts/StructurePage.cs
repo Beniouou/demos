@@ -83,14 +83,14 @@ public partial class StructurePage : HBoxContainer, IMenuPage
         var shape = Shape(roots);
         if (shape != _shape)
         {
-            // Au premier affichage, l'État et la première commune sont déroulés, le reste replié.
+            // Au premier affichage, l'État et la première commune (avec ce qui la contient) sont déroulés, le reste replié.
             if (_shape == "")
             {
                 foreach (var root in roots)
                 {
                     _expanded.Add(root.Id);
-                    if (root.Children.FirstOrDefault(c => c.Kind == StructureNodeKind.Commune) is { } first)
-                        _expanded.Add(first.Id);
+                    foreach (var id in PathToFirstCommune(root))
+                        _expanded.Add(id);
                 }
                 _selected ??= roots.FirstOrDefault()?.Id;
             }
@@ -120,6 +120,19 @@ public partial class StructurePage : HBoxContainer, IMenuPage
 
     // ---- Le schéma -------------------------------------------------------------------------------------------------
 
+    /// <summary>Les préfectures à traverser jusqu'à la première commune, puis la commune : vide s'il n'y en a pas.</summary>
+    private static List<string> PathToFirstCommune(StructureNode node)
+    {
+        foreach (var child in node.Children)
+        {
+            if (child.Kind == StructureNodeKind.Commune)
+                return [child.Id];
+            if (child.Kind == StructureNodeKind.Prefecture && PathToFirstCommune(child) is { Count: > 0 } path)
+                return [child.Id, .. path];
+        }
+        return [];
+    }
+
     /// <summary>Ce qui oblige à refaire le schéma : une structure ou une loi en plus, en moins ou renommée.</summary>
     private static string Shape(IEnumerable<StructureNode> nodes) =>
         string.Join(";", nodes.Select(n => $"{n.Id}:{n.Name}:{n.Ownership}[{string.Join(",", n.Laws.Select(l => l.Id))}]({Shape(n.Children)})"));
@@ -135,7 +148,7 @@ public partial class StructurePage : HBoxContainer, IMenuPage
     private void AddNode(TreeItem parent, StructureNode node)
     {
         var item = Item(parent, node.Id, node.Kind == StructureNodeKind.State ? node.Name.ToUpperInvariant() : node.Name,
-            node.Kind is StructureNodeKind.State or StructureNodeKind.Commune ? EntityColor : UnitColor);
+            node.Kind is StructureNodeKind.State or StructureNodeKind.Prefecture or StructureNodeKind.Commune ? EntityColor : UnitColor);
         if (node.Kind == StructureNodeKind.Building)
             item.SetIcon(0, UiTheme.Square(UiTheme.OwnershipColor(node.Ownership), 12, 12));
         AddLawChips(item, node.Laws);
@@ -167,7 +180,7 @@ public partial class StructurePage : HBoxContainer, IMenuPage
                     AddNode(categoryItem, child);
             }
 
-            foreach (var child in node.Children.Where(c => c.Kind is StructureNodeKind.Commune or StructureNodeKind.State))
+            foreach (var child in node.Children.Where(c => c.Kind is StructureNodeKind.Commune or StructureNodeKind.Prefecture or StructureNodeKind.State))
                 AddNode(item, child);
         }
         else
@@ -238,6 +251,9 @@ public partial class StructurePage : HBoxContainer, IMenuPage
                 foreach (var pole in Demos.Domain.Politics.Orientation.All)
                     text.AppendLine($"  {Chip(pole)} {WorldText.PoleName(pole)} ({pole.Code}) {_view.LegitimacyOf(pole):F0}");
                 break;
+            case StructureNodeKind.Prefecture when _view.Prefectures().FirstOrDefault(p => p.Id == node.Id) is { } prefecture:
+                DescribePrefecture(text, prefecture, All(_view.StructureTree()).ToList());
+                break;
             case StructureNodeKind.Commune when _view.Communes().FirstOrDefault(c => c.Id == node.Id) is { } commune:
                 text.AppendLine(Escape(WorldText.Commune(commune)));
                 break;
@@ -249,6 +265,9 @@ public partial class StructurePage : HBoxContainer, IMenuPage
                 break;
         }
 
+        if (_view.EntityLoads().FirstOrDefault(l => l.Id == node.Id) is { } load)
+            DescribeLoad(text, load, node.Kind == StructureNodeKind.State);
+
         text.AppendLine();
         text.Append(Heading("LOIS QUI S'APPLIQUENT"));
         var laws = _view.LawsApplyingTo(node.Id);
@@ -257,6 +276,35 @@ public partial class StructurePage : HBoxContainer, IMenuPage
         foreach (var law in laws)
             text.AppendLine($"{string.Concat(law.Orientations.Select(Chip))} {Escape(law.Name)}  "
                 + Muted(law.StructureId == node.Id ? "(créée ici)" : $"(de {law.StructureName})"));
+    }
+
+    /// <summary>Une préfecture : son chef-lieu, ce qu'elle regroupe, son bâtiment (ou son chantier), ses emplois et salaires.</summary>
+    private static void DescribePrefecture(StringBuilder text, PrefectureView prefecture, List<StructureNode> all)
+    {
+        string NameOf(string id) => all.FirstOrDefault(n => n.Id == id)?.Name ?? id;
+        text.AppendLine($"Chef-lieu : {Escape(prefecture.SeatName ?? "—")}");
+        text.AppendLine($"Regroupe : {Escape(string.Join(", ", prefecture.MemberIds.Select(NameOf)))}");
+        text.AppendLine(prefecture.BuildingId is null
+            ? $"Bâtiment de la préfecture en chantier : encore {prefecture.ConstructionDaysLeft} jour(s)"
+            : "Bâtiment de la préfecture en service");
+        text.AppendLine($"Emplois : {prefecture.Jobs:N0} · salaires {prefecture.DailyWages:N0} par jour, payés par le trésor");
+    }
+
+    /// <summary>
+    /// L'extension d'une entité : ce qu'elle gère, sa charge (1 = la limite de ce qu'elle gère sans perte) et son
+    /// efficacité ; ailleurs qu'à l'État, l'efficacité qu'y ont les décisions de l'État.
+    /// </summary>
+    private static void DescribeLoad(StringBuilder text, EntityLoadView load, bool isState)
+    {
+        text.AppendLine();
+        text.Append(Heading("EXTENSION"));
+        var charge = $"Charge {load.Charge:0.00} (1 = la limite) · efficacité {load.Efficiency:P0}";
+        text.AppendLine(load.Charge > 1 ? $"[color=#{UiTheme.Danger.ToHtml(false)}]{charge}[/color]" : charge);
+        text.AppendLine($"Population comptée {load.CountedPopulation:N0} · bâtiments publics gérés en direct {load.DirectBuildings} · "
+            + $"bâtiments autonomes {load.AutonomousBuildings}");
+        if (!isState)
+            text.AppendLine($"Décisions de l'État ici : efficacité {load.StateEfficiencyHere:P0} "
+                + Muted($"({load.PrefecturesFromState} préfecture(s) traversée(s) depuis l'État)"));
     }
 
     /// <summary>Les bâtiments d'une commune, tous ou ceux d'une catégorie.</summary>
