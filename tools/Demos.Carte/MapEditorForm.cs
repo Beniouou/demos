@@ -46,6 +46,8 @@ public sealed partial class MapEditorForm : Form
     // Raccourcis de compatibilité vers les contrôles gérés par le contextBar
     private TrackBar _sliderBrushRadius => _contextBar.SliderBrushRadius;
     private TrackBar _sliderBrushPower => _contextBar.SliderBrushPower;
+    private TrackBar _sliderSmoothRadius => _contextBar.SliderSmoothRadius;
+    private TrackBar _sliderSmoothPower => _contextBar.SliderSmoothPower;
     private TrackBar _sliderBiomeRadius => _contextBar.SliderBiomeRadius;
     private TrackBar _sliderForestRadius => _contextBar.SliderBiomeRadius;
     private TrackBar _sliderResourceRadius => _contextBar.SliderResourceRadius;
@@ -127,6 +129,7 @@ public sealed partial class MapEditorForm : Form
         {
             (EditorTool.Navigate, "🔍", "Navigation"),
             (EditorTool.ElevateBrush, "⛰️", "Terrain"),
+            (EditorTool.SmoothBrush, "〰️", "Adoucir"),
             (EditorTool.DrawRiver, "💧", "Fleuves"),
             (EditorTool.DrawBiome, "🗺️", "Biomes"),
             (EditorTool.PlaceResource, "⛏️", "Gisement"),
@@ -201,6 +204,18 @@ public sealed partial class MapEditorForm : Form
     public void ElevateBrushForTesting(double x, double y, double radius, double delta)
     {
         _currentHeightmap?.ApplyBrush(x, y, radius, delta);
+        ReextractContoursAfterElevationChange();
+    }
+
+    public void SmoothBrushForTesting(double x, double y, double radius, double power)
+    {
+        _currentHeightmap?.ApplySmoothBrush(x, y, radius, power);
+        ReextractContoursAfterElevationChange();
+    }
+
+    public void FlattenBrushForTesting(double x, double y, double radius, double targetAltitude, double power)
+    {
+        _currentHeightmap?.ApplyFlattenBrush(x, y, radius, targetAltitude, power);
         ReextractContoursAfterElevationChange();
     }
 
@@ -286,6 +301,39 @@ public sealed partial class MapEditorForm : Form
             return false;
         }
 
+        _sliderSmoothRadius.Value = 160;
+        if ((int)_canvas.SmoothBrushRadius != 160)
+        {
+            report = $"Failed: smooth radius 160 -> canvas={_canvas.SmoothBrushRadius}";
+            return false;
+        }
+
+        _sliderSmoothPower.Value = 65;
+        if ((int)_canvas.SmoothBrushPower != 65)
+        {
+            report = $"Failed: smooth power 65 -> canvas={_canvas.SmoothBrushPower}";
+            return false;
+        }
+
+        // Test fonctionnel du pinceau Adoucisseur (lissage et plateau)
+        _currentHeightmap.ApplyBrush(600, 600, 50, 400); // crée un pic aigu à (600,600)
+        var peakBefore = _currentHeightmap.SampleElevation(600, 600);
+        SmoothBrushForTesting(600, 600, 60, 0.6);
+        var peakAfterSmooth = _currentHeightmap.SampleElevation(600, 600);
+        if (peakAfterSmooth >= peakBefore)
+        {
+            report = $"Failed: smooth brush should round and lower the sharp peak (before={peakBefore:F1}, after={peakAfterSmooth:F1})";
+            return false;
+        }
+
+        FlattenBrushForTesting(600, 600, 60, 150.0, 0.8);
+        var peakAfterFlatten = _currentHeightmap.SampleElevation(600, 600);
+        if (Math.Abs(peakAfterFlatten - 150.0) >= Math.Abs(peakAfterSmooth - 150.0))
+        {
+            report = $"Failed: flatten brush should pull elevation towards target 150m (was={peakAfterSmooth:F1}, now={peakAfterFlatten:F1})";
+            return false;
+        }
+
         if (!_canvas.TestBrushHoverSafety())
         {
             report = "Failed: Canvas hover safety test failed";
@@ -368,6 +416,14 @@ public sealed partial class MapEditorForm : Form
                 report = $"Failed: cliff brush should succeed on steep mountain slope (err={cliffHighErr})";
                 return false;
             }
+
+            // Marais sur le flanc escarpé de la montagne doit être rejeté (pente >= 30%)
+            var swampOnSteep = ApplyBiomeBrushForTesting(1800, 1200, 40, "marais", true, out var swampErr);
+            if (swampOnSteep || swampErr == null)
+            {
+                report = "Failed: swamp brush should be rejected on steep mountain slope (slope >= 30%)";
+                return false;
+            }
         }
 
         // Test d'inversion des falaises / sommet (anneaux et trous Marching Squares)
@@ -398,7 +454,23 @@ public sealed partial class MapEditorForm : Form
             return false;
         }
 
-        report = $"All slider, hover, river, commune move, cliff hole extraction, and 7-biome rule tests passed successfully! (River test: {riverPts.Count} points, Mountain peak: {highAlt:F0}m)";
+        // Test de la pré-génération automatique des biomes naturels sur l'île
+        CreateIslandMap();
+        if (_currentMap.AllBiomes.Count == 0)
+        {
+            report = "Failed: CreateIslandMap should produce biomes via AutoGenerateBiomes";
+            return false;
+        }
+        var hasBeaches = _currentMap.AllBiomes.Any(b => b.Kind == "plage");
+        var hasFertile = _currentMap.AllBiomes.Any(b => b.Kind == "fertile");
+        var hasForest = _currentMap.AllBiomes.Any(b => b.Kind == "foret");
+        if (!hasBeaches || !hasFertile || !hasForest)
+        {
+            report = $"Failed: AutoGenerateBiomes should produce beaches, fertile lands and forests (beaches={hasBeaches}, fertile={hasFertile}, forest={hasForest})";
+            return false;
+        }
+
+        report = $"All slider, hover, river, commune move, cliff hole extraction, and 7-biome rule tests passed successfully! (River test: {riverPts.Count} points, Mountain peak: {highAlt:F0}m, Auto-biomes: {_currentMap.AllBiomes.Count})";
         return true;
     }
 
@@ -472,6 +544,20 @@ public sealed partial class MapEditorForm : Form
             _contextBar.LblBrushPowerVal.Text = $"{_sliderBrushPower.Value} m";
         };
 
+        // Pinceau Adoucisseur
+        _sliderSmoothRadius.ValueChanged += (_, _) =>
+        {
+            _canvas.SmoothBrushRadius = _sliderSmoothRadius.Value;
+            _contextBar.LblSmoothRadiusVal.Text = $"{_sliderSmoothRadius.Value} lieues";
+            _canvas.Invalidate();
+        };
+
+        _sliderSmoothPower.ValueChanged += (_, _) =>
+        {
+            _canvas.SmoothBrushPower = _sliderSmoothPower.Value;
+            _contextBar.LblSmoothPowerVal.Text = $"{_sliderSmoothPower.Value} %";
+        };
+
         // Fleuves
         _sliderRiverWidth.ValueChanged += (_, _) =>
         {
@@ -505,6 +591,7 @@ public sealed partial class MapEditorForm : Form
             _canvas.BiomeBrushName = _txtBiomeName.Text;
         };
 
+        _contextBar.BtnBiomeAutoGenerate.Click += (_, _) => AutoGenerateBiomes();
         _contextBar.BtnBiomeClearAll.Click += (_, _) => ClearAllBiomes();
 
         // Gisements
@@ -558,6 +645,8 @@ public sealed partial class MapEditorForm : Form
         // Initialisation des valeurs des pinceaux pour le Canvas
         _canvas.BrushRadius = _sliderBrushRadius.Value;
         _canvas.BrushPower = _sliderBrushPower.Value;
+        _canvas.SmoothBrushRadius = _sliderSmoothRadius.Value;
+        _canvas.SmoothBrushPower = _sliderSmoothPower.Value;
         _canvas.BiomeBrushRadius = _sliderBiomeRadius.Value;
         _canvas.BiomeBrushType = ZoneMaskGrid.BiomeTypes[0].Key;
         _canvas.BiomeBrushName = _txtBiomeName.Text;
@@ -802,6 +891,21 @@ public sealed partial class MapEditorForm : Form
         Log("🗑 Tous les milieux naturels ont été effacés.");
     }
 
+    public void AutoGenerateBiomes()
+    {
+        if (_currentHeightmap is null || _currentZoneGrid is null || _currentMap is null) return;
+
+        PushUndo();
+        _currentZoneGrid.AutoGenerateBiomes(_currentHeightmap, _currentMap.AllRivers);
+        var biomes = _currentZoneGrid.ExtractBiomes(_canvas.BiomeBrushType, _txtBiomeName.Text);
+        var forests = _currentZoneGrid.ExtractForests(_txtBiomeName.Text);
+        _currentMap = _currentMap with { Biomes = biomes, Forests = forests };
+        _canvas.SetMap(_currentMap, _currentHeightmap, GetCurrentStyle(), _currentZoneGrid);
+
+        var stats = string.Join(", ", _currentMap.AllBiomes.GroupBy(b => b.Kind).Select(g => $"{g.Count()} {g.Key}"));
+        Log($"🪄 Biomes naturels pré-générés automatiquement selon le relief ({_currentMap.AllBiomes.Count} zones : {stats}).");
+    }
+
     private void ClearAllForests() => ClearAllBiomes();
 
     private void OnPlaceCategoryChanged(int index)
@@ -999,15 +1103,18 @@ public sealed partial class MapEditorForm : Form
         var zcols = Math.Clamp((int)Math.Round(w / 10.0), 100, 360);
         var zrows = Math.Clamp((int)Math.Round(h / 10.0), 64, 230);
         _currentZoneGrid = new ZoneMaskGrid(zcols, zrows, w, h);
-        _currentZoneGrid.RasterizeFromMap(_currentMap);
+        _currentZoneGrid.AutoGenerateBiomes(_currentHeightmap, _currentMap.AllRivers);
+        var biomes = _currentZoneGrid.ExtractBiomes();
+        var forests = _currentZoneGrid.ExtractForests();
+        _currentMap = _currentMap with { Biomes = biomes, Forests = forests };
         _canvas.SetMap(_currentMap, _currentHeightmap, GetCurrentStyle(), _currentZoneGrid);
         _canvas.ResetView();
         UpdateCommuneLabels();
         UpdateRiverContextButtons();
 
         _statusDimensions.Text = $"{w:N0} × {h:N0} lieues";
-        _statusStats.Text = $"Île découpée créée ({_currentMap.Contours.Count} courbes, {_currentMap.WaterBodies.Count} mers)";
-        Log($"🏝️ Mode Île initialisé ({w:N0} × {h:N0} lieues, côtes découpées et océan enveloppant).");
+        _statusStats.Text = $"Île découpée créée ({_currentMap.Contours.Count} courbes, {_currentMap.AllBiomes.Count} biomes, {_currentMap.WaterBodies.Count} mers)";
+        Log($"🏝️ Mode Île initialisé ({w:N0} × {h:N0} lieues, côtes découpées, biomes naturels et océan).");
     }
 
     /// <summary>

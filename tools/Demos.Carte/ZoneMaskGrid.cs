@@ -32,9 +32,9 @@ public sealed class ZoneMaskGrid
     [
         ("foret", "🌲 Forêt", "Bois des Chênes", "Terre émergée sous les glaciers (< 2 500 m)"),
         ("fertile", "🌾 Terre fertile", "Plaine fertile", "Terre émergée en plaine ou coteaux (< 600 m, pente tolérée < 60 %)"),
-        ("marais", "🌾💧 Marais", "Grand Marais", "Près de l'eau (littoral bas ou le long d'un fleuve)"),
+        ("marais", "🌾💧 Marais", "Grand Marais", "Près de l'eau (littoral bas ou fleuve, pente < 30 %)"),
         ("plage", "🏖️ Plage", "Plage dorée", "Interface immédiate terre/mer (littoral ≤ 30 m)"),
-        ("falaise", "🧗 Falaise", "Falaises rocheuses", "Forte pente (dénivelé abrupt ≥ 60 %) ou rivage à-pic"),
+        ("falaise", "🧗 Falaise", "Falaises rocheuses", "Forte pente (dénivelé abrupt ≥ 150 %)"),
         ("desert", "🏜️ Désert", "Désert aride", "Plaine aride (< 250 m, pente douce)"),
         ("glacier", "❄️ Glacier", "Glacier éternel", "Haute altitude (≥ 2 500 m)")
     ];
@@ -235,13 +235,13 @@ public sealed class ZoneMaskGrid
                         break;
 
                     case "marais":
-                        isValid = alt < 400.0 && (IsNearSea(gx, gy, heightmap, 25.0) || IsNearRiver(gx, gy, rivers, 25.0));
+                        var slopeM = ComputeSlope(gx, gy, heightmap);
+                        isValid = alt < 400.0 && slopeM < 0.30 && (IsNearSea(gx, gy, heightmap, 25.0) || IsNearRiver(gx, gy, rivers, 25.0));
                         break;
 
                     case "falaise":
                         var slopeC = ComputeSlope(gx, gy, heightmap);
-                        var isCoastalCliff = IsNearSea(gx, gy, heightmap, 16.0) && alt >= 20.0 && slopeC >= 0.40;
-                        isValid = slopeC >= 0.60 || isCoastalCliff;
+                        isValid = slopeC >= 1.50;
                         break;
                 }
 
@@ -264,8 +264,8 @@ public sealed class ZoneMaskGrid
                 "glacier" => "❄️ Un glacier requiert une haute altitude (≥ 2 500 m).",
                 "foret" or "forest" => "🌲 La forêt s'arrête sous la ligne des glaciers (< 2 500 m).",
                 "plage" => "🏖️ Une plage doit border le littoral (interface terre/mer).",
-                "marais" => "🌾💧 Un marais doit border un littoral bas ou un cours d'eau.",
-                "falaise" => "🧗 Une falaise requiert une pente abrupte (≥ 60 %) ou un rivage à-pic (alt. ≥ 20 m).",
+                "marais" => "🌾💧 Un marais doit border un cours d'eau ou un littoral sur terrain plat (pente < 30 %, alt. < 400 m).",
+                "falaise" => "🧗 Une falaise requiert une pente abrupte (dénivelé ≥ 150 %).",
                 "desert" => "🏜️ Un désert ne s'étend que dans les plaines (< 250 m, pente douce).",
                 "fertile" or "zone fertile" => "🌾 Les terres fertiles requièrent un terrain cultivable (< 600 m, pente < 60 %).",
                 _ => null
@@ -273,6 +273,92 @@ public sealed class ZoneMaskGrid
         }
 
         return modifiedAny;
+    }
+
+    /// <summary>
+    /// Pré-génère automatiquement les biomes naturels sur l'ensemble de la carte
+    /// en appliquant les règles d'adéquation géographique et une distribution spatiale cohérente.
+    /// </summary>
+    public void AutoGenerateBiomes(Heightmap heightmap, IReadOnlyList<RiverData>? rivers, int seed = 42)
+    {
+        ClearBiomes();
+
+        for (var i = 0; i < Columns; i++)
+        {
+            var gx = GetWorldX(i);
+            for (var j = 0; j < Rows; j++)
+            {
+                var gy = GetWorldY(j);
+                var alt = heightmap.SampleElevation(gx, gy);
+
+                // 1. Mer / Océan
+                if (alt <= 0.0) continue;
+
+                var slope = ComputeSlope(gx, gy, heightmap);
+                var nearSea = IsNearSea(gx, gy, heightmap, 22.0);
+                var nearRiver = IsNearRiver(gx, gy, rivers, 30.0);
+
+                // 2. Glaciers sommitaux (haute montagne >= 2500m)
+                if (alt >= 2500.0)
+                {
+                    _biome[i, j] = 7; // glacier
+                    continue;
+                }
+
+                // 3. Falaises rocheuses (pente abrupte >= 150%)
+                if (slope >= 1.50)
+                {
+                    _biome[i, j] = 5; // falaise
+                    continue;
+                }
+
+                // 4. Plages de sable (littoral doux <= 30m)
+                if (alt <= 30.0 && nearSea && slope < 0.40)
+                {
+                    _biome[i, j] = 4; // plage
+                    continue;
+                }
+
+                // 5. Terres émergées habitables (< 2500m, pente < 60%)
+                var n1 = Math.Sin(gx * 0.007 + seed * 1.31) * Math.Cos(gy * 0.007 + seed * 0.77);
+                var n2 = Math.Sin(gx * 0.015 - gy * 0.012 + seed * 2.19);
+                var n3 = Math.Cos(gx * 0.031 + gy * 0.028 + seed * 3.73);
+                var noiseHarmonic = (n1 + 0.5 * n2 + 0.25 * n3) / 1.75;
+
+                var nMarais = Math.Sin(gx * 0.022 + gy * 0.018 + seed * 4.15);
+                var nDesert = Math.Cos(gx * 0.008 - gy * 0.006 + seed * 5.71);
+
+                // Marais : très basse altitude (< 120m), très plat (pente < 10%), près de l'eau
+                if (alt < 120.0 && slope < 0.10 && (nearRiver || nearSea) && nMarais > 0.40)
+                {
+                    _biome[i, j] = 3; // marais
+                    continue;
+                }
+
+                // Terres fertiles : plaines et coteaux (< 600m), favorisées le long des cours d'eau
+                var fertileScore = noiseHarmonic + (nearRiver ? 0.40 : 0.0) + (alt < 250.0 ? 0.25 : 0.0) - slope * 0.50;
+                if (alt < 600.0 && slope < 0.50 && fertileScore > 0.12)
+                {
+                    _biome[i, j] = 2; // fertile
+                    continue;
+                }
+
+                // Désert : plaines très basses et plates, loin de tout cours d'eau et de la mer
+                if (alt < 200.0 && slope < 0.15 && !nearRiver && !nearSea && nDesert > 0.55)
+                {
+                    _biome[i, j] = 6; // desert
+                    continue;
+                }
+
+                // Forêt : massifs sur collines, plateaux et moyennes montagnes (ou vallées boisées)
+                var forestScore = -noiseHarmonic + (alt >= 100.0 && alt <= 1800.0 ? 0.35 : 0.0) + (slope >= 0.10 ? 0.15 : 0.0);
+                if (alt < 2500.0 && slope < 1.50 && forestScore > -0.05)
+                {
+                    _biome[i, j] = 1; // foret
+                    continue;
+                }
+            }
+        }
     }
 
     /// <summary>

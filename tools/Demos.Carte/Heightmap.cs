@@ -180,6 +180,104 @@ public sealed class Heightmap
     }
 
     /// <summary>
+    /// Adoucit les pentes et élimine le bruit du relief sous un pinceau circulaire (flou gaussien local).
+    /// </summary>
+    public void ApplySmoothBrush(double worldX, double worldY, double radius, double power)
+    {
+        if (radius <= 0 || power <= 0) return;
+
+        var sx = WorldWidth / (Columns - 1);
+        var sy = WorldHeight / (Rows - 1);
+
+        var minI = Math.Clamp((int)Math.Floor((worldX - radius) / sx), 0, Columns - 1);
+        var maxI = Math.Clamp((int)Math.Ceiling((worldX + radius) / sx), 0, Columns - 1);
+        var minJ = Math.Clamp((int)Math.Floor((worldY - radius) / sy), 0, Rows - 1);
+        var maxJ = Math.Clamp((int)Math.Ceiling((worldY + radius) / sy), 0, Rows - 1);
+
+        var countI = maxI - minI + 1;
+        var countJ = maxJ - minJ + 1;
+        var buffer = new double[countI, countJ];
+
+        for (var i = minI; i <= maxI; i++)
+        {
+            var gx = GetWorldX(i);
+            var i0 = Math.Max(0, i - 1);
+            var i1 = Math.Min(Columns - 1, i + 1);
+
+            for (var j = minJ; j <= maxJ; j++)
+            {
+                var gy = GetWorldY(j);
+                var j0 = Math.Max(0, j - 1);
+                var j1 = Math.Min(Rows - 1, j + 1);
+
+                var cur = _grid[i, j];
+                var dist = Math.Sqrt((gx - worldX) * (gx - worldX) + (gy - worldY) * (gy - worldY));
+                if (dist < radius)
+                {
+                    var sum = cur * 4.0
+                        + _grid[i0, j] * 2.0 + _grid[i1, j] * 2.0 + _grid[i, j0] * 2.0 + _grid[i, j1] * 2.0
+                        + _grid[i0, j0] + _grid[i1, j0] + _grid[i0, j1] + _grid[i1, j1];
+                    var blurred = sum / 16.0;
+
+                    var falloff = Math.Cos((dist / radius) * (Math.PI * 0.5));
+                    var factor = Math.Clamp(power * falloff, 0.0, 1.0);
+                    buffer[i - minI, j - minJ] = Math.Clamp(cur + (blurred - cur) * factor, -40.0, 5000.0);
+                }
+                else
+                {
+                    buffer[i - minI, j - minJ] = cur;
+                }
+            }
+        }
+
+        for (var i = minI; i <= maxI; i++)
+        {
+            for (var j = minJ; j <= maxJ; j++)
+            {
+                _grid[i, j] = Math.Round(buffer[i - minI, j - minJ], 1);
+            }
+        }
+
+        UpdateMinMax();
+    }
+
+    /// <summary>
+    /// Aplanit le relief en plateau sous un pinceau circulaire vers une altitude de référence cible.
+    /// </summary>
+    public void ApplyFlattenBrush(double worldX, double worldY, double radius, double targetAltitude, double power)
+    {
+        if (radius <= 0 || power <= 0) return;
+
+        var sx = WorldWidth / (Columns - 1);
+        var sy = WorldHeight / (Rows - 1);
+
+        var minI = Math.Clamp((int)Math.Floor((worldX - radius) / sx), 0, Columns - 1);
+        var maxI = Math.Clamp((int)Math.Ceiling((worldX + radius) / sx), 0, Columns - 1);
+        var minJ = Math.Clamp((int)Math.Floor((worldY - radius) / sy), 0, Rows - 1);
+        var maxJ = Math.Clamp((int)Math.Ceiling((worldY + radius) / sy), 0, Rows - 1);
+
+        for (var i = minI; i <= maxI; i++)
+        {
+            var gx = GetWorldX(i);
+            for (var j = minJ; j <= maxJ; j++)
+            {
+                var gy = GetWorldY(j);
+                var dist = Math.Sqrt((gx - worldX) * (gx - worldX) + (gy - worldY) * (gy - worldY));
+                if (dist < radius)
+                {
+                    var cur = _grid[i, j];
+                    var falloff = Math.Cos((dist / radius) * (Math.PI * 0.5));
+                    var factor = Math.Clamp(power * falloff, 0.0, 1.0);
+                    var newVal = Math.Clamp(cur + (targetAltitude - cur) * factor, -40.0, 5000.0);
+                    _grid[i, j] = Math.Round(newVal, 1);
+                }
+            }
+        }
+
+        UpdateMinMax();
+    }
+
+    /// <summary>
     /// Creuse la vallée fluviale (thalweg) le long d'un tracé de fleuve personnalisé.
     /// </summary>
     public void DigRiverThalweg(IReadOnlyList<Point2D> riverPoints, double maxDepth = 45.0, double influenceRadius = 60.0)

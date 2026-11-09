@@ -11,6 +11,9 @@ public enum EditorTool
     /// <summary>Pinceau de terrain unifié : Clic gauche = Surélever, Clic droit = Creuser (devient mer sous 0 m).</summary>
     ElevateBrush,
 
+    /// <summary>Pinceau adoucisseur : Clic gauche = Lisser les pentes (flou gaussien), Clic droit = Aplanir en plateau.</summary>
+    SmoothBrush,
+
     /// <summary>Nommer un lieu / toponymie : poser un point d'intérêt avec nom et logo sans déformer le relief.</summary>
     NamePlace,
 

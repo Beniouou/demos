@@ -81,6 +81,14 @@ public sealed class MapCanvasControl : Control
     public string ResourceBrushName { get; set; } = "Carrière de pierre";
 
     [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
+    public double SmoothBrushRadius { get; set; } = 80.0;
+
+    [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
+    public double SmoothBrushPower { get; set; } = 30.0;
+
+    private double _flattenTargetAltitude = 0.0;
+
+    [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
     public ZoneMaskGrid? ZoneGrid { get; set; }
 
     [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
@@ -367,6 +375,17 @@ public sealed class MapCanvasControl : Control
                     }
                     break;
 
+                case EditorTool.SmoothBrush:
+                    var rs = (float)SmoothBrushRadius;
+                    var smoothColor = Color.FromArgb(210, 30, 140, 200); // Bleu azur / cyan lissage
+                    using (var sPen = new Pen(smoothColor, 2.0f / finalScale) { DashStyle = DashStyle.Dash })
+                    using (var sFill = new SolidBrush(Color.FromArgb(30, smoothColor)))
+                    {
+                        g.FillEllipse(sFill, _hoverWorldPt.X - rs, _hoverWorldPt.Y - rs, rs * 2, rs * 2);
+                        g.DrawEllipse(sPen, _hoverWorldPt.X - rs, _hoverWorldPt.Y - rs, rs * 2, rs * 2);
+                    }
+                    break;
+
                 case EditorTool.NamePlace:
                     var curAlt = _heightmap?.SampleElevation(_hoverWorldPt.X, _hoverWorldPt.Y) ?? 0.0;
                     var catObj = PlaceCategories.Get(PlaceLabelCategory);
@@ -591,7 +610,7 @@ public sealed class MapCanvasControl : Control
         }
 
         // Clic droit ou clic molette pour lancer le pan (sauf en mode Pinceau Terrain, Nommer un lieu, Fleuve, Commune, Biome ou Gisement)
-        if (e.Button == MouseButtons.Middle || (e.Button == MouseButtons.Right && _currentTool != EditorTool.ElevateBrush && _currentTool != EditorTool.NamePlace && _currentTool != EditorTool.DrawRiver && _currentTool != EditorTool.MoveCommune && _currentTool != EditorTool.DrawBiome && _currentTool != EditorTool.PlaceResource))
+        if (e.Button == MouseButtons.Middle || (e.Button == MouseButtons.Right && _currentTool != EditorTool.ElevateBrush && _currentTool != EditorTool.NamePlace && _currentTool != EditorTool.DrawRiver && _currentTool != EditorTool.MoveCommune && _currentTool != EditorTool.DrawBiome && _currentTool != EditorTool.PlaceResource && _currentTool != EditorTool.SmoothBrush))
         {
             _isPanning = true;
             _dragStartMouse = e.Location;
@@ -615,6 +634,25 @@ public sealed class MapCanvasControl : Control
                 _isBrushing = true;
                 var delta = e.Button == MouseButtons.Left ? Math.Abs(BrushPower) : -Math.Abs(BrushPower);
                 _heightmap.ApplyBrush(wx, wy, BrushRadius, delta);
+                var updatedWater = ContourExtractor.ExtractWaterBodies(_heightmap);
+                _map = _map with { WaterBodies = updatedWater };
+                Invalidate();
+                return;
+            }
+
+            if (_currentTool == EditorTool.SmoothBrush && (e.Button is MouseButtons.Left or MouseButtons.Right))
+            {
+                _isBrushing = true;
+                var powerFactor = Math.Clamp(SmoothBrushPower / 100.0, 0.05, 1.0);
+                if (e.Button == MouseButtons.Right)
+                {
+                    _flattenTargetAltitude = _heightmap.SampleElevation(wx, wy);
+                    _heightmap.ApplyFlattenBrush(wx, wy, SmoothBrushRadius, _flattenTargetAltitude, powerFactor);
+                }
+                else
+                {
+                    _heightmap.ApplySmoothBrush(wx, wy, SmoothBrushRadius, powerFactor);
+                }
                 var updatedWater = ContourExtractor.ExtractWaterBodies(_heightmap);
                 _map = _map with { WaterBodies = updatedWater };
                 Invalidate();
@@ -799,6 +837,22 @@ public sealed class MapCanvasControl : Control
                 _map = map;
                 Invalidate();
             }
+            else if (_currentTool == EditorTool.SmoothBrush)
+            {
+                var powerFactor = Math.Clamp(SmoothBrushPower / 100.0, 0.05, 1.0);
+                if ((e.Button & MouseButtons.Right) != 0)
+                {
+                    heightmap.ApplyFlattenBrush(wx, wy, SmoothBrushRadius, _flattenTargetAltitude, powerFactor * 0.4);
+                }
+                else
+                {
+                    heightmap.ApplySmoothBrush(wx, wy, SmoothBrushRadius, powerFactor * 0.4);
+                }
+                var updatedWater = ContourExtractor.ExtractWaterBodies(heightmap);
+                map = map with { WaterBodies = updatedWater };
+                _map = map;
+                Invalidate();
+            }
             else if (_currentTool == EditorTool.DrawBiome)
             {
                 var isAdding = (e.Button & MouseButtons.Left) != 0;
@@ -856,6 +910,15 @@ public sealed class MapCanvasControl : Control
         _isBrushing = false;
 
         if (_currentTool == EditorTool.ElevateBrush)
+        {
+            if (_heightmap is not null && _map is not null)
+            {
+                var updatedWater = ContourExtractor.ExtractWaterBodies(_heightmap);
+                _map = _map with { WaterBodies = updatedWater };
+            }
+            ElevationModified?.Invoke();
+        }
+        else if (_currentTool == EditorTool.SmoothBrush)
         {
             if (_heightmap is not null && _map is not null)
             {

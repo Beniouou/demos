@@ -43,6 +43,14 @@ public sealed class EditorContextBarManager
     public TrackBar SliderBrushPower { get; } = new() { Minimum = 5, Maximum = 150, Value = 30, TickFrequency = 15, Width = 100, Margin = new Padding(0, 2, 2, 0) };
     public Label LblBrushPowerVal { get; } = new() { Text = "30 m", AutoSize = true, Margin = new Padding(0, 6, 12, 0) };
 
+    // Pinceau Adoucisseur & Aplanisseur
+    public Label LblSmoothRadius { get; } = new() { Text = "Rayon :", AutoSize = true, Margin = new Padding(0, 6, 2, 0) };
+    public TrackBar SliderSmoothRadius { get; } = new() { Minimum = 15, Maximum = 400, Value = 80, TickFrequency = 25, Width = 110, Margin = new Padding(0, 2, 2, 0) };
+    public Label LblSmoothRadiusVal { get; } = new() { Text = "80 lieues", AutoSize = true, Margin = new Padding(0, 6, 8, 0) };
+    public Label LblSmoothPower { get; } = new() { Text = "Intensité :", AutoSize = true, Margin = new Padding(0, 6, 2, 0) };
+    public TrackBar SliderSmoothPower { get; } = new() { Minimum = 10, Maximum = 100, Value = 30, TickFrequency = 10, Width = 100, Margin = new Padding(0, 2, 2, 0) };
+    public Label LblSmoothPowerVal { get; } = new() { Text = "30 %", AutoSize = true, Margin = new Padding(0, 6, 12, 0) };
+
     // Fleuves & Réseau hydrographique
     public Label LblRiverStatus { get; } = new() { Text = "💧 0 fleuve", Font = new Font("Segoe UI", 9.5f, FontStyle.Bold), AutoSize = true, Margin = new Padding(0, 6, 8, 0) };
     public Label LblRiverName { get; } = new() { Text = "Nom :", AutoSize = true, Margin = new Padding(0, 6, 2, 0) };
@@ -78,6 +86,7 @@ public sealed class EditorContextBarManager
     public Label LblBiomeRadiusVal { get; } = new() { Text = "50 lieues", AutoSize = true, Margin = new Padding(0, 6, 8, 0) };
     public Label LblBiomeName { get; } = new() { Text = "Nom :", AutoSize = true, Margin = new Padding(0, 6, 2, 0) };
     public TextBox TxtBiomeName { get; } = new() { Text = "Bois des Chênes", Width = 140, Margin = new Padding(0, 3, 8, 0) };
+    public Button BtnBiomeAutoGenerate { get; } = new() { Text = "🪄 Peupler biomes", Height = 32, AutoSize = true, BackColor = Color.FromArgb(46, 125, 50), ForeColor = Color.White, Font = new Font("Segoe UI", 9f, FontStyle.Bold), Margin = new Padding(0, 1, 4, 0), Cursor = Cursors.Hand };
     public Button BtnBiomeClearAll { get; } = new() { Text = "🗑 Effacer tous les biomes", Height = 32, AutoSize = true, BackColor = Color.FromArgb(198, 40, 40), ForeColor = Color.White, Margin = new Padding(0, 1, 8, 0), Cursor = Cursors.Hand };
     public Label LblBiomeRuleHint { get; } = new() { Text = "📌 Terre émergée sous les glaciers (< 2 500 m) | Clic GAUCHE = Peindre | Clic DROIT = Gommer", AutoSize = true, ForeColor = Color.FromArgb(30, 90, 40), Font = new Font("Segoe UI", 8.8f, FontStyle.Italic), Margin = new Padding(4, 7, 8, 0) };
 
@@ -183,6 +192,17 @@ public sealed class EditorContextBarManager
                 FlowContent.Controls.Add(CreateHint("👉 Clic GAUCHE = Surélever (+) | Clic DROIT = Creuser (−, mer sous 0 m)", Color.FromArgb(40, 80, 50)));
                 break;
 
+            case EditorTool.SmoothBrush:
+                FlowContent.Controls.Add(LblSmoothRadius);
+                FlowContent.Controls.Add(SliderSmoothRadius);
+                FlowContent.Controls.Add(LblSmoothRadiusVal);
+                FlowContent.Controls.Add(LblSmoothPower);
+                FlowContent.Controls.Add(SliderSmoothPower);
+                FlowContent.Controls.Add(LblSmoothPowerVal);
+                FlowContent.Controls.Add(CreateSep());
+                FlowContent.Controls.Add(CreateHint("👉 Clic GAUCHE = Adoucir la pente (lissage gaussien) | Clic DROIT = Aplanir en plateau", Color.FromArgb(20, 100, 140)));
+                break;
+
             case EditorTool.DrawRiver:
                 FlowContent.Controls.Add(LblRiverStatus);
                 FlowContent.Controls.Add(LblRiverName);
@@ -209,6 +229,7 @@ public sealed class EditorContextBarManager
                 FlowContent.Controls.Add(LblBiomeRadiusVal);
                 FlowContent.Controls.Add(LblBiomeName);
                 FlowContent.Controls.Add(TxtBiomeName);
+                FlowContent.Controls.Add(BtnBiomeAutoGenerate);
                 FlowContent.Controls.Add(BtnBiomeClearAll);
                 FlowContent.Controls.Add(CreateSep());
                 FlowContent.Controls.Add(LblBiomeRuleHint);

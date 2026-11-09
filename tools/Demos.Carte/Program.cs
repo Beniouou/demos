@@ -123,6 +123,15 @@ public static class Program
                     form.AddCommuneForTesting(1950, 1100, "Saint-Malo");
                     form.AddCommuneForTesting(450, 950, "Châteauneuf");
                 }
+                else if (t == EditorTool.SmoothBrush)
+                {
+                    for (int step = 0; step < 10; step++)
+                    {
+                        form.ElevateBrushForTesting(1200, 750, 160, 100);
+                    }
+                    form.FlattenBrushForTesting(1200, 750, 70, 450.0, 0.7);
+                    form.SmoothBrushForTesting(1200, 850, 90, 0.5);
+                }
             }
 
             form.Show();

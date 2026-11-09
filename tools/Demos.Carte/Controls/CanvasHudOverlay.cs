@@ -54,6 +54,11 @@ public static class CanvasHudOverlay
             message = "Pinceau Terrain — Clic gauche : Surélever (+ relief) | Clic droit : Creuser (− relief, mer sous 0 m)";
             badgeColor = Color.FromArgb(245, 45, 95, 65);
         }
+        else if (currentTool == EditorTool.SmoothBrush)
+        {
+            message = "Pinceau Adoucisseur — Clic gauche : Adoucir la pente | Clic droit : Aplanir en plateau";
+            badgeColor = Color.FromArgb(245, 20, 110, 160);
+        }
         else if (currentTool == EditorTool.NamePlace)
         {
             message = "Toponymie — Clic gauche : Placer le nom | Clic droit : Supprimer un lieu";
