@@ -45,6 +45,38 @@ public static class MapPalette
     public static readonly Color InfluenceBorder = new("#A84C42");
     public static readonly Color TerraIncognitaHatch = new(0.55f, 0.48f, 0.40f, 0.25f);
 
+    // Préfectures, Juridictions & Frontières départementales
+    public static readonly Color PrefectureSeat = new("#6D2C4D");             // Pourpre civique noble
+    public static readonly Color PrefectureBorder = new("#803657");           // Liseré frontière départementale
+    public static readonly Color PrefectureWash = new(0.65f, 0.38f, 0.52f, 0.14f); // Lavis aquarelle pastel doux
+    public static readonly Color AdministrativeLink = new(0.48f, 0.22f, 0.38f, 0.65f); // Pointillés liaison chef-lieu
+    public static readonly Color CapitalGold = new("#E6B422");                // Or républicain capitale
+
+    public static readonly Color[] PrefectureDepartmentWashes =
+    [
+        new Color(0.65f, 0.38f, 0.52f, 0.14f), // Pourpre / Lilas
+        new Color(0.75f, 0.58f, 0.28f, 0.14f), // Ambre / Miel
+        new Color(0.38f, 0.62f, 0.48f, 0.14f), // Sauge / Émeraude douce
+        new Color(0.35f, 0.52f, 0.68f, 0.14f), // Bleu ardoise / Céleste
+        new Color(0.72f, 0.42f, 0.35f, 0.14f), // Ocre / Terre cuite
+        new Color(0.55f, 0.45f, 0.65f, 0.14f), // Lavande
+    ];
+
+    public static readonly Color[] PrefectureDepartmentBorders =
+    [
+        new Color(0.55f, 0.25f, 0.42f, 0.85f),
+        new Color(0.65f, 0.45f, 0.18f, 0.85f),
+        new Color(0.28f, 0.50f, 0.36f, 0.85f),
+        new Color(0.25f, 0.42f, 0.58f, 0.85f),
+        new Color(0.62f, 0.32f, 0.25f, 0.85f),
+        new Color(0.45f, 0.35f, 0.55f, 0.85f),
+    ];
+
+    // Transit & Voies de communication
+    public static readonly Color TradeRoad = new("#9C683B");                 // Voie marchande bistre
+    public static readonly Color TradeRoadDashed = new(0.60f, 0.38f, 0.20f, 0.75f);
+    public static readonly Color TradeRiverHighlight = new(0.25f, 0.55f, 0.75f, 0.35f); // Corridor fluvial navigable
+
     // Textes et cartouches
     public static readonly Color InkText = new("#3D2916");
     public static readonly Color LabelBackground = new(0.99f, 0.98f, 0.96f, 0.95f);

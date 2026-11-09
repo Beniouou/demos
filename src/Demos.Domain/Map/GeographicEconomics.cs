@@ -22,6 +22,25 @@ public static class GeographicEconomics
     public const double DefaultPollutionDispersionDistance = 250.0;
 
     /// <summary>
+    /// Calcule la part de perte de transport d'un produit selon la distance physique en lieues.
+    /// Formule : BaseLoss * (0.5 + 0.5 * distance / distanceRef), bornée entre MinTransportLoss et MaxTransportLoss.
+    /// </summary>
+    public static double TransportLoss(
+        double distance,
+        double baseLoss = 0.20,
+        double referenceDistance = DefaultTransportReferenceDistance)
+    {
+        if (distance <= 0)
+            return 0;
+
+        if (referenceDistance <= 0)
+            return baseLoss;
+
+        var loss = baseLoss * (0.5 + 0.5 * (distance / referenceDistance));
+        return Math.Clamp(loss, MinTransportLoss, MaxTransportLoss);
+    }
+
+    /// <summary>
     /// Calcule la part de perte de transport d'un produit entre deux communes distinctes.
     /// Formule : BaseLoss * (0.5 + 0.5 * distance / distanceRef), bornée entre MinTransportLoss et MaxTransportLoss.
     /// </summary>
@@ -38,12 +57,7 @@ public static class GeographicEconomics
         if (!positions.TryGetValue(originCommuneId, out var p1) || !positions.TryGetValue(destinationCommuneId, out var p2))
             return baseLoss;
 
-        if (referenceDistance <= 0)
-            return baseLoss;
-
-        var dist = p1.DistanceTo(p2);
-        var loss = baseLoss * (0.5 + 0.5 * (dist / referenceDistance));
-        return Math.Clamp(loss, MinTransportLoss, MaxTransportLoss);
+        return TransportLoss(p1.DistanceTo(p2), baseLoss, referenceDistance);
     }
 
     /// <summary>

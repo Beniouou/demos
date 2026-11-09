@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text.Json;
+using Demos.Application;
 using Demos.Domain.Map;
 using Godot;
 
@@ -18,8 +19,14 @@ public partial class MapCanvas : Control
     public InfluenceField Field { get; private set; } = null!;
     public List<CommuneSite> Communes { get; } = [];
     public MapViewMode ViewMode { get; set; } = MapViewMode.Geography;
+    public VectorMapDefinition? VectorMap => _vectorMap;
+    public GameView? GameView => _gameView;
 
     private VectorMapDefinition? _vectorMap;
+    private GameView? _gameView;
+    private readonly Dictionary<string, List<Vector2[]>> _prefecturePolygonsCache = [];
+    private int _lastCommunesCount = -1;
+    private int _lastPrefecturesCount = -1;
     private Vector2 _panOffset;
     private float _zoom = 1.0f;
     private bool _isDragging;
@@ -77,12 +84,50 @@ public partial class MapCanvas : Control
         QueueRedraw();
     }
 
+    public void Init(GameView view)
+    {
+        _gameView = view;
+        _prefecturePolygonsCache.Clear();
+        QueueRedraw();
+    }
+
+    public void Refresh(GameView view)
+    {
+        _gameView = view;
+        var comms = view.Communes();
+        var prefs = view.Prefectures();
+        if (comms.Count != _lastCommunesCount || prefs.Count != _lastPrefecturesCount)
+        {
+            _lastCommunesCount = comms.Count;
+            _lastPrefecturesCount = prefs.Count;
+            _prefecturePolygonsCache.Clear();
+            QueueRedraw();
+        }
+    }
+
     public void SetViewMode(MapViewMode mode)
     {
         if (ViewMode != mode)
         {
             ViewMode = mode;
             QueueRedraw();
+        }
+    }
+
+    public void CenterOnCapital()
+    {
+        var communes = GetActiveCommunesList();
+        if (communes.Count > 0)
+        {
+            CenterOnWorld(communes[0].WorldPos);
+        }
+        else if (_vectorMap?.DefaultCommune is not null)
+        {
+            CenterOnWorld(new Vector2((float)_vectorMap.DefaultCommune.Position.X, (float)_vectorMap.DefaultCommune.Position.Y));
+        }
+        else
+        {
+            CenterOnWorld(new Vector2(470, 310));
         }
     }
 
@@ -227,7 +272,7 @@ public partial class MapCanvas : Control
         // 2. Mer et littoral (Baie méridionale pastel)
         DrawSea();
 
-        // 3. Forêts (contours organiques pastel)
+        // 3. Forêts et biomes naturels (contours organiques pastel)
         DrawForests();
 
         // 4. Estompage topographique (réservé à l'ancienne maquette historique 1000x640 sans courbes réelles)
@@ -242,19 +287,28 @@ public partial class MapCanvas : Control
         // 6. Points cotés d'altitude (croix IGN et cotes en mètres)
         DrawSpotElevations(font);
 
-        // 7. Fleuve La Sereine (cours d'eau sinueux)
+        // 7. Fleuves et réseau hydrographique
         DrawRiver(font);
 
-        // 8. Frontière de souveraineté et voile Terra Incognita
+        // 8. Voies navigables et réseau d'échanges marchands (mode Transit)
+        if (ViewMode == MapViewMode.Transit)
+        {
+            DrawTransitNetwork(font);
+        }
+
+        // 9. Préfectures, frontières de juridiction et liaisons administratives
+        DrawPrefecturesAndJurisdictions(font);
+
+        // 10. Frontière de souveraineté et voile Terra Incognita (ancienne maquette démo)
         DrawSovereigntyAndWildlands();
 
-        // 9. Unités extérieures géoréférencées (Carrières, Mines, Fermes)
+        // 11. Gisements et unités de production géoréférencées (Carrières, Mines, Terres arables)
         DrawExteriorProduction(font);
 
-        // 10. La Ville : Blason central + Cadastre architectural des bâtiments construits
+        // 12. Les Communes, Chefs-lieux et Capitale (cadastre architectural ou symboles territoriaux)
         DrawCadastralTown(font);
 
-        // 11. Réticule de survol et cartouche topographique
+        // 13. Réticule de survol et cartouche topographique
         DrawHoverCartouche(font);
     }
 
@@ -287,6 +341,9 @@ public partial class MapCanvas : Control
         if (biomes is not { Count: > 0 })
             return;
 
+        var isGeopolitics = ViewMode == MapViewMode.Geopolitics;
+        var isTransit = ViewMode == MapViewMode.Transit;
+
         foreach (var biome in biomes)
         {
             var screenPoints = biome.Boundary
@@ -306,6 +363,12 @@ public partial class MapCanvas : Control
                     "glacier" => (new Color("#E1F0F8"), new Color("#8CB4D2")),
                     _ => (MapPalette.Forest, MapPalette.ForestStroke)
                 };
+
+                if (isGeopolitics || isTransit)
+                {
+                    fill = new Color(fill.R, fill.G, fill.B, fill.A * 0.55f);
+                    stroke = new Color(stroke.R, stroke.G, stroke.B, stroke.A * 0.55f);
+                }
 
                 if (biome.Holes is { Count: > 0 } holes)
                 {
@@ -418,9 +481,16 @@ public partial class MapCanvas : Control
         if (_vectorMap?.Contours is not { Count: > 0 } contours)
             return;
 
+        var isGeopolitics = ViewMode == MapViewMode.Geopolitics;
+        var isTransit = ViewMode == MapViewMode.Transit;
+
         foreach (var contour in contours)
         {
             if (contour.Points.Count < 2)
+                continue;
+
+            // En vue géopolitique, alléger les courbes de niveau pour privilégier la souveraineté
+            if (isGeopolitics && !contour.IsIndex)
                 continue;
 
             var screenPoints = contour.Points
@@ -428,12 +498,17 @@ public partial class MapCanvas : Control
                 .ToArray();
 
             var color = contour.IsIndex ? MapPalette.ContourIndex : MapPalette.ContourStandard;
+            if (isGeopolitics || isTransit)
+            {
+                color = new Color(color.R, color.G, color.B, color.A * 0.45f);
+            }
+
             var width = (contour.IsIndex ? 1.4f : 0.75f) * Math.Clamp(_zoom, 0.7f, 1.8f);
 
             DrawPolyline(screenPoints, color, width, antialiased: true);
 
             // Cotes altimétriques sur les courbes maîtresses (100, 200, 300, 400, 500)
-            if (contour.IsIndex && _zoom >= 0.85f && screenPoints.Length >= 4)
+            if (contour.IsIndex && _zoom >= 0.85f && screenPoints.Length >= 4 && !isGeopolitics)
             {
                 var mid = screenPoints[screenPoints.Length / 2];
                 var label = $"{contour.Altitude:F0}";
@@ -514,6 +589,10 @@ public partial class MapCanvas : Control
         if (_vectorMap == null)
             return;
 
+        var isNaturalResources = ViewMode == MapViewMode.NaturalResources;
+        var isProduction = ViewMode == MapViewMode.Production;
+        var s = _zoom;
+
         if (_vectorMap.AllResourceZones.Count > 0)
         {
             foreach (var zone in _vectorMap.AllResourceZones)
@@ -525,20 +604,33 @@ public partial class MapCanvas : Control
 
                 var (fill, stroke, icon) = zone.Kind.ToLowerInvariant() switch
                 {
-                    "pierre" => (new Color(0.55f, 0.62f, 0.68f, 0.35f), new Color(0.40f, 0.48f, 0.55f, 0.8f), "🪨"),
-                    "charbon" => (new Color(0.20f, 0.20f, 0.22f, 0.40f), new Color(0.12f, 0.12f, 0.14f, 0.85f), "⛏️"),
-                    "fer" => (new Color(0.72f, 0.36f, 0.22f, 0.35f), new Color(0.55f, 0.25f, 0.15f, 0.8f), "⛓️"),
-                    "fertile" or "zone fertile" or "ble" or "lin" => (new Color(0.88f, 0.80f, 0.45f, 0.35f), new Color(0.70f, 0.60f, 0.28f, 0.8f), "🌾"),
-                    _ => (new Color(0.6f, 0.6f, 0.6f, 0.35f), new Color(0.4f, 0.4f, 0.4f, 0.8f), "💎")
+                    "pierre" => (new Color(0.55f, 0.62f, 0.68f, 0.35f), new Color(0.40f, 0.48f, 0.55f, 0.85f), "🪨"),
+                    "charbon" => (new Color(0.20f, 0.20f, 0.22f, 0.40f), new Color(0.12f, 0.12f, 0.14f, 0.90f), "⛏️"),
+                    "fer" => (new Color(0.72f, 0.36f, 0.22f, 0.35f), new Color(0.55f, 0.25f, 0.15f, 0.85f), "⛓️"),
+                    "fertile" or "zone fertile" or "ble" or "lin" => (new Color(0.88f, 0.80f, 0.45f, 0.35f), new Color(0.70f, 0.60f, 0.28f, 0.85f), "🌾"),
+                    _ => (new Color(0.6f, 0.6f, 0.6f, 0.35f), new Color(0.4f, 0.4f, 0.4f, 0.85f), "💎")
                 };
 
-                SafeDrawColoredPolygon(screenPoints, fill);
-                DrawPolyline(screenPoints, stroke, 1.4f * _zoom, antialiased: true);
+                if (isNaturalResources)
+                {
+                    fill = new Color(fill.R, fill.G, fill.B, Math.Min(0.55f, fill.A * 1.5f));
+                    stroke = new Color(stroke.R, stroke.G, stroke.B, 1.0f);
+                }
+                else if (ViewMode == MapViewMode.Geopolitics)
+                {
+                    fill = new Color(fill.R, fill.G, fill.B, fill.A * 0.4f);
+                    stroke = new Color(stroke.R, stroke.G, stroke.B, stroke.A * 0.4f);
+                }
 
-                if (_zoom >= 0.75f)
+                SafeDrawColoredPolygon(screenPoints, fill);
+                DrawPolyline(screenPoints, stroke, (isNaturalResources ? 2.0f : 1.4f) * s, antialiased: true);
+
+                if (s >= 0.6f || isNaturalResources)
                 {
                     var center = screenPoints.Aggregate(Vector2.Zero, (acc, p) => acc + p) / screenPoints.Length;
-                    DrawString(font, center, $"{icon} {zone.Name}", HorizontalAlignment.Center, -1, (int)Math.Max(9, 10 * _zoom), stroke);
+                    var label = $"{icon} {zone.Name}";
+                    var fontSize = (int)Math.Clamp(10 * s, 9, 13);
+                    DrawString(font, center, label, HorizontalAlignment.Center, -1, fontSize, stroke);
                 }
             }
             return;
@@ -559,19 +651,19 @@ public partial class MapCanvas : Control
                 _ => ("Site d'extraction", MapPalette.RoofTile, false),
             };
 
-            DrawBuildingFootprint(pos, new Vector2(24, 16) * _zoom, roofColor);
+            DrawBuildingFootprint(pos, new Vector2(24, 16) * s, roofColor);
 
-            if (_zoom >= 0.9f)
+            if (s >= 0.85f || isNaturalResources || isProduction)
             {
                 var label = $"{name} ({r.Resource})";
-                DrawString(font, pos + new Vector2(-30, 22 * _zoom), label, HorizontalAlignment.Center, -1, 10, MapPalette.InkText);
+                DrawString(font, pos + new Vector2(-30, 22 * s), label, HorizontalAlignment.Center, -1, 10, MapPalette.InkText);
             }
         }
     }
 
     private void DrawCadastralTown(Font font)
     {
-        if (_vectorMap is not null && (_vectorMap.Width > 1100.0 || _vectorMap.AllCommunes.Count > 1))
+        if (_vectorMap is not null && (_vectorMap.Width > 1100.0 || _vectorMap.AllCommunes.Count > 1 || (_gameView is not null && _gameView.Communes().Count > 1)))
         {
             DrawCommunesNational(font);
             return;
@@ -582,17 +674,354 @@ public partial class MapCanvas : Control
 
     private void DrawCommunesNational(Font font)
     {
-        if (_vectorMap is null) return;
+        var communes = GetActiveCommunesList();
+        var prefectures = _gameView?.Prefectures();
+        var seatIds = prefectures?.Where(p => p.SeatId is not null).Select(p => p.SeatId!).ToHashSet() ?? [];
+
         var s = _zoom;
 
-        foreach (var commune in _vectorMap.AllCommunes)
+        foreach (var (id, name, pos, pop) in communes)
         {
-            var center = ToScreen(new Vector2((float)commune.Position.X, (float)commune.Position.Y));
+            var center = ToScreen(pos);
+            var isCapital = id == "commune-1" || id == PrototypeScenario.FirstCommuneId;
+            var isPrefectureSeat = seatIds.Contains(id);
 
-            DrawCircle(center, 5f * s, new Color("#8B1E1E"));
-            DrawCircle(center, 2.5f * s, new Color("#FFF9EE"));
-            DrawString(font, center + new Vector2(0, 14 * s), commune.Name, HorizontalAlignment.Center, -1, (int)(10 * s), new Color("#332211"));
+            if (isCapital)
+            {
+                // 1. Capitale nationale : Sceau or et carmin
+                DrawCircle(center, 9.0f * s, MapPalette.BlasonGold);
+                DrawCircle(center, 7.5f * s, MapPalette.BlasonRed);
+                DrawCircle(center, 4.0f * s, MapPalette.BlasonGold);
+                DrawCircle(center, 2.0f * s, Colors.White);
+
+                if (s >= 0.5f)
+                {
+                    var popText = pop > 0 ? $" · {pop:N0} hab." : "";
+                    var label = $"CAPITALE · {name.ToUpperInvariant()}{popText}";
+                    DrawCommuneBadge(font, center, label, MapPalette.BlasonRed, MapPalette.BlasonGold);
+                }
+            }
+            else if (isPrefectureSeat)
+            {
+                // 2. Chef-lieu de préfecture : Sceau civique pourpre
+                DrawCircle(center, 8.0f * s, MapPalette.PrefectureSeat);
+                DrawCircle(center, 6.0f * s, Colors.White);
+                DrawCircle(center, 3.5f * s, MapPalette.PrefectureSeat);
+
+                if (s >= 0.5f)
+                {
+                    var popText = pop > 0 ? $" · {pop:N0} hab." : "";
+                    var label = $"CHEF-LIEU · {name}{popText}";
+                    DrawCommuneBadge(font, center, label, MapPalette.PrefectureSeat, new Color("#EBDCE4"));
+                }
+            }
+            else
+            {
+                // 3. Commune ordinaire : Disque bicolore sobre
+                DrawCircle(center, 6.0f * s, new Color("#8B1E1E"));
+                DrawCircle(center, 4.0f * s, new Color("#FFF9EE"));
+                DrawCircle(center, 2.0f * s, new Color("#8B1E1E"));
+
+                if (s >= 0.5f)
+                {
+                    var popText = pop > 0 ? $" ({pop:N0} hab.)" : "";
+                    var label = $"{name}{popText}";
+                    DrawCommuneBadge(font, center, label, MapPalette.InkText, MapPalette.LabelBackground);
+                }
+            }
         }
+    }
+
+    private void DrawPrefecturesAndJurisdictions(Font font)
+    {
+        var prefectures = _gameView?.Prefectures();
+        var isGeopolitics = ViewMode == MapViewMode.Geopolitics;
+        var s = _zoom;
+
+        if (prefectures is { Count: > 0 } prefs)
+        {
+            for (var idx = 0; idx < prefs.Count; idx++)
+            {
+                var pref = prefs[idx];
+                var washColor = MapPalette.PrefectureDepartmentWashes[idx % MapPalette.PrefectureDepartmentWashes.Length];
+                var borderColor = MapPalette.PrefectureDepartmentBorders[idx % MapPalette.PrefectureDepartmentBorders.Length];
+
+                if (!isGeopolitics)
+                {
+                    washColor = new Color(washColor.R, washColor.G, washColor.B, washColor.A * 0.45f);
+                    borderColor = new Color(borderColor.R, borderColor.G, borderColor.B, borderColor.A * 0.45f);
+                }
+
+                var regions = GetPrefecturePolygons(pref);
+                foreach (var poly in regions)
+                {
+                    var screenPts = poly.Select(ToScreen).ToArray();
+                    SafeDrawColoredPolygon(screenPts, washColor);
+                    DrawPolyline([.. screenPts, screenPts[0]], borderColor, (isGeopolitics ? 2.2f : 1.2f) * s, antialiased: true);
+                }
+
+                // Liaisons administratives pointillées entre le chef-lieu et chaque membre
+                if (pref.SeatId is not null)
+                {
+                    var seatPos = GetCommuneWorldPosition(pref.SeatId);
+                    if (seatPos.HasValue)
+                    {
+                        var screenSeat = ToScreen(seatPos.Value);
+                        foreach (var memberId in pref.MemberIds)
+                        {
+                            if (memberId == pref.SeatId) continue;
+                            var memberPos = GetCommuneWorldPosition(memberId);
+                            if (memberPos.HasValue)
+                            {
+                                var screenMember = ToScreen(memberPos.Value);
+                                DrawDashedLine(screenSeat, screenMember, MapPalette.AdministrativeLink, (isGeopolitics ? 2.0f : 1.2f) * s, dash: 6.0f * s);
+                            }
+                        }
+
+                        // Cartouche de préfecture au-dessus du chef-lieu
+                        if (isGeopolitics && s >= 0.55f)
+                        {
+                            DrawPrefectureHeader(font, screenSeat, pref.Name);
+                        }
+                    }
+                }
+            }
+        }
+        else
+        {
+            // Aucune préfecture formelle : tracer les bassins de juridiction directe des communes
+            var communes = GetActiveCommunesList();
+            foreach (var (_, _, pos, _) in communes)
+            {
+                var disk = CreateCirclePolygon(pos, 240.0f, 20);
+                var screenPts = disk.Select(ToScreen).ToArray();
+                var wash = isGeopolitics ? MapPalette.PrefectureWash : new Color(MapPalette.PrefectureWash.R, MapPalette.PrefectureWash.G, MapPalette.PrefectureWash.B, 0.04f);
+                SafeDrawColoredPolygon(screenPts, wash);
+                DrawPolyline([.. screenPts, screenPts[0]], MapPalette.InfluenceBorder, (isGeopolitics ? 1.8f : 1.0f) * s, antialiased: true);
+            }
+        }
+    }
+
+    private void DrawTransitNetwork(Font font)
+    {
+        if (_vectorMap == null) return;
+        var s = _zoom;
+
+        // 1. Mise en valeur des corridors fluviaux navigables
+        foreach (var river in _vectorMap.AllRivers)
+        {
+            if (river.Points.Count < 2) continue;
+            var screenPts = river.Points.Select(p => ToScreen(new Vector2((float)p.X, (float)p.Y))).ToArray();
+            var haloWidth = (float)river.Width * 2.0f * s;
+            DrawPolyline(screenPts, MapPalette.TradeRiverHighlight, haloWidth, antialiased: true);
+        }
+
+        // 2. Axes d'échanges commerciaux inter-communes
+        var communes = GetActiveCommunesList();
+        if (communes.Count >= 2)
+        {
+            for (var i = 0; i < communes.Count; i++)
+            {
+                for (var j = i + 1; j < communes.Count; j++)
+                {
+                    var c1 = communes[i];
+                    var c2 = communes[j];
+                    var p1 = ToScreen(c1.WorldPos);
+                    var p2 = ToScreen(c2.WorldPos);
+
+                    DrawDashedLine(p1, p2, MapPalette.TradeRoad, 2.2f * s, dash: 8.0f * s);
+
+                    var dx = (double)(c1.WorldPos.X - c2.WorldPos.X);
+                    var dy = (double)(c1.WorldPos.Y - c2.WorldPos.Y);
+                    var dist = Math.Sqrt(dx * dx + dy * dy);
+                    var loss = GeographicEconomics.TransportLoss(dist);
+
+                    var mid = (p1 + p2) * 0.5f;
+                    var tag = $"{dist:F0} lieues · Perte {(loss * 100):F0}%";
+                    var fontSize = (int)Math.Clamp(9 * s, 8, 11);
+                    var tagSize = font.GetStringSize(tag, HorizontalAlignment.Left, -1, fontSize);
+                    var tagRect = new Rect2(mid.X - tagSize.X * 0.5f - 4, mid.Y - tagSize.Y * 0.5f - 2, tagSize.X + 8, tagSize.Y + 4);
+
+                    DrawRect(tagRect, MapPalette.LabelBackground);
+                    DrawRect(tagRect, MapPalette.TradeRoad, filled: false, width: 0.9f);
+                    DrawString(font, new Vector2(tagRect.Position.X + 4, tagRect.Position.Y + tagSize.Y), tag, HorizontalAlignment.Left, -1, fontSize, MapPalette.TradeRoad);
+                }
+            }
+        }
+    }
+
+    private IReadOnlyList<(string Id, string Name, Vector2 WorldPos, double Population)> GetActiveCommunesList()
+    {
+        var list = new List<(string Id, string Name, Vector2 WorldPos, double Population)>();
+
+        if (_gameView is not null)
+        {
+            var simCommunes = _gameView.Communes();
+            foreach (var c in simCommunes)
+            {
+                var pos = GetCommuneWorldPosition(c.Id);
+                if (pos.HasValue)
+                {
+                    list.Add((c.Id, c.Name, pos.Value, c.Residents));
+                }
+            }
+            if (list.Count > 0)
+                return list;
+        }
+
+        if (_vectorMap is not null)
+        {
+            foreach (var c in _vectorMap.AllCommunes)
+            {
+                list.Add((c.Id, c.Name, new Vector2((float)c.Position.X, (float)c.Position.Y), c.Population));
+            }
+            if (list.Count > 0)
+                return list;
+        }
+
+        // Fallback démo
+        list.Add(("commune-1", "Première commune", new Vector2(470, 310), 5000));
+        return list;
+    }
+
+    private Vector2? GetCommuneWorldPosition(string communeId)
+    {
+        if (_gameView is not null)
+        {
+            var p = _gameView.CommunePosition(communeId);
+            if (p.HasValue)
+                return new Vector2((float)p.Value.X, (float)p.Value.Y);
+        }
+
+        if (_vectorMap is not null)
+        {
+            var match = _vectorMap.AllCommunes.FirstOrDefault(c => c.Id == communeId);
+            if (match is not null)
+                return new Vector2((float)match.Position.X, (float)match.Position.Y);
+
+            if ((communeId == "commune-1" || communeId == PrototypeScenario.FirstCommuneId) && _vectorMap.DefaultCommune is not null)
+                return new Vector2((float)_vectorMap.DefaultCommune.Position.X, (float)_vectorMap.DefaultCommune.Position.Y);
+        }
+
+        if (communeId == "commune-1" || communeId == PrototypeScenario.FirstCommuneId)
+            return new Vector2(470, 310);
+
+        return null;
+    }
+
+    private List<Vector2[]> GetPrefecturePolygons(PrefectureView prefecture)
+    {
+        if (_prefecturePolygonsCache.TryGetValue(prefecture.Id, out var cached))
+            return cached;
+
+        var memberPositions = new List<Vector2>();
+        foreach (var memberId in prefecture.MemberIds)
+        {
+            var pos = GetCommuneWorldPosition(memberId);
+            if (pos.HasValue)
+                memberPositions.Add(pos.Value);
+        }
+
+        if (prefecture.SeatId is not null)
+        {
+            var seatPos = GetCommuneWorldPosition(prefecture.SeatId);
+            if (seatPos.HasValue && !memberPositions.Any(p => p.DistanceSquaredTo(seatPos.Value) < 1.0f))
+            {
+                memberPositions.Add(seatPos.Value);
+            }
+        }
+
+        if (memberPositions.Count == 0)
+        {
+            _prefecturePolygonsCache[prefecture.Id] = [];
+            return [];
+        }
+
+        const float radius = 240.0f; // Rayon de juridiction en lieues
+        var currentRegions = new List<Vector2[]> { CreateCirclePolygon(memberPositions[0], radius, 16) };
+
+        for (var i = 1; i < memberPositions.Count; i++)
+        {
+            var newDisk = CreateCirclePolygon(memberPositions[i], radius, 16);
+            var mergedWithAny = false;
+            for (var r = 0; r < currentRegions.Count; r++)
+            {
+                var merged = Geometry2D.MergePolygons(currentRegions[r], newDisk);
+                if (merged.Count == 1)
+                {
+                    currentRegions[r] = merged[0];
+                    mergedWithAny = true;
+                    break;
+                }
+            }
+            if (!mergedWithAny)
+            {
+                currentRegions.Add(newDisk);
+            }
+        }
+
+        if (currentRegions.Count > 1)
+        {
+            var consolidated = new List<Vector2[]>();
+            foreach (var poly in currentRegions)
+            {
+                var merged = false;
+                for (var j = 0; j < consolidated.Count; j++)
+                {
+                    var res = Geometry2D.MergePolygons(consolidated[j], poly);
+                    if (res.Count == 1)
+                    {
+                        consolidated[j] = res[0];
+                        merged = true;
+                        break;
+                    }
+                }
+                if (!merged) consolidated.Add(poly);
+            }
+            currentRegions = consolidated;
+        }
+
+        _prefecturePolygonsCache[prefecture.Id] = currentRegions;
+        return currentRegions;
+    }
+
+    private static Vector2[] CreateCirclePolygon(Vector2 center, float radius, int segments = 16)
+    {
+        var pts = new Vector2[segments];
+        var step = Mathf.Tau / segments;
+        for (var i = 0; i < segments; i++)
+        {
+            var angle = i * step;
+            pts[i] = center + new Vector2(Mathf.Cos(angle), Mathf.Sin(angle)) * radius;
+        }
+        return pts;
+    }
+
+    private void DrawCommuneBadge(Font font, Vector2 center, string text, Color textColor, Color bgColor)
+    {
+        var s = _zoom;
+        var fontSize = (int)Math.Clamp(10 * s, 9, 13);
+        var textSize = font.GetStringSize(text, HorizontalAlignment.Left, -1, fontSize);
+        var padding = new Vector2(6 * s, 3 * s);
+        var boxRect = new Rect2(center.X - textSize.X * 0.5f - padding.X, center.Y + 12 * s, textSize.X + padding.X * 2, textSize.Y + padding.Y * 2);
+
+        DrawRect(boxRect, bgColor);
+        DrawRect(boxRect, MapPalette.LabelBorder, filled: false, width: 1.0f);
+        DrawString(font, new Vector2(boxRect.Position.X + padding.X, boxRect.Position.Y + padding.Y + textSize.Y - 2), text, HorizontalAlignment.Left, -1, fontSize, textColor);
+    }
+
+    private void DrawPrefectureHeader(Font font, Vector2 seatCenter, string prefName)
+    {
+        var s = _zoom;
+        var fontSize = (int)Math.Clamp(11 * s, 10, 14);
+        var label = $"DÉPARTEMENT DE {prefName.ToUpperInvariant()}";
+        var textSize = font.GetStringSize(label, HorizontalAlignment.Left, -1, fontSize);
+        var padding = new Vector2(8 * s, 4 * s);
+        var boxRect = new Rect2(seatCenter.X - textSize.X * 0.5f - padding.X, seatCenter.Y - 26 * s - textSize.Y, textSize.X + padding.X * 2, textSize.Y + padding.Y * 2);
+
+        DrawRect(boxRect, new Color(0.99f, 0.98f, 0.96f, 0.94f));
+        DrawRect(boxRect, MapPalette.PrefectureBorder, filled: false, width: 1.2f);
+        DrawString(font, new Vector2(boxRect.Position.X + padding.X, boxRect.Position.Y + padding.Y + textSize.Y - 2), label, HorizontalAlignment.Left, -1, fontSize, MapPalette.PrefectureSeat);
     }
 
     private void DrawLegacyCadastralTown(Font font)

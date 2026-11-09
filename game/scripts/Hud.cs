@@ -42,6 +42,7 @@ public partial class Hud : Control
             SizeFlagsHorizontal = SizeFlags.ExpandFill,
             SizeFlagsVertical = SizeFlags.ExpandFill,
         };
+        Map.Init(view);
 
         Menu = new MainMenu();
         Menu.Init(view, desk, Map);

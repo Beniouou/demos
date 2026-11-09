@@ -1,4 +1,5 @@
 using Demos.Domain.Economy;
+using Demos.Domain.Map;
 using Demos.Domain.Politics;
 using Demos.Domain.Population;
 using Demos.Domain.Shared;
@@ -24,6 +25,13 @@ public sealed class GameView(Simulation simulation)
     public double LegitimacyOf(Orientation pole) => World.Legitimacy[pole];
 
     public IReadOnlyList<CommuneView> Communes() => World.Communes.Select(DescribeCommune).ToList();
+
+    /// <summary>Positions cartographiques géoréférencées des communes dans le monde vectoriel.</summary>
+    public IReadOnlyDictionary<string, Point2D> CommunePositions() => World.CommunePositions;
+
+    /// <summary>Position géographique d'une commune par son identifiant, ou null si non géoréférencée.</summary>
+    public Point2D? CommunePosition(string communeId) =>
+        World.CommunePositions.TryGetValue(communeId, out var pos) ? pos : null;
 
     /// <summary>
     /// Extension et bureaucratie : la charge et l'efficacité de chaque entité politique (État, préfectures, communes),

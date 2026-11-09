@@ -31,7 +31,7 @@ public partial class MapPage : VBoxContainer, IMenuPage
             FocusMode = FocusModeEnum.None,
             CustomMinimumSize = new Vector2(220, 32),
         };
-        recenterButton.Pressed += () => _map.CenterOn(PrototypeMap.DefaultCommunePosition);
+        recenterButton.Pressed += () => _map.CenterOnCapital();
         AddChild(recenterButton);
 
         AddChild(new HSeparator());
@@ -55,37 +55,39 @@ public partial class MapPage : VBoxContainer, IMenuPage
 
     private void UpdateStats()
     {
-        if (_map.Field is null)
-            return;
+        var vMap = _map.VectorMap;
+        var view = _map.GameView;
 
-        var controlledCount = _map.Field.ControlledCells().Count();
-        var totalCells = _map.Map.Width * _map.Map.Height;
-        var percent = (double)controlledCount / totalCells * 100.0;
+        var communesCount = view?.Communes().Count ?? vMap?.AllCommunes.Count ?? _map.Communes.Count;
+        var prefecturesCount = view?.Prefectures().Count ?? 0;
+        var totalPop = view?.Communes().Sum(c => c.Residents) ?? (communesCount * 5000);
 
         _stats.Text = _mode switch
         {
             MapViewMode.Geography =>
-                $"Dimensions : {_map.Map.Width} × {_map.Map.Height} lieues (quadrillage continu)\n" +
-                $"Relief : Massif rocheux au nord-est, fleuve central, plaine alluviale et baie maritime.",
+                $"Dimensions : {(vMap != null ? $"{vMap.Width:F0} × {vMap.Height:F0}" : "1 000 × 640")} lieues (IGN continue)\n" +
+                $"Relief : {(vMap?.Contours.Count ?? 0)} isohypses Marching Squares, {(vMap?.SpotElevations.Count ?? 0)} points cotés.\n" +
+                $"Hydrographie : {(vMap?.AllRivers.Count ?? 1)} cours d'eau thalweg avec modélisation d'écoulement.",
 
             MapViewMode.Geopolitics =>
-                $"Souveraineté : {controlledCount} cases sous juridiction ({percent:F1} % du territoire connu).\n" +
-                $"Communes établies : {_map.Communes.Count}\n" +
-                $"L'influence s'arrête devant les massifs et progresse le long de l'eau.",
+                $"Communes établies : {communesCount} · Population administrée : {totalPop:N0} citoyens\n" +
+                $"Préfectures & départements : {prefecturesCount} chef(s)-lieu(x) et cantons rattachés\n" +
+                $"Les enveloppes de juridiction s'étendent le long des plaines et s'arrêtent aux crêtes.",
 
             MapViewMode.Production =>
-                $"Unités rattachées à la Première commune :\n" +
-                $"• Mine de charbon, carrière de pierre, camp de bûcherons.\n" +
-                $"• Ferme céréalière, moulin, boulangerie, atelier de tissage.",
+                $"Unités et bassins d'extraction répertoriés : {(vMap?.AllResourceZones.Count ?? 4)} gisements\n" +
+                $"• Carrières de pierre, mines de charbon, gisements de fer.\n" +
+                $"• Terres arables fertiles, moulins et manufactures communales.",
 
             MapViewMode.Transit =>
-                $"Voie fluviale navigable principale : connecte les piémonts du nord à l'estuaire du sud-ouest.\n" +
-                $"Friction réduite : gain de vitesse et d'extension de 30 % le long du fleuve.",
+                $"Réseau logistique & transport : {(vMap?.AllRivers.Count ?? 1)} corridors fluviaux navigables\n" +
+                $"Friction de transport : perte de 5 % à 60 % calibrée sur la distance réelle en lieues.\n" +
+                $"Les voies marchandes inter-communes assurent les transferts de produits.",
 
             MapViewMode.NaturalResources =>
-                $"Gisements naturels identifiés dans le bassin de vie :\n" +
-                $"• Pierre : massif nord-est · Charbon : piémont minier\n" +
-                $"• Bois : grand massif forestier occidental · Blé & Lin : plaine alluviale.",
+                $"Gisements naturels identifiés dans le cadastre : {(vMap?.AllResourceZones.Count ?? 0)} zones\n" +
+                $"• Pierre : bancs de calcaire et falaises · Charbon : filons sédimentaires\n" +
+                $"• Fer : veines de magnétite · Terres fertiles : plaines alluviales.",
 
             _ => "",
         };
@@ -100,37 +102,40 @@ public partial class MapPage : VBoxContainer, IMenuPage
         {
             case MapViewMode.Geography:
                 box.AddChild(LegendItem(MapPalette.Water, "Étendue d'eau / Baie maritime pastel"));
-                box.AddChild(LegendItem(MapPalette.River, "Fleuve navigable (La Sereine)"));
+                box.AddChild(LegendItem(MapPalette.River, "Cours d'eau thalweg avec débit"));
                 box.AddChild(LegendItem(MapPalette.ContourIndex, "Courbes de niveau maîtresses (100 m)"));
                 box.AddChild(LegendItem(MapPalette.ContourStandard, "Courbes de niveau intermédiaires (25 m / 50 m)"));
-                box.AddChild(LegendItem(MapPalette.Hillshade, "Estompage topographique (ombrage continu)"));
-                box.AddChild(LegendItem(MapPalette.Forest, "Massif forestier (Bois des Chênes)"));
+                box.AddChild(LegendItem(MapPalette.SpotElevation, "Points cotés d'arpentage (alt. IGN en mètres)"));
+                box.AddChild(LegendItem(MapPalette.Forest, "Biomes naturels (forêts, marais, glaciers, arables)"));
                 break;
 
             case MapViewMode.Geopolitics:
-                box.AddChild(LegendItem(MapPalette.BlasonRed, "Blason communal / Chef-lieu"));
-                box.AddChild(LegendItem(MapPalette.InfluenceBorder, "Frontière d'arpentage (souveraineté)"));
-                box.AddChild(LegendItem(MapPalette.TerraIncognitaHatch, "Terres sauvages inexplorées (Terra Incognita)"));
+                box.AddChild(LegendItem(MapPalette.BlasonGold, "Capitale nationale (blason or et carmin)"));
+                box.AddChild(LegendItem(MapPalette.PrefectureSeat, "Chef-lieu de préfecture (sceau pourpre civique)"));
+                box.AddChild(LegendItem(MapPalette.PrefectureBorder, "Frontière départementale & enveloppe de juridiction"));
+                box.AddChild(LegendItem(MapPalette.AdministrativeLink, "Liaison administrative chef-lieu / membre"));
+                box.AddChild(LegendItem(MapPalette.InfluenceBorder, "Limite d'arpentage communal"));
                 break;
 
             case MapViewMode.Production:
                 box.AddChild(LegendItem(MapPalette.RoofSlate, "Mairie & Entrepôt (toits d'ardoise)"));
-                box.AddChild(LegendItem(MapPalette.RoofTile, "École, Moulin & Logements (toits de tuile)"));
+                box.AddChild(LegendItem(MapPalette.RoofTile, "Ateliers, Moulins & Logements (toits de tuile)"));
                 box.AddChild(LegendItem(MapPalette.ContourIndex, "Carrières de pierre & Mines de charbon"));
                 box.AddChild(LegendItem(MapPalette.Forest, "Exploitations forestières d'État"));
                 break;
 
             case MapViewMode.Transit:
-                box.AddChild(LegendItem(MapPalette.River, "Corridor fluvial navigable (faible friction)"));
-                box.AddChild(LegendItem(MapPalette.Street, "Réseau de ruelles et voies de communication"));
-                box.AddChild(LegendItem(MapPalette.ContourIndex, "Passes de crêtes et reliefs"));
+                box.AddChild(LegendItem(MapPalette.TradeRiverHighlight, "Corridor fluvial navigable (friction réduite)"));
+                box.AddChild(LegendItem(MapPalette.TradeRoad, "Voie marchande & axe logistique inter-communes"));
+                box.AddChild(LegendItem(MapPalette.Street, "Réseau viaire et ruelles urbaines"));
                 break;
 
             case MapViewMode.NaturalResources:
-                box.AddChild(LegendItem(MapPalette.RoofTile, "🌾 Blé & 🌿 Lin (plaine alluviale)"));
-                box.AddChild(LegendItem(MapPalette.Forest, "🌲 Bois (massif forestier ouest)"));
-                box.AddChild(LegendItem(MapPalette.ContourIndex, "⛏️ Pierre (massif rocheux nord)"));
-                box.AddChild(LegendItem(MapPalette.SpotElevation, "⚒️ Charbon (piémont minier)"));
+                box.AddChild(LegendItem(new Color(0.88f, 0.80f, 0.45f), "🌾 Plaine alluviale & terres fertiles"));
+                box.AddChild(LegendItem(MapPalette.Forest, "🌲 Massif forestier (bois d'œuvre)"));
+                box.AddChild(LegendItem(new Color(0.55f, 0.62f, 0.68f), "🪨 Bancs de calcaire (pierre de taille)"));
+                box.AddChild(LegendItem(new Color(0.20f, 0.20f, 0.22f), "⛏️ Filon de charbon sédimentaire"));
+                box.AddChild(LegendItem(new Color(0.72f, 0.36f, 0.22f), "⛓️ Veine de fer (minerai)"));
                 break;
         }
 

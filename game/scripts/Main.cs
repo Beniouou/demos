@@ -71,6 +71,7 @@ public partial class Main : Node
 
         _hud.TopBar.Refresh(_view, _paused, _speedIndex);
         _hud.Menu.Refresh();
+        _hud.Map.Refresh(_view);
     }
 
     public override void _UnhandledInput(InputEvent @event)
@@ -97,7 +98,7 @@ public partial class Main : Node
         var housing = _simulation.World.BuildingTypes["logements"]
             .Build(id, PrototypeScenario.FirstCommuneId, name: $"Logements d'État {_housingBuilt + 1}");
 
-        if (_simulation.TryBuild(housing, HousingCost, PaymentMode.StockFirst))
+        if (_simulation.TryBuild(housing, PaymentMode.StockFirst))
         {
             _housingBuilt++;
             _hud.ShowMessage($"{housing.Name} construits ({_housingBuilt} en tout).");
