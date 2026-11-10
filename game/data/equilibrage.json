@@ -27,6 +27,7 @@
   "transportLossMax": 0.6,
   "distantPollutionShare": 0.1,
   "pollutionDispersionDistance": 250,
+  "extractionMaxDistance": 240,
   "pollutedThreshold": 0.1,
   "foundingGrantDays": 60,
   "foundingMaterials": 1000,

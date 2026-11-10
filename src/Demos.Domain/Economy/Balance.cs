@@ -148,6 +148,12 @@ public sealed record BalanceSettings
     /// </summary>
     public double PollutionDispersionDistance { get; init; } = 250;
 
+    /// <summary>
+    /// Distance maximale, en lieues, entre un bâtiment d'extraction et sa commune : il se pose sur une zone de la carte
+    /// qui correspond (forêt, terre fertile, pierre, charbon, fer) à cette distance au plus (décidé le 10 novembre 2026).
+    /// </summary>
+    public double ExtractionMaxDistance { get; init; } = 240;
+
     /// <summary>Pollution par habitant et par jour au-delà de laquelle une commune est polluée.</summary>
     public double PollutedThreshold { get; init; } = 0.1;
 

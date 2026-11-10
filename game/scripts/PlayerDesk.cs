@@ -107,6 +107,10 @@ public sealed class PlayerDesk(Simulation simulation)
             return "Recette inconnue.";
 
         var recipe = type.AvailableRecipes[recipeIndex];
+        // Une mine posée sur le charbon ne passe pas au fer : la nouvelle recette doit convenir à son emplacement.
+        if (World.BuildingPositions.TryGetValue(buildingId, out var site) && World.CommuneOf(building) is { } communeId
+            && World.ExtractionSiteProblem(typeId, recipe.ProductId, communeId, site) is { } problem)
+            return $"Impossible ici : {problem}.";
         simulation.UpdateBuilding(building with { Production = recipe });
         return $"Recette : {recipe.Label}.";
     }
@@ -167,7 +171,7 @@ public sealed class PlayerDesk(Simulation simulation)
     /// Lance le chantier d'un bâtiment public dans une commune. Son coût est payé tout de suite (réserve de chantier,
     /// stock de l'État, puis achat avec le trésor) ; le bâtiment arrive à la fin du chantier.
     /// </summary>
-    public string Build(string typeId, string communeId)
+    public string Build(string typeId, string communeId, Demos.Domain.Map.Point2D? position = null)
     {
         if (!World.BuildingTypes.TryGetValue(typeId, out var type) || type.Construction is not { } cost
             || BuildableTypes().All(t => t.Id != typeId))
@@ -177,7 +181,15 @@ public sealed class PlayerDesk(Simulation simulation)
         while (World.IsIdTaken($"{typeId}-{number}"))
             number++;
         var building = type.Build($"{typeId}-{number}", communeId);
-        if (simulation.TryBuild(building, PaymentMode.StockFirst))
+        // Un bâtiment d'extraction se pose sur une zone de la carte qui correspond, à portée de la commune.
+        if (World.NeedsExtractionSite(typeId, building.Production?.ProductId))
+        {
+            if (position is not { } site)
+                return "Choisissez son emplacement sur la carte.";
+            if (World.ExtractionSiteProblem(typeId, building.Production?.ProductId, communeId, site) is { } problem)
+                return $"Emplacement impossible : {problem}.";
+        }
+        if (simulation.TryBuild(building, PaymentMode.StockFirst, position))
             return $"Chantier lancé : {building.Name}, {cost.Days} jours. Les matériaux sont payés.";
 
         var available = AvailabilityOf(communeId, cost.ProductId);

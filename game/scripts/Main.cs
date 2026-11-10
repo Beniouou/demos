@@ -85,6 +85,10 @@ public partial class Main : Node
             case Key.Key3: _speedIndex = 2; break;
             case Key.Key4: _speedIndex = 3; break;
             case Key.C: ChoosePole(); break;
+            case Key.Escape when _hud.Map.IsPlacing:
+                _hud.Map.CancelPlacement();
+                _hud.ShowMessage("Placement annulé.");
+                break;
             case Key.Escape: _hud.Menu.Close(); break;
         }
     }

@@ -59,7 +59,12 @@ public sealed class Simulation(World world, GameClock clock)
     /// trésor, ou les deux. Le bâtiment rejoint la partie à la fin du chantier. Renvoie false, sans rien lancer ni
     /// dépenser, si c'est impossible (type sans coût de construction, matériaux ou argent insuffisants).
     /// </summary>
-    public bool TryBuild(Structure structure, PaymentMode mode)
+    /// <remarks>
+    /// Un bâtiment d'extraction (camp de bûcheron, ferme, carrière, mine) se pose à <paramref name="position"/>, sur une
+    /// zone de la carte qui correspond, à portée de sa commune (voir <see cref="World.ExtractionSiteProblem"/>) : sans
+    /// position permise, il n'est pas construit. Sans carte, la position n'est pas demandée.
+    /// </remarks>
+    public bool TryBuild(Structure structure, PaymentMode mode, Point2D? position = null)
     {
         if (World.IsIdTaken(structure.Id)
             || structure.TypeId is not { } typeId
@@ -69,11 +74,20 @@ public sealed class Simulation(World world, GameClock clock)
             || typeId == PrefectureTypeId
             || structure.ParentId is not { } parentId
             || !World.Structures.TryGetValue(parentId, out var parent)
-            || World.CommuneOf(parent) is not { } communeId
-            || !Construction.TryPay(type.Construction!.Materials, mode, Market.StateSellerId(communeId), World.Treasury, World.MarketOf(communeId),
+            || World.CommuneOf(parent) is not { } communeId)
+            return false;
+
+        var productId = structure.Production?.ProductId;
+        if (World.NeedsExtractionSite(typeId, productId)
+            && (position is not { } site || World.ExtractionSiteProblem(typeId, productId, communeId, site) is not null))
+            return false;
+
+        if (!Construction.TryPay(type.Construction!.Materials, mode, Market.StateSellerId(communeId), World.Treasury, World.MarketOf(communeId),
                 World.ConstructionReserveOf(communeId)))
             return false;
 
+        if (position is { } placed)
+            World.SetBuildingPosition(structure.Id, placed);
         World.AddConstructionSite(new ConstructionSite(structure, type.Construction.Days));
         return true;
     }

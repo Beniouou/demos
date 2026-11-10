@@ -90,9 +90,9 @@ désactivés : TVA sur la valeur ajoutée, épargne progressive des entreprises.
   - Terme de distance administrative dans `src/Demos.Domain/Politics/Extension.cs` via `AdministrativeDistance.cs` (2 000 lieues par point de charge, réglage `extensionDistancePerLoad`).
   - Pertes de transport dans `Trade.cs` (5 % à 60 %, réglages `transport…`) et dispersion de pollution dans `Pollution.cs` (loi en $1/(1+(d/250)^2)$) via `GeographicEconomics.cs`.
   - Coordonnées géographiques exposées dans `GameView.cs` (`CommunePositions()`, `CommunePosition(id)`).
+- Bâtiments d'extraction posés sur la carte (décidé le 10 novembre 2026) : sur une zone qui convient, à 240 lieues de la
+  commune au plus (`extractionMaxDistance`) ; règle dans `Map/ExtractionSites.cs`, mode placement dans
+  `game/scripts/Map/MapCanvas.Placement.cs` (Production → Construire ouvre la carte).
 - Chantiers suivants ouverts :
   - Pose interactive d'une commune par clic sur la carte avec validation du terrain constructible.
-  - Conditionnement des bâtiments extractifs (mines, carrières) à la présence d'un gisement réel à portée de la commune.
   - Bonus logistique de transport fluvial le long des 17 cours d'eau navigables.
-  - Interface dédiée pour la fondation et le rattachement des préfectures.
-  - Sélection des communes/préfectures au clic sur la carte pour afficher leur fiche détaillée.

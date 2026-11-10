@@ -45,6 +45,7 @@ public partial class Hud : Control
 
         Menu = new MainMenu();
         Menu.Init(view, desk, Map);
+        Menu.Message += ShowMessage;
         middle.AddChild(Menu);
         middle.AddChild(Map);
 

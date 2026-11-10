@@ -78,6 +78,16 @@ Le document de règles de référence est dans Claude Docs, et tu n'y as pas acc
 - La capitale est le chef-lieu de l'État (`Structure.SeatId` de l'État, `World.CapitalId`, `GameView.CapitalId`) :
   ne pas la reconnaître par l'identifiant « commune-1 ».
 
+**Bâtiments d'extraction sur la carte (décidé par l'utilisateur le 10 novembre 2026, codé par Claude)**
+- Un camp de bûcheron se pose sur une forêt, une ferme (ou entreprise agricole) sur une terre fertile, une carrière sur
+  un gisement de pierre, une mine sur un gisement de charbon ou de fer selon sa recette. C'est **obligatoire**.
+- Il se pose à **240 lieues** de sa commune au plus (réglage `extractionMaxDistance`). La distance n'a **aucun effet** sur
+  la production pour l'instant. Une zone peut être partagée par plusieurs bâtiments et plusieurs communes.
+- Les bâtiments d'extraction du départ sont posés automatiquement sur la zone qui convient la plus proche de leur
+  commune. Tour de forage et puits : sans zone pour l'instant.
+- Code : `src/Demos.Domain/Map/ExtractionSites.cs` (la règle), `World.BuildingPositions`, `Simulation.TryBuild(…, position)`,
+  `game/scripts/Map/MapCanvas.Placement.cs` (icônes et mode placement). Ne pas retirer `TryPlaceAt` du clic de `MapCanvas`.
+
 **Structures politiques (décidé et codé)**
 - L'État contient des communes et des **préfectures**. Une préfecture contient des communes ou d'autres préfectures,
   empilées librement. Tout habitant vit dans une commune.
@@ -112,7 +122,7 @@ Le document de règles de référence est dans Claude Docs, et tu n'y as pas acc
   (`AppliedConstants` et `WriteConstants` dans `tools/Demos.Equilibrage/Program.cs`, `Constants` dans `Apply.cs`).
 - Les fichiers JSON gardent leur format : une ligne par élément.
 - Après chaque changement : `dotnet test tests/Demos.Tests`, puis `dotnet build game`, puis la simulation (`simuler`,
-  3 ans). La référence actuelle est un **trésor de 258 846 la 3e année**. Si ce chiffre change, dis-le et explique
+  3 ans). La référence actuelle est un **trésor de 252 207 la 3e année**. Si ce chiffre change, dis-le et explique
   pourquoi. Vérifie aussi que le jeu démarre (`--headless --path . --quit-after 300`, aucune ligne « error »).
 - Tout en français : réponses, commentaires, textes, messages de commit. Les noms de classes et de méthodes restent en
   anglais.

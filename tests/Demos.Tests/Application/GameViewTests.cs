@@ -72,6 +72,37 @@ public class GameViewTests
     }
 
     [Fact]
+    public void Les_batiments_d_extraction_de_depart_sont_poses_sur_leur_zone_a_portee_de_la_commune()
+    {
+        var world = PrototypeScenario.Create(GameData.Content()).World;
+        var capital = world.CommunePositions[PrototypeScenario.FirstCommuneId];
+
+        foreach (var id in new[] { "camp-forestier", "ferme", "champ-de-lin", "carriere", "mine" })
+        {
+            var building = world.Structures[id];
+            var position = Assert.Contains(id, world.BuildingPositions);
+            Assert.Null(world.ExtractionSiteProblem(building.TypeId, building.Production?.ProductId, PrototypeScenario.FirstCommuneId, position));
+            Assert.True(position.DistanceTo(capital) <= Demos.Domain.Economy.Balance.Current.ExtractionMaxDistance);
+        }
+    }
+
+    [Fact]
+    public void Un_batiment_d_extraction_ne_se_construit_que_sur_sa_zone_a_portee()
+    {
+        var simulation = PrototypeScenario.Create(GameData.Content());
+        var world = simulation.World;
+        var type = world.BuildingTypes["camp-forestier"];
+        var forest = world.BuildingPositions["camp-forestier"];
+        var capital = world.CommunePositions[PrototypeScenario.FirstCommuneId];
+
+        Assert.False(simulation.TryBuild(type.Build("bucheron-2", PrototypeScenario.FirstCommuneId), Demos.Domain.Economy.PaymentMode.StockFirst));
+        Assert.False(simulation.TryBuild(type.Build("bucheron-2", PrototypeScenario.FirstCommuneId), Demos.Domain.Economy.PaymentMode.StockFirst,
+            new Demos.Domain.Map.Point2D(capital.X + 1000, capital.Y)));
+        Assert.True(simulation.TryBuild(type.Build("bucheron-2", PrototypeScenario.FirstCommuneId), Demos.Domain.Economy.PaymentMode.StockFirst, forest));
+        Assert.Equal(forest, world.BuildingPositions["bucheron-2"]);
+    }
+
+    [Fact]
     public void Un_chantier_lance_apparait_dans_la_vue_avec_sa_commune_et_ses_jours()
     {
         var simulation = PrototypeScenario.Create(GameData.Content());

@@ -53,6 +53,7 @@ public static class BalanceApplier
         ("TransportMax", ["transportLossMax"], b => b.TransportLossMax),
         ("PollutionLoin", ["distantPollutionShare"], b => b.DistantPollutionShare),
         ("PollutionDistance", ["pollutionDispersionDistance"], b => b.PollutionDispersionDistance),
+        ("ExtractionDistance", ["extractionMaxDistance"], b => b.ExtractionMaxDistance),
         ("SeuilPollution", ["pollutedThreshold"], b => b.PollutedThreshold),
         ("Dotation", ["foundingGrantDays"], b => b.FoundingGrantDays),
         ("StockFondation", ["foundingMaterials"], b => b.FoundingMaterials),

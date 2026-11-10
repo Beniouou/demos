@@ -204,9 +204,10 @@ public partial class MapCanvas : Control
                 else
                 {
                     _isDragging = false;
-                    // Un clic gauche sans glisser choisit la commune ou la préfecture sous la souris.
+                    // Un clic gauche sans glisser pose le bâtiment en mode placement, sinon choisit la commune ou la
+                    // préfecture sous la souris.
                     if (mb.ButtonIndex == MouseButton.Left && mb.Position.DistanceTo(_dragStartMouse) <= ClickTolerance
-                        && StructureAt(mb.Position) is { } structureId)
+                        && !TryPlaceAt(mb.Position) && StructureAt(mb.Position) is { } structureId)
                         StructureClicked?.Invoke(structureId);
                 }
                 AcceptEvent();
@@ -223,6 +224,9 @@ public partial class MapCanvas : Control
             }
 
             UpdateHoveredInfo(mm.Position);
+            // En mode placement, le curseur vert ou rouge suit la souris.
+            if (IsPlacing)
+                QueueRedraw();
         }
     }
 
@@ -345,8 +349,14 @@ public partial class MapCanvas : Control
         // 12. Les Communes, Chefs-lieux et Capitale (cadastre architectural ou symboles territoriaux)
         DrawCadastralTown(font);
 
+        // 12 bis. Les bâtiments d'extraction posés sur la carte (MapCanvas.Placement.cs)
+        DrawExtractionBuildings(font);
+
         // 13. Réticule de survol et cartouche topographique
         DrawHoverCartouche(font);
+
+        // 14. Mode placement d'un bâtiment d'extraction (MapCanvas.Placement.cs)
+        DrawPlacement(font);
     }
 
     private void DrawSea()

@@ -89,6 +89,42 @@ public sealed class World
         UpdateExtension();
     }
 
+    private readonly Dictionary<string, Point2D> _buildingPositions = [];
+
+    /// <summary>
+    /// Coordonnées cartographiques des bâtiments posés sur la carte (les bâtiments d'extraction), y compris ceux en
+    /// chantier.
+    /// </summary>
+    public IReadOnlyDictionary<string, Point2D> BuildingPositions => _buildingPositions;
+
+    public void SetBuildingPosition(string buildingId, Point2D position) => _buildingPositions[buildingId] = position;
+
+    /// <summary>
+    /// Les zones de la carte où se posent les bâtiments d'extraction (forêts, terres fertiles, gisements) ; vide sans
+    /// carte, et alors leur emplacement n'est pas contrôlé.
+    /// </summary>
+    public IReadOnlyList<PolygonArea> MapZones { get; private set; } = [];
+
+    public void SetMapZones(IReadOnlyList<PolygonArea> zones) => MapZones = zones;
+
+    /// <summary>
+    /// Ce qui empêche de poser un bâtiment de ce type, avec cette recette, à cette position pour cette commune, ou null
+    /// si c'est permis (aussi quand le type ne demande pas de zone, ou sans carte).
+    /// </summary>
+    public string? ExtractionSiteProblem(string? typeId, string? productId, string communeId, Point2D position)
+    {
+        var kinds = ExtractionSites.ZonesFor(typeId, productId);
+        if (kinds.Count == 0 || MapZones.Count == 0)
+            return null;
+        if (!_communePositions.TryGetValue(communeId, out var commune))
+            return "la commune n'a pas de position sur la carte";
+        return ExtractionSites.ProblemWith(kinds, position, commune, Balance.Current.ExtractionMaxDistance, MapZones);
+    }
+
+    /// <summary>Vrai si ce type de bâtiment, avec cette recette, doit être posé sur une zone de la carte (une carte chargée).</summary>
+    public bool NeedsExtractionSite(string? typeId, string? productId) =>
+        MapZones.Count > 0 && ExtractionSites.ZonesFor(typeId, productId).Count > 0;
+
     /// <summary>
     /// Charge et efficacité de chaque entité politique (extension et bureaucratie), recalculées chaque jour ;
     /// calculées à la première lecture avant la première journée.

@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using Demos.Application;
+using Demos.Game.Map;
 using Godot;
 
 namespace Demos.Game;
@@ -10,7 +11,9 @@ namespace Demos.Game;
 /// Production → Construire. À gauche, la commune où bâtir, puis le catalogue des bâtiments constructibles rangé par
 /// catégorie (boîtes repliables). À droite, la fiche du type choisi : ce qu'il coûte, ce qui peut le payer dans la
 /// commune (réserve de chantier, stock de l'État, achat avec le trésor), ce qu'il apporte ; le bouton pour lancer le
-/// chantier, et les chantiers en cours dans la commune. La construction passe par le bureau du joueur.
+/// chantier, et les chantiers en cours dans la commune. Un bâtiment d'extraction (camp de bûcheron, ferme, carrière, mine)
+/// se pose sur la carte : le bouton ferme le menu et passe la carte en mode placement. La construction passe par le
+/// bureau du joueur.
 /// </summary>
 public partial class ConstructionPage : HBoxContainer, IMenuPage
 {
@@ -19,16 +22,22 @@ public partial class ConstructionPage : HBoxContainer, IMenuPage
     private readonly GameView _view = null!;
     private readonly PlayerDesk _desk = null!;
     private readonly TreeSheet _schema = null!;
+    private readonly MapCanvas _map = null!;
+    private readonly System.Action _closeMenu = null!;
+    private readonly System.Action<string> _report = null!;
     private OptionButton _commune = null!;
     private readonly List<string> _communeIds = [];
     private Button _build = null!;
     private Label _message = null!;
     private Label _sites = null!;
 
-    public ConstructionPage(GameView view, PlayerDesk desk)
+    public ConstructionPage(GameView view, PlayerDesk desk, MapCanvas map, System.Action closeMenu, System.Action<string> report)
     {
         _view = view;
         _desk = desk;
+        _map = map;
+        _closeMenu = closeMenu;
+        _report = report;
         AddThemeConstantOverride("separation", 12);
         _schema = new TreeSheet { Build = Build, Describe = Describe };
 
@@ -87,6 +96,9 @@ public partial class ConstructionPage : HBoxContainer, IMenuPage
 
         _schema.Refresh($"{SelectedCommune()}|{string.Join(";", types.Select(t => t.Id))}");
         _build.Disabled = SelectedCommune() is null || !_schema.Selected!.StartsWith("type:");
+        _build.Text = SelectedType() is { } typeId && _view.ExtractionZonesFor(typeId).Count > 0
+            ? "Choisir l'emplacement sur la carte"
+            : "Lancer le chantier dans cette commune";
 
         var sites = _view.ConstructionSites().Where(s => s.CommuneId == SelectedCommune()).ToList();
         _sites.Text = sites.Count == 0
@@ -114,12 +126,36 @@ public partial class ConstructionPage : HBoxContainer, IMenuPage
     private string? SelectedCommune() =>
         _commune.Selected >= 0 && _commune.Selected < _communeIds.Count ? _communeIds[_commune.Selected] : null;
 
+    private string? SelectedType() =>
+        _schema.Selected is { } key && key.StartsWith("type:") ? key["type:".Length..] : null;
+
+    /// <summary>
+    /// Lance le chantier ; pour un bâtiment d'extraction, ferme le menu et passe la carte en mode placement : le chantier
+    /// est lancé au clic sur un emplacement permis, et son résultat s'affiche dans la barre du bas.
+    /// </summary>
     private void BuildSelected()
     {
-        if (SelectedCommune() is not { } communeId || _schema.Selected is not { } key || !key.StartsWith("type:"))
+        if (SelectedCommune() is not { } communeId || SelectedType() is not { } typeId)
             return;
-        _message.Text = _desk.Build(key["type:".Length..], communeId);
-        _message.Visible = true;
+
+        var zones = _view.ExtractionZonesFor(typeId);
+        if (zones.Count == 0)
+        {
+            _message.Text = _desk.Build(typeId, communeId);
+            _message.Visible = true;
+            return;
+        }
+
+        var name = _desk.BuildableTypes().FirstOrDefault(t => t.Id == typeId)?.Name ?? typeId;
+        var place = string.Join(" ou ", zones.Select(Demos.Domain.Map.ExtractionSites.ZoneName));
+        _closeMenu();
+        _map.BeginPlacement(new MapCanvas.PlacementRequest(
+            $"{name}, sur {place}, à {_view.ExtractionMaxDistance:0} lieues de la commune au plus",
+            zones,
+            communeId,
+            _view.ExtractionMaxDistance,
+            position => _view.ExtractionSiteProblem(typeId, communeId, position),
+            position => _report(_desk.Build(typeId, communeId, position))));
     }
 
     // ---- Le catalogue ----------------------------------------------------------------------------------------------
@@ -156,6 +192,14 @@ public partial class ConstructionPage : HBoxContainer, IMenuPage
             text.AppendLine(SheetText.Muted(type.Description));
         if (!type.IsFunctional)
             text.AppendLine($"[color=#{UiTheme.Danger.ToHtml(false)}]Ce bâtiment n'a pas encore d'effet dans le jeu.[/color]");
+
+        var zones = _view.ExtractionZonesFor(type.Id);
+        if (zones.Count > 0)
+        {
+            text.Append(SheetText.Section("Emplacement"));
+            text.AppendLine($"Sur la carte, sur {string.Join(" ou ", zones.Select(Demos.Domain.Map.ExtractionSites.ZoneName))}, "
+                + $"à {_view.ExtractionMaxDistance:0} lieues de la commune au plus. Le bouton ouvre la carte pour le choisir.");
+        }
 
         text.Append(SheetText.Section("Coût"));
         text.AppendLine($"{type.MaterialQuantity:N0} {SheetText.Escape(type.MaterialName)}, {type.Days} jours de chantier");

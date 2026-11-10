@@ -43,6 +43,9 @@ public partial class MainMenu : HBoxContainer
     private TabContainer _tabs = null!;
     private int _open = -1;
 
+    /// <summary>Un message pour la barre du bas (le résultat d'une action finie menu fermé, comme un placement sur la carte).</summary>
+    public event System.Action<string>? Message;
+
     public void Init(GameView view, PlayerDesk desk, MapCanvas map)
     {
         _menus =
@@ -69,7 +72,7 @@ public partial class MainMenu : HBoxContainer
             new("Production",
             [
                 new("Unités de production", () => new BuildingsPage(view, desk)),
-                new("Construire", () => new ConstructionPage(view, desk)),
+                new("Construire", () => new ConstructionPage(view, desk, map, Close, message => Message?.Invoke(message))),
                 Coming("Chaîne de production", "Des matières premières aux produits : quelles recettes, quels bâtiments."),
                 Coming("Statistiques", "La production et la consommation de chaque produit dans le temps."),
             ], Wide: true),

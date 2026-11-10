@@ -154,7 +154,7 @@ internal sealed class Book(XLWorkbook workbook, World world, BalanceSettings bal
     [
         "Marge", "Encadrement", "Direction", "MultOuvriers", "MultPI", "MultCadres", "Chauffage", "Eau", "Hiver", "Printemps",
         "Ete", "Automne", "SansEnergie", "ReserveCombustible", "ReserveEntreprise", "ReserveDepart", "EpargneReserve", "ImpotEtat", "ImpotCommune", "Transport",
-        "TransportDistance", "TransportMin", "TransportMax", "PollutionLoin", "PollutionDistance", "SeuilPollution", "Dotation", "StockFondation", "TvaEtat", "TvaCommune", "LicenciementInvendus", "EmbaucheInvendus", "VitessePublic", "VitesseScop",
+        "TransportDistance", "TransportMin", "TransportMax", "PollutionLoin", "PollutionDistance", "ExtractionDistance", "SeuilPollution", "Dotation", "StockFondation", "TvaEtat", "TvaCommune", "LicenciementInvendus", "EmbaucheInvendus", "VitessePublic", "VitesseScop",
         "VitessePrive", "BaisseSalaireScop", "BaisseSalaireScopMax", "LoiRemboursement", "LoiNonVises", "LoiVerrou", "LoiRegalien", "LoiMinimum",
         "ExtensionPopulation", "ExtensionBatiments", "ExtensionAutonomes", "ExtensionContenues", "ExtensionPartComptee", "ExtensionDistance", "BureaucratieEchelon",
         "PrefectureEmplois", "PrefectureLegitimite", "RattachementLegitimite", "PrefectureMinimum",
@@ -371,6 +371,8 @@ internal sealed class Book(XLWorkbook workbook, World world, BalanceSettings bal
             ("PollutionLoin", "Part de la pollution des autres communes", balance.DistantPollutionShare, "Au contact (distance nulle)."),
             ("PollutionDistance", "Pollution : distance de dispersion (lieues)", balance.PollutionDispersionDistance,
                 "À cette distance, la part reçue est divisée par 2 : part ÷ (1 + (distance ÷ cette distance)²)."),
+            ("ExtractionDistance", "Extraction : distance maximale à la commune (lieues)", balance.ExtractionMaxDistance,
+                "Un bâtiment d'extraction se pose sur une zone de la carte qui correspond, à cette distance de sa commune au plus."),
             ("SeuilPollution", "Seuil de pollution (par habitant et par jour)", balance.PollutedThreshold, ""),
             ("Dotation", "Dotation d'une nouvelle commune (jours)", balance.FoundingGrantDays, "Jours de salaires du camp de base."),
             ("StockFondation", "Réserve de chantier d'une commune à sa fondation", balance.FoundingMaterials, "Matériaux de construction, hors stockage : pour ses premiers chantiers (et ceux de la première commune)."),

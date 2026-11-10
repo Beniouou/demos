@@ -32,6 +32,27 @@ public sealed class GameView(Simulation simulation)
     /// <summary>La capitale : le chef-lieu de l'État, ou null s'il n'en a pas.</summary>
     public string? CapitalId => World.CapitalId;
 
+    /// <summary>Les positions des bâtiments posés sur la carte (bâtiments d'extraction), chantiers compris.</summary>
+    public IReadOnlyDictionary<string, Point2D> BuildingPositions() => new Dictionary<string, Point2D>(World.BuildingPositions);
+
+    /// <summary>Distance maximale, en lieues, entre un bâtiment d'extraction et sa commune.</summary>
+    public double ExtractionMaxDistance => Balance.Current.ExtractionMaxDistance;
+
+    /// <summary>
+    /// Les zones de la carte (forêt, terre fertile, pierre, charbon, fer) où se pose un bâtiment neuf de ce type, avec sa
+    /// recette de départ ; vide s'il se construit sans emplacement (ou sans carte).
+    /// </summary>
+    public IReadOnlyList<string> ExtractionZonesFor(string typeId) =>
+        World.BuildingTypes.TryGetValue(typeId, out var type) && World.NeedsExtractionSite(typeId, type.DefaultProduction?.ProductId)
+            ? ExtractionSites.ZonesFor(typeId, type.DefaultProduction?.ProductId)
+            : [];
+
+    /// <summary>Ce qui empêche de poser un bâtiment neuf de ce type à cette position pour cette commune, ou null si c'est permis.</summary>
+    public string? ExtractionSiteProblem(string typeId, string communeId, Point2D position) =>
+        World.BuildingTypes.TryGetValue(typeId, out var type)
+            ? World.ExtractionSiteProblem(typeId, type.DefaultProduction?.ProductId, communeId, position)
+            : "type de bâtiment inconnu";
+
     /// <summary>Les chantiers en cours : le bâtiment, son type, sa commune et les jours qu'il reste.</summary>
     public IReadOnlyList<ConstructionSiteView> ConstructionSites() => World.ConstructionSites
         .Select(site => new ConstructionSiteView(
@@ -175,7 +196,9 @@ public sealed class GameView(Simulation simulation)
         World.Laws.Where(l => l.StructureId == structure.Id).Select(DescribeLaw).ToList(),
         World.Structures.Values.Where(s => s.ParentId == structure.Id).Select(DescribeNode).ToList(),
         structure.Ownership,
-        structure.TypeId is { } typeId && World.BuildingTypes.TryGetValue(typeId, out var type) ? type.Category : null);
+        structure.TypeId is { } typeId && World.BuildingTypes.TryGetValue(typeId, out var type) ? type.Category : null,
+        structure.TypeId,
+        structure.Production?.ProductId);
 
     /// <summary>
     /// Les lois qui s'appliquent à une structure : une loi créée dans une structure s'applique à tout ce qu'elle
@@ -265,7 +288,9 @@ public sealed record StructureNode(
     IReadOnlyList<LawView> Laws,
     IReadOnlyList<StructureNode> Children,
     Ownership Ownership,
-    string? Category = null);
+    string? Category = null,
+    string? TypeId = null,
+    string? ProductId = null);
 
 /// <summary>
 /// Une loi vue par le joueur : où elle a été créée, ses pôles idéologiques (ceux de ses briques, selon le sens de leurs

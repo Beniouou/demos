@@ -1,5 +1,6 @@
 using Demos.Application.Ports;
 using Demos.Domain.Economy;
+using Demos.Domain.Map;
 using Demos.Domain.Politics;
 using Demos.Domain.Population;
 using Demos.Domain.Shared;
@@ -72,6 +73,8 @@ public static class PrototypeScenario
         {
             foreach (var commune in map.AllCommunes)
                 world.SetCommunePosition(commune.Id, commune.Position);
+            world.SetMapZones([.. map.AllBiomes, .. map.AllResourceZones]);
+            PlaceExtractionBuildings(world);
         }
 
         var simulation = new Simulation(world, new GameClock(new DateOnly(1900, 1, 1)));
@@ -115,5 +118,23 @@ public static class PrototypeScenario
             DailyRent = building.DailyRent ?? structure.DailyRent,
             HeatingProductId = heatingFuel ?? structure.HeatingProductId,
         };
+    }
+
+    /// <summary>
+    /// Pose chaque bâtiment d'extraction de départ sur la zone de la carte qui correspond la plus proche de sa commune, à
+    /// portée (décidé le 10 novembre 2026). Un bâtiment sans zone à portée reste sans position.
+    /// </summary>
+    private static void PlaceExtractionBuildings(World world)
+    {
+        foreach (var building in world.Structures.Values.Where(s => s.Kind == StructureKind.Building))
+        {
+            var kinds = ExtractionSites.ZonesFor(building.TypeId, building.Production?.ProductId);
+            if (kinds.Count == 0 || world.CommuneOf(building) is not { } communeId
+                || !world.CommunePositions.TryGetValue(communeId, out var commune))
+                continue;
+
+            if (ExtractionSites.NearestSite(kinds, commune, Balance.Current.ExtractionMaxDistance, world.MapZones) is { } site)
+                world.SetBuildingPosition(building.Id, site);
+        }
     }
 }
