@@ -58,7 +58,7 @@ public partial class MapCanvas
         {
             _placement = null;
             request.Place(position);
-            QueueRedraw();
+            RedrawBackground();
         }
         return true;
     }
@@ -88,6 +88,44 @@ public partial class MapCanvas
         if (positions.Count == 0)
             return;
 
+        var buildings = ExtractionBuildingInfos(_gameView);
+        var s = _zoom;
+        // Les noms se chevauchent vite (plusieurs bâtiments près de la commune) : tous en vue Production de près ; sinon
+        // seulement celui sous la souris, dessiné par-dessus le fond (DrawHoveredExtractionName).
+        var showAll = ShowAllExtractionNames;
+        foreach (var (id, worldPos) in positions)
+        {
+            if (!buildings.TryGetValue(id, out var info))
+                continue;
+
+            var showNames = showAll;
+            var center = ToScreen(new Vector2((float)worldPos.X, (float)worldPos.Y));
+            if (info.CommuneId is { } communeId && GetCommuneWorldPosition(communeId) is { } commune)
+                _pen.DrawDashedLine(center, ToScreen(commune), new Color(0.25f, 0.22f, 0.18f, 0.45f), 1.2f, 6f);
+
+            var color = ZoneColor(info.Kind);
+            var radius = Math.Clamp(6f * s, 4f, 10f);
+            if (info.Building)
+            {
+                _pen.DrawArc(center, radius, 0, Mathf.Tau, 24, color, 2f, antialiased: true);
+            }
+            else
+            {
+                _pen.DrawCircle(center, radius + 1.5f, Colors.White);
+                _pen.DrawCircle(center, radius, color);
+            }
+
+            if (showNames)
+                DrawExtractionName(font, center, radius, info.Name, info.Building);
+        }
+    }
+
+    /// <summary>Tous les noms des bâtiments d'extraction sont sur le fond en vue Production de près.</summary>
+    private bool ShowAllExtractionNames => ViewMode == MapViewMode.Production && _zoom >= 1.5f;
+
+    /// <summary>Chaque bâtiment d'extraction (et chaque chantier) : son nom, sa commune, sa zone, et s'il est en chantier.</summary>
+    private static Dictionary<string, (string Name, string? CommuneId, string? Kind, bool Building)> ExtractionBuildingInfos(GameView view)
+    {
         var buildings = new Dictionary<string, (string Name, string? CommuneId, string? Kind, bool Building)>();
         void Visit(StructureNode node, string? communeId)
         {
@@ -97,45 +135,32 @@ public partial class MapCanvas
             foreach (var child in node.Children)
                 Visit(child, commune);
         }
-        foreach (var root in _gameView.StructureTree())
+        foreach (var root in view.StructureTree())
             Visit(root, null);
-        foreach (var site in _gameView.ConstructionSites())
+        foreach (var site in view.ConstructionSites())
             buildings[site.BuildingId] = (site.Name, site.CommuneId, ExtractionSites.ZonesFor(site.TypeId, null).FirstOrDefault(), true);
+        return buildings;
+    }
 
-        var s = _zoom;
-        // Les noms se chevauchent vite (plusieurs bâtiments près de la commune) : seulement celui sous la souris, ou tous
-        // en vue Production de près.
-        var showAll = ViewMode == MapViewMode.Production && s >= 1.5f;
-        var hovered = _hoveredWorldPos is { } mouse
-            ? positions.Select(p => (p.Key, Distance: ToScreen(new Vector2((float)p.Value.X, (float)p.Value.Y)).DistanceTo(ToScreen(mouse))))
-                .Where(p => p.Distance <= 12f).OrderBy(p => p.Distance).Select(p => p.Key).FirstOrDefault()
-            : null;
-        foreach (var (id, worldPos) in positions)
-        {
-            if (!buildings.TryGetValue(id, out var info))
-                continue;
+    private void DrawExtractionName(Font font, Vector2 center, float radius, string name, bool building) =>
+        _pen.DrawString(font, center + new Vector2(radius + 3, 4), building ? $"{name} (chantier)" : name,
+            HorizontalAlignment.Left, -1, 11, MapPalette.InkText);
 
-            var showNames = showAll || id == hovered;
-            var center = ToScreen(new Vector2((float)worldPos.X, (float)worldPos.Y));
-            if (info.CommuneId is { } communeId && GetCommuneWorldPosition(communeId) is { } commune)
-                DrawDashedLine(center, ToScreen(commune), new Color(0.25f, 0.22f, 0.18f, 0.45f), 1.2f, 6f);
+    /// <summary>Le nom du bâtiment d'extraction sous la souris (à 12 pixels près), quand le fond ne les montre pas tous.</summary>
+    private void DrawHoveredExtractionName(Font font)
+    {
+        if (_gameView is null || ShowAllExtractionNames || _hoveredWorldPos is not { } mouse)
+            return;
 
-            var color = ZoneColor(info.Kind);
-            var radius = Math.Clamp(6f * s, 4f, 10f);
-            if (info.Building)
-            {
-                DrawArc(center, radius, 0, Mathf.Tau, 24, color, 2f, antialiased: true);
-            }
-            else
-            {
-                DrawCircle(center, radius + 1.5f, Colors.White);
-                DrawCircle(center, radius, color);
-            }
+        var positions = _gameView.BuildingPositions();
+        var hovered = positions.Select(p => (p.Key, Distance: ToScreen(new Vector2((float)p.Value.X, (float)p.Value.Y)).DistanceTo(ToScreen(mouse))))
+            .Where(p => p.Distance <= 12f).OrderBy(p => p.Distance).Select(p => p.Key).FirstOrDefault();
+        if (hovered is null || !ExtractionBuildingInfos(_gameView).TryGetValue(hovered, out var info))
+            return;
 
-            if (showNames)
-                DrawString(font, center + new Vector2(radius + 3, 4), info.Building ? $"{info.Name} (chantier)" : info.Name,
-                    HorizontalAlignment.Left, -1, 11, MapPalette.InkText);
-        }
+        var worldPos = positions[hovered];
+        var radius = Math.Clamp(6f * _zoom, 4f, 10f);
+        DrawExtractionName(font, ToScreen(new Vector2((float)worldPos.X, (float)worldPos.Y)), radius, info.Name, info.Building);
     }
 
     // ---- Mode placement --------------------------------------------------------------------------------------------
@@ -151,13 +176,17 @@ public partial class MapCanvas
         {
             if (zone.Boundary.Count < 3)
                 continue;
-            var points = zone.Boundary.Select(p => ToScreen(new Vector2((float)p.X, (float)p.Y))).ToArray();
-            SafeDrawColoredPolygon(points, new Color(accent, 0.18f));
-            DrawPolyline([.. points, points[0]], accent, 2f, antialiased: true);
+            // Triangles gardés d'un dessin à l'autre, et rien pour une zone hors de l'écran.
+            var shape = Scaled(zone.Boundary);
+            if (!IsOnScreen(shape, 8f))
+                continue;
+            var points = ToScreen(shape);
+            FillTriangles(Triangles(shape), new Color(accent, 0.18f));
+            _pen.DrawPolyline([.. points, points[0]], accent, 2f, antialiased: true);
         }
 
         if (GetCommuneWorldPosition(request.CommuneId) is { } commune)
-            DrawArc(ToScreen(commune), (float)request.MaxDistance * _zoom, 0, Mathf.Tau, 96, new Color(accent, 0.9f), 2f, antialiased: true);
+            _pen.DrawArc(ToScreen(commune), (float)request.MaxDistance * _zoom, 0, Mathf.Tau, 96, new Color(accent, 0.9f), 2f, antialiased: true);
 
         string hint;
         if (_hoveredWorldPos is { } hovered)
@@ -165,9 +194,9 @@ public partial class MapCanvas
             var problem = request.ProblemAt(new Point2D(hovered.X, hovered.Y));
             var cursor = ToScreen(hovered);
             var color = problem is null ? new Color("#2e9e4f") : new Color("#d33d3d");
-            DrawArc(cursor, 12f, 0, Mathf.Tau, 32, color, 3f, antialiased: true);
-            DrawLine(cursor + new Vector2(-18, 0), cursor + new Vector2(18, 0), color, 1.5f);
-            DrawLine(cursor + new Vector2(0, -18), cursor + new Vector2(0, 18), color, 1.5f);
+            _pen.DrawArc(cursor, 12f, 0, Mathf.Tau, 32, color, 3f, antialiased: true);
+            _pen.DrawLine(cursor + new Vector2(-18, 0), cursor + new Vector2(18, 0), color, 1.5f);
+            _pen.DrawLine(cursor + new Vector2(0, -18), cursor + new Vector2(0, 18), color, 1.5f);
             hint = problem is null ? $"Cliquez pour poser : {request.Label}" : $"Impossible ici : {problem}";
         }
         else
@@ -176,8 +205,8 @@ public partial class MapCanvas
         }
 
         var banner = new Rect2(12, 12, Size.X - 24, 28);
-        DrawRect(banner, MapPalette.LabelBackground);
-        DrawRect(banner, accent, filled: false, width: 1.5f);
-        DrawString(font, new Vector2(24, 31), $"{hint}   (Échap pour annuler)", HorizontalAlignment.Left, Size.X - 48, 13, MapPalette.InkText);
+        _pen.DrawRect(banner, MapPalette.LabelBackground);
+        _pen.DrawRect(banner, accent, filled: false, width: 1.5f);
+        _pen.DrawString(font, new Vector2(24, 31), $"{hint}   (Échap pour annuler)", HorizontalAlignment.Left, Size.X - 48, 13, MapPalette.InkText);
     }
 }

@@ -64,6 +64,8 @@ public partial class MapCanvas : Control
         ClipContents = true;
         CustomMinimumSize = new Vector2(400, 300);
         FocusMode = FocusModeEnum.All;
+        // Le fond se dessine dans une texture (MapCanvas.Layers.cs).
+        CreateLayers();
 
         Map = PrototypeMap.CreateHandcrafted();
         InitDefaultCommunes();
@@ -93,14 +95,14 @@ public partial class MapCanvas : Control
     public void RecalculateInfluence()
     {
         Field = InfluenceCalculator.Compute(Map, Communes);
-        QueueRedraw();
+        RedrawBackground();
     }
 
     public void Init(GameView view)
     {
         _gameView = view;
         _prefecturePolygonsCache.Clear();
-        QueueRedraw();
+        RedrawBackground();
     }
 
     public void Refresh(GameView view)
@@ -113,7 +115,15 @@ public partial class MapCanvas : Control
             _lastCommunesCount = comms.Count;
             _lastPrefecturesCount = prefs.Count;
             _prefecturePolygonsCache.Clear();
-            QueueRedraw();
+            RedrawBackground();
+        }
+
+        // Le fond ne se redessine plus au survol : il suit la partie quand ce qu'il affiche change.
+        var state = BackgroundStateKey(view, comms, prefs);
+        if (state != _backgroundStateKey)
+        {
+            _backgroundStateKey = state;
+            RedrawBackground();
         }
     }
 
@@ -122,7 +132,7 @@ public partial class MapCanvas : Control
         if (ViewMode != mode)
         {
             ViewMode = mode;
-            QueueRedraw();
+            RedrawBackground();
         }
     }
 
@@ -156,7 +166,7 @@ public partial class MapCanvas : Control
     {
         var viewCenter = Size * 0.5f;
         _panOffset = viewCenter - worldPos * _zoom;
-        QueueRedraw();
+        RedrawBackground();
     }
 
     private void LoadVectorMap()
@@ -220,7 +230,7 @@ public partial class MapCanvas : Control
             if (_isDragging)
             {
                 _panOffset = _dragStartOffset + (mm.Position - _dragStartMouse);
-                QueueRedraw();
+                RedrawBackground();
             }
 
             UpdateHoveredInfo(mm.Position);
@@ -254,13 +264,13 @@ public partial class MapCanvas : Control
     private void ApplyZoom(float factor, Vector2 pivot)
     {
         var oldZoom = _zoom;
-        var newZoom = Math.Clamp(_zoom * factor, 0.4f, 3.5f);
+        var newZoom = Math.Clamp(_zoom * factor, MinZoom, MaxZoom);
         if (Math.Abs(newZoom - oldZoom) < 0.001f)
             return;
 
         _panOffset = pivot - (pivot - _panOffset) * (newZoom / oldZoom);
         _zoom = newZoom;
-        QueueRedraw();
+        RedrawBackground();
     }
 
     private void UpdateHoveredInfo(Vector2 screenPos)
@@ -303,12 +313,34 @@ public partial class MapCanvas : Control
         }
     }
 
+    /// <summary>
+    /// La carte elle-même ne dessine que le fond déjà rendu (une texture, voir MapCanvas.Layers.cs) et, par-dessus, ce
+    /// qui suit la souris : un mouvement de souris ne redessine pas le fond.
+    /// </summary>
     public override void _Draw()
     {
         var font = ThemeDB.FallbackFont;
+        _pen = this;
+        DrawTexture(_backgroundViewport.GetTexture(), Vector2.Zero);
+
+        // Le nom du bâtiment d'extraction sous la souris (MapCanvas.Placement.cs)
+        DrawHoveredExtractionName(font);
+
+        // 13. Réticule de survol et cartouche topographique
+        DrawHoverCartouche(font);
+
+        // 14. Mode placement d'un bâtiment d'extraction (MapCanvas.Placement.cs)
+        DrawPlacement(font);
+    }
+
+    /// <summary>Le fond de la carte, dessiné sur le calque du fond (rendu dans une texture).</summary>
+    private void DrawBackground()
+    {
+        var font = ThemeDB.FallbackFont;
+        _pen = _backgroundLayer;
 
         // 1. Fond papier vélin IGN doux
-        DrawRect(new Rect2(Vector2.Zero, Size), MapPalette.Parchment);
+        _pen.DrawRect(new Rect2(Vector2.Zero, Size), MapPalette.Parchment);
 
         // 2. Mer et littoral (Baie méridionale pastel)
         DrawSea();
@@ -352,11 +384,7 @@ public partial class MapCanvas : Control
         // 12 bis. Les bâtiments d'extraction posés sur la carte (MapCanvas.Placement.cs)
         DrawExtractionBuildings(font);
 
-        // 13. Réticule de survol et cartouche topographique
-        DrawHoverCartouche(font);
-
-        // 14. Mode placement d'un bâtiment d'extraction (MapCanvas.Placement.cs)
-        DrawPlacement(font);
+        _pen = this;
     }
 
     private void DrawSea()
@@ -369,15 +397,14 @@ public partial class MapCanvas : Control
             if (body.IsErroneousGlobalSea(_vectorMap.Width, _vectorMap.Height))
                 continue;
 
-            var screenPoints = body.Boundary
-                .Select(p => ToScreen(new Vector2((float)p.X, (float)p.Y)))
-                .ToArray();
-
-            if (screenPoints.Length >= 3)
+            // Points et triangles gardés d'un dessin à l'autre (MapCanvas.Cache.cs), rien hors de l'écran.
+            var shape = Scaled(body.Boundary);
+            if (shape.Points.Length >= 3 && IsOnScreen(shape, 4f))
             {
+                var screenPoints = ToScreen(shape);
                 var color = body.Kind is "Island" or "Land" ? MapPalette.Parchment : MapPalette.Water;
-                SafeDrawColoredPolygon(screenPoints, color);
-                DrawPolyline(screenPoints, MapPalette.WaterShallow, 2.0f, antialiased: true);
+                FillTriangles(Triangles(shape), color);
+                _pen.DrawPolyline(screenPoints, MapPalette.WaterShallow, 2.0f, antialiased: true);
             }
         }
     }
@@ -393,12 +420,12 @@ public partial class MapCanvas : Control
 
         foreach (var biome in biomes)
         {
-            var screenPoints = biome.Boundary
-                .Select(p => ToScreen(new Vector2((float)p.X, (float)p.Y)))
-                .ToArray();
-
-            if (screenPoints.Length >= 3)
+            // Points, morceaux, triangles et bosquets gardés d'un dessin à l'autre (MapCanvas.Cache.cs) ; une forêt hors de
+            // l'écran (bosquets compris) n'est pas dessinée.
+            var outline = Scaled(biome.Boundary);
+            if (outline.Points.Length >= 3 && IsOnScreen(outline, 64f))
             {
+                var screenPoints = ToScreen(outline);
                 var (fill, stroke) = biome.Kind.ToLowerInvariant() switch
                 {
                     "foret" or "forest" => (MapPalette.Forest, MapPalette.ForestStroke),
@@ -419,84 +446,31 @@ public partial class MapCanvas : Control
 
                 if (biome.Holes is { Count: > 0 } holes)
                 {
-                    var pieces = new List<Vector2[]> { screenPoints };
-                    foreach (var hole in holes)
-                    {
-                        if (hole.Count < 3) continue;
-                        var holePoints = hole.Select(p => ToScreen(new Vector2((float)p.X, (float)p.Y))).ToArray();
-                        var nextPieces = new List<Vector2[]>();
-                        foreach (var piece in pieces)
-                        {
-                            var clipped = Geometry2D.ClipPolygons(piece, holePoints);
-                            if (clipped != null && clipped.Count > 0)
-                            {
-                                foreach (var cp in clipped) nextPieces.Add(cp);
-                            }
-                            else
-                            {
-                                nextPieces.Add(piece);
-                            }
-                        }
-                        pieces = nextPieces;
-                    }
+                    // Le contour moins chaque trou, découpé et triangulé une fois par zoom.
+                    foreach (var piece in ForestPieceTriangles(biome))
+                        FillTriangles(piece, fill);
 
-                    foreach (var piece in pieces)
-                    {
-                        if (piece.Length >= 3)
-                        {
-                            SafeDrawColoredPolygon(piece, fill);
-                        }
-                    }
-
-                    DrawPolyline(screenPoints, stroke, 1.2f, antialiased: true);
+                    _pen.DrawPolyline(screenPoints, stroke, 1.2f, antialiased: true);
                     foreach (var hole in holes)
                     {
                         if (hole.Count >= 3)
                         {
-                            var holePoints = hole.Select(p => ToScreen(new Vector2((float)p.X, (float)p.Y))).ToArray();
-                            DrawPolyline(holePoints, stroke, 1.2f, antialiased: true);
+                            var holePoints = ToScreen(Scaled(hole));
+                            _pen.DrawPolyline(holePoints, stroke, 1.2f, antialiased: true);
                         }
                     }
                 }
                 else
                 {
-                    SafeDrawColoredPolygon(screenPoints, fill);
-                    DrawPolyline(screenPoints, stroke, 1.2f, antialiased: true);
+                    FillTriangles(Triangles(outline), fill);
+                    _pen.DrawPolyline(screenPoints, stroke, 1.2f, antialiased: true);
                 }
 
                 if (biome.Kind is "foret" or "forest")
                 {
-                    // Petits bosquets dessinés uniquement à l'intérieur du massif forestier
-                    var minX = screenPoints.Min(p => p.X);
-                    var maxX = screenPoints.Max(p => p.X);
-                    var minY = screenPoints.Min(p => p.Y);
-                    var maxY = screenPoints.Max(p => p.Y);
-
-                    var step = 32f * _zoom;
-                    if (step < 14f) step = 14f;
-
-                    var treeCount = 0;
-                    for (var y = minY + step * 0.5f; y <= maxY; y += step)
-                    {
-                        for (var x = minX + step * 0.5f; x <= maxX; x += step)
-                        {
-                            var pt = new Vector2(x, y);
-                            if (Geometry2D.IsPointInPolygon(pt, screenPoints) && !(biome.Holes?.Any(h => Geometry2D.IsPointInPolygon(pt, h.Select(p => ToScreen(new Vector2((float)p.X, (float)p.Y))).ToArray())) ?? false))
-                            {
-                                DrawTreeCluster(pt);
-                                treeCount++;
-                            }
-                        }
-                    }
-
-                    if (treeCount == 0)
-                    {
-                        var center = screenPoints.Aggregate(Vector2.Zero, (acc, p) => acc + p) / screenPoints.Length;
-                        if (Geometry2D.IsPointInPolygon(center, screenPoints) && !(biome.Holes?.Any(h => Geometry2D.IsPointInPolygon(center, h.Select(p => ToScreen(new Vector2((float)p.X, (float)p.Y))).ToArray())) ?? false))
-                        {
-                            DrawTreeCluster(center);
-                        }
-                    }
+                    // Petits bosquets dessinés uniquement à l'intérieur du massif forestier (leur place est gardée par
+                    // zoom ; ceux hors de l'écran ne sont ni testés ni dessinés : MapCanvas.Cache.cs).
+                    DrawForestTrees(biome);
                 }
             }
         }
@@ -505,9 +479,9 @@ public partial class MapCanvas : Control
     private void DrawTreeCluster(Vector2 pos)
     {
         var r = 8f * Math.Max(0.6f, _zoom);
-        DrawCircle(pos, r, MapPalette.ForestTrees);
-        DrawCircle(pos + new Vector2(r * 0.7f, r * 0.3f), r * 0.8f, MapPalette.ForestTrees);
-        DrawCircle(pos + new Vector2(-r * 0.7f, r * 0.3f), r * 0.75f, MapPalette.ForestTrees);
+        _pen.DrawCircle(pos, r, MapPalette.ForestTrees);
+        _pen.DrawCircle(pos + new Vector2(r * 0.7f, r * 0.3f), r * 0.8f, MapPalette.ForestTrees);
+        _pen.DrawCircle(pos + new Vector2(-r * 0.7f, r * 0.3f), r * 0.75f, MapPalette.ForestTrees);
     }
 
     private void DrawHillshading()
@@ -520,7 +494,7 @@ public partial class MapCanvas : Control
         var p5 = ToScreen(new Vector2(900, 240));
         var p6 = ToScreen(new Vector2(700, 200));
 
-        DrawColoredPolygon([p1, p2, p3, p4, p5, p6], MapPalette.Hillshade);
+        _pen.DrawColoredPolygon([p1, p2, p3, p4, p5, p6], MapPalette.Hillshade);
     }
 
     private void DrawContourLines(Font font)
@@ -540,9 +514,11 @@ public partial class MapCanvas : Control
             if (isGeopolitics && !contour.IsIndex)
                 continue;
 
-            var screenPoints = contour.Points
-                .Select(p => ToScreen(new Vector2((float)p.X, (float)p.Y)))
-                .ToArray();
+            // Points gardés d'un dessin à l'autre (MapCanvas.Cache.cs), rien hors de l'écran (étiquette comprise).
+            var shape = Scaled(contour.Points);
+            if (!IsOnScreen(shape, 120f))
+                continue;
+            var screenPoints = ToScreen(shape);
 
             var color = contour.IsIndex ? MapPalette.ContourIndex : MapPalette.ContourStandard;
             if (isGeopolitics || isTransit)
@@ -552,14 +528,14 @@ public partial class MapCanvas : Control
 
             var width = (contour.IsIndex ? 1.4f : 0.75f) * Math.Clamp(_zoom, 0.7f, 1.8f);
 
-            DrawPolyline(screenPoints, color, width, antialiased: true);
+            _pen.DrawPolyline(screenPoints, color, width, antialiased: true);
 
             // Cotes altimétriques sur les courbes maîtresses (100, 200, 300, 400, 500)
             if (contour.IsIndex && _zoom >= 0.85f && screenPoints.Length >= 4 && !isGeopolitics)
             {
                 var mid = screenPoints[screenPoints.Length / 2];
                 var label = $"{contour.Altitude:F0}";
-                DrawString(font, mid + new Vector2(0, -2), label, HorizontalAlignment.Left, -1, 10, color);
+                _pen.DrawString(font, mid + new Vector2(0, -2), label, HorizontalAlignment.Left, -1, 10, color);
             }
         }
     }
@@ -574,14 +550,14 @@ public partial class MapCanvas : Control
             var pos = ToScreen(new Vector2((float)spot.Position.X, (float)spot.Position.Y));
             const float crossSize = 4f;
 
-            DrawLine(pos + new Vector2(-crossSize, 0), pos + new Vector2(crossSize, 0), MapPalette.SpotElevation, 1.2f);
-            DrawLine(pos + new Vector2(0, -crossSize), pos + new Vector2(0, crossSize), MapPalette.SpotElevation, 1.2f);
+            _pen.DrawLine(pos + new Vector2(-crossSize, 0), pos + new Vector2(crossSize, 0), MapPalette.SpotElevation, 1.2f);
+            _pen.DrawLine(pos + new Vector2(0, -crossSize), pos + new Vector2(0, crossSize), MapPalette.SpotElevation, 1.2f);
 
             var cat = PlaceCategories.Get(spot.Category);
             var label = spot.ShowAltitude
                 ? $"{cat.Icon} {spot.Name} ({spot.Altitude:F0} m)"
                 : $"{cat.Icon} {spot.Name}";
-            DrawString(font, pos + new Vector2(6, 4), label, HorizontalAlignment.Left, -1, 11, MapPalette.SpotElevation);
+            _pen.DrawString(font, pos + new Vector2(6, 4), label, HorizontalAlignment.Left, -1, 11, MapPalette.SpotElevation);
         }
     }
 
@@ -594,18 +570,20 @@ public partial class MapCanvas : Control
         {
             if (river.Points.Count < 2) continue;
 
-            var screenPoints = river.Points
-                .Select(p => ToScreen(new Vector2((float)p.X, (float)p.Y)))
-                .ToArray();
+            // Points gardés d'un dessin à l'autre (MapCanvas.Cache.cs), rien hors de l'écran (nom compris).
+            var shape = Scaled(river.Points);
+            if (!IsOnScreen(shape, (float)river.Width * _zoom + 400f))
+                continue;
+            var screenPoints = ToScreen(shape);
 
             var riverWidth = (float)river.Width * _zoom;
-            DrawPolyline(screenPoints, MapPalette.River, riverWidth, antialiased: true);
-            DrawPolyline(screenPoints, MapPalette.RiverCore, Math.Max(1.0f, riverWidth * 0.4f), antialiased: true);
+            _pen.DrawPolyline(screenPoints, MapPalette.River, riverWidth, antialiased: true);
+            _pen.DrawPolyline(screenPoints, MapPalette.RiverCore, Math.Max(1.0f, riverWidth * 0.4f), antialiased: true);
 
             if (_zoom >= 0.9f && screenPoints.Length >= 4 && !string.IsNullOrWhiteSpace(river.Name))
             {
                 var textPos = screenPoints[screenPoints.Length / 2];
-                DrawString(font, textPos + new Vector2(10, -6), river.Name, HorizontalAlignment.Left, -1, 11, MapPalette.River);
+                _pen.DrawString(font, textPos + new Vector2(10, -6), river.Name, HorizontalAlignment.Left, -1, 11, MapPalette.River);
             }
         }
     }
@@ -628,7 +606,7 @@ public partial class MapCanvas : Control
             ToScreen(new Vector2(200, 230)),
         };
 
-        DrawPolyline([.. poly, poly[0]], MapPalette.InfluenceBorder, 1.8f * _zoom, antialiased: true);
+        _pen.DrawPolyline([.. poly, poly[0]], MapPalette.InfluenceBorder, 1.8f * _zoom, antialiased: true);
     }
 
     private void DrawExteriorProduction(Font font)
@@ -645,9 +623,11 @@ public partial class MapCanvas : Control
             foreach (var zone in _vectorMap.AllResourceZones)
             {
                 if (zone.Boundary.Count < 3) continue;
-                var screenPoints = zone.Boundary
-                    .Select(p => ToScreen(new Vector2((float)p.X, (float)p.Y)))
-                    .ToArray();
+                // Points et triangles gardés d'un dessin à l'autre (MapCanvas.Cache.cs), rien hors de l'écran (nom compris).
+                var shape = Scaled(zone.Boundary);
+                if (!IsOnScreen(shape, 300f))
+                    continue;
+                var screenPoints = ToScreen(shape);
 
                 var (fill, stroke, icon) = zone.Kind.ToLowerInvariant() switch
                 {
@@ -669,15 +649,15 @@ public partial class MapCanvas : Control
                     stroke = new Color(stroke.R, stroke.G, stroke.B, stroke.A * 0.4f);
                 }
 
-                SafeDrawColoredPolygon(screenPoints, fill);
-                DrawPolyline(screenPoints, stroke, (isNaturalResources ? 2.0f : 1.4f) * s, antialiased: true);
+                FillTriangles(Triangles(shape), fill);
+                _pen.DrawPolyline(screenPoints, stroke, (isNaturalResources ? 2.0f : 1.4f) * s, antialiased: true);
 
                 if (s >= 0.6f || isNaturalResources)
                 {
                     var center = screenPoints.Aggregate(Vector2.Zero, (acc, p) => acc + p) / screenPoints.Length;
                     var label = $"{icon} {zone.Name}";
                     var fontSize = (int)Math.Clamp(10 * s, 9, 13);
-                    DrawString(font, center, label, HorizontalAlignment.Center, -1, fontSize, stroke);
+                    _pen.DrawString(font, center, label, HorizontalAlignment.Center, -1, fontSize, stroke);
                 }
             }
             return;
@@ -703,7 +683,7 @@ public partial class MapCanvas : Control
             if (s >= 0.85f || isNaturalResources || isProduction)
             {
                 var label = $"{name} ({r.Resource})";
-                DrawString(font, pos + new Vector2(-30, 22 * s), label, HorizontalAlignment.Center, -1, 10, MapPalette.InkText);
+                _pen.DrawString(font, pos + new Vector2(-30, 22 * s), label, HorizontalAlignment.Center, -1, 10, MapPalette.InkText);
             }
         }
     }
@@ -736,10 +716,10 @@ public partial class MapCanvas : Control
             if (isCapital)
             {
                 // 1. Capitale nationale : Sceau or et carmin
-                DrawCircle(center, 9.0f * s, MapPalette.BlasonGold);
-                DrawCircle(center, 7.5f * s, MapPalette.BlasonRed);
-                DrawCircle(center, 4.0f * s, MapPalette.BlasonGold);
-                DrawCircle(center, 2.0f * s, Colors.White);
+                _pen.DrawCircle(center, 9.0f * s, MapPalette.BlasonGold);
+                _pen.DrawCircle(center, 7.5f * s, MapPalette.BlasonRed);
+                _pen.DrawCircle(center, 4.0f * s, MapPalette.BlasonGold);
+                _pen.DrawCircle(center, 2.0f * s, Colors.White);
 
                 if (s >= 0.5f)
                 {
@@ -751,9 +731,9 @@ public partial class MapCanvas : Control
             else if (isPrefectureSeat)
             {
                 // 2. Chef-lieu de préfecture : Sceau civique pourpre
-                DrawCircle(center, 8.0f * s, MapPalette.PrefectureSeat);
-                DrawCircle(center, 6.0f * s, Colors.White);
-                DrawCircle(center, 3.5f * s, MapPalette.PrefectureSeat);
+                _pen.DrawCircle(center, 8.0f * s, MapPalette.PrefectureSeat);
+                _pen.DrawCircle(center, 6.0f * s, Colors.White);
+                _pen.DrawCircle(center, 3.5f * s, MapPalette.PrefectureSeat);
 
                 if (s >= 0.5f)
                 {
@@ -765,9 +745,9 @@ public partial class MapCanvas : Control
             else
             {
                 // 3. Commune ordinaire : Disque bicolore sobre
-                DrawCircle(center, 6.0f * s, new Color("#8B1E1E"));
-                DrawCircle(center, 4.0f * s, new Color("#FFF9EE"));
-                DrawCircle(center, 2.0f * s, new Color("#8B1E1E"));
+                _pen.DrawCircle(center, 6.0f * s, new Color("#8B1E1E"));
+                _pen.DrawCircle(center, 4.0f * s, new Color("#FFF9EE"));
+                _pen.DrawCircle(center, 2.0f * s, new Color("#8B1E1E"));
 
                 if (s >= 0.5f)
                 {
@@ -804,7 +784,7 @@ public partial class MapCanvas : Control
                 {
                     var screenPts = poly.Select(ToScreen).ToArray();
                     SafeDrawColoredPolygon(screenPts, washColor);
-                    DrawPolyline([.. screenPts, screenPts[0]], borderColor, (isGeopolitics ? 2.2f : 1.2f) * s, antialiased: true);
+                    _pen.DrawPolyline([.. screenPts, screenPts[0]], borderColor, (isGeopolitics ? 2.2f : 1.2f) * s, antialiased: true);
                 }
 
                 // Liaisons administratives pointillées entre le chef-lieu et chaque membre
@@ -821,7 +801,7 @@ public partial class MapCanvas : Control
                             if (memberPos.HasValue)
                             {
                                 var screenMember = ToScreen(memberPos.Value);
-                                DrawDashedLine(screenSeat, screenMember, MapPalette.AdministrativeLink, (isGeopolitics ? 2.0f : 1.2f) * s, dash: 6.0f * s);
+                                _pen.DrawDashedLine(screenSeat, screenMember, MapPalette.AdministrativeLink, (isGeopolitics ? 2.0f : 1.2f) * s, dash: 6.0f * s);
                             }
                         }
 
@@ -844,7 +824,7 @@ public partial class MapCanvas : Control
                 var screenPts = disk.Select(ToScreen).ToArray();
                 var wash = isGeopolitics ? MapPalette.PrefectureWash : new Color(MapPalette.PrefectureWash.R, MapPalette.PrefectureWash.G, MapPalette.PrefectureWash.B, 0.04f);
                 SafeDrawColoredPolygon(screenPts, wash);
-                DrawPolyline([.. screenPts, screenPts[0]], MapPalette.InfluenceBorder, (isGeopolitics ? 1.8f : 1.0f) * s, antialiased: true);
+                _pen.DrawPolyline([.. screenPts, screenPts[0]], MapPalette.InfluenceBorder, (isGeopolitics ? 1.8f : 1.0f) * s, antialiased: true);
             }
         }
     }
@@ -858,9 +838,12 @@ public partial class MapCanvas : Control
         foreach (var river in _vectorMap.AllRivers)
         {
             if (river.Points.Count < 2) continue;
-            var screenPts = river.Points.Select(p => ToScreen(new Vector2((float)p.X, (float)p.Y))).ToArray();
             var haloWidth = (float)river.Width * 2.0f * s;
-            DrawPolyline(screenPts, MapPalette.TradeRiverHighlight, haloWidth, antialiased: true);
+            var shape = Scaled(river.Points);
+            if (!IsOnScreen(shape, haloWidth + 4f))
+                continue;
+            var screenPts = ToScreen(shape);
+            _pen.DrawPolyline(screenPts, MapPalette.TradeRiverHighlight, haloWidth, antialiased: true);
         }
 
         // 2. Axes d'échanges commerciaux inter-communes
@@ -876,7 +859,7 @@ public partial class MapCanvas : Control
                     var p1 = ToScreen(c1.WorldPos);
                     var p2 = ToScreen(c2.WorldPos);
 
-                    DrawDashedLine(p1, p2, MapPalette.TradeRoad, 2.2f * s, dash: 8.0f * s);
+                    _pen.DrawDashedLine(p1, p2, MapPalette.TradeRoad, 2.2f * s, dash: 8.0f * s);
 
                     var dx = (double)(c1.WorldPos.X - c2.WorldPos.X);
                     var dy = (double)(c1.WorldPos.Y - c2.WorldPos.Y);
@@ -889,9 +872,9 @@ public partial class MapCanvas : Control
                     var tagSize = font.GetStringSize(tag, HorizontalAlignment.Left, -1, fontSize);
                     var tagRect = new Rect2(mid.X - tagSize.X * 0.5f - 4, mid.Y - tagSize.Y * 0.5f - 2, tagSize.X + 8, tagSize.Y + 4);
 
-                    DrawRect(tagRect, MapPalette.LabelBackground);
-                    DrawRect(tagRect, MapPalette.TradeRoad, filled: false, width: 0.9f);
-                    DrawString(font, new Vector2(tagRect.Position.X + 4, tagRect.Position.Y + tagSize.Y), tag, HorizontalAlignment.Left, -1, fontSize, MapPalette.TradeRoad);
+                    _pen.DrawRect(tagRect, MapPalette.LabelBackground);
+                    _pen.DrawRect(tagRect, MapPalette.TradeRoad, filled: false, width: 0.9f);
+                    _pen.DrawString(font, new Vector2(tagRect.Position.X + 4, tagRect.Position.Y + tagSize.Y), tag, HorizontalAlignment.Left, -1, fontSize, MapPalette.TradeRoad);
                 }
             }
         }
@@ -1052,9 +1035,9 @@ public partial class MapCanvas : Control
         var padding = new Vector2(6 * s, 3 * s);
         var boxRect = new Rect2(center.X - textSize.X * 0.5f - padding.X, center.Y + 12 * s, textSize.X + padding.X * 2, textSize.Y + padding.Y * 2);
 
-        DrawRect(boxRect, bgColor);
-        DrawRect(boxRect, MapPalette.LabelBorder, filled: false, width: 1.0f);
-        DrawString(font, new Vector2(boxRect.Position.X + padding.X, boxRect.Position.Y + padding.Y + textSize.Y - 2), text, HorizontalAlignment.Left, -1, fontSize, textColor);
+        _pen.DrawRect(boxRect, bgColor);
+        _pen.DrawRect(boxRect, MapPalette.LabelBorder, filled: false, width: 1.0f);
+        _pen.DrawString(font, new Vector2(boxRect.Position.X + padding.X, boxRect.Position.Y + padding.Y + textSize.Y - 2), text, HorizontalAlignment.Left, -1, fontSize, textColor);
     }
 
     private void DrawPrefectureHeader(Font font, Vector2 seatCenter, string prefName)
@@ -1066,9 +1049,9 @@ public partial class MapCanvas : Control
         var padding = new Vector2(8 * s, 4 * s);
         var boxRect = new Rect2(seatCenter.X - textSize.X * 0.5f - padding.X, seatCenter.Y - 26 * s - textSize.Y, textSize.X + padding.X * 2, textSize.Y + padding.Y * 2);
 
-        DrawRect(boxRect, new Color(0.99f, 0.98f, 0.96f, 0.94f));
-        DrawRect(boxRect, MapPalette.PrefectureBorder, filled: false, width: 1.2f);
-        DrawString(font, new Vector2(boxRect.Position.X + padding.X, boxRect.Position.Y + padding.Y + textSize.Y - 2), label, HorizontalAlignment.Left, -1, fontSize, MapPalette.PrefectureSeat);
+        _pen.DrawRect(boxRect, new Color(0.99f, 0.98f, 0.96f, 0.94f));
+        _pen.DrawRect(boxRect, MapPalette.PrefectureBorder, filled: false, width: 1.2f);
+        _pen.DrawString(font, new Vector2(boxRect.Position.X + padding.X, boxRect.Position.Y + padding.Y + textSize.Y - 2), label, HorizontalAlignment.Left, -1, fontSize, MapPalette.PrefectureSeat);
     }
 
     private void DrawLegacyCadastralTown(Font font)
@@ -1077,16 +1060,16 @@ public partial class MapCanvas : Control
 
         // 1. Ruelle et chemins pavés reliant les quartiers
         var s = _zoom;
-        DrawLine(townCenter + new Vector2(-50, 20) * s, townCenter + new Vector2(60, -15) * s, MapPalette.Street, 3f * s);
-        DrawLine(townCenter + new Vector2(-20, -40) * s, townCenter + new Vector2(30, 45) * s, MapPalette.Street, 3f * s);
-        DrawLine(townCenter, townCenter + new Vector2(-65, -20) * s, MapPalette.Street, 2.5f * s);
-        DrawLine(townCenter + new Vector2(20, -10) * s, townCenter + new Vector2(80, 25) * s, MapPalette.Street, 2.5f * s);
+        _pen.DrawLine(townCenter + new Vector2(-50, 20) * s, townCenter + new Vector2(60, -15) * s, MapPalette.Street, 3f * s);
+        _pen.DrawLine(townCenter + new Vector2(-20, -40) * s, townCenter + new Vector2(30, 45) * s, MapPalette.Street, 3f * s);
+        _pen.DrawLine(townCenter, townCenter + new Vector2(-65, -20) * s, MapPalette.Street, 2.5f * s);
+        _pen.DrawLine(townCenter + new Vector2(20, -10) * s, townCenter + new Vector2(80, 25) * s, MapPalette.Street, 2.5f * s);
 
         // 2. Bâtiments réels dessinés avec leurs toitures cadastrales
         // Mairie
         var mairiePos = townCenter + new Vector2(-15, -30) * s;
         DrawBuildingFootprint(mairiePos, new Vector2(28, 20) * s, MapPalette.RoofSlate);
-        DrawCircle(mairiePos + new Vector2(0, -14 * s), 3f * s, MapPalette.BellTower);
+        _pen.DrawCircle(mairiePos + new Vector2(0, -14 * s), 3f * s, MapPalette.BellTower);
 
         // École
         var ecolePos = townCenter + new Vector2(-65, -15) * s;
@@ -1095,7 +1078,7 @@ public partial class MapCanvas : Control
         // Moulin & Boulangerie
         var moulinPos = townCenter + new Vector2(45, -20) * s;
         DrawBuildingFootprint(moulinPos, new Vector2(22, 16) * s, MapPalette.RoofTile);
-        DrawCircle(moulinPos + new Vector2(14 * s, 0), 4f * s, MapPalette.BuildingStroke);
+        _pen.DrawCircle(moulinPos + new Vector2(14 * s, 0), 4f * s, MapPalette.BuildingStroke);
 
         // Logements d'État
         var logPos = townCenter + new Vector2(-45, 30) * s;
@@ -1110,9 +1093,9 @@ public partial class MapCanvas : Control
 
         // 4. Cartouche avec le nom
         var bannerRect = new Rect2(townCenter.X - 90 * s, townCenter.Y + 60 * s, 180 * s, 22 * s);
-        DrawRect(bannerRect, MapPalette.LabelBackground);
-        DrawRect(bannerRect, MapPalette.LabelBorder, filled: false, width: 1.2f);
-        DrawString(font, new Vector2(bannerRect.Position.X, bannerRect.Position.Y + 15 * s), "PREMIÈRE COMMUNE", HorizontalAlignment.Center, (int)bannerRect.Size.X, (int)(11 * s), MapPalette.InkText);
+        _pen.DrawRect(bannerRect, MapPalette.LabelBackground);
+        _pen.DrawRect(bannerRect, MapPalette.LabelBorder, filled: false, width: 1.2f);
+        _pen.DrawString(font, new Vector2(bannerRect.Position.X, bannerRect.Position.Y + 15 * s), "PREMIÈRE COMMUNE", HorizontalAlignment.Center, (int)bannerRect.Size.X, (int)(11 * s), MapPalette.InkText);
     }
 
     private void DrawBuildingFootprint(Vector2 center, Vector2 size, Color roofColor)
@@ -1121,8 +1104,8 @@ public partial class MapCanvas : Control
         var rect = new Rect2(center - half, size);
 
         // Empreinte murale
-        DrawRect(rect, MapPalette.BuildingWall);
-        DrawRect(rect, MapPalette.BuildingStroke, filled: false, width: 1.0f);
+        _pen.DrawRect(rect, MapPalette.BuildingWall);
+        _pen.DrawRect(rect, MapPalette.BuildingStroke, filled: false, width: 1.0f);
 
         // Toit à deux versants avec arête de faîtage
         var pLeft = new Vector2(rect.Position.X, rect.Position.Y + half.Y);
@@ -1130,8 +1113,8 @@ public partial class MapCanvas : Control
         var pTop = new Vector2(center.X, rect.Position.Y);
         var pBottom = new Vector2(center.X, rect.Position.Y + size.Y);
 
-        DrawColoredPolygon([rect.Position, new Vector2(rect.Position.X + size.X, rect.Position.Y), pBottom, new Vector2(rect.Position.X, rect.Position.Y + size.Y)], roofColor);
-        DrawLine(new Vector2(rect.Position.X, center.Y), new Vector2(rect.Position.X + size.X, center.Y), MapPalette.BuildingStroke, 1.2f);
+        _pen.DrawColoredPolygon([rect.Position, new Vector2(rect.Position.X + size.X, rect.Position.Y), pBottom, new Vector2(rect.Position.X, rect.Position.Y + size.Y)], roofColor);
+        _pen.DrawLine(new Vector2(rect.Position.X, center.Y), new Vector2(rect.Position.X + size.X, center.Y), MapPalette.BuildingStroke, 1.2f);
     }
 
     private void DrawBlason(Vector2 pos)
@@ -1146,11 +1129,11 @@ public partial class MapCanvas : Control
             pos + new Vector2(-12, 2) * s,
         };
 
-        DrawColoredPolygon(shield, MapPalette.BlasonRed);
-        DrawPolyline([.. shield, shield[0]], MapPalette.BuildingStroke, 1.5f, antialiased: true);
+        _pen.DrawColoredPolygon(shield, MapPalette.BlasonRed);
+        _pen.DrawPolyline([.. shield, shield[0]], MapPalette.BuildingStroke, 1.5f, antialiased: true);
 
         // Étoile d'or au chef
-        DrawCircle(pos + new Vector2(0, -4) * s, 3f * s, MapPalette.BlasonGold);
+        _pen.DrawCircle(pos + new Vector2(0, -4) * s, 3f * s, MapPalette.BlasonGold);
     }
 
     private void DrawHoverCartouche(Font font)
@@ -1158,9 +1141,9 @@ public partial class MapCanvas : Control
         if (!string.IsNullOrWhiteSpace(_hoveredInfo))
         {
             var cartoucheRect = new Rect2(12, Size.Y - 36, Size.X - 24, 26);
-            DrawRect(cartoucheRect, MapPalette.LabelBackground);
-            DrawRect(cartoucheRect, MapPalette.LabelBorder, filled: false, width: 1.0f);
-            DrawString(font, new Vector2(24, Size.Y - 18), _hoveredInfo, HorizontalAlignment.Left, -1, 12, MapPalette.InkText);
+            _pen.DrawRect(cartoucheRect, MapPalette.LabelBackground);
+            _pen.DrawRect(cartoucheRect, MapPalette.LabelBorder, filled: false, width: 1.0f);
+            _pen.DrawString(font, new Vector2(24, Size.Y - 18), _hoveredInfo, HorizontalAlignment.Left, -1, 12, MapPalette.InkText);
         }
     }
 
@@ -1168,10 +1151,21 @@ public partial class MapCanvas : Control
 
     private void SafeDrawColoredPolygon(Vector2[] points, Color color)
     {
-        if (points == null || points.Length < 3) return;
+        foreach (var triangle in SafeTriangulate(points))
+            _pen.DrawColoredPolygon(triangle, color);
+    }
+
+    /// <summary>
+    /// Les triangles d'un polygone rempli, sans les sommets doublés ni les triangles plats (moins d'un pixel) ; gardés
+    /// par zoom pour les tracés de la carte (MapCanvas.Cache.cs).
+    /// </summary>
+    private static List<Vector2[]> SafeTriangulate(Vector2[] points)
+    {
+        var triangles = new List<Vector2[]>();
+        if (points == null || points.Length < 3) return triangles;
 
         var cleaned = CleanPolygonVertices(points);
-        if (cleaned.Length < 3) return;
+        if (cleaned.Length < 3) return triangles;
 
         if (Geometry2D.IsPolygonClockwise(cleaned))
         {
@@ -1184,9 +1178,9 @@ public partial class MapCanvas : Control
             if (area > 1.0f)
             {
                 if (Geometry2D.IsPolygonClockwise(cleaned)) Array.Reverse(cleaned);
-                DrawColoredPolygon(cleaned, color);
+                triangles.Add(cleaned);
             }
-            return;
+            return triangles;
         }
 
         var indices = Geometry2D.TriangulatePolygon(cleaned);
@@ -1202,10 +1196,10 @@ public partial class MapCanvas : Control
                     {
                         Array.Reverse(tri);
                     }
-                    DrawColoredPolygon(tri, color);
+                    triangles.Add(tri);
                 }
             }
-            return;
+            return triangles;
         }
 
         var convexParts = Geometry2D.DecomposePolygonInConvex(cleaned);
@@ -1232,12 +1226,14 @@ public partial class MapCanvas : Control
                             {
                                 Array.Reverse(tri);
                             }
-                            DrawColoredPolygon(tri, color);
+                            triangles.Add(tri);
                         }
                     }
                 }
             }
         }
+
+        return triangles;
     }
 
     private static Vector2[] CleanPolygonVertices(Vector2[] pts)
