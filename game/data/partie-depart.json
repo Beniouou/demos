@@ -21,6 +21,7 @@
     { "id": "camp-forestier", "type": "camp-forestier", "commune": "commune-1", "name": "Camp de bûcheron d'État", "jobs": 300 },
     { "id": "scierie", "type": "atelier", "commune": "commune-1", "name": "Scierie d'État", "product": "planche", "jobs": 40 },
     { "id": "menuiserie", "type": "atelier", "commune": "commune-1", "name": "Menuiserie d'État", "product": "meubles", "jobs": 40 },
+    { "id": "atelier-materiaux", "type": "atelier", "commune": "commune-1", "name": "Atelier de matériaux d'État", "product": "materiaux-de-construction", "jobs": 20 },
     { "id": "logements-etat", "type": "logements", "commune": "commune-1", "name": "Logements d'État", "housingPlaces": 3100 },
     { "id": "logements-prives", "type": "logements", "commune": "commune-1", "name": "Logements privés", "ownership": "Private", "owner": "cadres", "housingPlaces": 2200, "dailyRent": 0.5 },
     { "id": "ecole", "type": "ecole", "commune": "commune-1", "name": "École d'État" },

@@ -123,10 +123,17 @@ public class SimulationTests
         var simulation = CreatePrototype();
         Assert.Equal(Balance.Current.FoundingMaterials, ReserveOf(simulation), precision: 6);
 
-        AdvanceDays(simulation, 60);
+        // L'atelier de matériaux d'État en fabrique : le marché ne contient que ce qu'il a produit, rien de la réserve.
+        var produced = 0.0;
+        for (var day = 0; day < 60; day++)
+        {
+            simulation.AdvanceDay();
+            produced += simulation.World.Produced.GetValueOrDefault("atelier-materiaux");
+        }
 
         Assert.Equal(Balance.Current.FoundingMaterials, ReserveOf(simulation), precision: 6);
-        Assert.Equal(0, simulation.World.MarketOf("commune-1").QuantityOf("materiaux-de-construction"), precision: 6);
+        Assert.True(produced > 0);
+        Assert.InRange(simulation.World.MarketOf("commune-1").QuantityOf("materiaux-de-construction"), 0, produced + 1e-6);
     }
 
     [Fact]
