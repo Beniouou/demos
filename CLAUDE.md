@@ -79,9 +79,19 @@ désactivés : TVA sur la valeur ajoutée, épargne progressive des entreprises.
 ## Carte & Géographie : état actuel (résumé)
 
 - Données produites dans `game/data/carte.json` (`VectorMapDefinition` dans `src/Demos.Domain/Map/MapVectorData.cs`) :
-  contours d'isohypses Marching Squares, réseau hydrographique thalweg (`AllRivers`), 7 biomes naturels avec trous polygonaux
-  intérieurs (`Biomes` et `Forests`), gisements (`ResourceZones`, `Resources`), communes et toponymie.
-- Le moteur Godot peut charger `carte.json` pour afficher la carte au centre de l'écran (`game/scripts/Hud.cs` et menu Carte `game/scripts/MainMenu.cs`).
-- Terme distance de l'extension : dans `src/Demos.Domain/Politics/Extension.cs`, la variable `const double distance = 0;`
-  est prête à recevoir une fonction de distance basée sur les coordonnées réelles $(X, Y)$ des communes et préfectures
-  définies dans la carte.
+  carte vectorielle continue (3 600 × 2 250 lieues), 1 567 contours d'isohypses Marching Squares, 17 cours d'eau thalweg (`AllRivers`), 150 biomes naturels avec trous polygonaux intérieurs (`Biomes` et `Forests`), 66 gisements de sol (`ResourceZones`, `Resources`), communes et toponymie.
+- Le moteur Godot affiche la carte vectorielle IGN Pastel au centre de l'écran (`game/scripts/Map/MapCanvas.cs`, `game/scripts/Hud.cs` et menu Carte `game/scripts/MainMenu.cs`) :
+  - Enveloppes départementales continues des préfectures fusionnées dynamiquement sans grille (`Geometry2D.MergePolygons`).
+  - Liaisons administratives pointillées (`DrawDashedLine`) reliant chaque commune membre au chef-lieu de préfecture.
+  - Distinction visuelle entre Capitale nationale (blason or et carmin), Chef-lieu de préfecture (sceau pourpre civique) et Communes ordinaires.
+  - 5 Vues thématiques intégrées : Géographie physique, Géopolitique & souveraineté, Production, Transit & voies de communication, Ressources naturelles.
+- Calculs géographiques branchés dans la simulation :
+  - Terme de distance administrative dans `src/Demos.Domain/Politics/Extension.cs` via `AdministrativeDistance.cs` (2 000 lieues par point de charge, réglage `extensionDistancePerLoad`).
+  - Pertes de transport dans `Trade.cs` (5 % à 60 %, réglages `transport…`) et dispersion de pollution dans `Pollution.cs` (loi en $1/(1+(d/250)^2)$) via `GeographicEconomics.cs`.
+  - Coordonnées géographiques exposées dans `GameView.cs` (`CommunePositions()`, `CommunePosition(id)`).
+- Chantiers suivants ouverts :
+  - Pose interactive d'une commune par clic sur la carte avec validation du terrain constructible.
+  - Conditionnement des bâtiments extractifs (mines, carrières) à la présence d'un gisement réel à portée de la commune.
+  - Bonus logistique de transport fluvial le long des 17 cours d'eau navigables.
+  - Interface dédiée pour la fondation et le rattachement des préfectures.
+  - Sélection des communes/préfectures au clic sur la carte pour afficher leur fiche détaillée.

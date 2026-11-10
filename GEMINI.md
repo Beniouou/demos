@@ -63,8 +63,20 @@ Le document de règles de référence est dans Claude Docs, et tu n'y as pas acc
 **Questions encore ouvertes (à faire trancher par l'utilisateur)**
 - Le découpage en régions politiques et administratives au-dessus du fond vectoriel.
 - Où se bâtit un camp de base : n'importe où, ou sur une région libre ? Faut-il une distance minimale entre communes ?
-- Les distances : la formule exacte du terme distance dans `Extension.cs` basée sur les coordonnées de la carte.
-- La logistique : quels bâtiments (route, voie ferrée, gare, port…) réduisent la perte de 20 % entre communes, et de combien ? Lignes d'approvisionnement avec délais.
+- La logistique : quels bâtiments (route, voie ferrée, gare, port…) réduisent la perte entre communes, et de combien ? Lignes d'approvisionnement avec délais.
+
+**Distances (décidé par l'utilisateur le 10 novembre 2026)**
+- **Perte de transport entre communes** : 20 % × (0,5 + 0,5 × distance ÷ 500 lieues), bornée entre 5 % et 60 %
+  (environ 11 % à 50 lieues, 20 % à 500, 40 % à 1 500). Sans position sur la carte, la perte reste de 20 %.
+- **Pollution venue d'une autre commune** : 10 % ÷ (1 + (distance ÷ 250 lieues)²), en gardant le plafond (jamais plus,
+  par habitant, que dans la commune où elle est produite).
+- **Terme distance de l'extension** : distance au chef-lieu (la capitale pour l'État) ÷ **2 000 lieues** par point de
+  charge, et non 500 : à 500, une seule commune à 800 lieues faisait tomber le trésor de 153 838 à 51 067 en 3 ans.
+- Ces chiffres sont des réglages (`transportLoss`, `transportReferenceDistance`, `transportLossMin`, `transportLossMax`,
+  `distantPollutionShare`, `pollutionDispersionDistance`, `extensionDistancePerLoad`) dans `BalanceSettings`,
+  `equilibrage.json` et la feuille Constantes du tableur. Ne pas les remettre en constantes dans le code.
+- La capitale est le chef-lieu de l'État (`Structure.SeatId` de l'État, `World.CapitalId`, `GameView.CapitalId`) :
+  ne pas la reconnaître par l'identifiant « commune-1 ».
 
 **Structures politiques (décidé et codé)**
 - L'État contient des communes et des **préfectures**. Une préfecture contient des communes ou d'autres préfectures,
@@ -77,22 +89,21 @@ Le document de règles de référence est dans Claude Docs, et tu n'y as pas acc
   1 / charge.
 - La charge vaut : population comptée / 20 000 + bâtiments publics directs / 40 + 0,25 × bâtiments autonomes / 40 +
   0,1 × la charge hors population des entités contenues + **distance**.
-- **Le terme distance vaut 0 en attendant la carte. Le remplir est à ton chantier.** Une piste, notée dans le
-  document : la distance des bâtiments et des communes au centre de l'entité. La formule exacte est à proposer à
-  l'utilisateur.
+- **Le terme distance est maintenant branché** : calculé par `AdministrativeDistance.cs` et injecté via
+  `Func<string, double>? distanceOf` dans `Extension.Compute`. Réglage décidé : **2 000 lieues par point de charge** ; c'est le réglage `extensionDistancePerLoad`.
 - Chaque préfecture traversée entre l'entité qui décide et la commune fait perdre 10 % d'efficacité.
 
 ## Où te brancher dans le code
 
-| Besoin | Endroit |
-| --- | --- |
-| Terme distance de l'extension | `src/Demos.Domain/Politics/Extension.cs`, dans `ComputeLoad` : `const double distance = 0;`. Remplace-le par une valeur fournie de l'extérieur (par exemple un `Func<string, double>` passé à `Extension.Compute`), plutôt que de mettre la carte dans le domaine politique. |
-| Perte de transport entre communes (20 %) | `src/Demos.Domain/Economy/Trade.cs` (`TransportLoss`, réglage `transportLoss`) |
-| Pollution venue d'une autre commune (10 %) | `src/Demos.Domain/Economy/Pollution.cs` (`DistantShare`, réglage `distantPollutionShare`) |
-| Arbre des entités, commune d'un bâtiment | `src/Demos.Domain/Politics/Structure.cs` (`Level`, `SeatId`), `Communes.cs` (`CommuneOf`, `Within`) |
-| Ce que l'interface lit | `src/Demos.Application/GameView.cs` (`StructureTree`, `Communes`, `EntityLoads`, `Prefectures`) |
-| Fonder une commune ou une préfecture | `src/Demos.Application/Simulation.cs` (`TryFoundCommune`, `TryFoundPrefecture`, `TryAttach`) |
-| Place de la carte à l'écran | `game/scripts/Hud.cs` (« Carte en régions — à venir ») et `game/scripts/MainMenu.cs` (menu Carte) : ce sont des fichiers de l'interface, à voir dans le fichier de coordination avant de les changer. |
+| Besoin | Endroit | État |
+| --- | --- | --- |
+| Terme distance de l'extension | `src/Demos.Domain/Politics/Extension.cs` | **Branché** (`AdministrativeDistance.cs`, paramètre `distanceOf`) |
+| Perte de transport entre communes | `src/Demos.Domain/Economy/Trade.cs` | **Branché** (`GeographicEconomics.TransportLoss(dist)`) |
+| Pollution venue d'une autre commune | `src/Demos.Domain/Economy/Pollution.cs` | **Branché** (`GeographicEconomics.DistantPollutionShare(dist)`) |
+| Coordonnées géoréférencées | `src/Demos.Application/GameView.cs` | **Branché** (`CommunePositions()`, `CommunePosition(id)`) |
+| Rendu de la carte vectorielle | `game/scripts/Map/MapCanvas.cs` | **Branché** (Préfectures sans grille `MergePolygons`, 5 vues thématiques) |
+| Place de la carte à l'écran | `game/scripts/Hud.cs` et `game/scripts/MainMenu.cs` | **Branché** (`MapCanvas` initialisé et rafraîchi en direct) |
+| Fonder une commune ou une préfecture | `src/Demos.Application/Simulation.cs` | `TryFoundCommune` (avec `Point2D? position`), `TryFoundPrefecture` |
 
 ## Règles de travail à ne pas oublier
 
