@@ -17,9 +17,20 @@ internal static class SimulationReport
     private static readonly Rank[] Ranks = [Rank.Workers, Rank.Intermediate, Rank.Executives];
 
     /// <summary>Jour de fondation de la deuxième commune, quand elle est demandée.</summary>
+    /// <summary>Jour de fondation de la deuxième commune, quand elle est demandée.</summary>
     private const int FoundingDay = 30;
 
-    public static void Write(IContentSource content, int years, bool secondCommune, string reportPath)
+    /// <summary>
+    /// Distance de la deuxième commune à la capitale, en lieues, quand aucune n'est donnée : pour que la simulation
+    /// éprouve les règles de la carte (transport, pollution, distance administrative). Réglage de l'outil, pas du jeu.
+    /// </summary>
+    public const double DefaultSecondCommuneDistance = 500;
+
+    /// <summary>
+    /// Simule <paramref name="years"/> ans ; avec <paramref name="secondCommuneDistance"/>, une deuxième commune est fondée
+    /// le jour 30, à cette distance à l'ouest de la capitale (sans position si la capitale n'en a pas).
+    /// </summary>
+    public static void Write(IContentSource content, int years, double? secondCommuneDistance, string reportPath)
     {
         var simulation = PrototypeScenario.Create(content);
         var world = simulation.World;
@@ -30,7 +41,7 @@ internal static class SimulationReport
         var curve = new List<(int Day, double Treasury, double Population)> { (0, world.Treasury.Balance, world.Classes.Sum(c => c.Population)) };
         string? foundingNote = null;
 
-        Console.WriteLine($"Simulation de {years} an(s){(secondCommune ? ", avec une deuxième commune" : "")}…");
+        Console.WriteLine($"Simulation de {years} an(s){(secondCommuneDistance is { } announced ? $", avec une deuxième commune à {Count(announced)} lieues de la capitale" : "")}…");
         var day = 0;
         for (var year = 1; year <= years; year++)
         {
@@ -46,8 +57,8 @@ internal static class SimulationReport
                 foreach (var building in world.Structures.Values.Where(s => s.Jobs > 0 || s.HousingPlaces > 0))
                     energy[building.Id] = energy.GetValueOrDefault(building.Id) + world.EnergyShareOf(building);
 
-                if (secondCommune && day == FoundingDay)
-                    foundingNote = FoundSecondCommune(simulation);
+                if (secondCommuneDistance is { } distance && day == FoundingDay)
+                    foundingNote = FoundSecondCommune(simulation, distance);
                 if (day % 7 == 0)
                     curve.Add((day, world.Treasury.Balance, world.Classes.Sum(c => c.Population)));
             }
@@ -60,15 +71,20 @@ internal static class SimulationReport
         Console.WriteLine($"Rapport écrit : {reportPath}");
     }
 
-    private static string FoundSecondCommune(Simulation simulation)
+    private static string FoundSecondCommune(Simulation simulation, double distance)
     {
         var world = simulation.World;
         var pole = Orientation.All.MaxBy(p => world.Legitimacy[p]);
-        var commune = simulation.TryFoundCommune("Deuxième commune", PrototypeScenario.FirstCommuneId, PaymentMode.StockFirst, pole, 5);
+        // À l'ouest de la capitale, à la distance demandée ; sans position si la capitale n'en a pas sur la carte.
+        Demos.Domain.Map.Point2D? position = world.CapitalId is { } capitalId && world.CommunePositions.TryGetValue(capitalId, out var capital)
+            ? new(capital.X - distance, capital.Y)
+            : null;
+        var commune = simulation.TryFoundCommune("Deuxième commune", PrototypeScenario.FirstCommuneId, PaymentMode.StockFirst, pole, 5, position);
         var cost = world.BuildingTypes[Simulation.BaseCampTypeId].Construction;
         var materials = cost is null ? "aucun coût de construction" : $"{Count(cost.Quantity)} {cost.ProductId}, {cost.Days} jours de chantier";
+        var place = position is null ? "sans position sur la carte" : $"à {Count(distance)} lieues de la capitale";
         return commune is not null
-            ? $"Deuxième commune fondée le jour {FoundingDay} (charte {pole.Code}, {materials}, payés par la réserve de chantier, le stock ou le trésor)."
+            ? $"Deuxième commune fondée le jour {FoundingDay}, {place} (charte {pole.Code}, {materials}, payés par la réserve de chantier, le stock ou le trésor)."
             : $"La deuxième commune n'a pas pu être fondée le jour {FoundingDay} ({materials} : matériaux, argent ou légitimité insuffisants).";
     }
 

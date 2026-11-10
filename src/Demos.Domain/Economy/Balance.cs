@@ -121,11 +121,32 @@ public sealed record BalanceSettings
     /// <summary>La TVA en tout : les prix l'incluent.</summary>
     public double VatRate => VatStateRate + VatCommuneRate;
 
-    /// <summary>Part perdue en route dans les échanges entre communes.</summary>
+    /// <summary>
+    /// Part perdue en route dans les échanges entre communes, à la distance de référence (ou sans position sur la carte).
+    /// </summary>
     public double TransportLoss { get; init; } = 0.2;
 
-    /// <summary>Part de la pollution des autres communes qu'une commune reçoit.</summary>
+    /// <summary>
+    /// Distance de référence du transport, en lieues : la perte y vaut <see cref="TransportLoss"/>. La perte suit
+    /// TransportLoss × (0,5 + 0,5 × distance ÷ cette distance), bornée par <see cref="TransportLossMin"/> et
+    /// <see cref="TransportLossMax"/> (décidé le 10 novembre 2026).
+    /// </summary>
+    public double TransportReferenceDistance { get; init; } = 500;
+
+    /// <summary>Perte de transport minimale entre deux communes distinctes.</summary>
+    public double TransportLossMin { get; init; } = 0.05;
+
+    /// <summary>Perte de transport maximale entre deux communes, même très éloignées.</summary>
+    public double TransportLossMax { get; init; } = 0.6;
+
+    /// <summary>Part de la pollution des autres communes qu'une commune reçoit, au contact (distance nulle).</summary>
     public double DistantPollutionShare { get; init; } = 0.1;
+
+    /// <summary>
+    /// Distance de dispersion de la pollution, en lieues : à cette distance, la part reçue est divisée par 2. La part
+    /// suit DistantPollutionShare ÷ (1 + (distance ÷ cette distance)²) (décidé le 10 novembre 2026).
+    /// </summary>
+    public double PollutionDispersionDistance { get; init; } = 250;
 
     /// <summary>Pollution par habitant et par jour au-delà de laquelle une commune est polluée.</summary>
     public double PollutedThreshold { get; init; } = 0.1;
@@ -191,6 +212,12 @@ public sealed record BalanceSettings
 
     /// <summary>Extension : part de la population comptée par une entité contenue que compte une préfecture ou l'État.</summary>
     public double ExtensionCountedShare { get; init; } = 0.25;
+
+    /// <summary>
+    /// Extension : lieues entre une entité contenue et le chef-lieu (la capitale pour l'État) pour 1 point de charge
+    /// (décidé le 10 novembre 2026 : 2 000 ; à 500, une seule commune à 800 lieues faisait s'effondrer le trésor).
+    /// </summary>
+    public double ExtensionDistancePerLoad { get; init; } = 2000;
 
     /// <summary>Bureaucratie : perte d'efficacité par préfecture traversée entre l'entité qui décide et la commune.</summary>
     public double BureaucracyLossPerLevel { get; init; } = 0.1;

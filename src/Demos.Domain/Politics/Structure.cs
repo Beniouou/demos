@@ -91,7 +91,8 @@ public readonly record struct Production(string ProductId, double QuantityPerWor
 /// Type d'une entité politique ; null vaut commune pour une entité qui a un parent (l'entité sans parent est l'État).
 /// </param>
 /// <param name="SeatId">
-/// Chef-lieu d'une préfecture : la commune où se trouvent ses bâtiments et où vivent leurs employés.
+/// Chef-lieu d'une préfecture : la commune où se trouvent ses bâtiments et où vivent leurs employés. Pour l'État, la
+/// capitale (la première commune de la partie de départ).
 /// </param>
 public sealed record Structure(
     string Id,

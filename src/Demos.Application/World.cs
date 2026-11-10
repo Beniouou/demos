@@ -79,6 +79,9 @@ public sealed class World
     /// <summary>Coordonnées cartographiques des communes.</summary>
     public IReadOnlyDictionary<string, Point2D> CommunePositions => _communePositions;
 
+    /// <summary>La capitale : le chef-lieu de l'État, ou null s'il n'en a pas.</summary>
+    public string? CapitalId => _structures.Values.FirstOrDefault(s => s.IsNational)?.SeatId;
+
     /// <summary>Enregistre ou met à jour la position géographique d'une commune.</summary>
     public void SetCommunePosition(string communeId, Point2D position)
     {

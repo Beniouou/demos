@@ -10,8 +10,9 @@ using Demos.Infrastructure;
 // Outil d'équilibrage, à lancer depuis le dossier demos :
 //   dotnet run --project tools/Demos.Equilibrage -- generer          refait le tableur depuis les données du jeu
 //   dotnet run --project tools/Demos.Equilibrage -- appliquer        reporte les cellules jaunes du tableur dans game/data
-//   dotnet run --project tools/Demos.Equilibrage -- simuler [années] [commune]
-//                                     simule la partie de départ (avec une 2e commune si « commune ») et écrit un rapport HTML
+//   dotnet run --project tools/Demos.Equilibrage -- simuler [années] [commune[=lieues]]
+//                                     simule la partie de départ (avec une 2e commune si « commune », placée à 500 lieues
+//                                     de la capitale, ou à la distance donnée : « commune=1500 ») et écrit un rapport HTML
 // Le tableur (equilibrage demos.xlsx) et le rapport (rapport simulation.html) sont à côté du dossier demos.
 
 Console.OutputEncoding = System.Text.Encoding.UTF8;
@@ -29,11 +30,15 @@ switch (command)
         return BalanceApplier.Apply(paths.Workbook, paths.Data, content);
     case "simuler":
         var years = args.Skip(1).Select(a => int.TryParse(a, out var y) ? y : 0).FirstOrDefault(y => y > 0, 3);
-        var secondCommune = args.Skip(1).Any(a => a.Equals("commune", StringComparison.OrdinalIgnoreCase));
-        SimulationReport.Write(content, years, secondCommune, paths.Report);
+        // « commune » : une 2e commune à 500 lieues de la capitale ; « commune=1500 » : à 1 500 lieues.
+        var communeArg = args.Skip(1).FirstOrDefault(a => a.StartsWith("commune", StringComparison.OrdinalIgnoreCase));
+        double? secondCommuneDistance = communeArg is null ? null
+            : communeArg.Split('=') is [_, var distance] && double.TryParse(distance, System.Globalization.CultureInfo.InvariantCulture, out var d) ? d
+            : SimulationReport.DefaultSecondCommuneDistance;
+        SimulationReport.Write(content, years, secondCommuneDistance, paths.Report);
         return 0;
     default:
-        Console.WriteLine("Commandes : generer, appliquer, simuler [années] [commune].");
+        Console.WriteLine("Commandes : generer, appliquer, simuler [années] [commune[=lieues]].");
         return 1;
 }
 
@@ -149,9 +154,9 @@ internal sealed class Book(XLWorkbook workbook, World world, BalanceSettings bal
     [
         "Marge", "Encadrement", "Direction", "MultOuvriers", "MultPI", "MultCadres", "Chauffage", "Eau", "Hiver", "Printemps",
         "Ete", "Automne", "SansEnergie", "ReserveCombustible", "ReserveEntreprise", "ReserveDepart", "EpargneReserve", "ImpotEtat", "ImpotCommune", "Transport",
-        "PollutionLoin", "SeuilPollution", "Dotation", "StockFondation", "TvaEtat", "TvaCommune", "LicenciementInvendus", "EmbaucheInvendus", "VitessePublic", "VitesseScop",
+        "TransportDistance", "TransportMin", "TransportMax", "PollutionLoin", "PollutionDistance", "SeuilPollution", "Dotation", "StockFondation", "TvaEtat", "TvaCommune", "LicenciementInvendus", "EmbaucheInvendus", "VitessePublic", "VitesseScop",
         "VitessePrive", "BaisseSalaireScop", "BaisseSalaireScopMax", "LoiRemboursement", "LoiNonVises", "LoiVerrou", "LoiRegalien", "LoiMinimum",
-        "ExtensionPopulation", "ExtensionBatiments", "ExtensionAutonomes", "ExtensionContenues", "ExtensionPartComptee", "BureaucratieEchelon",
+        "ExtensionPopulation", "ExtensionBatiments", "ExtensionAutonomes", "ExtensionContenues", "ExtensionPartComptee", "ExtensionDistance", "BureaucratieEchelon",
         "PrefectureEmplois", "PrefectureLegitimite", "RattachementLegitimite", "PrefectureMinimum",
     ];
 
@@ -357,8 +362,15 @@ internal sealed class Book(XLWorkbook workbook, World world, BalanceSettings bal
             ("TvaEtat", "TVA des entreprises : État", balance.VatStateRate,
                 "Part de la valeur ajoutée (ventes moins matières) des entreprises privées et des SCOP versée au trésor. Les prix l'incluent."),
             ("TvaCommune", "TVA des entreprises : commune", balance.VatCommuneRate, "Part versée à la caisse de la commune."),
-            ("Transport", "Perte en route entre communes", balance.TransportLoss, ""),
-            ("PollutionLoin", "Part de la pollution des autres communes", balance.DistantPollutionShare, ""),
+            ("Transport", "Perte en route entre communes", balance.TransportLoss,
+                "À la distance de référence, ou si une commune n'a pas de position sur la carte."),
+            ("TransportDistance", "Transport : distance de référence (lieues)", balance.TransportReferenceDistance,
+                "Perte = perte en route × (0,5 + 0,5 × distance ÷ cette distance), entre le minimum et le maximum."),
+            ("TransportMin", "Transport : perte minimale", balance.TransportLossMin, "Entre deux communes distinctes, même voisines."),
+            ("TransportMax", "Transport : perte maximale", balance.TransportLossMax, "Même entre communes très éloignées."),
+            ("PollutionLoin", "Part de la pollution des autres communes", balance.DistantPollutionShare, "Au contact (distance nulle)."),
+            ("PollutionDistance", "Pollution : distance de dispersion (lieues)", balance.PollutionDispersionDistance,
+                "À cette distance, la part reçue est divisée par 2 : part ÷ (1 + (distance ÷ cette distance)²)."),
             ("SeuilPollution", "Seuil de pollution (par habitant et par jour)", balance.PollutedThreshold, ""),
             ("Dotation", "Dotation d'une nouvelle commune (jours)", balance.FoundingGrantDays, "Jours de salaires du camp de base."),
             ("StockFondation", "Réserve de chantier d'une commune à sa fondation", balance.FoundingMaterials, "Matériaux de construction, hors stockage : pour ses premiers chantiers (et ceux de la première commune)."),
@@ -385,6 +397,8 @@ internal sealed class Book(XLWorkbook workbook, World world, BalanceSettings bal
             ("ExtensionContenues", "Extension : poids des entités contenues", balance.ExtensionChildWeight, "Part de leur charge hors population."),
             ("ExtensionPartComptee", "Extension : part de population comptée en remontant", balance.ExtensionCountedShare,
                 "Une préfecture ou l'État compte cette part de ce que comptent ses entités, en cascade."),
+            ("ExtensionDistance", "Extension : lieues pour 1 point de charge", balance.ExtensionDistancePerLoad,
+                "Somme des distances entre le chef-lieu (la capitale pour l'État) et les entités contenues, divisée par ce nombre."),
             ("BureaucratieEchelon", "Bureaucratie : perte par échelon", balance.BureaucracyLossPerLevel, "Par préfecture traversée."),
             ("PrefectureEmplois", "Préfecture : emplois par entité contenue", balance.PrefectureJobsPerEntity,
                 "S'ajoutent aux emplois du type Préfecture (professions intermédiaires)."),

@@ -29,6 +29,9 @@ public sealed class GameView(Simulation simulation)
     /// <summary>Positions cartographiques géoréférencées des communes dans le monde vectoriel.</summary>
     public IReadOnlyDictionary<string, Point2D> CommunePositions() => World.CommunePositions;
 
+    /// <summary>La capitale : le chef-lieu de l'État, ou null s'il n'en a pas.</summary>
+    public string? CapitalId => World.CapitalId;
+
     /// <summary>Position géographique d'une commune par son identifiant, ou null si non géoréférencée.</summary>
     public Point2D? CommunePosition(string communeId) =>
         World.CommunePositions.TryGetValue(communeId, out var pos) ? pos : null;

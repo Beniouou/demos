@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Demos.Domain.Economy;
 using Demos.Domain.Politics;
 
 namespace Demos.Domain.Map;
@@ -8,27 +9,20 @@ namespace Demos.Domain.Map;
 /// <summary>
 /// Calcule la charge de distance administrative entre communes, préfectures et État à partir de leurs coordonnées réelles.
 /// Une commune gère son propre territoire en direct (charge distance = 0).
-/// Pour une préfecture ou l'État, la charge dépend de l'éloignement géographique des entités administrées par rapport au chef-lieu.
+/// Pour une préfecture ou l'État, la charge est la somme des distances entre son chef-lieu (<see cref="Structure.SeatId"/> :
+/// la capitale pour l'État) et les entités qu'elle contient, divisée par le réglage
+/// <see cref="BalanceSettings.ExtensionDistancePerLoad"/> (décidé le 10 novembre 2026 : 2 000 lieues par point).
 /// </summary>
 public static class AdministrativeDistance
 {
-    /// <summary>Distance de référence en lieues pour normaliser la charge (500 lieues = 1 point de charge).</summary>
-    public const double DefaultReferenceDistance = 500.0;
-
-    /// <summary>
-    /// Calcule la charge de distance administrative d'une entité politique.
-    /// </summary>
+    /// <summary>Calcule la charge de distance administrative d'une entité politique.</summary>
     /// <param name="entityId">Identifiant de l'entité (État, préfecture ou commune).</param>
     /// <param name="structures">Ensemble des structures de la partie.</param>
     /// <param name="positions">Coordonnées cartographiques de chaque commune.</param>
-    /// <param name="capitalCommuneId">Chef-lieu ou capitale nationale de référence pour l'État.</param>
-    /// <param name="referenceDistance">Distance de référence pour 1 point de charge (défaut : 500 lieues).</param>
     public static double LoadOf(
         string entityId,
         IReadOnlyDictionary<string, Structure> structures,
-        IReadOnlyDictionary<string, Point2D> positions,
-        string capitalCommuneId = "commune-1",
-        double referenceDistance = DefaultReferenceDistance)
+        IReadOnlyDictionary<string, Point2D> positions)
     {
         if (!structures.TryGetValue(entityId, out var entity) || entity.Kind != StructureKind.PoliticalEntity)
             return 0;
@@ -37,12 +31,9 @@ public static class AdministrativeDistance
         if (entity.IsCommune)
             return 0;
 
-        // Chef-lieu ou centre de l'entité
-        var seatCommuneId = entity.IsPrefecture ? entity.SeatId : capitalCommuneId;
-        if (seatCommuneId is null || !positions.TryGetValue(seatCommuneId, out var seatPos))
-            return 0;
-
-        if (referenceDistance <= 0)
+        // Le chef-lieu de l'entité : celui d'une préfecture, ou la capitale pour l'État.
+        var perLoad = Balance.Current.ExtensionDistancePerLoad;
+        if (entity.SeatId is not { } seatCommuneId || !positions.TryGetValue(seatCommuneId, out var seatPos) || perLoad <= 0)
             return 0;
 
         var children = structures.Values
@@ -53,11 +44,9 @@ public static class AdministrativeDistance
         {
             var childCommuneId = child.IsCommune ? child.Id : child.SeatId;
             if (childCommuneId is not null && positions.TryGetValue(childCommuneId, out var childPos))
-            {
                 totalDistance += seatPos.DistanceTo(childPos);
-            }
         }
 
-        return totalDistance / referenceDistance;
+        return totalDistance / perLoad;
     }
 }

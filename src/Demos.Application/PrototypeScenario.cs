@@ -26,7 +26,8 @@ public static class PrototypeScenario
         var types = content.LoadBuildingTypes().ToDictionary(t => t.Id);
         var scenario = content.LoadScenario();
 
-        var structures = new List<Structure> { new(StateId, "État", StructureKind.PoliticalEntity, null) };
+        // La capitale (chef-lieu de l'État) est la première commune de la partie de départ.
+        var structures = new List<Structure> { new(StateId, "État", StructureKind.PoliticalEntity, null, SeatId: scenario.Communes.FirstOrDefault()?.Id) };
         structures.AddRange(scenario.Communes.Select(c => new Structure(c.Id, c.Name, StructureKind.PoliticalEntity, StateId)));
         structures.AddRange(scenario.Buildings.Select(b => BuildingOf(b, types, scenario.HeatingFuel)));
 

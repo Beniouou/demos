@@ -72,6 +72,15 @@ public class GameViewTests
     }
 
     [Fact]
+    public void La_capitale_est_le_chef_lieu_de_l_Etat_la_premiere_commune_de_la_partie()
+    {
+        var simulation = PrototypeScenario.Create(GameData.Content());
+
+        Assert.Equal(PrototypeScenario.FirstCommuneId, simulation.World.CapitalId);
+        Assert.Equal(PrototypeScenario.FirstCommuneId, new GameView(simulation).CapitalId);
+    }
+
+    [Fact]
     public void Le_code_civil_liste_toutes_les_lois_en_vigueur_et_le_catalogue_ses_briques()
     {
         var simulation = PrototypeScenario.Create(GameData.Content());

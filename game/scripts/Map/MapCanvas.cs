@@ -683,7 +683,7 @@ public partial class MapCanvas : Control
         foreach (var (id, name, pos, pop) in communes)
         {
             var center = ToScreen(pos);
-            var isCapital = id == "commune-1" || id == PrototypeScenario.FirstCommuneId;
+            var isCapital = id == _gameView?.CapitalId;
             var isPrefectureSeat = seatIds.Contains(id);
 
             if (isCapital)
@@ -899,11 +899,11 @@ public partial class MapCanvas : Control
             if (match is not null)
                 return new Vector2((float)match.Position.X, (float)match.Position.Y);
 
-            if ((communeId == "commune-1" || communeId == PrototypeScenario.FirstCommuneId) && _vectorMap.DefaultCommune is not null)
+            if ((communeId == _gameView?.CapitalId) && _vectorMap.DefaultCommune is not null)
                 return new Vector2((float)_vectorMap.DefaultCommune.Position.X, (float)_vectorMap.DefaultCommune.Position.Y);
         }
 
-        if (communeId == "commune-1" || communeId == PrototypeScenario.FirstCommuneId)
+        if (communeId == _gameView?.CapitalId)
             return new Vector2(470, 310);
 
         return null;

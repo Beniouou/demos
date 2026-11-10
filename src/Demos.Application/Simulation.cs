@@ -579,7 +579,7 @@ public sealed class Simulation(World world, GameClock clock)
         World.PollutionByCommune = Pollution.PerResidentByCommune(
             World.Structures, World.Workers, World.Classes,
             World.CommunePositions.Count > 0
-                ? (from, to) => GeographicEconomics.DistantPollutionShare(from, to, World.CommunePositions, Balance.Current.DistantPollutionShare)
+                ? (from, to) => GeographicEconomics.DistantPollutionShare(from, to, World.CommunePositions)
                 : null);
         // La caisse de chaque entreprise au début de la journée : son bénéfice du jour décide de ce qu'elle verse.
         var fundsAtDayStart = World.Structures.Values.Where(Companies.HasCompanyFund).ToDictionary(b => b.Id, b => World.CompanyFundOf(b).Balance);
@@ -591,7 +591,7 @@ public sealed class Simulation(World world, GameClock clock)
             communeIds, World.Classes, World.Products, World.MarketOf,
             (communeId, productId) => World.StorageOf(communeId).FreeFor(productId),
             World.CommunePositions.Count > 0
-                ? (from, to) => GeographicEconomics.TransportLoss(from, to, World.CommunePositions, Balance.Current.TransportLoss)
+                ? (from, to) => GeographicEconomics.TransportLoss(from, to, World.CommunePositions)
                 : null);
         Housing.RunDaily(World.Structures, World.Classes, World.Treasury, World.CompanyFundOf, World.EnergyEffectOf, laws.HasHousingPriority);
         Education.RunDaily(World.Structures, World.Classes, World.Treasury, World.CompanyFundOf, World.EnergyEffectOf);
