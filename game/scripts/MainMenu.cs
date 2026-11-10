@@ -26,10 +26,11 @@ public partial class MainMenu : HBoxContainer
     private const string HelpText =
         "Espace : pause ou reprise\n" +
         "1 à 4 : vitesse (un jour dure 5 s en ×1)\n" +
-        "B : construire 500 places de logement d'État (200 pierre, 100 bois)\n" +
-        "C : bâtir un camp de base, qui fonde une nouvelle commune\n" +
-        "Échap : fermer le menu ouvert\n\n" +
-        "Un bâtiment se gère depuis Production → Unités de production : vente au privé, nationalisation, " +
+        "C : bâtir un camp de base, qui fonde une nouvelle commune (là où est la souris sur la carte)\n" +
+        "Échap : fermer le menu ouvert\n" +
+        "Clic sur une commune ou une préfecture de la carte : sa fiche dans le menu Structure\n\n" +
+        "Un bâtiment se construit dans Production → Construire, et se gère dans Production → Unités de production : " +
+        "vente au privé, nationalisation, " +
         "postes ouverts, recette et chauffage. Les impôts se changent par une loi (menu Lois) ; " +
         "Ressources → Revenus montre ce qu'ils rapportent.";
 
@@ -68,6 +69,7 @@ public partial class MainMenu : HBoxContainer
             new("Production",
             [
                 new("Unités de production", () => new BuildingsPage(view, desk)),
+                new("Construire", () => new ConstructionPage(view, desk)),
                 Coming("Chaîne de production", "Des matières premières aux produits : quelles recettes, quels bâtiments."),
                 Coming("Statistiques", "La production et la consommation de chaque produit dans le temps."),
             ], Wide: true),
@@ -157,6 +159,22 @@ public partial class MainMenu : HBoxContainer
             page.Refresh();
     }
 
+    /// <summary>
+    /// Ouvre le menu Structure sur la fiche d'une structure (une commune ou une préfecture cliquée sur la carte), sans le
+    /// refermer s'il est déjà ouvert.
+    /// </summary>
+    public void ShowStructure(string structureId)
+    {
+        var structure = System.Array.FindIndex(_menus, m => m.Title == "Structure");
+        if (structure < 0)
+            return;
+        if (_open != structure)
+            Toggle(structure);
+        _tabs.CurrentTab = 0;
+        if (_tabs.GetCurrentTabControl() is StructurePage page)
+            page.Show(structureId);
+    }
+
     private void Toggle(int menu)
     {
         if (menu == _open)
@@ -165,6 +183,9 @@ public partial class MainMenu : HBoxContainer
             return;
         }
 
+        // Un menu ouvert sans clic sur son bouton (depuis la carte) : le bouton du menu d'avant se relève aussi.
+        if (_open >= 0)
+            _buttons[_open].SetPressedNoSignal(false);
         _open = menu;
         _buttons[menu].SetPressedNoSignal(true);
         _panelTitle.Text = _menus[menu].Title;

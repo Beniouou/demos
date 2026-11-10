@@ -17,9 +17,7 @@ public partial class Main : Node
     private static readonly double[] SecondsPerDay = [5, 2, 0.5, 0.1];
     private static readonly string[] SpeedLabels = ["×1", "×2", "×3", "×4"];
 
-    // Constructions de démonstration : logements d'État (touche B) et camp de base (touche C).
-    private static readonly MaterialCost[] HousingCost = [new("pierre", 200), new("bois", 100)];
-    private static readonly MaterialCost[] BaseCampCost = [new("pierre", 100), new("bois", 100)];
+    // Fondation de démonstration d'une commune (touche C) : légitimité payée dans le pôle choisi.
     private const double BaseCampLegitimacyCost = 20;
 
     private Simulation _simulation = null!;
@@ -29,7 +27,6 @@ public partial class Main : Node
     private bool _paused = true;
     private int _speedIndex;
     private double _pendingDays;
-    private int _housingBuilt;
 
     public override void _Ready()
     {
@@ -48,8 +45,9 @@ public partial class Main : Node
         _hud.Init(_view, new PlayerDesk(_simulation), SpeedLabels);
         _hud.TopBar.PauseToggled += () => _paused = !_paused;
         _hud.TopBar.SpeedChosen += speed => _speedIndex = speed;
-        _hud.BuildHousingPressed += BuildHousing;
         _hud.FoundCommunePressed += ChoosePole;
+        // Un clic sur une commune ou une préfecture de la carte ouvre sa fiche dans le menu Structure.
+        _hud.Map.StructureClicked += _hud.Menu.ShowStructure;
 
         // Choix du pôle de légitimité à la fondation d'une commune : il devient sa charte de fondation.
         _polePicker = new PopupMenu { Title = "Charte de fondation : quel pôle payer ?" };
@@ -86,26 +84,8 @@ public partial class Main : Node
             case Key.Key2: _speedIndex = 1; break;
             case Key.Key3: _speedIndex = 2; break;
             case Key.Key4: _speedIndex = 3; break;
-            case Key.B: BuildHousing(); break;
             case Key.C: ChoosePole(); break;
             case Key.Escape: _hud.Menu.Close(); break;
-        }
-    }
-
-    private void BuildHousing()
-    {
-        var id = $"logements-etat-{_housingBuilt + 1}";
-        var housing = _simulation.World.BuildingTypes["logements"]
-            .Build(id, PrototypeScenario.FirstCommuneId, name: $"Logements d'État {_housingBuilt + 1}");
-
-        if (_simulation.TryBuild(housing, PaymentMode.StockFirst))
-        {
-            _housingBuilt++;
-            _hud.ShowMessage($"{housing.Name} construits ({_housingBuilt} en tout).");
-        }
-        else
-        {
-            _hud.ShowMessage("Construction impossible : ni le stock, ni le trésor, ni le marché ne suffisent.");
         }
     }
 
@@ -140,8 +120,10 @@ public partial class Main : Node
         }
         else
         {
-            _hud.ShowMessage($"Camp de base impossible : il faut 100 pierre, 100 bois, {BaseCampLegitimacyCost} de légitimité " +
-              $"et {Simulation.FoundingGrantOf(_simulation.World.BuildingTypes[Simulation.BaseCampTypeId]):N0} de dotation au trésor.");
+            var camp = _simulation.World.BuildingTypes[Simulation.BaseCampTypeId];
+            var materials = camp.Construction is { } cost ? $"{cost.Quantity:N0} {cost.ProductId}, " : "";
+            _hud.ShowMessage($"Camp de base impossible : il faut {materials}{BaseCampLegitimacyCost} de légitimité " +
+              $"et {Simulation.FoundingGrantOf(camp):N0} de dotation au trésor.");
         }
     }
 }

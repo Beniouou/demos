@@ -35,6 +35,18 @@ public partial class MapCanvas : Control
     private Vector2? _hoveredWorldPos;
     private string? _hoveredInfo;
 
+    /// <summary>
+    /// Un clic (sans glisser) sur une commune ou dans l'enveloppe d'une préfecture : l'identifiant de la structure, pour
+    /// ouvrir sa fiche.
+    /// </summary>
+    public event Action<string>? StructureClicked;
+
+    // Au-delà de ce déplacement (en pixels) entre l'appui et le relâchement, c'est un glisser, pas un clic.
+    private const float ClickTolerance = 5f;
+
+    // Rayon, en pixels à l'écran, autour du centre d'une commune où un clic la choisit.
+    private const float CommuneClickRadius = 12f;
+
     public Vector2? HoveredWorldPos => _hoveredWorldPos;
     public MapCoordinates? HoveredCell => _hoveredWorldPos.HasValue
         ? new MapCoordinates((int)(_hoveredWorldPos.Value.X / 16.6), (int)(_hoveredWorldPos.Value.Y / 16.0))
@@ -192,6 +204,10 @@ public partial class MapCanvas : Control
                 else
                 {
                     _isDragging = false;
+                    // Un clic gauche sans glisser choisit la commune ou la préfecture sous la souris.
+                    if (mb.ButtonIndex == MouseButton.Left && mb.Position.DistanceTo(_dragStartMouse) <= ClickTolerance
+                        && StructureAt(mb.Position) is { } structureId)
+                        StructureClicked?.Invoke(structureId);
                 }
                 AcceptEvent();
                 return;
@@ -208,6 +224,27 @@ public partial class MapCanvas : Control
 
             UpdateHoveredInfo(mm.Position);
         }
+    }
+
+    /// <summary>
+    /// La structure sous un point de l'écran : la commune la plus proche dans un petit rayon, sinon la préfecture dont
+    /// l'enveloppe contient le point (la plus petite, si plusieurs s'emboîtent), sinon rien.
+    /// </summary>
+    private string? StructureAt(Vector2 screenPos)
+    {
+        var commune = GetActiveCommunesList()
+            .Select(c => (c.Id, Distance: ToScreen(c.WorldPos).DistanceTo(screenPos)))
+            .Where(c => c.Distance <= CommuneClickRadius * Math.Max(_zoom, 1f))
+            .OrderBy(c => c.Distance)
+            .FirstOrDefault();
+        if (commune.Id is not null)
+            return commune.Id;
+
+        var worldPos = (screenPos - _panOffset) / _zoom;
+        return _gameView?.Prefectures()
+            .Where(p => GetPrefecturePolygons(p).Any(polygon => Geometry2D.IsPointInPolygon(worldPos, polygon)))
+            .OrderBy(p => p.MemberIds.Count)
+            .FirstOrDefault()?.Id;
     }
 
     private void ApplyZoom(float factor, Vector2 pivot)

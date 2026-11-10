@@ -32,6 +32,16 @@ public sealed class GameView(Simulation simulation)
     /// <summary>La capitale : le chef-lieu de l'État, ou null s'il n'en a pas.</summary>
     public string? CapitalId => World.CapitalId;
 
+    /// <summary>Les chantiers en cours : le bâtiment, son type, sa commune et les jours qu'il reste.</summary>
+    public IReadOnlyList<ConstructionSiteView> ConstructionSites() => World.ConstructionSites
+        .Select(site => new ConstructionSiteView(
+            site.Building.Id,
+            site.Building.Name,
+            site.Building.TypeId,
+            World.CommuneOf(site.Building),
+            site.DaysLeft))
+        .ToList();
+
     /// <summary>Position géographique d'une commune par son identifiant, ou null si non géoréférencée.</summary>
     public Point2D? CommunePosition(string communeId) =>
         World.CommunePositions.TryGetValue(communeId, out var pos) ? pos : null;
@@ -307,6 +317,9 @@ public sealed record CommuneView(
     IReadOnlyDictionary<string, double> Stock,
     IReadOnlyDictionary<string, double> StateStock,
     IReadOnlyList<SocialClassView> Classes);
+
+/// <summary>Un chantier en cours : le bâtiment à venir, son type, sa commune et les jours qu'il reste.</summary>
+public sealed record ConstructionSiteView(string BuildingId, string Name, string? TypeId, string? CommuneId, int DaysLeft);
 
 /// <summary>
 /// Un groupe local (une classe dans sa commune) vu par le joueur, à un instant donné : son rang, le multiplicateur de

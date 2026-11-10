@@ -101,6 +101,36 @@ public partial class StructurePage : HBoxContainer, IMenuPage
         _sheet.Text = Describe(_selected, roots);
     }
 
+    /// <summary>
+    /// Affiche la fiche d'une structure (cliquée sur la carte) : ce qui la contient est déroulé, elle est choisie, et le
+    /// schéma défile jusqu'à elle.
+    /// </summary>
+    public void Show(string structureId)
+    {
+        Refresh();
+        var roots = _view.StructureTree();
+        foreach (var id in PathTo(roots, structureId))
+            _expanded.Add(id);
+        _selected = structureId;
+        Build(roots);
+        _sheet.Text = Describe(_selected, roots);
+        if (_tree.GetSelected() is { } item)
+            _tree.ScrollToItem(item);
+    }
+
+    /// <summary>Les structures qui contiennent celle-ci, de l'État jusqu'à elle (vide si elle n'existe pas).</summary>
+    private static List<string> PathTo(IEnumerable<StructureNode> nodes, string id)
+    {
+        foreach (var node in nodes)
+        {
+            if (node.Id == id)
+                return [node.Id];
+            if (PathTo(node.Children, id) is { Count: > 0 } path)
+                return [node.Id, .. path];
+        }
+        return [];
+    }
+
     private void Choose(TreeItem? item)
     {
         if (item?.GetMetadata(0).AsString() is not { Length: > 0 } key)

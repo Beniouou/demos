@@ -9,7 +9,6 @@ namespace Demos.Game;
 /// </summary>
 public partial class Hud : Control
 {
-    public event System.Action? BuildHousingPressed;
     public event System.Action? FoundCommunePressed;
 
     public TopBar TopBar { get; private set; } = null!;
@@ -65,7 +64,6 @@ public partial class Hud : Control
         row.AddChild(_message);
 
         row.AddChild(UiTheme.Caption("Démonstration :"));
-        row.AddChild(ActionButton("Logements d'État", "Touche B : 500 places pour 200 pierre et 100 bois", () => BuildHousingPressed?.Invoke()));
         row.AddChild(ActionButton("Camp de base", "Touche C : fonde une nouvelle commune", () => FoundCommunePressed?.Invoke()));
         return bar;
     }

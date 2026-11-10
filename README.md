@@ -37,7 +37,9 @@ dotnet test
 ## Lancer le jeu
 
 Ouvrir `game/project.godot` dans Godot .NET, puis F5.
-Espace met en pause ou relance le temps ; 1 à 4 changent la vitesse (un jour dure 5 s en ×1) ; B construit des logements d'État avec le stock, complété par le trésor ; C bâtit un camp de base qui fonde une nouvelle commune.
+Espace met en pause ou relance le temps ; 1 à 4 changent la vitesse (un jour dure 5 s en ×1) ; C bâtit un camp de base qui fonde une nouvelle commune. Un clic sur une
+commune ou une préfecture de la carte ouvre sa fiche (menu Structure) ; un bâtiment se construit dans Production →
+Construire.
 Les menus du joueur (carte, lois, structure, production, recherche, ressources, aide) s'ouvrent depuis la colonne de
 gauche ; Échap ferme le menu ouvert. Un bâtiment se gère dans Production → Unités de production ; les impôts se
 changent par une loi (menu Lois), et Ressources → Revenus montre ce qu'ils rapportent. Le contenu du jeu (emplois, salaires, production, stockage, prix…) se règle dans le tableur

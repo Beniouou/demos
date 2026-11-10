@@ -72,6 +72,20 @@ public class GameViewTests
     }
 
     [Fact]
+    public void Un_chantier_lance_apparait_dans_la_vue_avec_sa_commune_et_ses_jours()
+    {
+        var simulation = PrototypeScenario.Create(GameData.Content());
+        var view = new GameView(simulation);
+        var type = simulation.World.BuildingTypes["logements"];
+
+        Assert.True(simulation.TryBuild(type.Build("logements-neufs", PrototypeScenario.FirstCommuneId), Demos.Domain.Economy.PaymentMode.StockFirst));
+
+        var site = Assert.Single(view.ConstructionSites());
+        Assert.Equal(("logements-neufs", "logements", PrototypeScenario.FirstCommuneId, type.Construction!.Days),
+            (site.BuildingId, site.TypeId, site.CommuneId, site.DaysLeft));
+    }
+
+    [Fact]
     public void La_capitale_est_le_chef_lieu_de_l_Etat_la_premiere_commune_de_la_partie()
     {
         var simulation = PrototypeScenario.Create(GameData.Content());

@@ -123,6 +123,73 @@ public sealed class PlayerDesk(Simulation simulation)
     }
 
     /// <summary>
+    /// Les types de bâtiments que le joueur peut construire : ceux qui ont un coût de construction, sauf le camp de base
+    /// (il fonde une commune) et la préfecture (elle se fonde dans le menu Structure).
+    /// </summary>
+    public IReadOnlyList<BuildableType> BuildableTypes() => World.BuildingTypes.Values
+        .Where(t => t.CanBeBuilt && t.Id is not (Simulation.BaseCampTypeId or Simulation.PrefectureTypeId))
+        .Select(t => new BuildableType(
+            t.Id,
+            t.Name,
+            t.Category,
+            t.Level,
+            t.Tier,
+            t.Description,
+            t.Construction!.ProductId,
+            ProductName(t.Construction.ProductId),
+            t.Construction.Quantity,
+            t.Construction.Days,
+            t.Jobs,
+            t.HousingPlaces,
+            t.SchoolPlaces,
+            t.StorageCapacity,
+            t.AvailableRecipes.Select(r => r.Label).ToList(),
+            t.IsFunctional))
+        .ToList();
+
+    /// <summary>
+    /// Ce qui peut payer un matériau dans une commune, dans l'ordre où le chantier le prend : sa réserve de chantier, le
+    /// stock de l'État, puis ce qui est en vente, acheté avec le trésor.
+    /// </summary>
+    public MaterialAvailability AvailabilityOf(string communeId, string productId)
+    {
+        var market = World.MarketOf(communeId);
+        var stateSeller = Market.StateSellerId(communeId);
+        return new MaterialAvailability(
+            World.ConstructionReserveOf(communeId).QuantityOf(productId),
+            market.QuantityOf(productId, stateSeller),
+            market.QuantityOfOthers(productId, stateSeller),
+            market.PriceOf(productId),
+            World.Treasury.Balance);
+    }
+
+    /// <summary>
+    /// Lance le chantier d'un bâtiment public dans une commune. Son coût est payé tout de suite (réserve de chantier,
+    /// stock de l'État, puis achat avec le trésor) ; le bâtiment arrive à la fin du chantier.
+    /// </summary>
+    public string Build(string typeId, string communeId)
+    {
+        if (!World.BuildingTypes.TryGetValue(typeId, out var type) || type.Construction is not { } cost
+            || BuildableTypes().All(t => t.Id != typeId))
+            return "Ce type de bâtiment ne se construit pas ici (le camp de base fonde une commune, la préfecture se fonde dans Structure).";
+
+        var number = 1;
+        while (World.IsIdTaken($"{typeId}-{number}"))
+            number++;
+        var building = type.Build($"{typeId}-{number}", communeId);
+        if (simulation.TryBuild(building, PaymentMode.StockFirst))
+            return $"Chantier lancé : {building.Name}, {cost.Days} jours. Les matériaux sont payés.";
+
+        var available = AvailabilityOf(communeId, cost.ProductId);
+        return $"Construction impossible : il faut {cost.Quantity:N0} {ProductName(cost.ProductId)}. Il y a {available.Reserve:N0} en réserve "
+            + $"de chantier, {available.StateStock:N0} dans le stock de l'État et {available.OnSale:N0} en vente, à acheter avec le trésor.";
+    }
+
+    /// <summary>Le nom lisible d'un produit (« matériaux de construction »), ou son identifiant s'il est inconnu.</summary>
+    public string ProductName(string productId) =>
+        World.Products.FirstOrDefault(p => p.Id == productId)?.Name ?? productId;
+
+    /// <summary>
     /// Fonde une préfecture qui regroupe les entités choisies, dans l'État ou une préfecture ; son bâtiment est payé par
     /// le chef-lieu (sa réserve de chantier, le stock de l'État, puis le marché), la légitimité dans le pôle choisi.
     /// </summary>
@@ -240,6 +307,31 @@ public sealed class PlayerDesk(Simulation simulation)
 }
 
 /// <summary>Fiche d'un bâtiment à un instant donné : ses informations et ce que le joueur peut y décider.</summary>
+/// <summary>
+/// Un type de bâtiment constructible : son coût (un matériau, sa quantité, la durée du chantier), ce qu'il apporte
+/// (emplois, places, stockage, recettes) et s'il a déjà un effet dans le jeu.
+/// </summary>
+public sealed record BuildableType(
+    string Id,
+    string Name,
+    string Category,
+    int Level,
+    int Tier,
+    string Description,
+    string MaterialId,
+    string MaterialName,
+    double MaterialQuantity,
+    int Days,
+    int Jobs,
+    int HousingPlaces,
+    int SchoolPlaces,
+    int StorageCapacity,
+    IReadOnlyList<string> Recipes,
+    bool IsFunctional);
+
+/// <summary>Ce qui peut payer un matériau dans une commune : réserve de chantier, stock de l'État, en vente (et son prix), trésor.</summary>
+public sealed record MaterialAvailability(double Reserve, double StateStock, double OnSale, double Price, double Treasury);
+
 public sealed record BuildingSheet(
     string Id,
     string Name,
