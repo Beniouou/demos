@@ -74,6 +74,7 @@ public static class PrototypeScenario
             foreach (var commune in map.AllCommunes)
                 world.SetCommunePosition(commune.Id, commune.Position);
             world.SetMapZones([.. map.AllBiomes, .. map.AllResourceZones]);
+            world.SetRelief(content.LoadRelief());
             PlaceExtractionBuildings(world);
         }
 

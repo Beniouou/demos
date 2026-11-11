@@ -67,7 +67,7 @@ public sealed record ToolPaths(string Data, string Workbook, string Report)
         throw new DirectoryNotFoundException("Dossier game/data introuvable : lancez l'outil depuis le dépôt.");
     }
 
-    public JsonContentSource Content() => new(file => File.ReadAllText(Path.Combine(Data, file)));
+    public JsonContentSource Content() => new(file => File.ReadAllText(Path.Combine(Data, file)), file => File.ReadAllBytes(Path.Combine(Data, file)));
 }
 
 /// <summary>Refait le tableur d'équilibrage depuis les données du jeu.</summary>
@@ -154,7 +154,9 @@ internal sealed class Book(XLWorkbook workbook, World world, BalanceSettings bal
     [
         "Marge", "Encadrement", "Direction", "MultOuvriers", "MultPI", "MultCadres", "Chauffage", "Eau", "Hiver", "Printemps",
         "Ete", "Automne", "SansEnergie", "ReserveCombustible", "ReserveEntreprise", "ReserveDepart", "EpargneReserve", "ImpotEtat", "ImpotCommune", "Transport",
-        "TransportDistance", "TransportMin", "TransportMax", "PollutionLoin", "PollutionDistance", "ExtractionDistance", "SeuilPollution", "Dotation", "StockFondation", "TvaEtat", "TvaCommune", "LicenciementInvendus", "EmbaucheInvendus", "VitessePublic", "VitesseScop",
+        "TransportDistance", "TransportMin", "TransportMax", "PollutionLoin", "PollutionDistance", "ExtractionDistance", "RouteSeuilSentier", "RouteSeuilChemin", "RouteSeuilRoute", "RouteCoutSentier", "RouteCoutChemin",
+        "RouteCoutRoute", "RouteEntretienSentier", "RouteEntretienChemin", "RouteEntretienRoute", "RouteMontee", "RouteBaisseChemin", "RouteBaisseRoute",
+        "TracePenteMax", "TracePoidsPente", "TraceReutilisation", "TraceCase", "SeuilPollution", "Dotation", "StockFondation", "TvaEtat", "TvaCommune", "LicenciementInvendus", "EmbaucheInvendus", "VitessePublic", "VitesseScop",
         "VitessePrive", "BaisseSalaireScop", "BaisseSalaireScopMax", "LoiRemboursement", "LoiNonVises", "LoiVerrou", "LoiRegalien", "LoiMinimum",
         "ExtensionPopulation", "ExtensionBatiments", "ExtensionAutonomes", "ExtensionContenues", "ExtensionPartComptee", "ExtensionDistance", "BureaucratieEchelon",
         "PrefectureEmplois", "PrefectureLegitimite", "RattachementLegitimite", "PrefectureMinimum",
@@ -373,6 +375,27 @@ internal sealed class Book(XLWorkbook workbook, World world, BalanceSettings bal
                 "À cette distance, la part reçue est divisée par 2 : part ÷ (1 + (distance ÷ cette distance)²)."),
             ("ExtractionDistance", "Extraction : distance maximale à la commune (lieues)", balance.ExtractionMaxDistance,
                 "Un bâtiment d'extraction se pose sur une zone de la carte qui correspond, à cette distance de sa commune au plus."),
+            ("RouteSeuilSentier", "Routes : trafic d'un mois pour un sentier", balance.RoadTrailTraffic,
+                "Produits échangés en un mois entre deux communes (dans les deux sens). Le trafic crée les routes, un niveau par mois au plus."),
+            ("RouteSeuilChemin", "Routes : trafic d'un mois pour un chemin", balance.RoadPathTraffic, ""),
+            ("RouteSeuilRoute", "Routes : trafic d'un mois pour une route", balance.RoadRoadTraffic, ""),
+            ("RouteCoutSentier", "Routes : construction d'un sentier (par lieue)", balance.RoadTrailCost,
+                "Payée par la plus petite structure qui contient les deux lieux (commune, préfecture, sinon l'État)."),
+            ("RouteCoutChemin", "Routes : d'un sentier à un chemin (par lieue)", balance.RoadPathCost, ""),
+            ("RouteCoutRoute", "Routes : d'un chemin à une route (par lieue)", balance.RoadRoadCost, ""),
+            ("RouteEntretienSentier", "Routes : entretien d'un sentier (par lieue et par an)", balance.RoadTrailUpkeep,
+                "Impayé, la liaison descend d'un niveau."),
+            ("RouteEntretienChemin", "Routes : entretien d'un chemin (par lieue et par an)", balance.RoadPathUpkeep, ""),
+            ("RouteEntretienRoute", "Routes : entretien d'une route (par lieue et par an)", balance.RoadRoadUpkeep, ""),
+            ("RouteMontee", "Routes : lieues comptées par mètre de montée", balance.RoadClimbLength,
+                "Construction et entretien suivent la longueur plus la montée × ce chiffre."),
+            ("RouteBaisseChemin", "Routes : perte de transport retirée sur un chemin", balance.RoadPathLossCut, ""),
+            ("RouteBaisseRoute", "Routes : perte de transport retirée sur une route", balance.RoadRoadLossCut, ""),
+            ("TracePenteMax", "Tracé : pente maximale (m par lieue)", balance.RoadMaxSlope, "Au-delà, le tracé contourne."),
+            ("TracePoidsPente", "Tracé : poids de la pente", balance.RoadSlopeWeight, "Un pas coûte sa longueur × (1 + ce poids × la pente)."),
+            ("TraceReutilisation", "Tracé : prix d'un pas sur une voie existante", balance.RoadReuseFactor,
+                "Part du prix normal : le réseau se ramifie."),
+            ("TraceCase", "Tracé : taille d'une case (lieues)", balance.RoadGridCell, "La grille posée sur la carte d'altitude."),
             ("SeuilPollution", "Seuil de pollution (par habitant et par jour)", balance.PollutedThreshold, ""),
             ("Dotation", "Dotation d'une nouvelle commune (jours)", balance.FoundingGrantDays, "Jours de salaires du camp de base."),
             ("StockFondation", "Réserve de chantier d'une commune à sa fondation", balance.FoundingMaterials, "Matériaux de construction, hors stockage : pour ses premiers chantiers (et ceux de la première commune)."),

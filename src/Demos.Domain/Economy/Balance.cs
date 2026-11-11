@@ -154,6 +154,56 @@ public sealed record BalanceSettings
     /// </summary>
     public double ExtractionMaxDistance { get; init; } = 240;
 
+    // ---- Routes (règle décidée le 10 novembre 2026 ; chiffres validés le 11 novembre 2026) -------------------------
+
+    /// <summary>Routes : trafic d'un mois entre deux lieux (produits échangés, dans les deux sens) pour ouvrir un sentier.</summary>
+    public double RoadTrailTraffic { get; init; } = 1000;
+
+    /// <summary>Routes : trafic d'un mois pour faire d'un sentier un chemin.</summary>
+    public double RoadPathTraffic { get; init; } = 4000;
+
+    /// <summary>Routes : trafic d'un mois pour faire d'un chemin une route.</summary>
+    public double RoadRoadTraffic { get; init; } = 9000;
+
+    /// <summary>Routes : coût de construction d'un sentier, par lieue de longueur (comptée avec la montée).</summary>
+    public double RoadTrailCost { get; init; } = 2;
+
+    /// <summary>Routes : coût pour faire d'un sentier un chemin, par lieue.</summary>
+    public double RoadPathCost { get; init; } = 10;
+
+    /// <summary>Routes : coût pour faire d'un chemin une route, par lieue.</summary>
+    public double RoadRoadCost { get; init; } = 30;
+
+    /// <summary>Routes : entretien d'un sentier, par lieue et par an.</summary>
+    public double RoadTrailUpkeep { get; init; } = 0.2;
+
+    /// <summary>Routes : entretien d'un chemin, par lieue et par an.</summary>
+    public double RoadPathUpkeep { get; init; } = 1;
+
+    /// <summary>Routes : entretien d'une route, par lieue et par an.</summary>
+    public double RoadRoadUpkeep { get; init; } = 3;
+
+    /// <summary>Routes : lieues de longueur comptées en plus pour chaque mètre de montée (coût et entretien).</summary>
+    public double RoadClimbLength { get; init; } = 0.05;
+
+    /// <summary>Routes : part de la perte de transport retirée sur un chemin.</summary>
+    public double RoadPathLossCut { get; init; } = 0.25;
+
+    /// <summary>Routes : part de la perte de transport retirée sur une route.</summary>
+    public double RoadRoadLossCut { get; init; } = 0.5;
+
+    /// <summary>Tracé : pente la plus forte permise, en mètres de dénivelé par lieue.</summary>
+    public double RoadMaxSlope { get; init; } = 40;
+
+    /// <summary>Tracé : un pas coûte sa longueur × (1 + ce poids × la pente en mètres par lieue).</summary>
+    public double RoadSlopeWeight { get; init; } = 0.1;
+
+    /// <summary>Tracé : un pas sur une voie déjà tracée coûte cette part de son prix (le réseau se ramifie).</summary>
+    public double RoadReuseFactor { get; init; } = 0.5;
+
+    /// <summary>Tracé : taille d'une case de la grille du tracé, en lieues.</summary>
+    public double RoadGridCell { get; init; } = 8;
+
     /// <summary>Pollution par habitant et par jour au-delà de laquelle une commune est polluée.</summary>
     public double PollutedThreshold { get; init; } = 0.1;
 

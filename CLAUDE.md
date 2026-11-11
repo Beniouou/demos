@@ -42,10 +42,13 @@ Jeu solo de construction de nation (Godot .NET 4.7, C#, .NET 10), en français. 
 | Éditeur de contenu | `editeur.bat` (fenêtre Windows, `tools/Demos.Editeur`) |
 | Éditeur de carte | `carte.bat` (fenêtre Windows, `tools/Demos.Carte`) |
 | Test auto de la carte | `dotnet run --project tools/Demos.Carte -- --test-sliders` |
+| Relief de la carte (images) | `dotnet run --project tools/Demos.Carte -- --relief` (après chaque changement de `carte.json`) |
+| Petites images de la carte | `dotnet run --project tools/Demos.Carte -- --images` (dessine celles qui manquent dans `game/assets/carte/` ; `--forcer` les redessine toutes) |
 
 Le tableur (`equilibrage demos.xlsx`) et le rapport (`rapport simulation.html`) sont **à côté** du dossier `demos/`,
 hors du dépôt. Référence actuelle de la simulation : trésor **252 207** la 3e année (`simuler`, 3 ans, départ préréglé, depuis l'atelier
 de matériaux d'État du 10 novembre 2026 ; avant : 258 846 ; le chiffre sans loi, 410 815, date d'avant l'atelier).
+Avec une deuxième commune (`simuler 3 commune`) : **116 018** depuis les routes (10 novembre 2026 ; 141 622 avant).
 
 ## Architecture et données
 
@@ -85,7 +88,9 @@ désactivés : TVA sur la valeur ajoutée, épargne progressive des entreprises.
   - Enveloppes départementales continues des préfectures fusionnées dynamiquement sans grille (`Geometry2D.MergePolygons`).
   - Liaisons administratives pointillées (`DrawDashedLine`) reliant chaque commune membre au chef-lieu de préfecture.
   - Distinction visuelle entre Capitale nationale (blason or et carmin), Chef-lieu de préfecture (sceau pourpre civique) et Communes ordinaires.
-  - 5 Vues thématiques intégrées : Géographie physique, Géopolitique & souveraineté, Production, Transit & voies de communication, Ressources naturelles.
+  - Une vue de base, Monde, et des filtres qu'on superpose (`MapFilters`, cases à cocher du menu Carte, légende qui
+    suit) : Géographie physique, Biomes, Ressources minières et sols, Politique, Production et transport. Dessin en
+    calques, un par fichier, dans `game/scripts/Map/Layers/` (plan : `plan-refonte-carte.md`, à côté du dépôt).
 - Calculs géographiques branchés dans la simulation :
   - Terme de distance administrative dans `src/Demos.Domain/Politics/Extension.cs` via `AdministrativeDistance.cs` (2 000 lieues par point de charge, réglage `extensionDistancePerLoad`).
   - Pertes de transport dans `Trade.cs` (5 % à 60 %, réglages `transport…`) et dispersion de pollution dans `Pollution.cs` (loi en $1/(1+(d/250)^2)$) via `GeographicEconomics.cs`.
@@ -93,6 +98,11 @@ désactivés : TVA sur la valeur ajoutée, épargne progressive des entreprises.
 - Bâtiments d'extraction posés sur la carte (décidé le 10 novembre 2026) : sur une zone qui convient, à 240 lieues de la
   commune au plus (`extractionMaxDistance`) ; règle dans `Map/ExtractionSites.cs`, mode placement dans
   `game/scripts/Map/MapCanvas.Placement.cs` (Production → Construire ouvre la carte).
+- Routes (décidé et codé le 10 novembre 2026, `src/Demos.Domain/Map/Roads.cs`) : le trafic entre communes crée sentier, chemin,
+  route (un niveau par mois) ; tracé le moins cher sur la carte d'altitude (`game/data/relief-*.png`, lue par
+  `JsonContentSource.LoadRelief`) ; un chemin retire 25 % de la perte de transport, une route 50 % ; construction et
+  entretien payés par la plus petite structure qui contient les deux communes (préfecture : l'État paie pour l'instant).
+  Chiffres : réglages `road…` de `BalanceSettings` (validés le 11 novembre 2026).
 - Chantiers suivants ouverts :
   - Pose interactive d'une commune par clic sur la carte avec validation du terrain constructible.
   - Bonus logistique de transport fluvial le long des 17 cours d'eau navigables.

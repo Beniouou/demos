@@ -52,11 +52,7 @@ public partial class MainMenu : HBoxContainer
         [
             new("Carte",
             [
-                new("Géographie", () => new MapPage(map, MapViewMode.Geography, "Géographie physique", "Relief, hydrographie, altitude et courbes de niveau.")),
-                new("Géopolitique", () => new MapPage(map, MapViewMode.Geopolitics, "Géopolitique & Souveraineté", "Frontières de juridiction, zone d'influence et communes.")),
-                new("Production", () => new MapPage(map, MapViewMode.Production, "Unités & Bassins de production", "Sites d'extraction de matières premières et ateliers.")),
-                new("Transit", () => new MapPage(map, MapViewMode.Transit, "Voies de communication & Transit", "Corridors navigables et friction de transport.")),
-                new("Ressources nat.", () => new MapPage(map, MapViewMode.NaturalResources, "Ressources du sol", "Gisements de pierre, charbon, bois, blé et lin.")),
+                new("Filtres", () => new MapPage(map)),
             ]),
             new("Lois",
             [

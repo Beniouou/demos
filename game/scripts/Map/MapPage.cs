@@ -1,53 +1,92 @@
+using System.Collections.Generic;
 using System.Linq;
-using Demos.Domain.Map;
 using Godot;
 
 namespace Demos.Game.Map;
 
 /// <summary>
-/// Panneau d'un onglet du menu Carte : descriptif, légende cartographique, actions de cadrage et état du territoire.
-/// Dès qu'il est affiché, il bascule la vue correspondante sur le canevas de carte.
+/// La page du menu Carte : la vue de base (Monde), une case à cocher par filtre d'information (on peut les superposer),
+/// une légende qui suit les filtres cochés, et quelques chiffres sur ce que montrent ces filtres. Les filtres restent
+/// cochés sur la carte quand le menu se ferme.
 /// </summary>
-public partial class MapPage : VBoxContainer, IMenuPage
+public partial class MapPage : ScrollContainer, IMenuPage
 {
     private readonly MapCanvas _map;
-    private readonly MapViewMode _mode;
+    private readonly VBoxContainer _legend;
     private readonly Label _stats;
 
-    public MapPage(MapCanvas map, MapViewMode mode, string title, string description)
+    // Le nom des biomes et des gisements pour le joueur.
+    private static readonly Dictionary<string, string> KindNames = new()
+    {
+        ["foret"] = "Forêt",
+        ["fertile"] = "Terres fertiles",
+        ["marais"] = "Marais",
+        ["plage"] = "Plage",
+        ["falaise"] = "Falaise",
+        ["desert"] = "Désert",
+        ["glacier"] = "Glacier",
+        ["pierre"] = "Pierre (carrières)",
+        ["charbon"] = "Charbon (bassins houillers)",
+        ["fer"] = "Fer (minerai)",
+    };
+
+    public MapPage(MapCanvas map)
     {
         _map = map;
-        _mode = mode;
+        HorizontalScrollMode = ScrollMode.Disabled;
 
-        AddThemeConstantOverride("separation", 12);
+        var content = new VBoxContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill };
+        content.AddThemeConstantOverride("separation", 10);
+        AddChild(content);
 
-        AddChild(UiTheme.Title(title));
-        AddChild(new Label { Text = description });
+        content.AddChild(UiTheme.Title("Vue de base : Monde"));
+        content.AddChild(new Label
+        {
+            Text = "Le terrain, l'eau, les forêts, les bâtiments et le nom des communes. Cochez des filtres pour y superposer des informations.",
+            AutowrapMode = TextServer.AutowrapMode.WordSmart,
+        });
 
-        // Bouton de recentrage rapide sur la capitale / première commune
         var recenterButton = new Button
         {
-            Text = "Recadrer la carte sur la commune",
+            Text = "Recadrer la carte sur la capitale",
             FocusMode = FocusModeEnum.None,
             CustomMinimumSize = new Vector2(220, 32),
+            SizeFlagsHorizontal = SizeFlags.ShrinkBegin,
         };
         recenterButton.Pressed += () => _map.CenterOnCapital();
-        AddChild(recenterButton);
+        content.AddChild(recenterButton);
 
-        AddChild(new HSeparator());
-        AddChild(UiTheme.Caption("Légende cartographique :"));
-        AddChild(BuildLegend(mode));
+        content.AddChild(new HSeparator());
+        content.AddChild(UiTheme.Caption("Filtres d'information :"));
+        foreach (var (filter, name, description) in MapFilterCatalog.All)
+        {
+            var box = new CheckBox
+            {
+                Text = name,
+                TooltipText = description,
+                ButtonPressed = _map.HasFilter(filter),
+                FocusMode = FocusModeEnum.None,
+            };
+            box.Toggled += on =>
+            {
+                _map.SetFilter(filter, on);
+                BuildLegend();
+                UpdateStats();
+            };
+            content.AddChild(box);
+        }
 
-        AddChild(new HSeparator());
-        _stats = new Label();
-        AddChild(_stats);
+        content.AddChild(new HSeparator());
+        content.AddChild(UiTheme.Caption("Légende :"));
+        _legend = new VBoxContainer();
+        _legend.AddThemeConstantOverride("separation", 6);
+        content.AddChild(_legend);
 
-        UpdateStats();
-    }
+        content.AddChild(new HSeparator());
+        _stats = new Label { AutowrapMode = TextServer.AutowrapMode.WordSmart };
+        content.AddChild(_stats);
 
-    public override void _Ready()
-    {
-        _map.SetViewMode(_mode);
+        BuildLegend();
         UpdateStats();
     }
 
@@ -57,107 +96,108 @@ public partial class MapPage : VBoxContainer, IMenuPage
     {
         var vMap = _map.VectorMap;
         var view = _map.GameView;
-
         var communesCount = view?.Communes().Count ?? vMap?.AllCommunes.Count ?? _map.Communes.Count;
-        var prefecturesCount = view?.Prefectures().Count ?? 0;
-        var totalPop = view?.Communes().Sum(c => c.Residents) ?? (communesCount * 5000);
 
-        _stats.Text = _mode switch
+        var lines = new List<string>
         {
-            MapViewMode.Geography =>
-                $"Dimensions : {(vMap != null ? $"{vMap.Width:F0} × {vMap.Height:F0}" : "1 000 × 640")} lieues (IGN continue)\n" +
-                $"Relief : {(vMap?.Contours.Count ?? 0)} isohypses Marching Squares, {(vMap?.SpotElevations.Count ?? 0)} points cotés.\n" +
-                $"Hydrographie : {(vMap?.AllRivers.Count ?? 1)} cours d'eau thalweg avec modélisation d'écoulement.",
-
-            MapViewMode.Geopolitics =>
-                $"Communes établies : {communesCount} · Population administrée : {totalPop:N0} citoyens\n" +
-                $"Préfectures & départements : {prefecturesCount} chef(s)-lieu(x) et cantons rattachés\n" +
-                $"Les enveloppes de juridiction s'étendent le long des plaines et s'arrêtent aux crêtes.",
-
-            MapViewMode.Production =>
-                $"Unités et bassins d'extraction répertoriés : {(vMap?.AllResourceZones.Count ?? 4)} gisements\n" +
-                $"• Carrières de pierre, mines de charbon, gisements de fer.\n" +
-                $"• Terres arables fertiles, moulins et manufactures communales.",
-
-            MapViewMode.Transit =>
-                $"Réseau logistique & transport : {(vMap?.AllRivers.Count ?? 1)} corridors fluviaux navigables\n" +
-                $"Friction de transport : perte de 5 % à 60 % calibrée sur la distance réelle en lieues.\n" +
-                $"Les voies marchandes inter-communes assurent les transferts de produits.",
-
-            MapViewMode.NaturalResources =>
-                $"Gisements naturels identifiés dans le cadastre : {(vMap?.AllResourceZones.Count ?? 0)} zones\n" +
-                $"• Pierre : bancs de calcaire et falaises · Charbon : filons sédimentaires\n" +
-                $"• Fer : veines de magnétite · Terres fertiles : plaines alluviales.",
-
-            _ => "",
+            $"Monde : {(vMap != null ? $"{vMap.Width:F0} × {vMap.Height:F0}" : "1 000 × 640")} lieues, {communesCount} commune(s).",
         };
+        if (_map.HasFilter(MapFilters.Physical))
+            lines.Add($"Géographie physique : {vMap?.Contours.Count ?? 0} courbes de niveau, {vMap?.SpotElevations.Count ?? 0} points cotés, {vMap?.AllRivers.Count ?? 0} cours d'eau.");
+        if (_map.HasFilter(MapFilters.Biomes))
+            lines.Add($"Biomes : {vMap?.AllBiomes.Count ?? 0} zones naturelles.");
+        if (_map.HasFilter(MapFilters.Deposits))
+            lines.Add($"Ressources minières et sols : {vMap?.AllResourceZones.Count ?? 0} gisements.");
+        if (_map.HasFilter(MapFilters.Politics))
+            lines.Add($"Politique : {view?.Prefectures().Count ?? 0} préfecture(s), {view?.Communes().Sum(c => c.Residents) ?? 0:N0} habitants.");
+        if (_map.HasFilter(MapFilters.ProductionTransport))
+            lines.Add($"Production et transport : {view?.BuildingPositions().Count ?? 0} bâtiment(s) posé(s) sur la carte, {view?.Roads().Count ?? 0} liaison(s) (sentiers, chemins, routes), {vMap?.AllRivers.Count ?? 0} voies navigables ; perte de transport de 5 % à 60 % selon la distance, moins un quart sur un chemin et la moitié sur une route.");
+        _stats.Text = string.Join("\n", lines);
     }
 
-    private static Control BuildLegend(MapViewMode mode)
+    /// <summary>La légende : celle de la vue Monde, puis celle de chaque filtre coché.</summary>
+    private void BuildLegend()
     {
-        var box = new VBoxContainer();
-        box.AddThemeConstantOverride("separation", 6);
-
-        switch (mode)
+        foreach (var child in _legend.GetChildren())
         {
-            case MapViewMode.Geography:
-                box.AddChild(LegendItem(MapPalette.Water, "Étendue d'eau / Baie maritime pastel"));
-                box.AddChild(LegendItem(MapPalette.River, "Cours d'eau thalweg avec débit"));
-                box.AddChild(LegendItem(MapPalette.ContourIndex, "Courbes de niveau maîtresses (100 m)"));
-                box.AddChild(LegendItem(MapPalette.ContourStandard, "Courbes de niveau intermédiaires (25 m / 50 m)"));
-                box.AddChild(LegendItem(MapPalette.SpotElevation, "Points cotés d'arpentage (alt. IGN en mètres)"));
-                box.AddChild(LegendItem(MapPalette.Forest, "Biomes naturels (forêts, marais, glaciers, arables)"));
-                break;
-
-            case MapViewMode.Geopolitics:
-                box.AddChild(LegendItem(MapPalette.BlasonGold, "Capitale nationale (blason or et carmin)"));
-                box.AddChild(LegendItem(MapPalette.PrefectureSeat, "Chef-lieu de préfecture (sceau pourpre civique)"));
-                box.AddChild(LegendItem(MapPalette.PrefectureBorder, "Frontière départementale & enveloppe de juridiction"));
-                box.AddChild(LegendItem(MapPalette.AdministrativeLink, "Liaison administrative chef-lieu / membre"));
-                box.AddChild(LegendItem(MapPalette.InfluenceBorder, "Limite d'arpentage communal"));
-                break;
-
-            case MapViewMode.Production:
-                box.AddChild(LegendItem(MapPalette.RoofSlate, "Mairie & Entrepôt (toits d'ardoise)"));
-                box.AddChild(LegendItem(MapPalette.RoofTile, "Ateliers, Moulins & Logements (toits de tuile)"));
-                box.AddChild(LegendItem(MapPalette.ContourIndex, "Carrières de pierre & Mines de charbon"));
-                box.AddChild(LegendItem(MapPalette.Forest, "Exploitations forestières d'État"));
-                break;
-
-            case MapViewMode.Transit:
-                box.AddChild(LegendItem(MapPalette.TradeRiverHighlight, "Corridor fluvial navigable (friction réduite)"));
-                box.AddChild(LegendItem(MapPalette.TradeRoad, "Voie marchande & axe logistique inter-communes"));
-                box.AddChild(LegendItem(MapPalette.Street, "Réseau viaire et ruelles urbaines"));
-                break;
-
-            case MapViewMode.NaturalResources:
-                box.AddChild(LegendItem(new Color(0.88f, 0.80f, 0.45f), "🌾 Plaine alluviale & terres fertiles"));
-                box.AddChild(LegendItem(MapPalette.Forest, "🌲 Massif forestier (bois d'œuvre)"));
-                box.AddChild(LegendItem(new Color(0.55f, 0.62f, 0.68f), "🪨 Bancs de calcaire (pierre de taille)"));
-                box.AddChild(LegendItem(new Color(0.20f, 0.20f, 0.22f), "⛏️ Filon de charbon sédimentaire"));
-                box.AddChild(LegendItem(new Color(0.72f, 0.36f, 0.22f), "⛓️ Veine de fer (minerai)"));
-                break;
+            _legend.RemoveChild(child);
+            child.QueueFree();
         }
 
-        return box;
+        var vMap = _map.VectorMap;
+        Section("Monde");
+        Item(MapPalette.Water, "Mer et lacs");
+        Item(MapPalette.River, "Fleuves et rivières");
+        Item(MapPalette.BiomeSoft("foret").Fill, "Forêts et leurs bosquets");
+        Item(MapPalette.TerrainLegend, "Terrain coloré selon l'altitude, avec les ombres du relief");
+        Item(MapPalette.CommuneMark, "Commune et son nom");
+        Item(Layers.ProductionLayer.ZoneColor(null), "Bâtiment d'extraction, de la couleur de sa zone (nom au survol)");
+        Item(MapPalette.RoadSurface, "Sentier, chemin, route : le trafic entre communes les crée");
+
+        if (_map.HasFilter(MapFilters.Physical))
+        {
+            Section("Géographie physique");
+            Item(MapPalette.ContourIndex, "Courbe maîtresse (tous les 100 m), avec sa cote");
+            Item(MapPalette.ContourStandard, "Courbe intermédiaire");
+            Item(MapPalette.SpotElevation, "Point coté (sommet, col, lieu-dit)");
+            Item(MapPalette.River, "Nom des cours d'eau, de près");
+        }
+
+        if (_map.HasFilter(MapFilters.Biomes))
+        {
+            Section("Biomes");
+            foreach (var kind in Kinds(vMap?.AllBiomes.Select(b => b.Kind)))
+                Item(MapPalette.BiomeCrisp(kind).Fill, KindName(kind));
+        }
+
+        if (_map.HasFilter(MapFilters.Deposits))
+        {
+            Section("Ressources minières et sols");
+            foreach (var kind in Kinds(vMap?.AllResourceZones.Select(z => z.Kind)))
+            {
+                var (_, stroke, icon) = MapPalette.Deposit(kind);
+                Item(stroke, $"{icon} {KindName(kind)}");
+            }
+        }
+
+        if (_map.HasFilter(MapFilters.Politics))
+        {
+            Section("Politique");
+            Item(MapPalette.BlasonGold, "Capitale (sceau or et carmin)");
+            Item(MapPalette.PrefectureSeat, "Chef-lieu de préfecture (sceau pourpre)");
+            Item(MapPalette.PrefectureBorder, "Frontière d'une préfecture");
+            Item(MapPalette.AdministrativeLink, "Liaison entre le chef-lieu et une commune membre");
+            Item(MapPalette.InfluenceBorder, "Ressort d'une commune sans préfecture");
+        }
+
+        if (_map.HasFilter(MapFilters.ProductionTransport))
+        {
+            Section("Production et transport");
+            Item(MapPalette.ExtractionLink, "Lien d'un bâtiment d'extraction à sa commune (noms de près)");
+            Item(MapPalette.TradeRiverHighlight, "Voie navigable");
+            Item(MapPalette.TradeFlow, "Échange entre communes : ce qui circule en un mois, et la perte en route");
+            Item(MapPalette.RoadPath, "Un chemin retire un quart de la perte, une route la moitié");
+        }
     }
 
-    private static Control LegendItem(Color color, string text)
+    private static IEnumerable<string> Kinds(IEnumerable<string>? kinds) =>
+        (kinds ?? []).Select(k => k.ToLowerInvariant()).Distinct().OrderBy(KindName);
+
+    private static string KindName(string kind) => KindNames.TryGetValue(kind, out var name) ? name : kind;
+
+    private void Section(string title) => _legend.AddChild(UiTheme.Caption(title));
+
+    private void Item(Color color, string text)
     {
         var row = new HBoxContainer();
         row.AddThemeConstantOverride("separation", 8);
-
-        var patch = new ColorRect
+        row.AddChild(new ColorRect
         {
             Color = color,
             CustomMinimumSize = new Vector2(16, 16),
             SizeFlagsVertical = SizeFlags.ShrinkCenter,
-        };
-        row.AddChild(patch);
-
-        var label = UiTheme.Caption(text);
-        row.AddChild(label);
-
-        return row;
+        });
+        row.AddChild(new Label { Text = text });
+        _legend.AddChild(row);
     }
 }

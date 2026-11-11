@@ -103,6 +103,19 @@ Le document de règles de référence est dans Claude Docs, et tu n'y as pas acc
   `Func<string, double>? distanceOf` dans `Extension.Compute`. Réglage décidé : **2 000 lieues par point de charge** ; c'est le réglage `extensionDistancePerLoad`.
 - Chaque préfecture traversée entre l'entité qui décide et la commune fait perdre 10 % d'efficacité.
 
+**Routes (décidé et codé le 10 novembre 2026)** — règle dans `src/Demos.Domain/Map/Roads.cs`
+- Le trafic les crée : quand deux communes échangent assez en un mois, un sentier apparaît, puis un chemin, puis une
+  route (un niveau par mois au plus). Seuils validés (11 novembre 2026) : 1 000, 4 000 et 9 000 produits par mois.
+- Le tracé suit le chemin le moins cher sur la carte d'altitude (`game/data/relief-altitude.png`) : un pas coûte sa
+  longueur × (1 + 0,1 × pente), une pente de plus de 40 m par lieue et la mer sont interdites, une voie existante coûte
+  moitié prix (le réseau se ramifie).
+- Effet : un chemin retire 25 % de la perte de transport, une route 50 %.
+- Coût : construction et entretien selon la longueur et la montée, payés par la plus petite structure qui contient les
+  deux communes (commune, préfecture, sinon l'État). Une préfecture n'a pas encore de caisse : l'État paie pour elle.
+- Tous les chiffres, validés le 11 novembre 2026, sont des réglages `road…` (`BalanceSettings`, `equilibrage.json`,
+  feuille Constantes). La carte lit
+  les routes dans `GameView.Roads()` et les échanges dans `GameView.TradeFlows()` (calque `TransportLayer`).
+
 ## Où te brancher dans le code
 
 | Besoin | Endroit | État |
@@ -111,7 +124,7 @@ Le document de règles de référence est dans Claude Docs, et tu n'y as pas acc
 | Perte de transport entre communes | `src/Demos.Domain/Economy/Trade.cs` | **Branché** (`GeographicEconomics.TransportLoss(dist)`) |
 | Pollution venue d'une autre commune | `src/Demos.Domain/Economy/Pollution.cs` | **Branché** (`GeographicEconomics.DistantPollutionShare(dist)`) |
 | Coordonnées géoréférencées | `src/Demos.Application/GameView.cs` | **Branché** (`CommunePositions()`, `CommunePosition(id)`) |
-| Rendu de la carte vectorielle | `game/scripts/Map/MapCanvas.cs` | **Branché** (Préfectures sans grille `MergePolygons`, 5 vues thématiques) |
+| Rendu de la carte vectorielle | `game/scripts/Map/MapCanvas.cs` | **Branché** (Préfectures sans grille `MergePolygons` ; vue Monde et filtres superposables, calques dans `Map/Layers/`) |
 | Place de la carte à l'écran | `game/scripts/Hud.cs` et `game/scripts/MainMenu.cs` | **Branché** (`MapCanvas` initialisé et rafraîchi en direct) |
 | Fonder une commune ou une préfecture | `src/Demos.Application/Simulation.cs` | `TryFoundCommune` (avec `Point2D? position`), `TryFoundPrefecture` |
 

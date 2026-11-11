@@ -1,0 +1,22 @@
+{
+  "source": "carte.json",
+  "altitude": "relief-altitude.png",
+  "ombres": "relief-ombres.png",
+  "largeur": 1800,
+  "hauteur": 1125,
+  "lieuesParPixel": 2,
+  "codage": "altitude = (rouge × 256 + vert) / 10 − 1000 (m) ; bleu = 0 sur la mer, 255 sur terre",
+  "altitudeMin": -60,
+  "altitudeMax": 2700,
+  "reglages": {
+    "CellSize": 2,
+    "SolverIterations": 80,
+    "SmoothingRadius": 4,
+    "CoastSmoothing": 1,
+    "SeaDepthPerLieue": 0.5,
+    "MaxSeaDepth": 60,
+    "LightAzimuth": 315,
+    "LightElevation": 45,
+    "ShadeExaggeration": 0.1
+  }
+}

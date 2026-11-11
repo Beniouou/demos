@@ -40,6 +40,9 @@ internal static class SimulationReport
         var snapshots = new List<Snapshot>();
         var curve = new List<(int Day, double Treasury, double Population)> { (0, world.Treasury.Balance, world.Classes.Sum(c => c.Population)) };
         string? foundingNote = null;
+        // Les routes construites, entretenues ou délaissées, au fil des bilans du mois et de l'année.
+        var roadNotes = new List<string>();
+        var lastRoadChanges = simulation.RoadChanges;
 
         Console.WriteLine($"Simulation de {years} an(s){(secondCommuneDistance is { } announced ? $", avec une deuxième commune à {Count(announced)} lieues de la capitale" : "")}…");
         var day = 0;
@@ -52,6 +55,16 @@ internal static class SimulationReport
             {
                 simulation.AdvanceDay();
                 day++;
+                if (!ReferenceEquals(simulation.RoadChanges, lastRoadChanges))
+                {
+                    lastRoadChanges = simulation.RoadChanges;
+                    foreach (var change in lastRoadChanges)
+                    {
+                        var note = $"{simulation.Clock.Today:dd/MM/yyyy} : {DescribeRoad(world, change)}";
+                        Console.WriteLine($"    {note}");
+                        roadNotes.Add(note);
+                    }
+                }
                 foreach (var (id, produced) in world.Produced)
                     output[id] = output.GetValueOrDefault(id) + produced;
                 foreach (var building in world.Structures.Values.Where(s => s.Jobs > 0 || s.HousingPlaces > 0))
@@ -67,8 +80,30 @@ internal static class SimulationReport
             Console.WriteLine($"  année {year} : trésor {Money(world.Treasury.Balance)}, habitants {Count(world.Classes.Sum(c => c.Population))}");
         }
 
-        File.WriteAllText(reportPath, Html(start, snapshots, curve, years, foundingNote, world), new UTF8Encoding(false));
+        File.WriteAllText(reportPath, Html(start, snapshots, curve, years, foundingNote, roadNotes, world), new UTF8Encoding(false));
         Console.WriteLine($"Rapport écrit : {reportPath}");
+    }
+
+    /// <summary>Une route construite, entretenue ou délaissée, pour le rapport.</summary>
+    private static string DescribeRoad(World world, Demos.Domain.Map.RoadChange change)
+    {
+        string Name(string id) => world.Structures.TryGetValue(id, out var s) ? s.Name : id;
+        // Le nom du niveau, avec son article (« le sentier », « la route »).
+        string Level(Demos.Domain.Map.RoadLevel level, bool article = false) => level switch
+        {
+            Demos.Domain.Map.RoadLevel.Trail => article ? "le sentier" : "sentier",
+            Demos.Domain.Map.RoadLevel.Path => article ? "le chemin" : "chemin",
+            Demos.Domain.Map.RoadLevel.Road => article ? "la route" : "route",
+            _ => "plus rien",
+        };
+        var link = change.Link;
+        var between = $"{Name(link.A)} – {Name(link.B)} ({Count(link.Length)} lieues, montée {Count(link.Climb)} m, payé par {Name(link.PayerId)})";
+        return change.Reason switch
+        {
+            "trafic" => $"{Level(link.Level)} entre {between} : {Money(change.Cost)}",
+            "entretien" => $"entretien de {Level(link.Level, article: true)} {between} : {Money(change.Cost)}",
+            _ => $"entretien impayé : {Level(change.Before, article: true)} {between} devient {Level(link.Level)}",
+        };
     }
 
     private static string FoundSecondCommune(Simulation simulation, double distance)
@@ -205,7 +240,7 @@ internal static class SimulationReport
     };
 
     private static string Html(Snapshot start, List<Snapshot> years, List<(int Day, double Treasury, double Population)> curve, int count,
-        string? foundingNote, World world)
+        string? foundingNote, List<string> roadNotes, World world)
     {
         var html = new StringBuilder();
         html.Append("""
@@ -231,6 +266,9 @@ internal static class SimulationReport
             .Append($"Écrit le {DateTime.Now:dd/MM/yyyy à HH:mm}.</p>");
         if (foundingNote is not null)
             html.Append($"<p>{E(foundingNote)}</p>");
+        html.Append("<h2>Routes</h2>").Append(roadNotes.Count == 0
+            ? "<p class=\"muted\">Aucune route : le trafic entre communes n'a pas atteint le seuil d'un sentier.</p>"
+            : "<ul>" + string.Concat(roadNotes.Select(n => $"<li>{E(n)}</li>")) + "</ul>");
         html.Append("<nav>").Append(string.Join("", years.Select((y, i) => $"<a href=\"#annee{i + 1}\">{E(y.Title)}</a>"))).Append("</nav>");
 
         // Résumé : l'évolution d'une année à l'autre.

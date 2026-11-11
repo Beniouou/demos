@@ -35,6 +35,21 @@ public sealed class GameView(Simulation simulation)
     /// <summary>Les positions des bâtiments posés sur la carte (bâtiments d'extraction), chantiers compris.</summary>
     public IReadOnlyDictionary<string, Point2D> BuildingPositions() => new Dictionary<string, Point2D>(World.BuildingPositions);
 
+    /// <summary>Les sentiers, chemins et routes : les deux communes, le niveau, le tracé (en lieues) et la structure qui paie.</summary>
+    public IReadOnlyList<RoadLink> Roads() => World.Roads.Links.ToList();
+
+    /// <summary>
+    /// Les échanges entre communes : pour chaque paire, ce qui a circulé (dans les deux sens) le dernier mois fini, ou
+    /// depuis le début du mois si aucun mois n'est encore fini, et la perte de transport entre elles (route comprise).
+    /// </summary>
+    public IReadOnlyList<TradeFlowView> TradeFlows()
+    {
+        var traffic = World.RoadTraffic.LastMonth.Count > 0 ? World.RoadTraffic.LastMonth : World.RoadTraffic.ThisMonth;
+        return traffic.Select(t => new TradeFlowView(t.Key.Item1, t.Key.Item2, t.Value,
+                GeographicEconomics.TransportLoss(t.Key.Item1, t.Key.Item2, World.CommunePositions) * World.Roads.LossFactor(t.Key.Item1, t.Key.Item2)))
+            .ToList();
+    }
+
     /// <summary>Distance maximale, en lieues, entre un bâtiment d'extraction et sa commune.</summary>
     public double ExtractionMaxDistance => Balance.Current.ExtractionMaxDistance;
 
@@ -412,3 +427,6 @@ public sealed record PrefectureCostView(
     int BaseJobs,
     int JobsPerEntity,
     double WageBillPerJob);
+
+/// <summary>Ce qui circule entre deux communes en un mois (produits, dans les deux sens) et la perte de transport entre elles.</summary>
+public sealed record TradeFlowView(string A, string B, double MonthlyQuantity, double Loss);

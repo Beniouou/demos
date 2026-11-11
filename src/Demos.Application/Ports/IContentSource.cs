@@ -28,4 +28,7 @@ public interface IContentSource
 
     /// <summary>La carte vectorielle géographique du monde ; nulle si le fichier n'existe pas.</summary>
     VectorMapDefinition? LoadMap() => null;
+
+    /// <summary>La carte d'altitude (pour le tracé des routes) ; nulle si elle manque.</summary>
+    ReliefGrid? LoadRelief() => null;
 }

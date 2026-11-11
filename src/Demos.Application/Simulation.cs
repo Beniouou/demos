@@ -32,6 +32,9 @@ public sealed class Simulation(World world, GameClock clock)
     public event Action? SeasonPassed;
     public event Action? YearPassed;
 
+    /// <summary>Ce que les routes ont changé au dernier bilan du mois ou de l'année (construction, entretien).</summary>
+    public IReadOnlyList<RoadChange> RoadChanges { get; private set; } = [];
+
     public void AdvanceDay()
     {
         var change = Clock.AdvanceDay();
@@ -604,9 +607,11 @@ public sealed class Simulation(World world, GameClock clock)
         Trade.RunDaily(
             communeIds, World.Classes, World.Products, World.MarketOf,
             (communeId, productId) => World.StorageOf(communeId).FreeFor(productId),
+            // La perte de transport selon la distance, réduite par un chemin ou une route ; le trafic crée les routes.
             World.CommunePositions.Count > 0
-                ? (from, to) => GeographicEconomics.TransportLoss(from, to, World.CommunePositions)
-                : null);
+                ? (from, to) => GeographicEconomics.TransportLoss(from, to, World.CommunePositions) * World.Roads.LossFactor(from, to)
+                : null,
+            World.RoadTraffic.Add);
         Housing.RunDaily(World.Structures, World.Classes, World.Treasury, World.CompanyFundOf, World.EnergyEffectOf, laws.HasHousingPriority);
         Education.RunDaily(World.Structures, World.Classes, World.Treasury, World.CompanyFundOf, World.EnergyEffectOf);
 
@@ -667,6 +672,10 @@ public sealed class Simulation(World world, GameClock clock)
     // Promotions par l'éducation, puis bilan fiscal et statistique (à écrire).
     private void RunYearlyCalculations()
     {
+        // L'entretien des routes ; une route mal entretenue descend d'un niveau.
+        // Le 1er janvier est aussi un 1er du mois : les changements du mois restent, l'entretien s'y ajoute.
+        RoadChanges = [.. RoadChanges, .. Roads.RunYearly(World.Roads, World.FundOf, Balance.Current)];
+
         foreach (var created in ClassTransitions.RunYearly(World.Classes))
             World.AddClass(created);
 
@@ -676,6 +685,11 @@ public sealed class Simulation(World world, GameClock clock)
     private void RunMonthlyCalculations()
     {
         EnactVotedLaws();
+
+        // Le trafic du mois fini crée ou améliore les routes, si la structure qui les paie en a les moyens.
+        RoadChanges = Roads.RunMonthly(World.Roads, World.RoadTraffic.EndMonth(),
+            communeId => World.CommunePositions.TryGetValue(communeId, out var position) ? position : null,
+            World.RoadPlanner, World.RoadPayerOf, World.FundOf, Balance.Current);
 
         foreach (var building in Layoffs.RunMonthly(World.Structures, World.MarketOf, World.Wages, World.CompanyFundOf))
             World.UpdateStructure(building);

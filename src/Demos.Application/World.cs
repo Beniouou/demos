@@ -198,6 +198,38 @@ public sealed class World
 
     private readonly Dictionary<string, Treasury> _communeFunds = [];
 
+    // ---- Routes -------------------------------------------------------------------------------------------------------
+
+    /// <summary>La carte d'altitude (pour le tracé des routes) ; nulle sans carte, et alors les tracés sont droits.</summary>
+    public ReliefGrid? Relief { get; private set; }
+
+    public void SetRelief(ReliefGrid? relief)
+    {
+        Relief = relief;
+        _roadPlanner = null;
+    }
+
+    /// <summary>Les sentiers, chemins et routes de la partie.</summary>
+    public RoadNetwork Roads { get; } = new();
+
+    /// <summary>Le trafic entre communes : ce qu'elles s'échangent, compté sur le mois.</summary>
+    public RoadTraffic RoadTraffic { get; } = new();
+
+    /// <summary>Le tracé des routes sur la carte d'altitude (sa grille est calculée une fois).</summary>
+    public RoadPlanner RoadPlanner => _roadPlanner ??= new RoadPlanner(Relief, Balance.Current);
+
+    private RoadPlanner? _roadPlanner;
+
+    /// <summary>La plus petite structure qui contient deux lieux : celle qui paie la liaison entre eux.</summary>
+    public string? RoadPayerOf(string a, string b) => Domain.Map.Roads.PayerOf(a, b, _structures);
+
+    /// <summary>
+    /// La caisse d'une structure qui paie : la caisse de la commune, ou le trésor pour l'État. Une préfecture n'a pas
+    /// encore de caisse : en attendant, l'État paie pour elle (question ouverte).
+    /// </summary>
+    public Treasury FundOf(string structureId) =>
+        _structures.TryGetValue(structureId, out var structure) && structure.IsCommune ? CommuneFundOf(structureId) : Treasury;
+
     /// <summary>Solde de la caisse d'une commune, sans la créer si elle n'existe pas encore (0 dans ce cas).</summary>
     public double CommuneFundBalanceOf(string communeId) => _communeFunds.TryGetValue(communeId, out var fund) ? fund.Balance : 0;
 

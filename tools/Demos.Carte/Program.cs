@@ -31,6 +31,18 @@ public static class Program
             return RunCli(dataDir);
         }
 
+        // Mode relief : carte d'altitude et ombres calculées une fois, enregistrées dans game/data/ (le jeu les lit)
+        if (args.Length > 0 && args[0].Equals("--relief", StringComparison.OrdinalIgnoreCase))
+        {
+            return ReliefExport.Run(dataDir, args.Length > 1 ? args[1] : null);
+        }
+
+        // Mode images : les petites images de la carte du jeu (arbres, toits, fumée) dans game/assets/carte/
+        if (args.Length > 0 && args[0].Equals("--images", StringComparison.OrdinalIgnoreCase))
+        {
+            return MapSpriteImages.Run(dataDir, args.Any(a => a.Equals("--forcer", StringComparison.OrdinalIgnoreCase)));
+        }
+
         // Mode test automatique des curseurs et synchronisation
         if (args.Length > 0 && args[0].Equals("--test-sliders", StringComparison.OrdinalIgnoreCase))
         {

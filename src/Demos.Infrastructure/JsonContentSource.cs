@@ -11,9 +11,10 @@ namespace Demos.Infrastructure;
 /// <summary>
 /// Lit le contenu du jeu dans des fichiers JSON.
 /// <paramref name="readText"/> reçoit un nom de fichier (« products.json ») et renvoie son texte :
-/// Godot passe sa propre lecture de res://data/, les tests passent File.ReadAllText.
+/// Godot passe sa propre lecture de res://data/, les tests passent File.ReadAllText. <paramref name="readBytes"/> lit
+/// les images (la carte d'altitude) ; sans lui, pas de relief.
 /// </summary>
-public sealed class JsonContentSource(Func<string, string> readText) : IContentSource
+public sealed class JsonContentSource(Func<string, string> readText, Func<string, byte[]>? readBytes = null) : IContentSource
 {
     private static readonly JsonSerializerOptions Options = new()
     {
@@ -83,6 +84,34 @@ public sealed class JsonContentSource(Func<string, string> readText) : IContentS
         return string.IsNullOrWhiteSpace(text)
             ? null
             : JsonSerializer.Deserialize<VectorMapDefinition>(text, Options);
+    }
+
+    /// <summary>
+    /// La carte d'altitude calculée par l'outil de carte (relief.json et relief-altitude.png) ; nulle si elle manque ou
+    /// sans lecture des images.
+    /// </summary>
+    public ReliefGrid? LoadRelief()
+    {
+        if (readBytes is null)
+            return null;
+        try
+        {
+            using var info = JsonDocument.Parse(readText("relief.json"));
+            var root = info.RootElement;
+            var image = PngReader.Read(readBytes(root.GetProperty("altitude").GetString()!));
+            var altitudes = new float[image.Width * image.Height];
+            for (var y = 0; y < image.Height; y++)
+                for (var x = 0; x < image.Width; x++)
+                {
+                    var (high, low, _) = image[x, y];
+                    altitudes[y * image.Width + x] = (float)ReliefEncoding.Decode(high, low);
+                }
+            return new ReliefGrid(image.Width, image.Height, root.GetProperty("lieuesParPixel").GetDouble(), altitudes);
+        }
+        catch (Exception ex) when (ex is FileNotFoundException or DirectoryNotFoundException or KeyNotFoundException or InvalidDataException or JsonException)
+        {
+            return null;
+        }
     }
 
     private List<T> Load<T>(string fileName) =>

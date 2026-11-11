@@ -10,7 +10,7 @@ public static class GameData
     /// <summary>Le dossier game/data.</summary>
     public static string Folder => DataDirectory;
 
-    public static JsonContentSource Content() => new(fileName => File.ReadAllText(Path.Combine(DataDirectory, fileName)));
+    public static JsonContentSource Content() => new(fileName => File.ReadAllText(Path.Combine(DataDirectory, fileName)), fileName => File.ReadAllBytes(Path.Combine(DataDirectory, fileName)));
 
     private static string FindDataDirectory()
     {

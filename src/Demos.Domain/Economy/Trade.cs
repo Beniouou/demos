@@ -6,7 +6,8 @@ namespace Demos.Domain.Economy;
 /// Échanges entre communes, en attendant la logistique : chaque jour, pour chaque produit de base, les surplus des
 /// communes (ce qui dépasse les besoins de leurs habitants, selon leur rang) partent vers les communes qui en
 /// manquent. 20 % se perdent en route, et une commune ne reçoit que dans la limite de sa place de stockage libre pour
-/// ce produit. Les produits gardent leur vendeur, payé quand ils sont achetés à l'arrivée.
+/// ce produit. Les produits gardent leur vendeur, payé quand ils sont achetés à l'arrivée. Ce qui part d'une commune vers une
+/// autre est signalé (<c>shipped</c>) : c'est le trafic qui crée les routes.
 /// </summary>
 public static class Trade
 {
@@ -19,7 +20,8 @@ public static class Trade
         IReadOnlyList<ProductDefinition> products,
         Func<string, Market> marketOf,
         Func<string, string, double> freeStorageOf,
-        Func<string, string, double>? transportLossOf = null)
+        Func<string, string, double>? transportLossOf = null,
+        Action<string, string, double>? shipped = null)
     {
         foreach (var product in products)
         {
@@ -70,6 +72,7 @@ public static class Trade
                     var loss = transportLossOf?.Invoke(origin, destination) ?? TransportLoss;
                     foreach (var (sellerId, quantity) in marketOf(origin).Take(product.Id, sent * available / totalSurplus))
                     {
+                        shipped?.Invoke(origin, destination, quantity);
                         var arrived = quantity * (1 - loss);
                         marketOf(destination).Offer(product.Id, arrived, sellerId);
                         freeStorage[destination] -= arrived;

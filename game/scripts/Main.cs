@@ -30,7 +30,8 @@ public partial class Main : Node
 
     public override void _Ready()
     {
-        var content = new JsonContentSource(fileName => FileAccess.GetFileAsString($"res://data/{fileName}"));
+        var content = new JsonContentSource(fileName => FileAccess.GetFileAsString($"res://data/{fileName}"),
+            fileName => FileAccess.GetFileAsBytes($"res://data/{fileName}"));
         _simulation = PrototypeScenario.Create(content);
 
         // Sous un CanvasLayer, l'interface se cale sur la fenêtre (sous un simple Node, elle n'aurait pas de taille).
