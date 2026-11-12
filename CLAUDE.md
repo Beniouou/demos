@@ -107,6 +107,9 @@ désactivés : TVA sur la valeur ajoutée, épargne progressive des entreprises.
 - Éditeur de carte : au chargement, il prend le relief de la carte (`relief-altitude.png` s'il est plus récent que
   `carte.json`, sinon `ReliefBuilder`), échantillonné en `Heightmap.FromRelief`. Pentes des biomes en vrais % (seuils
   `ZoneMaskGrid.CliffMinSlope`… : falaise ≥ 8 %, fertile < 10 %, marais < 1 %, désert et plage < 2 % ; 12 novembre 2026).
+  Le canevas garde la carte dessinée en image (`MapCanvasControl.DrawMapFromCache`) : toute modification de la carte
+  ou du relief doit passer par `SetMap` (ou `NotifyReliefChanged`), sinon l'affichage ne suit pas. Les pinceaux de
+  biomes et de gisements recalculent les contours au relâcher seulement.
 - Routes (décidé et codé le 10 novembre 2026, `src/Demos.Domain/Map/Roads.cs`) : le trafic entre communes crée sentier, chemin,
   route (un niveau par mois) ; tracé le moins cher sur la carte d'altitude (`game/data/relief-*.png`, lue par
   `JsonContentSource.LoadRelief`) ; un chemin retire 25 % de la perte de transport, une route 50 % ; construction et
@@ -115,3 +118,15 @@ désactivés : TVA sur la valeur ajoutée, épargne progressive des entreprises.
 - Chantiers suivants ouverts :
   - Pose interactive d'une commune par clic sur la carte avec validation du terrain constructible.
   - Bonus logistique de transport fluvial le long des 17 cours d'eau navigables.
+
+## Interface Godot : état actuel (résumé)
+
+- Menus dans `game/scripts/MainMenu.cs` (Carte, Lois, Structure, Production, Recherche, Ressources, Aide) ; une page
+  par fichier (`*Page.cs`) ; `Coming(...)` = entrée grisée « à venir ». Lecture de la partie par `GameView`
+  (`src/Demos.Application/GameView.cs`), **actions du joueur par `PlayerDesk`** (`game/scripts/PlayerDesk.cs`, qui
+  appelle `Simulation`) ; textes de partie dans `WorldText.cs`, couleurs et styles dans `UiTheme.cs`.
+- Codé dans `Simulation` mais **pas encore branché** à l'interface (relevé du 12 novembre 2026) : la commission des
+  lois (`DraftFromTemplate`, `DraftAmendment`, `DraftRepeal`, `UpdateDraft`, `DeleteDraft`, `CostOf`, `TryVote`,
+  `CancelVote` ; `LawCommissionPage` ne fait qu'afficher), les taux d'impôt (`SetStateTaxRate`, `SetCommuneTaxRate`),
+  les messages des routes (`RoadChanges`), la fondation d'une commune autrement que par la touche C au survol.
+  Prompt de la session d'intégration : `prompt-integration-interface.md`, à côté du dépôt.
