@@ -4,7 +4,7 @@ namespace Demos.Tests.Domain;
 
 public class ExtractionSitesTests
 {
-    // Une forêt carrée de 100 lieues de côté, avec une clairière au milieu, et un gisement de charbon à côté.
+    // Une forêt carrée de 100 unités (10 km) de côté, avec une clairière au milieu, et un gisement de charbon à côté.
     private static readonly PolygonArea Forest = new("Bois", "foret",
         [new(0, 0), new(100, 0), new(100, 100), new(0, 100)],
         [[new(40, 40), new(60, 40), new(60, 60), new(40, 60)]]);
@@ -34,12 +34,12 @@ public class ExtractionSitesTests
     public void Un_camp_de_bucheron_se_pose_dans_la_foret_a_portee_mais_pas_dans_la_clairiere()
     {
         var commune = new Point2D(150, 50);
-        string? Problem(Point2D p) => ExtractionSites.ProblemWith(["foret"], p, commune, 240, Zones);
+        string? Problem(Point2D p) => ExtractionSites.ProblemWith(["foret"], p, commune, 24, Zones);
 
         Assert.Null(Problem(new(10, 10)));
         Assert.NotNull(Problem(new(50, 50)));   // la clairière, un trou de la forêt
         Assert.NotNull(Problem(new(250, 50)));  // le charbon, pas une forêt
-        Assert.Contains("trop loin", ExtractionSites.ProblemWith(["foret"], new(10, 10), new(1000, 1000), 240, Zones));
+        Assert.Contains("trop loin", ExtractionSites.ProblemWith(["foret"], new(10, 10), new(1000, 1000), 24, Zones));
     }
 
     [Fact]
@@ -47,11 +47,11 @@ public class ExtractionSitesTests
     {
         var commune = new Point2D(150, 50);
 
-        var site = ExtractionSites.NearestSite(["charbon"], commune, 240, Zones);
+        var site = ExtractionSites.NearestSite(["charbon"], commune, 24, Zones);
 
         Assert.NotNull(site);
         Assert.True(ExtractionSites.Contains(Coal, site.Value));
-        Assert.Null(ExtractionSites.NearestSite(["fer"], commune, 240, Zones));
-        Assert.Null(ExtractionSites.NearestSite(["charbon"], new Point2D(2000, 2000), 240, Zones));
+        Assert.Null(ExtractionSites.NearestSite(["fer"], commune, 24, Zones));
+        Assert.Null(ExtractionSites.NearestSite(["charbon"], new Point2D(2000, 2000), 24, Zones));
     }
 }

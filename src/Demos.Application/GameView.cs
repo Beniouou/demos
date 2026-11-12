@@ -35,7 +35,7 @@ public sealed class GameView(Simulation simulation)
     /// <summary>Les positions des bâtiments posés sur la carte (bâtiments d'extraction), chantiers compris.</summary>
     public IReadOnlyDictionary<string, Point2D> BuildingPositions() => new Dictionary<string, Point2D>(World.BuildingPositions);
 
-    /// <summary>Les sentiers, chemins et routes : les deux communes, le niveau, le tracé (en lieues) et la structure qui paie.</summary>
+    /// <summary>Les sentiers, chemins et routes : les deux communes, le niveau, le tracé (en unités de carte), la longueur (km) et la structure qui paie.</summary>
     public IReadOnlyList<RoadLink> Roads() => World.Roads.Links.ToList();
 
     /// <summary>
@@ -50,8 +50,14 @@ public sealed class GameView(Simulation simulation)
             .ToList();
     }
 
-    /// <summary>Distance maximale, en lieues, entre un bâtiment d'extraction et sa commune.</summary>
+    /// <summary>Distance maximale, en km, entre un bâtiment d'extraction et sa commune.</summary>
     public double ExtractionMaxDistance => Balance.Current.ExtractionMaxDistance;
+
+    /// <summary>Ressort d'une commune : rayon en km du territoire qu'elle tient.</summary>
+    public double CommuneJurisdictionRadius => Balance.Current.CommuneJurisdictionRadius;
+
+    /// <summary>Ressort d'une préfecture : rayon en km autour de son chef-lieu.</summary>
+    public double PrefectureJurisdictionRadius => Balance.Current.PrefectureJurisdictionRadius;
 
     /// <summary>
     /// Les zones de la carte (forêt, terre fertile, pierre, charbon, fer) où se pose un bâtiment neuf de ce type, avec sa

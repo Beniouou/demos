@@ -31,13 +31,21 @@ public sealed class ZoneMaskGrid
     public static readonly (string Key, string Label, string DefaultName, string Rule)[] BiomeTypes =
     [
         ("foret", "🌲 Forêt", "Bois des Chênes", "Terre émergée sous les glaciers (< 2 500 m)"),
-        ("fertile", "🌾 Terre fertile", "Plaine fertile", "Terre émergée en plaine ou coteaux (< 600 m, pente tolérée < 60 %)"),
-        ("marais", "🌾💧 Marais", "Grand Marais", "Près de l'eau (littoral bas ou fleuve, pente < 30 %)"),
+        ("fertile", "🌾 Terre fertile", "Plaine fertile", "Terre émergée en plaine ou coteaux (< 600 m, pente < 10 %)"),
+        ("marais", "🌾💧 Marais", "Grand Marais", "Près de l'eau (littoral bas ou fleuve, pente < 1 %)"),
         ("plage", "🏖️ Plage", "Plage dorée", "Interface immédiate terre/mer (littoral ≤ 30 m)"),
-        ("falaise", "🧗 Falaise", "Falaises rocheuses", "Forte pente (dénivelé abrupt ≥ 150 %)"),
-        ("desert", "🏜️ Désert", "Désert aride", "Plaine aride (< 250 m, pente douce)"),
+        ("falaise", "🧗 Falaise", "Falaises rocheuses", "Versant très raide (pente ≥ 8 % en moyenne ; une vraie falaise est plus petite qu'un pixel)"),
+        ("desert", "🏜️ Désert", "Désert aride", "Plaine aride (< 250 m, pente < 2 %)"),
         ("glacier", "❄️ Glacier", "Glacier éternel", "Haute altitude (≥ 2 500 m)")
     ];
+
+    // Les pentes, en vrais % (mètres de dénivelé pour 100 m), mesurées sur 1,2 km (décidé le 12 novembre 2026).
+    // Avant, ces seuils prenaient la pente pour une fraction et valaient 100 fois trop (« 150 % » était 1,5 %).
+    public const double CliffMinSlope = 8;
+    public const double FertileMaxSlope = 10;
+    public const double SwampMaxSlope = 1;
+    public const double DesertMaxSlope = 2;
+    public const double BeachMaxSlope = 2;
 
     private readonly byte[,] _biome;    // 0 = rien, 1 = foret, 2 = fertile, 3 = marais, 4 = plage, 5 = falaise, 6 = desert, 7 = glacier
     private readonly byte[,] _resource; // 0 = rien, 1 = pierre, 2 = charbon, 3 = fer
@@ -222,12 +230,12 @@ public sealed class ZoneMaskGrid
 
                     case "desert":
                         var slopeD = ComputeSlope(gx, gy, heightmap);
-                        isValid = alt < 250.0 && slopeD < 0.20;
+                        isValid = alt < 250.0 && slopeD < DesertMaxSlope;
                         break;
 
                     case "fertile" or "zone fertile":
                         var slopeF = ComputeSlope(gx, gy, heightmap);
-                        isValid = alt < 600.0 && slopeF < 0.60;
+                        isValid = alt < 600.0 && slopeF < FertileMaxSlope;
                         break;
 
                     case "plage":
@@ -236,12 +244,12 @@ public sealed class ZoneMaskGrid
 
                     case "marais":
                         var slopeM = ComputeSlope(gx, gy, heightmap);
-                        isValid = alt < 400.0 && slopeM < 0.30 && (IsNearSea(gx, gy, heightmap, 25.0) || IsNearRiver(gx, gy, rivers, 25.0));
+                        isValid = alt < 400.0 && slopeM < SwampMaxSlope && (IsNearSea(gx, gy, heightmap, 25.0) || IsNearRiver(gx, gy, rivers, 25.0));
                         break;
 
                     case "falaise":
                         var slopeC = ComputeSlope(gx, gy, heightmap);
-                        isValid = slopeC >= 1.50;
+                        isValid = slopeC >= CliffMinSlope;
                         break;
                 }
 
@@ -264,10 +272,10 @@ public sealed class ZoneMaskGrid
                 "glacier" => "❄️ Un glacier requiert une haute altitude (≥ 2 500 m).",
                 "foret" or "forest" => "🌲 La forêt s'arrête sous la ligne des glaciers (< 2 500 m).",
                 "plage" => "🏖️ Une plage doit border le littoral (interface terre/mer).",
-                "marais" => "🌾💧 Un marais doit border un cours d'eau ou un littoral sur terrain plat (pente < 30 %, alt. < 400 m).",
-                "falaise" => "🧗 Une falaise requiert une pente abrupte (dénivelé ≥ 150 %).",
-                "desert" => "🏜️ Un désert ne s'étend que dans les plaines (< 250 m, pente douce).",
-                "fertile" or "zone fertile" => "🌾 Les terres fertiles requièrent un terrain cultivable (< 600 m, pente < 60 %).",
+                "marais" => "🌾💧 Un marais doit border un cours d'eau ou un littoral sur terrain plat (pente < 1 %, alt. < 400 m).",
+                "falaise" => "🧗 Une falaise requiert un versant très raide (pente ≥ 8 %).",
+                "desert" => "🏜️ Un désert ne s'étend que dans les plaines (< 250 m, pente < 2 %).",
+                "fertile" or "zone fertile" => "🌾 Les terres fertiles requièrent un terrain cultivable (< 600 m, pente < 10 %).",
                 _ => null
             };
         }
@@ -305,21 +313,21 @@ public sealed class ZoneMaskGrid
                     continue;
                 }
 
-                // 3. Falaises rocheuses (pente abrupte >= 150%)
-                if (slope >= 1.50)
+                // 3. Falaises : les versants les plus raides
+                if (slope >= CliffMinSlope)
                 {
                     _biome[i, j] = 5; // falaise
                     continue;
                 }
 
                 // 4. Plages de sable (littoral doux <= 30m)
-                if (alt <= 30.0 && nearSea && slope < 0.40)
+                if (alt <= 30.0 && nearSea && slope < BeachMaxSlope)
                 {
                     _biome[i, j] = 4; // plage
                     continue;
                 }
 
-                // 5. Terres émergées habitables (< 2500m, pente < 60%)
+                // 5. Terres émergées habitables (< 2500 m)
                 var n1 = Math.Sin(gx * 0.007 + seed * 1.31) * Math.Cos(gy * 0.007 + seed * 0.77);
                 var n2 = Math.Sin(gx * 0.015 - gy * 0.012 + seed * 2.19);
                 var n3 = Math.Cos(gx * 0.031 + gy * 0.028 + seed * 3.73);
@@ -328,31 +336,31 @@ public sealed class ZoneMaskGrid
                 var nMarais = Math.Sin(gx * 0.022 + gy * 0.018 + seed * 4.15);
                 var nDesert = Math.Cos(gx * 0.008 - gy * 0.006 + seed * 5.71);
 
-                // Marais : très basse altitude (< 120m), très plat (pente < 10%), près de l'eau
-                if (alt < 120.0 && slope < 0.10 && (nearRiver || nearSea) && nMarais > 0.40)
+                // Marais : très basse altitude (< 120 m), très plat, près de l'eau
+                if (alt < 120.0 && slope < SwampMaxSlope && (nearRiver || nearSea) && nMarais > 0.40)
                 {
                     _biome[i, j] = 3; // marais
                     continue;
                 }
 
                 // Terres fertiles : plaines et coteaux (< 600m), favorisées le long des cours d'eau
-                var fertileScore = noiseHarmonic + (nearRiver ? 0.40 : 0.0) + (alt < 250.0 ? 0.25 : 0.0) - slope * 0.50;
-                if (alt < 600.0 && slope < 0.50 && fertileScore > 0.12)
+                var fertileScore = noiseHarmonic + (nearRiver ? 0.40 : 0.0) + (alt < 250.0 ? 0.25 : 0.0) - slope * 0.05; // une pente de 10 % retire 0,5
+                if (alt < 600.0 && slope < FertileMaxSlope && fertileScore > 0.12)
                 {
                     _biome[i, j] = 2; // fertile
                     continue;
                 }
 
                 // Désert : plaines très basses et plates, loin de tout cours d'eau et de la mer
-                if (alt < 200.0 && slope < 0.15 && !nearRiver && !nearSea && nDesert > 0.55)
+                if (alt < 200.0 && slope < DesertMaxSlope && !nearRiver && !nearSea && nDesert > 0.55)
                 {
                     _biome[i, j] = 6; // desert
                     continue;
                 }
 
                 // Forêt : massifs sur collines, plateaux et moyennes montagnes (ou vallées boisées)
-                var forestScore = -noiseHarmonic + (alt >= 100.0 && alt <= 1800.0 ? 0.35 : 0.0) + (slope >= 0.10 ? 0.15 : 0.0);
-                if (alt < 2500.0 && slope < 1.50 && forestScore > -0.05)
+                var forestScore = -noiseHarmonic + (alt >= 100.0 && alt <= 1800.0 ? 0.35 : 0.0) + (slope >= 2 ? 0.15 : 0.0);
+                if (alt < 2500.0 && slope < CliffMinSlope && forestScore > -0.05)
                 {
                     _biome[i, j] = 1; // foret
                     continue;
@@ -678,12 +686,14 @@ public sealed class ZoneMaskGrid
         }
     }
 
-    private static double ComputeSlope(double wx, double wy, Heightmap hm)
+    /// <summary>La pente en un point, en % (mètres de dénivelé pour 100 m), mesurée de part et d'autre sur 600 m.</summary>
+    public static double ComputeSlope(double wx, double wy, Heightmap hm)
     {
-        const double delta = 6.0;
-        var dx = (hm.SampleElevation(wx + delta, wy) - hm.SampleElevation(wx - delta, wy)) / (2.0 * delta);
-        var dy = (hm.SampleElevation(wx, wy + delta) - hm.SampleElevation(wx, wy - delta)) / (2.0 * delta);
-        return Math.Sqrt(dx * dx + dy * dy);
+        const double delta = 6.0; // unités de carte (600 m)
+        var run = 2.0 * delta * MapScale.MetersPerUnit;
+        var dx = (hm.SampleElevation(wx + delta, wy) - hm.SampleElevation(wx - delta, wy)) / run;
+        var dy = (hm.SampleElevation(wx, wy + delta) - hm.SampleElevation(wx, wy - delta)) / run;
+        return Math.Sqrt(dx * dx + dy * dy) * 100;
     }
 
     private static bool IsNearSea(double wx, double wy, Heightmap hm, double maxDist)

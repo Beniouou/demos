@@ -36,7 +36,7 @@ public sealed class PoliticsLayer : MapLayer
     private static void DrawPrefecturesAndJurisdictions(MapDrawContext c)
     {
         var prefectures = c.GameView?.Prefectures();
-        var s = c.Zoom;
+        var s = c.SymbolScale;
 
         if (prefectures is { Count: > 0 } prefs)
         {
@@ -72,7 +72,7 @@ public sealed class PoliticsLayer : MapLayer
             // Aucune préfecture formelle : tracer les bassins de juridiction directe des communes
             foreach (var (_, _, pos, _) in c.Data.Communes())
             {
-                var disk = MapData.CirclePolygon(pos, 240.0f, 20);
+                var disk = MapData.CirclePolygon(pos, c.Data.CommuneRadius(), 24);
                 var screenPts = disk.Select(c.ToScreen).ToArray();
                 var wash = MapPalette.PrefectureWash;
                 c.SafeDrawColoredPolygon(screenPts, wash);
@@ -104,7 +104,7 @@ public sealed class PoliticsLayer : MapLayer
 
     private static void DrawPrefectureHeader(MapDrawContext c, Vector2 seatCenter, string prefName)
     {
-        var s = c.Zoom;
+        var s = c.SymbolScale;
         var fontSize = (int)Math.Clamp(11 * s, 10, 14);
         var label = $"DÉPARTEMENT DE {prefName.ToUpperInvariant()}";
         var textSize = c.Font.GetStringSize(label, HorizontalAlignment.Left, -1, fontSize);

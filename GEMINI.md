@@ -42,11 +42,11 @@ Tu peux créer tes propres fichiers : par exemple un dossier `src/Demos.Domain/M
 Le document de règles de référence est dans Claude Docs, et tu n'y as pas accès. Voici ce qu'il dit d'utile pour toi.
 
 **Carte géographique vectorielle continue (implémentée et opérationnelle)**
-- Une carte vectorielle continue en coordonnées réelles (lieues), sans cases ni hexagones, enregistrée dans `game/data/carte.json` (`VectorMapDefinition` dans `src/Demos.Domain/Map/MapVectorData.cs`).
+- Une carte vectorielle continue en coordonnées réelles (unités de 100 m : 360 × 225 km), sans cases ni hexagones, enregistrée dans `game/data/carte.json` (`VectorMapDefinition` dans `src/Demos.Domain/Map/MapVectorData.cs`).
 - Rendu vectoriel sous deux styles : **IGN Pastel Moderne** et **Parchemin Ancien 1874**.
 - Relief ombré physique continu (*Hillshading 3D* Azimut 315° NW, Zénith 45°, méthode de Horn) avec adret crème chaud et ubac bistre/sépia.
 - Réseau hydrographique thalweg (creusement de vallées naturelles) et trait de côte avec hauts-fonds/estran et écume marine blanche.
-- Les 7 biomes géomorphologiques naturels : Glacier ($\ge 2\,500\text{ m}$), Falaise (pente $\ge 150\%$), Marais ($< 400\text{ m}$, pente $< 30\%$, bord d'eau), Terre fertile ($< 600\text{ m}$, pente $< 60\%$), Plage ($\le 30\text{ m}$, pente $< 40\%$), Désert ($< 250\text{ m}$, pente $< 20\%$), Forêt ($< 2\,500\text{ m}$, pente $< 150\%$).
+- Les 7 biomes géomorphologiques naturels (pentes en vrais %, mesurées sur 1,2 km ; corrigé le 12 novembre 2026, les anciens seuils valaient 100 fois trop) : Glacier (≥ 2 500 m), Falaise (versant très raide, pente ≥ 8 %), Marais (< 400 m, pente < 1 %, bord d'eau), Terre fertile (< 600 m, pente < 10 %), Plage (≤ 30 m, pente < 2 %), Désert (< 250 m, pente < 2 %), Forêt (< 2 500 m, pente < 8 %). Seuils dans `ZoneMaskGrid` (`CliffMinSlope`…). L'éditeur charge le relief de la carte (images du jeu, ou recalculé depuis les courbes), pas un relief procédural.
 - Gestion topologique stricte des trous polygonaux intérieurs (`PolygonArea.Holes`) : les sommets intérieurs ceinturés de falaises sont préservés.
 
 **Éditeur de carte (`tools/Demos.Carte`)**
@@ -66,12 +66,12 @@ Le document de règles de référence est dans Claude Docs, et tu n'y as pas acc
 - La logistique : quels bâtiments (route, voie ferrée, gare, port…) réduisent la perte entre communes, et de combien ? Lignes d'approvisionnement avec délais.
 
 **Distances (décidé par l'utilisateur le 10 novembre 2026)**
-- **Perte de transport entre communes** : 20 % × (0,5 + 0,5 × distance ÷ 500 lieues), bornée entre 5 % et 60 %
-  (environ 11 % à 50 lieues, 20 % à 500, 40 % à 1 500). Sans position sur la carte, la perte reste de 20 %.
-- **Pollution venue d'une autre commune** : 10 % ÷ (1 + (distance ÷ 250 lieues)²), en gardant le plafond (jamais plus,
+- **Perte de transport entre communes** : 20 % × (0,5 + 0,5 × distance ÷ 50 km), bornée entre 5 % et 60 %
+  (environ 11 % à 5 km, 20 % à 50 km, 40 % à 150 km). Sans position sur la carte, la perte reste de 20 %.
+- **Pollution venue d'une autre commune** : 10 % ÷ (1 + (distance ÷ 25 km)²), en gardant le plafond (jamais plus,
   par habitant, que dans la commune où elle est produite).
-- **Terme distance de l'extension** : distance au chef-lieu (la capitale pour l'État) ÷ **2 000 lieues** par point de
-  charge, et non 500 : à 500, une seule commune à 800 lieues faisait tomber le trésor de 153 838 à 51 067 en 3 ans.
+- **Terme distance de l'extension** : distance au chef-lieu (la capitale pour l'État) ÷ **200 km** par point de
+  charge, et non 50 : à 50 km, une seule commune à 80 km faisait tomber le trésor de 153 838 à 51 067 en 3 ans.
 - Ces chiffres sont des réglages (`transportLoss`, `transportReferenceDistance`, `transportLossMin`, `transportLossMax`,
   `distantPollutionShare`, `pollutionDispersionDistance`, `extensionDistancePerLoad`) dans `BalanceSettings`,
   `equilibrage.json` et la feuille Constantes du tableur. Ne pas les remettre en constantes dans le code.
@@ -81,7 +81,7 @@ Le document de règles de référence est dans Claude Docs, et tu n'y as pas acc
 **Bâtiments d'extraction sur la carte (décidé par l'utilisateur le 10 novembre 2026, codé par Claude)**
 - Un camp de bûcheron se pose sur une forêt, une ferme (ou entreprise agricole) sur une terre fertile, une carrière sur
   un gisement de pierre, une mine sur un gisement de charbon ou de fer selon sa recette. C'est **obligatoire**.
-- Il se pose à **240 lieues** de sa commune au plus (réglage `extractionMaxDistance`). La distance n'a **aucun effet** sur
+- Il se pose à **20 km** de sa commune au plus (réglage `extractionMaxDistance`). La distance n'a **aucun effet** sur
   la production pour l'instant. Une zone peut être partagée par plusieurs bâtiments et plusieurs communes.
 - Les bâtiments d'extraction du départ sont posés automatiquement sur la zone qui convient la plus proche de leur
   commune. Tour de forage et puits : sans zone pour l'instant.
@@ -100,14 +100,21 @@ Le document de règles de référence est dans Claude Docs, et tu n'y as pas acc
 - La charge vaut : population comptée / 20 000 + bâtiments publics directs / 40 + 0,25 × bâtiments autonomes / 40 +
   0,1 × la charge hors population des entités contenues + **distance**.
 - **Le terme distance est maintenant branché** : calculé par `AdministrativeDistance.cs` et injecté via
-  `Func<string, double>? distanceOf` dans `Extension.Compute`. Réglage décidé : **2 000 lieues par point de charge** ; c'est le réglage `extensionDistancePerLoad`.
+  `Func<string, double>? distanceOf` dans `Extension.Compute`. Réglage décidé : **200 km par point de charge** ; c'est le réglage `extensionDistancePerLoad`.
 - Chaque préfecture traversée entre l'entité qui décide et la commune fait perdre 10 % d'efficacité.
+
+**Échelle de la carte (décidé le 12 novembre 2026 ; la « lieue » est abandonnée)**
+- Une unité de carte vaut 100 m (`src/Demos.Domain/Map/MapScale.cs`) : la carte fait 360 × 225 km. Les règles et les
+  réglages de distance sont en km ; les coordonnées restent en unités, converties par `MapScale`. Ne plus écrire « lieue ».
+- Ressort d'une commune : 8 km ; d'une préfecture : 40 km autour du chef-lieu, plus les ressorts de ses communes.
+- Maisons et arbres sont presque à l'échelle (un toit figure un îlot de 100 m, un arbre un bosquet). Tailles dans
+  `MapPalette` ; une barre d'échelle en km est en bas à gauche de la carte.
 
 **Routes (décidé et codé le 10 novembre 2026)** — règle dans `src/Demos.Domain/Map/Roads.cs`
 - Le trafic les crée : quand deux communes échangent assez en un mois, un sentier apparaît, puis un chemin, puis une
   route (un niveau par mois au plus). Seuils validés (11 novembre 2026) : 1 000, 4 000 et 9 000 produits par mois.
 - Le tracé suit le chemin le moins cher sur la carte d'altitude (`game/data/relief-altitude.png`) : un pas coûte sa
-  longueur × (1 + 0,1 × pente), une pente de plus de 40 m par lieue et la mer sont interdites, une voie existante coûte
+  longueur × (1 + 0,1 × pente), une pente de plus de 12 % et la mer sont interdites, une voie existante coûte
   moitié prix (le réseau se ramifie).
 - Effet : un chemin retire 25 % de la perte de transport, une route 50 %.
 - Coût : construction et entretien selon la longueur et la montée, payés par la plus petite structure qui contient les

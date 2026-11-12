@@ -4,13 +4,13 @@ using Godot;
 namespace Demos.Game.Map.Layers;
 
 /// <summary>
-/// La caméra de la carte : le déplacement (en pixels) et le zoom. Un point de la carte (en lieues) est à l'écran en
+/// La caméra de la carte : le déplacement (en pixels) et le zoom. Un point de la carte (en unités de carte) est à l'écran en
 /// « déplacement + point × zoom ». La taille est celle de la carte à l'écran.
 /// </summary>
 public sealed class MapCamera(Func<Vector2> size)
 {
     public const float MinZoom = 0.4f;
-    public const float MaxZoom = 3.5f;
+    public const float MaxZoom = 8.75f;
 
     public Vector2 PanOffset { get; set; }
     public float Zoom { get; private set; } = 1.0f;

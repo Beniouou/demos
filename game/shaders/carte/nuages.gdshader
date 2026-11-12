@@ -5,12 +5,12 @@ shader_type canvas_item;
 #include "res://shaders/carte/relief.gdshaderinc"
 #include "res://shaders/carte/bruit.gdshaderinc"
 
-uniform float cloud_size = 180.0;           // la taille d'un nuage (lieues)
-uniform vec2 wind = vec2(5.0, -2.0);        // leur vitesse (lieues par seconde)
+uniform float cloud_size = 180.0;           // la taille d'un nuage (unités de carte)
+uniform vec2 wind = vec2(5.0, -2.0);        // leur vitesse (unités de carte par seconde)
 uniform float coverage = 0.64;              // plus haut : moins de nuages
 uniform float cloud_opacity = 0.55;
 uniform float shadow_opacity = 0.18;
-uniform vec2 shadow_offset = vec2(40.0, 55.0);   // lieues
+uniform vec2 shadow_offset = vec2(40.0, 55.0);   // unités
 uniform vec3 cloud_color = vec3(0.98, 0.98, 0.97);
 uniform vec3 shadow_color = vec3(0.10, 0.12, 0.16);
 

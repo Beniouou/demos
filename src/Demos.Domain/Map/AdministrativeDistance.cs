@@ -11,7 +11,7 @@ namespace Demos.Domain.Map;
 /// Une commune gère son propre territoire en direct (charge distance = 0).
 /// Pour une préfecture ou l'État, la charge est la somme des distances entre son chef-lieu (<see cref="Structure.SeatId"/> :
 /// la capitale pour l'État) et les entités qu'elle contient, divisée par le réglage
-/// <see cref="BalanceSettings.ExtensionDistancePerLoad"/> (décidé le 10 novembre 2026 : 2 000 lieues par point).
+/// <see cref="BalanceSettings.ExtensionDistancePerLoad"/> (décidé le 10 novembre 2026 ; 200 km par point depuis l'échelle du 12 novembre 2026).
 /// </summary>
 public static class AdministrativeDistance
 {
@@ -44,7 +44,7 @@ public static class AdministrativeDistance
         {
             var childCommuneId = child.IsCommune ? child.Id : child.SeatId;
             if (childCommuneId is not null && positions.TryGetValue(childCommuneId, out var childPos))
-                totalDistance += seatPos.DistanceTo(childPos);
+                totalDistance += MapScale.KmBetween(seatPos, childPos);
         }
 
         return totalDistance / perLoad;

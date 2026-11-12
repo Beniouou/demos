@@ -127,11 +127,11 @@ public sealed record BalanceSettings
     public double TransportLoss { get; init; } = 0.2;
 
     /// <summary>
-    /// Distance de référence du transport, en lieues : la perte y vaut <see cref="TransportLoss"/>. La perte suit
+    /// Distance de référence du transport, en km : la perte y vaut <see cref="TransportLoss"/>. La perte suit
     /// TransportLoss × (0,5 + 0,5 × distance ÷ cette distance), bornée par <see cref="TransportLossMin"/> et
     /// <see cref="TransportLossMax"/> (décidé le 10 novembre 2026).
     /// </summary>
-    public double TransportReferenceDistance { get; init; } = 500;
+    public double TransportReferenceDistance { get; init; } = 50;
 
     /// <summary>Perte de transport minimale entre deux communes distinctes.</summary>
     public double TransportLossMin { get; init; } = 0.05;
@@ -143,18 +143,27 @@ public sealed record BalanceSettings
     public double DistantPollutionShare { get; init; } = 0.1;
 
     /// <summary>
-    /// Distance de dispersion de la pollution, en lieues : à cette distance, la part reçue est divisée par 2. La part
+    /// Distance de dispersion de la pollution, en km : à cette distance, la part reçue est divisée par 2. La part
     /// suit DistantPollutionShare ÷ (1 + (distance ÷ cette distance)²) (décidé le 10 novembre 2026).
     /// </summary>
-    public double PollutionDispersionDistance { get; init; } = 250;
+    public double PollutionDispersionDistance { get; init; } = 25;
 
     /// <summary>
-    /// Distance maximale, en lieues, entre un bâtiment d'extraction et sa commune : il se pose sur une zone de la carte
-    /// qui correspond (forêt, terre fertile, pierre, charbon, fer) à cette distance au plus (décidé le 10 novembre 2026).
+    /// Distance maximale, en km, entre un bâtiment d'extraction et sa commune : il se pose sur une zone de la carte
+    /// qui correspond (forêt, terre fertile, pierre, charbon, fer) à cette distance au plus (décidé le 10 novembre 2026 ; 20 km depuis l'échelle du 12 novembre 2026).
     /// </summary>
-    public double ExtractionMaxDistance { get; init; } = 240;
+    public double ExtractionMaxDistance { get; init; } = 20;
 
-    // ---- Routes (règle décidée le 10 novembre 2026 ; chiffres validés le 11 novembre 2026) -------------------------
+    /// <summary>Ressort d'une commune : le rayon, en km, du territoire qu'elle tient autour d'elle (12 novembre 2026).</summary>
+    public double CommuneJurisdictionRadius { get; init; } = 8;
+
+    /// <summary>
+    /// Ressort d'une préfecture : le rayon, en km, de son territoire autour de son chef-lieu ; il s'ajoute aux ressorts
+    /// de ses communes (12 novembre 2026).
+    /// </summary>
+    public double PrefectureJurisdictionRadius { get; init; } = 40;
+
+    // ---- Routes (règle décidée le 10 novembre 2026 ; chiffres validés le 11 novembre 2026, en km depuis le 12) ---------
 
     /// <summary>Routes : trafic d'un mois entre deux lieux (produits échangés, dans les deux sens) pour ouvrir un sentier.</summary>
     public double RoadTrailTraffic { get; init; } = 1000;
@@ -165,26 +174,26 @@ public sealed record BalanceSettings
     /// <summary>Routes : trafic d'un mois pour faire d'un chemin une route.</summary>
     public double RoadRoadTraffic { get; init; } = 9000;
 
-    /// <summary>Routes : coût de construction d'un sentier, par lieue de longueur (comptée avec la montée).</summary>
-    public double RoadTrailCost { get; init; } = 2;
+    /// <summary>Routes : coût de construction d'un sentier, par km de longueur (comptée avec la montée).</summary>
+    public double RoadTrailCost { get; init; } = 20;
 
-    /// <summary>Routes : coût pour faire d'un sentier un chemin, par lieue.</summary>
-    public double RoadPathCost { get; init; } = 10;
+    /// <summary>Routes : coût pour faire d'un sentier un chemin, par km.</summary>
+    public double RoadPathCost { get; init; } = 100;
 
-    /// <summary>Routes : coût pour faire d'un chemin une route, par lieue.</summary>
-    public double RoadRoadCost { get; init; } = 30;
+    /// <summary>Routes : coût pour faire d'un chemin une route, par km.</summary>
+    public double RoadRoadCost { get; init; } = 300;
 
-    /// <summary>Routes : entretien d'un sentier, par lieue et par an.</summary>
-    public double RoadTrailUpkeep { get; init; } = 0.2;
+    /// <summary>Routes : entretien d'un sentier, par km et par an.</summary>
+    public double RoadTrailUpkeep { get; init; } = 2;
 
-    /// <summary>Routes : entretien d'un chemin, par lieue et par an.</summary>
-    public double RoadPathUpkeep { get; init; } = 1;
+    /// <summary>Routes : entretien d'un chemin, par km et par an.</summary>
+    public double RoadPathUpkeep { get; init; } = 10;
 
-    /// <summary>Routes : entretien d'une route, par lieue et par an.</summary>
-    public double RoadRoadUpkeep { get; init; } = 3;
+    /// <summary>Routes : entretien d'une route, par km et par an.</summary>
+    public double RoadRoadUpkeep { get; init; } = 30;
 
-    /// <summary>Routes : lieues de longueur comptées en plus pour chaque mètre de montée (coût et entretien).</summary>
-    public double RoadClimbLength { get; init; } = 0.05;
+    /// <summary>Routes : km de longueur comptés en plus pour chaque mètre de montée (coût et entretien) : 0,005, soit 5 m.</summary>
+    public double RoadClimbLength { get; init; } = 0.005;
 
     /// <summary>Routes : part de la perte de transport retirée sur un chemin.</summary>
     public double RoadPathLossCut { get; init; } = 0.25;
@@ -192,17 +201,17 @@ public sealed record BalanceSettings
     /// <summary>Routes : part de la perte de transport retirée sur une route.</summary>
     public double RoadRoadLossCut { get; init; } = 0.5;
 
-    /// <summary>Tracé : pente la plus forte permise, en mètres de dénivelé par lieue.</summary>
-    public double RoadMaxSlope { get; init; } = 40;
+    /// <summary>Tracé : pente la plus forte permise, en % (mètres de dénivelé pour 100 m).</summary>
+    public double RoadMaxSlope { get; init; } = 12;
 
-    /// <summary>Tracé : un pas coûte sa longueur × (1 + ce poids × la pente en mètres par lieue).</summary>
+    /// <summary>Tracé : un pas coûte sa longueur × (1 + ce poids × la pente en %).</summary>
     public double RoadSlopeWeight { get; init; } = 0.1;
 
     /// <summary>Tracé : un pas sur une voie déjà tracée coûte cette part de son prix (le réseau se ramifie).</summary>
     public double RoadReuseFactor { get; init; } = 0.5;
 
-    /// <summary>Tracé : taille d'une case de la grille du tracé, en lieues.</summary>
-    public double RoadGridCell { get; init; } = 8;
+    /// <summary>Tracé : taille d'une case de la grille du tracé, en km.</summary>
+    public double RoadGridCell { get; init; } = 0.8;
 
     /// <summary>Pollution par habitant et par jour au-delà de laquelle une commune est polluée.</summary>
     public double PollutedThreshold { get; init; } = 0.1;
@@ -270,10 +279,11 @@ public sealed record BalanceSettings
     public double ExtensionCountedShare { get; init; } = 0.25;
 
     /// <summary>
-    /// Extension : lieues entre une entité contenue et le chef-lieu (la capitale pour l'État) pour 1 point de charge
-    /// (décidé le 10 novembre 2026 : 2 000 ; à 500, une seule commune à 800 lieues faisait s'effondrer le trésor).
+    /// Extension : km entre une entité contenue et le chef-lieu (la capitale pour l'État) pour 1 point de charge
+    /// (décidé le 10 novembre 2026 : 2 000 unités de carte, soit 200 km ; à 50 km, une seule commune à 80 km faisait
+    /// s'effondrer le trésor).
     /// </summary>
-    public double ExtensionDistancePerLoad { get; init; } = 2000;
+    public double ExtensionDistancePerLoad { get; init; } = 200;
 
     /// <summary>Bureaucratie : perte d'efficacité par préfecture traversée entre l'entité qui décide et la commune.</summary>
     public double BureaucracyLossPerLevel { get; init; } = 0.1;

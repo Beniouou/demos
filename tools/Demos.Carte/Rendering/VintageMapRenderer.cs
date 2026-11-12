@@ -640,7 +640,7 @@ public static class VintageMapRenderer
 
         var barX = cx - 55f;
         var barY = cy + r + 26f;
-        const float barW = 110f;
+        var barW = (float)MapScale.ToUnits(10); // 10 km, en unités de carte (100 m)
         const float barH = 5f;
 
         using var barFont = new Font("Georgia", 8f, FontStyle.Regular);

@@ -68,7 +68,7 @@ public class ProductionAxisTests
         var positions = new Dictionary<string, Demos.Domain.Map.Point2D>
         {
             ["commune"] = new(0, 0),
-            ["commune-2"] = new(250, 0), // d = 250 lieues = d_disp -> part divisée par 2 = 5 %
+            ["commune-2"] = new(250, 0), // d = 250 unités = d_disp -> part divisée par 2 = 5 %
         };
 
         var shareOf = (string src, string dst) => Demos.Domain.Map.GeographicEconomics.DistantPollutionShare(src, dst, positions);

@@ -49,7 +49,7 @@ public sealed class EditorContextBarManager
     // Pinceau Terrain
     public Label LblBrushRadius { get; } = new() { Text = "Rayon :", AutoSize = true, Margin = new Padding(0, 6, 2, 0) };
     public TrackBar SliderBrushRadius { get; } = new() { Minimum = 15, Maximum = 400, Value = 80, TickStyle = TickStyle.None, Height = 24, Width = 110, Margin = new Padding(0, 4, 2, 0) };
-    public Label LblBrushRadiusVal { get; } = new() { Text = "80 lieues", AutoSize = true, Margin = new Padding(0, 6, 8, 0) };
+    public Label LblBrushRadiusVal { get; } = new() { Text = "8 km", AutoSize = true, Margin = new Padding(0, 6, 8, 0) };
     public Label LblBrushPower { get; } = new() { Text = "Force :", AutoSize = true, Margin = new Padding(0, 6, 2, 0) };
     public TrackBar SliderBrushPower { get; } = new() { Minimum = 5, Maximum = 150, Value = 30, TickStyle = TickStyle.None, Height = 24, Width = 100, Margin = new Padding(0, 4, 2, 0) };
     public Label LblBrushPowerVal { get; } = new() { Text = "30 m", AutoSize = true, Margin = new Padding(0, 6, 12, 0) };
@@ -59,7 +59,7 @@ public sealed class EditorContextBarManager
     // Pinceau Adoucisseur & Aplanisseur
     public Label LblSmoothRadius { get; } = new() { Text = "Rayon :", AutoSize = true, Margin = new Padding(0, 6, 2, 0) };
     public TrackBar SliderSmoothRadius { get; } = new() { Minimum = 15, Maximum = 400, Value = 80, TickStyle = TickStyle.None, Height = 24, Width = 110, Margin = new Padding(0, 4, 2, 0) };
-    public Label LblSmoothRadiusVal { get; } = new() { Text = "80 lieues", AutoSize = true, Margin = new Padding(0, 6, 8, 0) };
+    public Label LblSmoothRadiusVal { get; } = new() { Text = "8 km", AutoSize = true, Margin = new Padding(0, 6, 8, 0) };
     public Label LblSmoothPower { get; } = new() { Text = "Intensité :", AutoSize = true, Margin = new Padding(0, 6, 2, 0) };
     public TrackBar SliderSmoothPower { get; } = new() { Minimum = 10, Maximum = 100, Value = 30, TickStyle = TickStyle.None, Height = 24, Width = 100, Margin = new Padding(0, 4, 2, 0) };
     public Label LblSmoothPowerVal { get; } = new() { Text = "30 %", AutoSize = true, Margin = new Padding(0, 6, 12, 0) };
@@ -73,7 +73,7 @@ public sealed class EditorContextBarManager
     public CheckBox ChkDigThalweg { get; } = new() { Text = "Creuser vallée", Checked = true, AutoSize = true, Margin = new Padding(0, 6, 8, 0), Font = new Font("Segoe UI", 9f, FontStyle.Bold) };
     public Label LblRiverWidth { get; } = new() { Text = "Largeur :", AutoSize = true, Margin = new Padding(0, 6, 2, 0) };
     public TrackBar SliderRiverWidth { get; } = new() { Minimum = 2, Maximum = 15, Value = 5, TickStyle = TickStyle.None, Height = 24, Width = 90, Margin = new Padding(0, 4, 2, 0) };
-    public Label LblRiverWidthVal { get; } = new() { Text = "5 lieues", AutoSize = true, Margin = new Padding(0, 6, 8, 0) };
+    public Label LblRiverWidthVal { get; } = new() { Text = "500 m", AutoSize = true, Margin = new Padding(0, 6, 8, 0) };
     public Button BtnRiverDeleteLast { get; } = new() { Text = "⌫ Retirer", AutoSize = true, Margin = new Padding(0, 1, 4, 0) };
     public Button BtnRiverClearAll { get; } = new() { Text = "🗑 Tout effacer", AutoSize = true, Margin = new Padding(0, 1, 8, 0) };
 
@@ -96,7 +96,7 @@ public sealed class EditorContextBarManager
     public ComboBox ComboBiomeType { get; } = new() { DropDownStyle = ComboBoxStyle.DropDownList, Width = 165, Margin = new Padding(0, 3, 8, 0) };
     public Label LblBiomeRadius { get; } = new() { Text = "Rayon :", AutoSize = true, Margin = new Padding(0, 6, 2, 0) };
     public TrackBar SliderBiomeRadius { get; } = new() { Minimum = 15, Maximum = 300, Value = 50, TickStyle = TickStyle.None, Height = 24, Width = 110, Margin = new Padding(0, 4, 2, 0) };
-    public Label LblBiomeRadiusVal { get; } = new() { Text = "50 lieues", AutoSize = true, Margin = new Padding(0, 6, 8, 0) };
+    public Label LblBiomeRadiusVal { get; } = new() { Text = "5 km", AutoSize = true, Margin = new Padding(0, 6, 8, 0) };
     public Label LblBiomeName { get; } = new() { Text = "Nom :", AutoSize = true, Margin = new Padding(0, 6, 2, 0) };
     public TextBox TxtBiomeName { get; } = new() { Text = "Bois des Chênes", Width = 140, Margin = new Padding(0, 3, 8, 0) };
     public Button BtnBiomeAutoGenerate { get; } = new() { Text = "🪄 Peupler biomes", AutoSize = true, Margin = new Padding(0, 1, 4, 0) };
@@ -115,7 +115,7 @@ public sealed class EditorContextBarManager
     public ComboBox ComboResourceType { get; } = new() { DropDownStyle = ComboBoxStyle.DropDownList, Width = 135, Margin = new Padding(0, 3, 8, 0) };
     public Label LblResRadius { get; } = new() { Text = "Rayon :", AutoSize = true, Margin = new Padding(0, 6, 2, 0) };
     public TrackBar SliderResourceRadius { get; } = new() { Minimum = 10, Maximum = 200, Value = 40, TickStyle = TickStyle.None, Height = 24, Width = 100, Margin = new Padding(0, 4, 2, 0) };
-    public Label LblResourceRadiusVal { get; } = new() { Text = "40 lieues", AutoSize = true, Margin = new Padding(0, 6, 8, 0) };
+    public Label LblResourceRadiusVal { get; } = new() { Text = "4 km", AutoSize = true, Margin = new Padding(0, 6, 8, 0) };
     public Label LblResName { get; } = new() { Text = "Nom :", AutoSize = true, Margin = new Padding(0, 6, 2, 0) };
     public TextBox TxtResourceRegion { get; } = new() { Text = "Carrière de pierre", Width = 130, Margin = new Padding(0, 3, 8, 0) };
     public Button BtnResourceClearAll { get; } = new() { Text = "🗑 Effacer ressources", AutoSize = true, Margin = new Padding(0, 1, 8, 0) };
@@ -207,10 +207,10 @@ public sealed class EditorContextBarManager
     {
         ComboDimensions.Items.Clear();
         ComboDimensions.Items.AddRange([
-            "Petit Pays (2 400 × 1 500)",
-            "Grand Royaume (3 600 × 2 250)",
-            "Région / Duché (1 200 × 800)",
-            "Standard (1 000 × 640)"
+            "Petit Pays (240 × 150 km)",
+            "Grand Royaume (360 × 225 km)",
+            "Région / Duché (120 × 80 km)",
+            "Standard (100 × 64 km)"
         ]);
         ComboDimensions.SelectedIndex = 0;
     }

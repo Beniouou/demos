@@ -21,10 +21,10 @@ internal static class SimulationReport
     private const int FoundingDay = 30;
 
     /// <summary>
-    /// Distance de la deuxième commune à la capitale, en lieues, quand aucune n'est donnée : pour que la simulation
+    /// Distance de la deuxième commune à la capitale, en km, quand aucune n'est donnée : pour que la simulation
     /// éprouve les règles de la carte (transport, pollution, distance administrative). Réglage de l'outil, pas du jeu.
     /// </summary>
-    public const double DefaultSecondCommuneDistance = 500;
+    public const double DefaultSecondCommuneDistance = 50;
 
     /// <summary>
     /// Simule <paramref name="years"/> ans ; avec <paramref name="secondCommuneDistance"/>, une deuxième commune est fondée
@@ -44,7 +44,7 @@ internal static class SimulationReport
         var roadNotes = new List<string>();
         var lastRoadChanges = simulation.RoadChanges;
 
-        Console.WriteLine($"Simulation de {years} an(s){(secondCommuneDistance is { } announced ? $", avec une deuxième commune à {Count(announced)} lieues de la capitale" : "")}…");
+        Console.WriteLine($"Simulation de {years} an(s){(secondCommuneDistance is { } announced ? $", avec une deuxième commune à {Count(announced)} km de la capitale" : "")}…");
         var day = 0;
         for (var year = 1; year <= years; year++)
         {
@@ -97,7 +97,7 @@ internal static class SimulationReport
             _ => "plus rien",
         };
         var link = change.Link;
-        var between = $"{Name(link.A)} – {Name(link.B)} ({Count(link.Length)} lieues, montée {Count(link.Climb)} m, payé par {Name(link.PayerId)})";
+        var between = $"{Name(link.A)} – {Name(link.B)} ({link.Length.ToString("0.#", French)} km, montée {Count(link.Climb)} m, payé par {Name(link.PayerId)})";
         return change.Reason switch
         {
             "trafic" => $"{Level(link.Level)} entre {between} : {Money(change.Cost)}",
@@ -112,12 +112,12 @@ internal static class SimulationReport
         var pole = Orientation.All.MaxBy(p => world.Legitimacy[p]);
         // À l'ouest de la capitale, à la distance demandée ; sans position si la capitale n'en a pas sur la carte.
         Demos.Domain.Map.Point2D? position = world.CapitalId is { } capitalId && world.CommunePositions.TryGetValue(capitalId, out var capital)
-            ? new(capital.X - distance, capital.Y)
+            ? new(capital.X - Demos.Domain.Map.MapScale.ToUnits(distance), capital.Y)
             : null;
         var commune = simulation.TryFoundCommune("Deuxième commune", PrototypeScenario.FirstCommuneId, PaymentMode.StockFirst, pole, 5, position);
         var cost = world.BuildingTypes[Simulation.BaseCampTypeId].Construction;
         var materials = cost is null ? "aucun coût de construction" : $"{Count(cost.Quantity)} {cost.ProductId}, {cost.Days} jours de chantier";
-        var place = position is null ? "sans position sur la carte" : $"à {Count(distance)} lieues de la capitale";
+        var place = position is null ? "sans position sur la carte" : $"à {Count(distance)} km de la capitale";
         return commune is not null
             ? $"Deuxième commune fondée le jour {FoundingDay}, {place} (charte {pole.Code}, {materials}, payés par la réserve de chantier, le stock ou le trésor)."
             : $"La deuxième commune n'a pas pu être fondée le jour {FoundingDay} ({materials} : matériaux, argent ou légitimité insuffisants).";

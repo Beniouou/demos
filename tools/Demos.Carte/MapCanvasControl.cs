@@ -49,6 +49,21 @@ public sealed class MapCanvasControl : Control
     private PointF _dragCommuneStartWorld = PointF.Empty;
     private PointF _dragCommuneCurrentWorld = PointF.Empty;
 
+    // La carte dessinée gardée en image (un dessin complet coûte ~0,4 s) : redessinée seulement quand la carte, le
+    // relief, le zoom, le déplacement, la taille, le style ou les cases à cocher changent. Le survol ne redessine que
+    // les surimpressions ; pendant un glissement, l'image est décalée ; pendant un coup de pinceau, la carte est
+    // redessinée au plus toutes les MinRedrawInterval ms (l'image précédente sert entre deux).
+    private const int MinRedrawInterval = 120;
+    private Bitmap? _mapCache;
+    private (VectorMapDefinition? Map, int Relief, float Zoom, PointF Pan, Size Size, MapRenderStyle Style, int Flags) _cacheKey;
+    private int _reliefVersion;
+    private long _lastRenderTicks;
+    private readonly System.Windows.Forms.Timer _redrawTimer = new() { Interval = MinRedrawInterval };
+
+    // Pinceaux de biomes et de gisements : les contours ne sont recalculés qu'au relâcher ; en attendant, la trace
+    // du pinceau est dessinée par-dessus (centre, rayon, ajout ou effacement).
+    private readonly List<(double X, double Y, double Radius, bool Adding)> _zoneStroke = [];
+
     [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
     public double BrushRadius { get; set; } = 80.0;
 
@@ -172,12 +187,35 @@ public sealed class MapCanvasControl : Control
             true);
 
         BackColor = Color.FromArgb(240, 235, 225);
+        _redrawTimer.Tick += (_, _) =>
+        {
+            _redrawTimer.Stop();
+            Invalidate();
+        };
+    }
+
+    /// <summary>Le relief a été modifié sur place : la carte gardée en image sera redessinée.</summary>
+    public void NotifyReliefChanged()
+    {
+        _reliefVersion++;
+        Invalidate();
+    }
+
+    protected override void Dispose(bool disposing)
+    {
+        if (disposing)
+        {
+            _redrawTimer.Dispose();
+            _mapCache?.Dispose();
+        }
+        base.Dispose(disposing);
     }
 
     public void SetMap(VectorMapDefinition map, Heightmap heightmap, MapRenderStyle style, ZoneMaskGrid? zoneGrid = null)
     {
         _map = map;
         _heightmap = heightmap;
+        _reliefVersion++;
         _style = style;
         if (zoneGrid is not null) ZoneGrid = zoneGrid;
         Invalidate();
@@ -258,19 +296,11 @@ public sealed class MapCanvasControl : Control
             return;
         }
 
-        // Rendu de la carte avec zoom et panoramique
-        MapRenderer.Render(
-            e.Graphics,
-            ClientRectangle,
-            _map,
-            _heightmap,
-            _style,
-            _zoom,
-            _panOffset,
-            ShowContours,
-            ShowLabels,
-            ShowResources,
-            ShowCadastre);
+        // Rendu de la carte avec zoom et panoramique (gardé en image)
+        DrawMapFromCache(e.Graphics);
+
+        // La trace du pinceau de biome ou de gisement, en attendant le relâcher
+        DrawZoneStroke(e.Graphics);
 
         // Dessin des surimpressions d'outils (Preview du pinceau, tracés en cours)
         DrawToolOverlays(e.Graphics);
@@ -280,6 +310,84 @@ public sealed class MapCanvasControl : Control
         {
             DrawMinimap(e.Graphics);
         }
+    }
+
+    /// <summary>
+    /// Dessine la carte depuis l'image gardée, en la refaisant seulement si quelque chose a changé (voir
+    /// <see cref="_mapCache"/>).
+    /// </summary>
+    private void DrawMapFromCache(Graphics g)
+    {
+        var size = ClientSize;
+        if (size.Width <= 0 || size.Height <= 0)
+            return;
+
+        var flags = (ShowContours ? 1 : 0) | (ShowLabels ? 2 : 0) | (ShowResources ? 4 : 0) | (ShowCadastre ? 8 : 0);
+        (VectorMapDefinition? Map, int Relief, float Zoom, PointF Pan, Size Size, MapRenderStyle Style, int Flags) key =
+            (_map, _reliefVersion, _zoom, _panOffset, size, _style, flags);
+        var stale = _mapCache is null || key != _cacheKey;
+
+        if (stale && _mapCache is not null && _cacheKey.Size == size)
+        {
+            var onlyPan = key with { Pan = _cacheKey.Pan } == _cacheKey;
+            var sinceLast = (Environment.TickCount64 - _lastRenderTicks);
+
+            // Glissement : l'image décalée, la carte nette au relâcher.
+            if (onlyPan && _isPanning)
+            {
+                g.Clear(BackColor);
+                g.DrawImageUnscaled(_mapCache, (int)(_panOffset.X - _cacheKey.Pan.X), (int)(_panOffset.Y - _cacheKey.Pan.Y));
+                return;
+            }
+
+            // Coup de pinceau : pas plus d'un dessin complet toutes les MinRedrawInterval ms.
+            if (_isBrushing && sinceLast < MinRedrawInterval)
+            {
+                g.DrawImageUnscaled(_mapCache, 0, 0);
+                if (!_redrawTimer.Enabled)
+                    _redrawTimer.Start();
+                return;
+            }
+        }
+
+        if (stale)
+        {
+            if (_mapCache is null || _mapCache.Size != size)
+            {
+                _mapCache?.Dispose();
+                _mapCache = new Bitmap(size.Width, size.Height);
+            }
+            using (var cg = Graphics.FromImage(_mapCache))
+                MapRenderer.Render(cg, new Rectangle(Point.Empty, size), _map!, _heightmap!, _style, _zoom, _panOffset,
+                    ShowContours, ShowLabels, ShowResources, ShowCadastre);
+            _cacheKey = key;
+            _lastRenderTicks = Environment.TickCount64;
+        }
+
+        g.DrawImageUnscaled(_mapCache!, 0, 0);
+    }
+
+    /// <summary>La trace du pinceau de biome ou de gisement en cours (vert : ajout, rouge : effacement).</summary>
+    private void DrawZoneStroke(Graphics g)
+    {
+        if (_zoneStroke.Count == 0 || _map is null)
+            return;
+        var origin = ScreenToWorld(Point.Empty);
+        var scale = Math.Min((float)Width / (float)_map.Width, (float)Height / (float)_map.Height) * _zoom;
+        // Un seul tracé par couleur, rempli d'un coup (FillMode.Winding) : les cercles qui se chevauchent ne foncent pas.
+        using var addPath = new GraphicsPath(FillMode.Winding);
+        using var erasePath = new GraphicsPath(FillMode.Winding);
+        foreach (var (x, y, radius, adding) in _zoneStroke)
+        {
+            var r = (float)radius * scale;
+            var cx = ((float)x - origin.X) * scale;
+            var cy = ((float)y - origin.Y) * scale;
+            (adding ? addPath : erasePath).AddEllipse(cx - r, cy - r, r * 2, r * 2);
+        }
+        using var add = new SolidBrush(Color.FromArgb(80, 60, 140, 60));
+        using var erase = new SolidBrush(Color.FromArgb(80, 190, 60, 50));
+        g.FillPath(add, addPath);
+        g.FillPath(erase, erasePath);
     }
 
     private void DrawToolOverlays(Graphics g)
@@ -637,6 +745,7 @@ public sealed class MapCanvasControl : Control
                 _isBrushing = true;
                 var delta = e.Button == MouseButtons.Left ? Math.Abs(BrushPower) : -Math.Abs(BrushPower);
                 _heightmap.ApplyBrush(wx, wy, BrushRadius, delta, BrushProfile);
+                _reliefVersion++;
                 var updatedWater = ContourExtractor.ExtractWaterBodies(_heightmap);
                 _map = _map with { WaterBodies = updatedWater };
                 Invalidate();
@@ -656,6 +765,7 @@ public sealed class MapCanvasControl : Control
                 {
                     _heightmap.ApplySmoothBrush(wx, wy, SmoothBrushRadius, powerFactor);
                 }
+                _reliefVersion++;
                 var updatedWater = ContourExtractor.ExtractWaterBodies(_heightmap);
                 _map = _map with { WaterBodies = updatedWater };
                 Invalidate();
@@ -672,9 +782,8 @@ public sealed class MapCanvasControl : Control
                 {
                     BiomeValidationWarning?.Invoke(warn);
                 }
-                var biomes = ZoneGrid?.ExtractBiomes(BiomeBrushType, BiomeBrushName) ?? [];
-                var forests = ZoneGrid?.ExtractForests(BiomeBrushName) ?? [];
-                _map = _map with { Biomes = biomes, Forests = forests };
+                // Les contours sont recalculés au relâcher (EndBrushing) : ici, seulement la trace.
+                _zoneStroke.Add((wx, wy, BiomeBrushRadius, isAdding));
                 Invalidate();
                 return;
             }
@@ -683,8 +792,7 @@ public sealed class MapCanvasControl : Control
             {
                 _isBrushing = true;
                 ZoneGrid?.ApplyResourceBrush(wx, wy, ResourceBrushRadius, ResourceBrushType, isAdding: e.Button == MouseButtons.Left);
-                var (zones, deposits) = ZoneGrid?.ExtractResources(ResourceBrushName) ?? ([], []);
-                _map = _map with { ResourceZones = zones, Resources = deposits };
+                _zoneStroke.Add((wx, wy, ResourceBrushRadius, e.Button == MouseButtons.Left));
                 Invalidate();
                 return;
             }
@@ -835,6 +943,7 @@ public sealed class MapCanvasControl : Control
             {
                 var delta = (e.Button & MouseButtons.Left) != 0 ? Math.Abs(BrushPower) : -Math.Abs(BrushPower);
                 heightmap.ApplyBrush(wx, wy, BrushRadius, delta * 0.4, BrushProfile);
+                _reliefVersion++;
                 var updatedWater = ContourExtractor.ExtractWaterBodies(heightmap);
                 map = map with { WaterBodies = updatedWater };
                 _map = map;
@@ -851,6 +960,7 @@ public sealed class MapCanvasControl : Control
                 {
                     heightmap.ApplySmoothBrush(wx, wy, SmoothBrushRadius, powerFactor * 0.4);
                 }
+                _reliefVersion++;
                 var updatedWater = ContourExtractor.ExtractWaterBodies(heightmap);
                 map = map with { WaterBodies = updatedWater };
                 _map = map;
@@ -865,19 +975,14 @@ public sealed class MapCanvasControl : Control
                 {
                     BiomeValidationWarning?.Invoke(warn);
                 }
-                var biomes = ZoneGrid?.ExtractBiomes(BiomeBrushType, BiomeBrushName) ?? [];
-                var forests = ZoneGrid?.ExtractForests(BiomeBrushName) ?? [];
-                map = map with { Biomes = biomes, Forests = forests };
-                _map = map;
+                _zoneStroke.Add((wx, wy, BiomeBrushRadius, isAdding));
                 Invalidate();
             }
             else if (_currentTool == EditorTool.PlaceResource)
             {
                 var isAdding = (e.Button & MouseButtons.Left) != 0;
                 ZoneGrid?.ApplyResourceBrush(wx, wy, ResourceBrushRadius, ResourceBrushType, isAdding);
-                var (zones, deposits) = ZoneGrid?.ExtractResources(ResourceBrushName) ?? ([], []);
-                map = map with { ResourceZones = zones, Resources = deposits };
-                _map = map;
+                _zoneStroke.Add((wx, wy, ResourceBrushRadius, isAdding));
                 Invalidate();
             }
         }
@@ -916,6 +1021,7 @@ public sealed class MapCanvasControl : Control
         {
             if (_heightmap is not null && _map is not null)
             {
+                _reliefVersion++;
                 var updatedWater = ContourExtractor.ExtractWaterBodies(_heightmap);
                 _map = _map with { WaterBodies = updatedWater };
             }
@@ -925,6 +1031,7 @@ public sealed class MapCanvasControl : Control
         {
             if (_heightmap is not null && _map is not null)
             {
+                _reliefVersion++;
                 var updatedWater = ContourExtractor.ExtractWaterBodies(_heightmap);
                 _map = _map with { WaterBodies = updatedWater };
             }
@@ -932,10 +1039,28 @@ public sealed class MapCanvasControl : Control
         }
         else if (_currentTool == EditorTool.DrawBiome)
         {
+            // Les contours des biomes, une seule fois pour tout le coup de pinceau.
+            if (_map is not null && ZoneGrid is not null)
+            {
+                var biomes = ZoneGrid.ExtractBiomes(BiomeBrushType, BiomeBrushName);
+                // ExtractForests refait toute l'extraction : pour un pinceau de forêt, le résultat est le même que
+                // les forêts de la liste qu'on vient de calculer.
+                var forests = BiomeBrushType is "foret" or "forest"
+                    ? biomes.Where(b => b.Kind is "foret" or "Forest").ToList()
+                    : ZoneGrid.ExtractForests(BiomeBrushName);
+                _map = _map with { Biomes = biomes, Forests = forests };
+            }
+            _zoneStroke.Clear();
             BiomeBrushApplied?.Invoke();
         }
         else if (_currentTool == EditorTool.PlaceResource)
         {
+            if (_map is not null && ZoneGrid is not null)
+            {
+                var (zones, deposits) = ZoneGrid.ExtractResources(ResourceBrushName);
+                _map = _map with { ResourceZones = zones, Resources = deposits };
+            }
+            _zoneStroke.Clear();
             ResourceBrushApplied?.Invoke();
         }
         Invalidate();

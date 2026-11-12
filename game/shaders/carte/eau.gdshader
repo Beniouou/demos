@@ -10,7 +10,7 @@ uniform vec3 deep_color = vec3(0.20, 0.42, 0.60);
 uniform float deep_at = 60.0;                        // la profondeur (m) de la teinte la plus sombre
 uniform vec3 board_color = vec3(0.16, 0.15, 0.14);   // le plateau sous la maquette, hors de la carte
 
-uniform float ripple_scale = 0.06;      // la taille des rides (plus petit : plus grandes), par lieue
+uniform float ripple_scale = 0.06;      // la taille des rides (plus petit : plus grandes), par unité de carte
 uniform float ripple_speed = 0.35;      // leur vitesse
 uniform float ripple_strength = 0.10;   // leur éclat
 uniform vec3 foam_color = vec3(0.93, 0.96, 0.95);

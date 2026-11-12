@@ -221,8 +221,8 @@ public class MapTests
         var map = System.Text.Json.JsonSerializer.Deserialize<VectorMapDefinition>(json, options);
 
         Assert.NotNull(map);
-        Assert.True(map.Width >= 1000, "La largeur de la carte doit être d'au moins 1000 lieues.");
-        Assert.True(map.Height >= 640, "La hauteur de la carte doit être d'au moins 640 lieues.");
+        Assert.True(map.Width >= 1000, "La largeur de la carte doit être d'au moins 1000 unités.");
+        Assert.True(map.Height >= 640, "La hauteur de la carte doit être d'au moins 640 unités.");
         Assert.NotEmpty(map.Contours);
         Assert.NotNull(map.SpotElevations);
         Assert.False(string.IsNullOrWhiteSpace(map.River.Name), "Le cours d'eau principal doit avoir un nom.");

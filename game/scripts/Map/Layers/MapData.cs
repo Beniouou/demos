@@ -188,43 +188,38 @@ public sealed class MapData
         return null;
     }
 
+    /// <summary>Le ressort d'une commune, en unités de carte (réglage en km, <c>communeJurisdictionRadius</c>).</summary>
+    public float CommuneRadius() => (float)MapScale.ToUnits(View?.CommuneJurisdictionRadius ?? 8);
+
     // ---- Préfectures -------------------------------------------------------------------------------------------------
 
-    /// <summary>L'enveloppe d'une préfecture : les disques de juridiction de ses communes, fusionnés (gardée).</summary>
+    /// <summary>L'enveloppe d'une préfecture : le ressort de son chef-lieu et ceux de ses communes, fusionnés (gardée).</summary>
     public List<Vector2[]> PrefecturePolygons(PrefectureView prefecture)
     {
         if (_prefecturePolygonsCache.TryGetValue(prefecture.Id, out var cached))
             return cached;
 
-        var memberPositions = new List<Vector2>();
+        // Les ressorts (en unités de carte) : celui de la préfecture autour du chef-lieu, celui d'une commune autour des autres.
+        var communeRadius = CommuneRadius();
+        var seatRadius = Math.Max(communeRadius, (float)MapScale.ToUnits(View?.PrefectureJurisdictionRadius ?? 0));
+        var disks = new List<(Vector2 Center, float Radius)>();
+        if (prefecture.SeatId is not null && CommunePosition(prefecture.SeatId) is { } seatPos)
+            disks.Add((seatPos, seatRadius));
         foreach (var memberId in prefecture.MemberIds)
-        {
-            var pos = CommunePosition(memberId);
-            if (pos.HasValue)
-                memberPositions.Add(pos.Value);
-        }
+            if (memberId != prefecture.SeatId && CommunePosition(memberId) is { } pos)
+                disks.Add((pos, communeRadius));
 
-        if (prefecture.SeatId is not null)
-        {
-            var seatPos = CommunePosition(prefecture.SeatId);
-            if (seatPos.HasValue && !memberPositions.Any(p => p.DistanceSquaredTo(seatPos.Value) < 1.0f))
-            {
-                memberPositions.Add(seatPos.Value);
-            }
-        }
-
-        if (memberPositions.Count == 0)
+        if (disks.Count == 0)
         {
             _prefecturePolygonsCache[prefecture.Id] = [];
             return [];
         }
 
-        const float radius = 240.0f; // Rayon de juridiction en lieues
-        var currentRegions = new List<Vector2[]> { CirclePolygon(memberPositions[0], radius, 16) };
+        var currentRegions = new List<Vector2[]> { CirclePolygon(disks[0].Center, disks[0].Radius, 32) };
 
-        for (var i = 1; i < memberPositions.Count; i++)
+        for (var i = 1; i < disks.Count; i++)
         {
-            var newDisk = CirclePolygon(memberPositions[i], radius, 16);
+            var newDisk = CirclePolygon(disks[i].Center, disks[i].Radius, 24);
             var mergedWithAny = false;
             for (var r = 0; r < currentRegions.Count; r++)
             {

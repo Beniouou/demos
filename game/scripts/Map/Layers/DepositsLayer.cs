@@ -26,7 +26,7 @@ public sealed class DepositsLayer : MapLayer
             foreach (var (_, shape, screenPoints, fill, stroke, _) in VisibleZones(c))
             {
                 c.FillTriangles(c.Triangles(shape), fill);
-                c.Pen.DrawPolyline(screenPoints, stroke, 2.0f * c.Zoom, antialiased: true);
+                c.Pen.DrawPolyline(screenPoints, stroke, 2.0f * c.SymbolScale, antialiased: true);
             }
             return;
         }
@@ -45,7 +45,7 @@ public sealed class DepositsLayer : MapLayer
     {
         if (c.VectorMap == null || !c.Has(MapFilters.Deposits))
             return;
-        var s = c.Zoom;
+        var s = c.SymbolScale;
 
         if (c.VectorMap.AllResourceZones.Count > 0)
         {

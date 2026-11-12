@@ -16,7 +16,7 @@ public enum RoadLevel
 }
 
 /// <summary>
-/// Une liaison entre deux lieux (deux communes) : son niveau, son tracé sur la carte (en lieues), sa longueur et sa
+/// Une liaison entre deux lieux (deux communes) : son niveau, son tracé sur la carte (en unités de carte), sa longueur (en km) et sa
 /// montée (la somme des dénivelés, en mètres), et la structure qui la paie.
 /// </summary>
 public sealed record RoadLink(string A, string B, RoadLevel Level, IReadOnlyList<Point2D> Route, double Length, double Climb, string PayerId)
@@ -210,18 +210,19 @@ public static class Roads
     }
 }
 
-/// <summary>Un tracé : ses points (en lieues), sa longueur (lieues) et sa montée (somme des dénivelés, en mètres).</summary>
+/// <summary>Un tracé : ses points (en unités de carte), sa longueur (km) et sa montée (somme des dénivelés, en mètres).</summary>
 public sealed record RoadPlan(IReadOnlyList<Point2D> Route, double Length, double Climb);
 
 /// <summary>
 /// Le tracé d'une liaison : le chemin le moins cher sur une grille posée sur la carte d'altitude. Un pas coûte sa
-/// longueur × (1 + poids × pente) ; une pente plus forte que la pente permise est interdite, comme la mer ; un pas sur
+/// longueur × (1 + poids × pente en %) ; une pente plus forte que la pente permise est interdite, comme la mer ; un pas sur
 /// une voie déjà tracée coûte moins cher, donc le réseau se ramifie. Sans carte d'altitude, le tracé est la ligne droite.
 /// </summary>
 public sealed class RoadPlanner(ReliefGrid? relief, BalanceSettings settings)
 {
     private readonly ReliefGrid? _relief = relief;
-    private readonly double _cell = Math.Max(1, settings.RoadGridCell);
+    // La case de la grille, en unités de carte (le réglage est en km).
+    private readonly double _cell = Math.Max(1, MapScale.ToUnits(settings.RoadGridCell));
     private float[]? _altitudes;
     private int _width;
     private int _height;
@@ -229,7 +230,7 @@ public sealed class RoadPlanner(ReliefGrid? relief, BalanceSettings settings)
     public RoadPlan? Plan(Point2D from, Point2D to, IEnumerable<IReadOnlyList<Point2D>> existingRoutes)
     {
         if (_relief is null)
-            return new RoadPlan([from, to], from.DistanceTo(to), 0);
+            return new RoadPlan([from, to], MapScale.KmBetween(from, to), 0);
 
         EnsureGrid();
         var start = CellOf(from);
@@ -269,7 +270,8 @@ public sealed class RoadPlanner(ReliefGrid? relief, BalanceSettings settings)
                     if (_altitudes![next] < 0 && next != goalIndex)
                         continue;
                     var step = _cell * Math.Sqrt(dx * dx + dy * dy);
-                    var slope = Math.Abs(_altitudes[next] - _altitudes[index]) / step;
+                    // La pente en % : mètres de dénivelé pour 100 m.
+                    var slope = Math.Abs(_altitudes[next] - _altitudes[index]) / (step * MapScale.MetersPerUnit) * 100;
                     if (slope > settings.RoadMaxSlope)
                         continue;
                     var cost = step * (1 + settings.RoadSlopeWeight * slope) * (onRoad[next] ? settings.RoadReuseFactor : 1);
@@ -297,7 +299,7 @@ public sealed class RoadPlanner(ReliefGrid? relief, BalanceSettings settings)
         double length = 0, climb = 0;
         for (var i = 1; i < route.Count; i++)
         {
-            length += route[i - 1].DistanceTo(route[i]);
+            length += MapScale.KmBetween(route[i - 1], route[i]);
             climb += Math.Abs(_relief.Sample(route[i].X, route[i].Y) - _relief.Sample(route[i - 1].X, route[i - 1].Y));
         }
         return new RoadPlan(route, length, climb);

@@ -31,10 +31,10 @@ public sealed class MapRelief
     /// <summary>Le nombre de pixels des images (largeur, hauteur).</summary>
     public Vector2 Texels { get; }
 
-    /// <summary>La taille d'un pixel, en lieues.</summary>
+    /// <summary>La taille d'un pixel, en unités de carte.</summary>
     public float CellSize { get; }
 
-    /// <summary>L'altitude (m) d'un point de la carte (lieues), au pixel le plus proche ; la mer est sous 0.</summary>
+    /// <summary>L'altitude (m) d'un point de la carte (unités de carte), au pixel le plus proche ; la mer est sous 0.</summary>
     public float AltitudeAt(Vector2 world)
     {
         var x = Mathf.Clamp((int)(world.X / CellSize), 0, (int)Texels.X - 1);
@@ -58,7 +58,7 @@ public sealed class MapRelief
                 return null;
             return new MapRelief(altitude, shade,
                 new Vector2(root.GetProperty("largeur").GetInt32(), root.GetProperty("hauteur").GetInt32()),
-                (float)root.GetProperty("lieuesParPixel").GetDouble());
+                (float)(root.GetProperty("metresParPixel").GetDouble() / Demos.Domain.Map.MapScale.MetersPerUnit));
         }
         catch (Exception ex)
         {

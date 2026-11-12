@@ -24,6 +24,12 @@ public sealed class MapDrawContext(CanvasItem pen, MapCamera camera, MapGeometry
 
     public Font Font => ThemeDB.FallbackFont;
     public float Zoom => Camera.Zoom;
+
+    /// <summary>
+    /// Le facteur des symboles qui grossissent avec le zoom (sceaux, étiquettes, frontières, échanges) : le zoom, mais pas
+    /// plus de <see cref="MapPalette.SymbolZoomCap"/>, pour qu'ils ne cachent pas ce qu'ils désignent de très près.
+    /// </summary>
+    public float SymbolScale => Math.Min(Zoom, MapPalette.SymbolZoomCap);
     public Vector2 Size => Camera.Size;
     public VectorMapDefinition? VectorMap => Data.VectorMap;
     public GameView? GameView => Data.View;

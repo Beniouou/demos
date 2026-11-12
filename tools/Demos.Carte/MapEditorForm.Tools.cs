@@ -71,7 +71,7 @@ public sealed partial class MapEditorForm
         _sliderBrushRadius.ValueChanged += (_, _) =>
         {
             _canvas.BrushRadius = _sliderBrushRadius.Value;
-            _contextBar.LblBrushRadiusVal.Text = $"{_sliderBrushRadius.Value} lieues";
+            _contextBar.LblBrushRadiusVal.Text = MapScale.Format(MapScale.ToKm(_sliderBrushRadius.Value));
             _canvas.Invalidate();
         };
 
@@ -90,7 +90,7 @@ public sealed partial class MapEditorForm
         _sliderSmoothRadius.ValueChanged += (_, _) =>
         {
             _canvas.SmoothBrushRadius = _sliderSmoothRadius.Value;
-            _contextBar.LblSmoothRadiusVal.Text = $"{_sliderSmoothRadius.Value} lieues";
+            _contextBar.LblSmoothRadiusVal.Text = MapScale.Format(MapScale.ToKm(_sliderSmoothRadius.Value));
             _canvas.Invalidate();
         };
 
@@ -103,7 +103,7 @@ public sealed partial class MapEditorForm
         // Fleuves
         _sliderRiverWidth.ValueChanged += (_, _) =>
         {
-            _contextBar.LblRiverWidthVal.Text = $"{_sliderRiverWidth.Value} lieues";
+            _contextBar.LblRiverWidthVal.Text = MapScale.Format(MapScale.ToKm(_sliderRiverWidth.Value));
         };
 
         _contextBar.BtnRiverDeleteLast.Click += (_, _) => DeleteLastRiver();
@@ -124,7 +124,7 @@ public sealed partial class MapEditorForm
         _sliderBiomeRadius.ValueChanged += (_, _) =>
         {
             _canvas.BiomeBrushRadius = _sliderBiomeRadius.Value;
-            _contextBar.LblBiomeRadiusVal.Text = $"{_sliderBiomeRadius.Value} lieues";
+            _contextBar.LblBiomeRadiusVal.Text = MapScale.Format(MapScale.ToKm(_sliderBiomeRadius.Value));
             _canvas.Invalidate();
         };
 
@@ -140,7 +140,7 @@ public sealed partial class MapEditorForm
         _sliderResourceRadius.ValueChanged += (_, _) =>
         {
             _canvas.ResourceBrushRadius = _sliderResourceRadius.Value;
-            _contextBar.LblResourceRadiusVal.Text = $"{_sliderResourceRadius.Value} lieues";
+            _contextBar.LblResourceRadiusVal.Text = MapScale.Format(MapScale.ToKm(_sliderResourceRadius.Value));
             _canvas.Invalidate();
         };
 
@@ -298,7 +298,7 @@ public sealed partial class MapEditorForm
             _currentMap = _currentMap with { SpotElevations = newSpots };
 
             _canvas.SetMap(_currentMap, _currentHeightmap, GetCurrentStyle());
-            Log($"✓ Lieu nommé \"{placeName}\" ({cat.DisplayName}, Alt. {alt:F0} m) posé en ({wx:F0}, {wy:F0}).");
+            Log($"✓ Lieu nommé \"{placeName}\" ({cat.DisplayName}, Alt. {alt:F0} m) posé en ({MapScale.ToKm(wx):0.0} km, {MapScale.ToKm(wy):0.0} km).");
         };
 
         _canvas.PlaceDeleted += (wx, wy) =>

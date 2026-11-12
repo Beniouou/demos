@@ -10,9 +10,9 @@ using Demos.Infrastructure;
 // Outil d'équilibrage, à lancer depuis le dossier demos :
 //   dotnet run --project tools/Demos.Equilibrage -- generer          refait le tableur depuis les données du jeu
 //   dotnet run --project tools/Demos.Equilibrage -- appliquer        reporte les cellules jaunes du tableur dans game/data
-//   dotnet run --project tools/Demos.Equilibrage -- simuler [années] [commune[=lieues]]
-//                                     simule la partie de départ (avec une 2e commune si « commune », placée à 500 lieues
-//                                     de la capitale, ou à la distance donnée : « commune=1500 ») et écrit un rapport HTML
+//   dotnet run --project tools/Demos.Equilibrage -- simuler [années] [commune[=km]]
+//                                     simule la partie de départ (avec une 2e commune si « commune », placée à 50 km
+//                                     de la capitale, ou à la distance donnée : « commune=150 ») et écrit un rapport HTML
 // Le tableur (equilibrage demos.xlsx) et le rapport (rapport simulation.html) sont à côté du dossier demos.
 
 Console.OutputEncoding = System.Text.Encoding.UTF8;
@@ -30,7 +30,7 @@ switch (command)
         return BalanceApplier.Apply(paths.Workbook, paths.Data, content);
     case "simuler":
         var years = args.Skip(1).Select(a => int.TryParse(a, out var y) ? y : 0).FirstOrDefault(y => y > 0, 3);
-        // « commune » : une 2e commune à 500 lieues de la capitale ; « commune=1500 » : à 1 500 lieues.
+        // « commune » : une 2e commune à 50 km de la capitale ; « commune=150 » : à 150 km.
         var communeArg = args.Skip(1).FirstOrDefault(a => a.StartsWith("commune", StringComparison.OrdinalIgnoreCase));
         double? secondCommuneDistance = communeArg is null ? null
             : communeArg.Split('=') is [_, var distance] && double.TryParse(distance, System.Globalization.CultureInfo.InvariantCulture, out var d) ? d
@@ -38,7 +38,7 @@ switch (command)
         SimulationReport.Write(content, years, secondCommuneDistance, paths.Report);
         return 0;
     default:
-        Console.WriteLine("Commandes : generer, appliquer, simuler [années] [commune[=lieues]].");
+        Console.WriteLine("Commandes : generer, appliquer, simuler [années] [commune[=km]].");
         return 1;
 }
 
@@ -154,7 +154,7 @@ internal sealed class Book(XLWorkbook workbook, World world, BalanceSettings bal
     [
         "Marge", "Encadrement", "Direction", "MultOuvriers", "MultPI", "MultCadres", "Chauffage", "Eau", "Hiver", "Printemps",
         "Ete", "Automne", "SansEnergie", "ReserveCombustible", "ReserveEntreprise", "ReserveDepart", "EpargneReserve", "ImpotEtat", "ImpotCommune", "Transport",
-        "TransportDistance", "TransportMin", "TransportMax", "PollutionLoin", "PollutionDistance", "ExtractionDistance", "RouteSeuilSentier", "RouteSeuilChemin", "RouteSeuilRoute", "RouteCoutSentier", "RouteCoutChemin",
+        "TransportDistance", "TransportMin", "TransportMax", "PollutionLoin", "PollutionDistance", "ExtractionDistance", "RessortCommune", "RessortPrefecture", "RouteSeuilSentier", "RouteSeuilChemin", "RouteSeuilRoute", "RouteCoutSentier", "RouteCoutChemin",
         "RouteCoutRoute", "RouteEntretienSentier", "RouteEntretienChemin", "RouteEntretienRoute", "RouteMontee", "RouteBaisseChemin", "RouteBaisseRoute",
         "TracePenteMax", "TracePoidsPente", "TraceReutilisation", "TraceCase", "SeuilPollution", "Dotation", "StockFondation", "TvaEtat", "TvaCommune", "LicenciementInvendus", "EmbaucheInvendus", "VitessePublic", "VitesseScop",
         "VitessePrive", "BaisseSalaireScop", "BaisseSalaireScopMax", "LoiRemboursement", "LoiNonVises", "LoiVerrou", "LoiRegalien", "LoiMinimum",
@@ -366,36 +366,40 @@ internal sealed class Book(XLWorkbook workbook, World world, BalanceSettings bal
             ("TvaCommune", "TVA des entreprises : commune", balance.VatCommuneRate, "Part versée à la caisse de la commune."),
             ("Transport", "Perte en route entre communes", balance.TransportLoss,
                 "À la distance de référence, ou si une commune n'a pas de position sur la carte."),
-            ("TransportDistance", "Transport : distance de référence (lieues)", balance.TransportReferenceDistance,
+            ("TransportDistance", "Transport : distance de référence (km)", balance.TransportReferenceDistance,
                 "Perte = perte en route × (0,5 + 0,5 × distance ÷ cette distance), entre le minimum et le maximum."),
             ("TransportMin", "Transport : perte minimale", balance.TransportLossMin, "Entre deux communes distinctes, même voisines."),
             ("TransportMax", "Transport : perte maximale", balance.TransportLossMax, "Même entre communes très éloignées."),
             ("PollutionLoin", "Part de la pollution des autres communes", balance.DistantPollutionShare, "Au contact (distance nulle)."),
-            ("PollutionDistance", "Pollution : distance de dispersion (lieues)", balance.PollutionDispersionDistance,
+            ("PollutionDistance", "Pollution : distance de dispersion (km)", balance.PollutionDispersionDistance,
                 "À cette distance, la part reçue est divisée par 2 : part ÷ (1 + (distance ÷ cette distance)²)."),
-            ("ExtractionDistance", "Extraction : distance maximale à la commune (lieues)", balance.ExtractionMaxDistance,
+            ("ExtractionDistance", "Extraction : distance maximale à la commune (km)", balance.ExtractionMaxDistance,
                 "Un bâtiment d'extraction se pose sur une zone de la carte qui correspond, à cette distance de sa commune au plus."),
+            ("RessortCommune", "Ressort d'une commune : rayon (km)", balance.CommuneJurisdictionRadius,
+                "Le territoire qu'une commune tient autour d'elle (dessiné sur la carte)."),
+            ("RessortPrefecture", "Ressort d'une préfecture : rayon autour du chef-lieu (km)", balance.PrefectureJurisdictionRadius,
+                "S'ajoute aux ressorts des communes de la préfecture."),
             ("RouteSeuilSentier", "Routes : trafic d'un mois pour un sentier", balance.RoadTrailTraffic,
                 "Produits échangés en un mois entre deux communes (dans les deux sens). Le trafic crée les routes, un niveau par mois au plus."),
             ("RouteSeuilChemin", "Routes : trafic d'un mois pour un chemin", balance.RoadPathTraffic, ""),
             ("RouteSeuilRoute", "Routes : trafic d'un mois pour une route", balance.RoadRoadTraffic, ""),
-            ("RouteCoutSentier", "Routes : construction d'un sentier (par lieue)", balance.RoadTrailCost,
+            ("RouteCoutSentier", "Routes : construction d'un sentier (par km)", balance.RoadTrailCost,
                 "Payée par la plus petite structure qui contient les deux lieux (commune, préfecture, sinon l'État)."),
-            ("RouteCoutChemin", "Routes : d'un sentier à un chemin (par lieue)", balance.RoadPathCost, ""),
-            ("RouteCoutRoute", "Routes : d'un chemin à une route (par lieue)", balance.RoadRoadCost, ""),
-            ("RouteEntretienSentier", "Routes : entretien d'un sentier (par lieue et par an)", balance.RoadTrailUpkeep,
+            ("RouteCoutChemin", "Routes : d'un sentier à un chemin (par km)", balance.RoadPathCost, ""),
+            ("RouteCoutRoute", "Routes : d'un chemin à une route (par km)", balance.RoadRoadCost, ""),
+            ("RouteEntretienSentier", "Routes : entretien d'un sentier (par km et par an)", balance.RoadTrailUpkeep,
                 "Impayé, la liaison descend d'un niveau."),
-            ("RouteEntretienChemin", "Routes : entretien d'un chemin (par lieue et par an)", balance.RoadPathUpkeep, ""),
-            ("RouteEntretienRoute", "Routes : entretien d'une route (par lieue et par an)", balance.RoadRoadUpkeep, ""),
-            ("RouteMontee", "Routes : lieues comptées par mètre de montée", balance.RoadClimbLength,
+            ("RouteEntretienChemin", "Routes : entretien d'un chemin (par km et par an)", balance.RoadPathUpkeep, ""),
+            ("RouteEntretienRoute", "Routes : entretien d'une route (par km et par an)", balance.RoadRoadUpkeep, ""),
+            ("RouteMontee", "Routes : km comptés par mètre de montée", balance.RoadClimbLength,
                 "Construction et entretien suivent la longueur plus la montée × ce chiffre."),
             ("RouteBaisseChemin", "Routes : perte de transport retirée sur un chemin", balance.RoadPathLossCut, ""),
             ("RouteBaisseRoute", "Routes : perte de transport retirée sur une route", balance.RoadRoadLossCut, ""),
-            ("TracePenteMax", "Tracé : pente maximale (m par lieue)", balance.RoadMaxSlope, "Au-delà, le tracé contourne."),
-            ("TracePoidsPente", "Tracé : poids de la pente", balance.RoadSlopeWeight, "Un pas coûte sa longueur × (1 + ce poids × la pente)."),
+            ("TracePenteMax", "Tracé : pente maximale (%)", balance.RoadMaxSlope, "Au-delà, le tracé contourne."),
+            ("TracePoidsPente", "Tracé : poids de la pente", balance.RoadSlopeWeight, "Un pas coûte sa longueur × (1 + ce poids × la pente en %)."),
             ("TraceReutilisation", "Tracé : prix d'un pas sur une voie existante", balance.RoadReuseFactor,
                 "Part du prix normal : le réseau se ramifie."),
-            ("TraceCase", "Tracé : taille d'une case (lieues)", balance.RoadGridCell, "La grille posée sur la carte d'altitude."),
+            ("TraceCase", "Tracé : taille d'une case (km)", balance.RoadGridCell, "La grille posée sur la carte d'altitude."),
             ("SeuilPollution", "Seuil de pollution (par habitant et par jour)", balance.PollutedThreshold, ""),
             ("Dotation", "Dotation d'une nouvelle commune (jours)", balance.FoundingGrantDays, "Jours de salaires du camp de base."),
             ("StockFondation", "Réserve de chantier d'une commune à sa fondation", balance.FoundingMaterials, "Matériaux de construction, hors stockage : pour ses premiers chantiers (et ceux de la première commune)."),
@@ -422,7 +426,7 @@ internal sealed class Book(XLWorkbook workbook, World world, BalanceSettings bal
             ("ExtensionContenues", "Extension : poids des entités contenues", balance.ExtensionChildWeight, "Part de leur charge hors population."),
             ("ExtensionPartComptee", "Extension : part de population comptée en remontant", balance.ExtensionCountedShare,
                 "Une préfecture ou l'État compte cette part de ce que comptent ses entités, en cascade."),
-            ("ExtensionDistance", "Extension : lieues pour 1 point de charge", balance.ExtensionDistancePerLoad,
+            ("ExtensionDistance", "Extension : km pour 1 point de charge", balance.ExtensionDistancePerLoad,
                 "Somme des distances entre le chef-lieu (la capitale pour l'État) et les entités contenues, divisée par ce nombre."),
             ("BureaucratieEchelon", "Bureaucratie : perte par échelon", balance.BureaucracyLossPerLevel, "Par préfecture traversée."),
             ("PrefectureEmplois", "Préfecture : emplois par entité contenue", balance.PrefectureJobsPerEntity,

@@ -62,13 +62,16 @@ public static class MapPalette
     // Vue Monde : les biomes ne sont qu'une teinte posée sur le terrain (opacité), sans contour
     public const float BiomeTint = 0.40f;
 
-    // Les arbres (images arbre-feuillu.png, arbre-conifere.png) : un tous les tant de lieues dans les forêts, à peu
-    // près de telle taille (lieues), en conifères au-dessus de telle altitude (m), avec leur ombre (décalage en lieues
+    // Les tailles sont en unités de carte (une unité = 100 m, décidé le 12 novembre 2026). Maisons, arbres et fumées
+    // sont presque à l'échelle : un toit figure un îlot de maisons (100 m), un arbre un bosquet (240 m), un bourg de
+    // 5 000 habitants fait environ 1 km de large.
+    // Les arbres (images arbre-feuillu.png, arbre-conifere.png) : un tous les tant de unités dans les forêts, à peu
+    // près de telle taille (unités), en conifères au-dessus de telle altitude (m), avec leur ombre (décalage en unités
     // vers le sud-est, opacité). Teinte des arbres sous les filtres Politique et Production et transport.
-    public const float TreeSpacing = 9f;
-    public const float TreeSize = 12f;
+    public const float TreeSpacing = 1.8f;
+    public const float TreeSize = 2.4f;
     public const float ConiferAltitude = 900f;
-    public static readonly Vector2 TreeShadowOffset = new(2.2f, 2.6f);
+    public static readonly Vector2 TreeShadowOffset = new(0.44f, 0.52f);
     public const float TreeShadowStrength = 0.35f;
     public static readonly Color TreesFaded = new(1f, 1f, 1f, 0.55f);
 
@@ -83,18 +86,18 @@ public static class MapPalette
     };
 
     // Les toits des communes (images toit-1.png à toit-3.png) : une maison pour tant d'habitants, au plus tant ; taille
-    // d'un toit (lieues), écart entre maisons (le rayon du bourg est cet écart × la racine du nombre de maisons), ombre.
+    // d'un toit (unités), écart entre maisons (le rayon du bourg est cet écart × la racine du nombre de maisons), ombre.
     public const float ResidentsPerHouse = 60f;
     public const int MaxHouses = 400;
-    public const float RoofSize = 6f;
-    public const float HouseSpacing = 4.5f;
-    public static readonly Vector2 RoofShadowOffset = new(1.2f, 1.5f);
+    public const float RoofSize = 1f;
+    public const float HouseSpacing = 0.52f;
+    public static readonly Vector2 RoofShadowOffset = new(0.2f, 0.24f);
     public const float RoofShadowStrength = 0.45f;
 
-    // Les fumées : une cheminée qui fume pour tant de maisons, tant de bouffées par cheminée, leur taille (lieues).
+    // Les fumées : une cheminée qui fume pour tant de maisons, tant de bouffées par cheminée, leur taille (unités).
     public const int HousesPerChimney = 10;
     public const int PuffsPerChimney = 4;
-    public const float PuffSize = 4f;
+    public const float PuffSize = 0.8f;
 
     // Communes dans la vue Monde (disque bicolore sobre)
     public static readonly Color CommuneMark = new("#8B1E1E");
@@ -155,6 +158,14 @@ public static class MapPalette
     public static readonly Color TradeRoad = new("#9C683B");                 // Voie marchande bistre
     public static readonly Color TradeRoadDashed = new(0.60f, 0.38f, 0.20f, 0.75f);
     public static readonly Color TradeRiverHighlight = new(0.25f, 0.55f, 0.75f, 0.35f); // Corridor fluvial navigable
+
+    // Les sceaux, étiquettes, frontières et échanges grossissent avec le zoom jusqu'à ce zoom, puis plus.
+    public const float SymbolZoomCap = 2f;
+
+    // Barre d'échelle : tronçons sombres et clairs, sur un fond clair
+    public static readonly Color ScaleDark = new("#3D2916");
+    public static readonly Color ScaleLight = new("#F4EEE0");
+    public static readonly Color ScaleBackground = new(0.99f, 0.98f, 0.96f, 0.80f);
 
     // Textes et cartouches
     public static readonly Color InkText = new("#3D2916");

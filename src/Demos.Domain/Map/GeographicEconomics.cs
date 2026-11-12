@@ -12,7 +12,7 @@ namespace Demos.Domain.Map;
 public static class GeographicEconomics
 {
     /// <summary>
-    /// Part de perte de transport d'un produit selon la distance en lieues :
+    /// Part de perte de transport d'un produit selon la distance en km :
     /// TransportLoss × (0,5 + 0,5 × distance ÷ distance de référence), bornée entre la perte minimale et maximale.
     /// </summary>
     public static double TransportLoss(double distance)
@@ -39,7 +39,7 @@ public static class GeographicEconomics
         if (!positions.TryGetValue(originCommuneId, out var p1) || !positions.TryGetValue(destinationCommuneId, out var p2))
             return Balance.Current.TransportLoss;
 
-        return TransportLoss(p1.DistanceTo(p2));
+        return TransportLoss(MapScale.KmBetween(p1, p2));
     }
 
     /// <summary>
@@ -56,7 +56,7 @@ public static class GeographicEconomics
             || settings.PollutionDispersionDistance <= 0)
             return settings.DistantPollutionShare;
 
-        var ratio = p1.DistanceTo(p2) / settings.PollutionDispersionDistance;
+        var ratio = MapScale.KmBetween(p1, p2) / settings.PollutionDispersionDistance;
         return settings.DistantPollutionShare / (1.0 + ratio * ratio);
     }
 }

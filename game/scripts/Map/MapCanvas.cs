@@ -342,6 +342,9 @@ public partial class MapCanvas : Control
         // Le nom du bâtiment d'extraction sous la souris (MapCanvas.Placement.cs)
         DrawHoveredExtractionName(font);
 
+        // Barre d'échelle (MapCanvas.Scale.cs)
+        DrawScaleBar(font);
+
         // Réticule de survol et cartouche topographique
         DrawHoverCartouche(font);
 

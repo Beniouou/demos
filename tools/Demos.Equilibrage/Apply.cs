@@ -54,6 +54,8 @@ public static class BalanceApplier
         ("PollutionLoin", ["distantPollutionShare"], b => b.DistantPollutionShare),
         ("PollutionDistance", ["pollutionDispersionDistance"], b => b.PollutionDispersionDistance),
         ("ExtractionDistance", ["extractionMaxDistance"], b => b.ExtractionMaxDistance),
+        ("RessortCommune", ["communeJurisdictionRadius"], b => b.CommuneJurisdictionRadius),
+        ("RessortPrefecture", ["prefectureJurisdictionRadius"], b => b.PrefectureJurisdictionRadius),
         ("RouteSeuilSentier", ["roadTrailTraffic"], b => b.RoadTrailTraffic),
         ("RouteSeuilChemin", ["roadPathTraffic"], b => b.RoadPathTraffic),
         ("RouteSeuilRoute", ["roadRoadTraffic"], b => b.RoadRoadTraffic),

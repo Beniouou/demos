@@ -4,8 +4,8 @@ namespace Demos.Tests.Domain;
 
 public class ReliefTests
 {
-    // Une île ronde au milieu d'une carte de 400 × 400 lieues : courbes de 100, 200 et 300 m (rayons 150, 100 et 50),
-    // un sommet coté à 400 m au centre, et la mer au-delà de 180 lieues du centre.
+    // Une île ronde au milieu d'une carte de 400 × 400 unités : courbes de 100, 200 et 300 m (rayons 150, 100 et 50),
+    // un sommet coté à 400 m au centre, et la mer au-delà de 180 unités du centre.
     private static readonly Point2D Center = new(200, 200);
 
     private static ContourLine Circle(double altitude, double radius) =>
@@ -62,7 +62,7 @@ public class ReliefTests
         for (var r = 0; r <= 170; r += 5)
         {
             var altitude = grid.Sample(Center.X + r, Center.Y);
-            Assert.True(altitude <= previous + 0.5, $"à {r} lieues du centre : {altitude:F1} m après {previous:F1} m");
+            Assert.True(altitude <= previous + 0.5, $"à {r} unités du centre : {altitude:F1} m après {previous:F1} m");
             previous = altitude;
         }
     }
@@ -76,7 +76,7 @@ public class ReliefTests
         Assert.True(grid.IsWater(0, 0));
         Assert.False(grid.IsWater(100, 100));
         Assert.InRange(grid[0, 0], -settings.MaxSeaDepth, -1);
-        // Près de la côte (à 186 lieues du centre), moins profond qu'au coin de la carte.
+        // Près de la côte (à 186 unités du centre), moins profond qu'au coin de la carte.
         Assert.True(grid.Sample(Center.X + 186, Center.Y) > grid[0, 0]);
         Assert.All(Enumerable.Range(0, grid.Width * grid.Height).Where(i => grid.Altitudes[i] >= 0),
             i => Assert.True(grid.Altitudes[i] >= 0));

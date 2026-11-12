@@ -55,7 +55,7 @@ internal static class ReliefExport
             ombres = ShadeFile,
             largeur = grid.Width,
             hauteur = grid.Height,
-            lieuesParPixel = grid.CellSize,
+            metresParPixel = grid.CellSize * MapScale.MetersPerUnit,
             codage = "altitude = (rouge × 256 + vert) / 10 − 1000 (m) ; bleu = 0 sur la mer, 255 sur terre",
             altitudeMin = Math.Round(min, 1),
             altitudeMax = Math.Round(max, 1),
@@ -67,7 +67,7 @@ internal static class ReliefExport
         if (previewPath is not null)
             SavePreview(previewPath, grid, shade, max);
 
-        Console.WriteLine($"Relief : {grid.Width} × {grid.Height} pixels ({grid.CellSize} lieues par pixel), altitude de {min:F0} à {max:F0} m, calculé en {computeMs} ms.");
+        Console.WriteLine($"Relief : {grid.Width} × {grid.Height} pixels ({grid.CellSize * MapScale.MetersPerUnit:0} m par pixel), altitude de {min:F0} à {max:F0} m, calculé en {computeMs} ms.");
         Console.WriteLine($"Écrit : {AltitudeFile}, {ShadeFile}, {InfoFile} dans {dataDir}");
         return 0;
     }

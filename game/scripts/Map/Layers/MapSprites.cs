@@ -29,7 +29,7 @@ public static class MapSprites
         return Textures[name] = texture;
     }
 
-    /// <summary>Un carré d'une lieue de côté, centré : chaque image posée l'agrandit à sa taille.</summary>
+    /// <summary>Un carré d'une unité de carte de côté, centré : chaque image posée l'agrandit à sa taille.</summary>
     public static ArrayMesh Quad
     {
         get
@@ -48,7 +48,7 @@ public static class MapSprites
     }
 
     /// <summary>
-    /// Une image posée à chaque endroit donné (en lieues : centre et taille), en un seul nœud ; avec, si demandé, son
+    /// Une image posée à chaque endroit donné (en unités de carte : centre et taille), en un seul nœud ; avec, si demandé, son
     /// ombre portée dessous (un second nœud, voir <see cref="PlaceOnMap"/>).
     /// </summary>
     public static MultiMeshInstance2D Instances(Texture2D texture, IReadOnlyList<(Vector2 Center, float Size)> items, Color? tint = null)
@@ -70,7 +70,7 @@ public static class MapSprites
         };
     }
 
-    /// <summary>L'ombre portée de ces images : la même silhouette, sombre, décalée de <paramref name="offset"/> lieues.</summary>
+    /// <summary>L'ombre portée de ces images : la même silhouette, sombre, décalée de <paramref name="offset"/> unités.</summary>
     public static MultiMeshInstance2D Shadow(MultiMeshInstance2D instances, float strength)
     {
         var material = MapShaders.Material("ombre");
@@ -84,7 +84,7 @@ public static class MapSprites
         };
     }
 
-    /// <summary>Met un nœud posé en lieues à sa place à l'écran (déplacement + point × zoom), décalé de <paramref name="offset"/> lieues.</summary>
+    /// <summary>Met un nœud posé en unités de carte à sa place à l'écran (déplacement + point × zoom), décalé de <paramref name="offset"/> unités.</summary>
     public static void PlaceOnMap(Node2D node, MapCamera camera, Vector2 offset = default)
     {
         node.Position = camera.PanOffset + offset * camera.Zoom;

@@ -166,22 +166,22 @@ public class TradeTests
         var positions = new Dictionary<string, Demos.Domain.Map.Point2D>
         {
             ["c1"] = new(0, 0),
-            ["c2"] = new(500, 0), // d = 500 lieues
-            ["c3"] = new(1000, 0), // d = 1000 lieues
-            ["c_proche"] = new(50, 0), // d = 50 lieues
-            ["c_tres_loin"] = new(3000, 0), // d = 3000 lieues
+            ["c2"] = new(500, 0), // d = 500 unités
+            ["c3"] = new(1000, 0), // d = 1000 unités
+            ["c_proche"] = new(50, 0), // d = 50 unités
+            ["c_tres_loin"] = new(3000, 0), // d = 3000 unités
         };
 
         // Même commune : 0 %
         Assert.Equal(0.0, Demos.Domain.Map.GeographicEconomics.TransportLoss("c1", "c1", positions));
 
-        // Distance de référence (500 lieues) : 20 % de perte
+        // Distance de référence (500 unités) : 20 % de perte
         Assert.Equal(0.20, Demos.Domain.Map.GeographicEconomics.TransportLoss("c1", "c2", positions), precision: 6);
 
-        // Distance proche (50 lieues) : 20% * (0.5 + 0.5 * 0.1) = 11 %
+        // Distance proche (50 unités) : 20% * (0.5 + 0.5 * 0.1) = 11 %
         Assert.Equal(0.11, Demos.Domain.Map.GeographicEconomics.TransportLoss("c1", "c_proche", positions), precision: 6);
 
-        // Distance double (1000 lieues) : 20% * (0.5 + 0.5 * 2) = 30 %
+        // Distance double (1000 unités) : 20% * (0.5 + 0.5 * 2) = 30 %
         Assert.Equal(0.30, Demos.Domain.Map.GeographicEconomics.TransportLoss("c1", "c3", positions), precision: 6);
 
         // Très lointain : plafonné à 60 %

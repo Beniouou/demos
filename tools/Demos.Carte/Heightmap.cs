@@ -66,6 +66,24 @@ public sealed class Heightmap
     }
 
     /// <summary>
+    /// Crée la carte d'élévation d'une carte existante à partir de son relief (celui du jeu : <see cref="ReliefGrid"/>,
+    /// calculé depuis les courbes de niveau), échantillonné aux nœuds de la grille de l'éditeur.
+    /// </summary>
+    public static Heightmap FromRelief(ReliefGrid relief, int columns, int rows, double worldWidth, double worldHeight)
+    {
+        var hm = new Heightmap(columns, rows, worldWidth, worldHeight, isFlat: true, 0);
+        for (var i = 0; i < columns; i++)
+            for (var j = 0; j < rows; j++)
+            {
+                var x = i * worldWidth / (columns - 1);
+                var y = j * worldHeight / (rows - 1);
+                hm._grid[i, j] = Math.Round(relief.Sample(x, y), 1);
+            }
+        hm.UpdateMinMax();
+        return hm;
+    }
+
+    /// <summary>
     /// Crée une carte d'élévation insulaire naturelle avec côtes festonnées et bords découpés (caps, baies, péninsules).
     /// </summary>
     public static Heightmap CreateIsland(int columns, int rows, double worldWidth, double worldHeight) =>
@@ -799,7 +817,7 @@ public sealed class Heightmap
                 break;
             }
 
-            // 3. Confluence naturelle : si on approche à moins de 12 lieues d'un cours d'eau existant
+            // 3. Confluence naturelle : si on approche à moins de 12 unités d'un cours d'eau existant
             if (existingRivers is not null && points.Count >= 3)
             {
                 Point2D? confluencePoint = null;
@@ -843,7 +861,7 @@ public sealed class Heightmap
                 double bestDx = 0, bestDy = 0;
                 var foundDescent = false;
 
-                // Sonde à 18, 36 puis 72 lieues pour trouver le cheminement vers la mer ou la vallée
+                // Sonde à 18, 36 puis 72 unités pour trouver le cheminement vers la mer ou la vallée
                 double[] probeDistances = [18.0, 36.0, 72.0];
                 foreach (var probeDist in probeDistances)
                 {
@@ -888,7 +906,7 @@ public sealed class Heightmap
                 }
                 else
                 {
-                    // Aucun dénivelé descendant direct trouvé à 72 lieues.
+                    // Aucun dénivelé descendant direct trouvé à 72 unités.
                     if (step == 0 || (vx * vx + vy * vy < 0.0001))
                     {
                         // Premier pas en terrain plat : orienter vers l'extérieur (direction du littoral/bordure)
@@ -997,7 +1015,7 @@ public sealed class Heightmap
             {
                 var p = points[k];
                 var dSq = (curX - p.X) * (curX - p.X) + (curY - p.Y) * (curY - p.Y);
-                if (dSq < 64.0) // < 8 lieues
+                if (dSq < 64.0) // < 8 unités
                 {
                     tooCloseToPrevious = true;
                     break;

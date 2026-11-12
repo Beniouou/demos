@@ -154,13 +154,13 @@ public class ExtensionTests
         var positions = new Dictionary<string, Demos.Domain.Map.Point2D>
         {
             ["chef-lieu"] = new(100, 100),
-            ["commune-eloignee"] = new(1300, 1700), // Distance euclidienne = sqrt(1200^2 + 1600^2) = 2 000 lieues
+            ["commune-eloignee"] = new(1300, 1700), // Distance euclidienne = sqrt(1200^2 + 1600^2) = 2 000 unités (200 km)
         };
 
         var distOf = (string id) => Demos.Domain.Map.AdministrativeDistance.LoadOf(id, structures, positions);
         var extension = Extension.Compute(structures, _ => 0, Settings, distOf);
 
-        // Chef-lieu à 0 lieue, commune éloignée à 2 000 lieues ÷ 2 000 lieues par point = 1,0 de charge distance
+        // Chef-lieu à 0 km, commune éloignée à 200 km ÷ 200 km par point = 1,0 de charge distance
         Assert.Equal(1.0, extension.Loads["pref"].Distance, 6);
         Assert.Equal(1.0, extension.Loads["pref"].Charge, 6);
         Assert.Equal(1.0, extension.Loads["pref"].Efficiency);

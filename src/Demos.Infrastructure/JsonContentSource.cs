@@ -106,7 +106,7 @@ public sealed class JsonContentSource(Func<string, string> readText, Func<string
                     var (high, low, _) = image[x, y];
                     altitudes[y * image.Width + x] = (float)ReliefEncoding.Decode(high, low);
                 }
-            return new ReliefGrid(image.Width, image.Height, root.GetProperty("lieuesParPixel").GetDouble(), altitudes);
+            return new ReliefGrid(image.Width, image.Height, root.GetProperty("metresParPixel").GetDouble() / Demos.Domain.Map.MapScale.MetersPerUnit, altitudes);
         }
         catch (Exception ex) when (ex is FileNotFoundException or DirectoryNotFoundException or KeyNotFoundException or InvalidDataException or JsonException)
         {

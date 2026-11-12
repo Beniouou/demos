@@ -10,7 +10,7 @@ namespace Demos.Domain.Map;
 /// </summary>
 public sealed record ReliefSettings
 {
-    /// <summary>La taille d'un pixel des images, en lieues.</summary>
+    /// <summary>La taille d'un pixel des images, en unités de carte (2 : 200 m).</summary>
     public double CellSize { get; init; } = 2.0;
 
     /// <summary>Le nombre de passes de l'interpolation, à chaque niveau de détail (plus : plus juste, plus lent).</summary>
@@ -22,8 +22,8 @@ public sealed record ReliefSettings
     /// <summary>Un dernier flou, en pixels, après avoir creusé la mer : le trait de côte devient une courbe douce.</summary>
     public double CoastSmoothing { get; init; } = 1.0;
 
-    /// <summary>La mer s'enfonce de tant de mètres par lieue de distance à la côte…</summary>
-    public double SeaDepthPerLieue { get; init; } = 0.5;
+    /// <summary>La mer s'enfonce de tant de mètres par km de distance à la côte…</summary>
+    public double SeaDepthPerKm { get; init; } = 5;
 
     /// <summary>… jusqu'à cette profondeur, en mètres.</summary>
     public double MaxSeaDepth { get; init; } = 60.0;
@@ -35,14 +35,14 @@ public sealed record ReliefSettings
     public double LightElevation { get; init; } = 45.0;
 
     /// <summary>
-    /// L'exagération des pentes pour les ombres : une lieue fait quelques kilomètres et les courbes sont espacées de
-    /// 25 m, donc les vraies pentes ne se verraient presque pas.
+    /// L'exagération des pentes pour les ombres (choisie à l'œil) : les pentes sont lues en mètres par unité de carte
+    /// (100 m), et les courbes sont espacées de 25 m.
     /// </summary>
     public double ShadeExaggeration { get; init; } = 0.10;
 }
 
 /// <summary>
-/// Une carte d'altitude en grille : un pixel tous les <see cref="CellSize"/> lieues, le pixel (x, y) ayant son centre en
+/// Une carte d'altitude en grille : un pixel tous les <see cref="CellSize"/> unités de carte, le pixel (x, y) ayant son centre en
 /// ((x + 0,5) × taille, (y + 0,5) × taille). Altitude en mètres ; la mer est sous 0.
 /// </summary>
 public sealed class ReliefGrid
@@ -66,7 +66,7 @@ public sealed class ReliefGrid
 
     public bool IsWater(int x, int y) => this[x, y] < 0;
 
-    /// <summary>L'altitude en un point de la carte (en lieues), interpolée entre les quatre pixels voisins.</summary>
+    /// <summary>L'altitude en un point de la carte (en unités de carte), interpolée entre les quatre pixels voisins.</summary>
     public double Sample(double worldX, double worldY)
     {
         var fx = Math.Clamp(worldX / CellSize - 0.5, 0, Width - 1);
@@ -163,7 +163,7 @@ public static class ReliefBuilder
         for (var i = 0; i < altitudes.Length; i++)
         {
             if (water[i])
-                altitudes[i] = -(float)Math.Min(settings.MaxSeaDepth, Math.Max(1.0, distance[i] * cell * settings.SeaDepthPerLieue));
+                altitudes[i] = -(float)Math.Min(settings.MaxSeaDepth, Math.Max(1.0, MapScale.ToKm(distance[i] * cell) * settings.SeaDepthPerKm));
             else if (altitudes[i] < 0)
                 altitudes[i] = 0;
         }

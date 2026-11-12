@@ -6,7 +6,7 @@ namespace Demos.Domain.Map;
 
 /// <summary>
 /// Où se posent les bâtiments d'extraction (décidé le 10 novembre 2026) : sur une zone de la carte qui correspond à ce
-/// qu'ils extraient (forêt, terre fertile, pierre, charbon, fer), à une distance limitée de leur commune. Plusieurs
+/// qu'ils extraient (forêt, terre fertile, pierre, charbon, fer), à une distance limitée de leur commune (en km). Plusieurs
 /// bâtiments peuvent partager une zone ; la distance n'a pas d'effet sur la production pour l'instant. Les bâtiments
 /// sans zone sur la carte (tour de forage, puits…) se posent sans contrainte.
 /// </summary>
@@ -48,8 +48,9 @@ public static class ExtractionSites
     {
         if (kinds.Count == 0)
             return null;
-        if (position.DistanceTo(communePosition) > maxDistance)
-            return $"trop loin de la commune ({position.DistanceTo(communePosition):0} lieues ; {maxDistance:0} au plus)";
+        var distance = MapScale.KmBetween(position, communePosition);
+        if (distance > maxDistance)
+            return $"trop loin de la commune ({MapScale.Format(distance)} ; {MapScale.Format(maxDistance)} au plus)";
         return zones.Any(z => kinds.Contains(z.Kind) && Contains(z, position))
             ? null
             : $"il faut le poser sur {string.Join(" ou ", kinds.Select(ZoneName))}";
@@ -69,7 +70,7 @@ public static class ExtractionSites
         var candidates = matching
             .SelectMany(z => z.Boundary.Select(p => (Zone: z, Point: Inside(z, p))))
             .Where(c => Contains(c.Zone, c.Point))
-            .Select(c => (c.Point, Distance: c.Point.DistanceTo(communePosition)))
+            .Select(c => (c.Point, Distance: MapScale.KmBetween(c.Point, communePosition)))
             .Where(c => c.Distance <= maxDistance)
             .OrderBy(c => c.Distance)
             .ToList();

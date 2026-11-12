@@ -19,7 +19,7 @@ public sealed partial class MapEditorForm : Form
     private readonly ToolStripStatusLabel _statusCoords = new() { Text = "Arpentage : X --- · Y ---", BorderSides = ToolStripStatusLabelBorderSides.Right, Margin = new Padding(3, 2, 3, 2) };
     private readonly ToolStripStatusLabel _statusAlt = new() { Text = "Alt. : --- m", BorderSides = ToolStripStatusLabelBorderSides.Right, Margin = new Padding(3, 2, 3, 2) };
     private readonly ToolStripStatusLabel _statusZoom = new() { Text = "Zoom : 100 %", BorderSides = ToolStripStatusLabelBorderSides.Right, Margin = new Padding(3, 2, 3, 2) };
-    private readonly ToolStripStatusLabel _statusDimensions = new() { Text = "2 400 × 1 500", BorderSides = ToolStripStatusLabelBorderSides.Right, Margin = new Padding(3, 2, 3, 2) };
+    private readonly ToolStripStatusLabel _statusDimensions = new() { Text = "240 × 150 km", BorderSides = ToolStripStatusLabelBorderSides.Right, Margin = new Padding(3, 2, 3, 2) };
     private readonly ToolStripStatusLabel _statusTool = new() { Text = "Outil : Navigation", BorderSides = ToolStripStatusLabelBorderSides.Right, Margin = new Padding(3, 2, 3, 2) };
     private readonly ToolStripStatusLabel _statusFeature = new() { Text = "Prêt", Spring = true, TextAlign = ContentAlignment.MiddleLeft };
     private readonly ToolStripStatusLabel _statusStats = new() { Text = "" };
@@ -277,7 +277,7 @@ public sealed partial class MapEditorForm : Form
     {
         if (info.IsInMap)
         {
-            _statusCoords.Text = $"Arpentage : X {info.WorldX:F0} · Y {info.WorldY:F0}";
+            _statusCoords.Text = $"Arpentage : X {MapScale.ToKm(info.WorldX):0.0} km · Y {MapScale.ToKm(info.WorldY):0.0} km";
             _statusAlt.Text = $"Alt. : {info.Altitude:F0} m";
             _statusFeature.Text = info.FeatureName;
         }

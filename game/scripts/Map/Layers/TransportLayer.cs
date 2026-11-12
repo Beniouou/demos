@@ -46,9 +46,9 @@ public sealed class TransportLayer : MapLayer
         if (production)
             foreach (var (from, to, flow) in Pairs(c))
             {
-                var width = flow is null ? 2.2f * s : Math.Clamp(MathF.Log10(1 + (float)flow.MonthlyQuantity) * 1.6f, 1.5f, 9f);
+                var width = flow is null ? 2.2f * c.SymbolScale : Math.Clamp(MathF.Log10(1 + (float)flow.MonthlyQuantity) * 1.6f, 1.5f, 9f);
                 var color = flow is null ? new Color(MapPalette.TradeRoad, 0.5f) : MapPalette.TradeFlow;
-                c.Pen.DrawDashedLine(c.ToScreen(from), c.ToScreen(to), color, width, dash: 8.0f * s);
+                c.Pen.DrawDashedLine(c.ToScreen(from), c.ToScreen(to), color, width, dash: 8.0f * c.SymbolScale);
             }
 
         // 3. Les sentiers, puis les chemins, puis les routes par-dessus (dans toutes les vues)
@@ -111,14 +111,14 @@ public sealed class TransportLayer : MapLayer
     {
         if (!c.Has(MapFilters.ProductionTransport))
             return;
-        var s = c.Zoom;
+        var s = c.SymbolScale;
         var font = c.Font;
 
         foreach (var (from, to, flow) in Pairs(c))
         {
             var dist = from.DistanceTo(to);
             var tag = flow is null
-                ? $"{dist:F0} lieues · perte {GeographicEconomics.TransportLoss(dist) * 100:F0} %"
+                ? $"{MapScale.Format(MapScale.ToKm(dist))} · perte {GeographicEconomics.TransportLoss(MapScale.ToKm(dist)) * 100:F0} %"
                 : $"{flow.MonthlyQuantity:N0} par mois · perte {flow.Loss * 100:F0} %";
             var mid = (c.ToScreen(from) + c.ToScreen(to)) * 0.5f;
             var fontSize = (int)Math.Clamp(9 * s, 8, 11);

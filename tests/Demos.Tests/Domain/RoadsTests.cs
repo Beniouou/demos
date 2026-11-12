@@ -69,8 +69,8 @@ public class RoadsTests
         var trail = Assert.Single(first);
         Assert.Equal(RoadLevel.Trail, trail.Link.Level);
         Assert.Equal("pref", trail.Link.PayerId);
-        Assert.Equal(100, trail.Link.Length, 6);
-        Assert.Equal(Roads.BuildCost(RoadLevel.Trail, 100, 0, Settings), trail.Cost, 6);
+        Assert.Equal(10, trail.Link.Length, 6); // 100 unités = 10 km
+        Assert.Equal(Roads.BuildCost(RoadLevel.Trail, 10, 0, Settings), trail.Cost, 6);
         Assert.Equal(100_000 - trail.Cost, funds["pref"].Balance, 6);
 
         Roads.RunMonthly(network, traffic, PositionOf, planner, (x, y) => Roads.PayerOf(x, y, Structures), id => funds[id], Settings);
@@ -97,7 +97,7 @@ public class RoadsTests
     public void L_entretien_se_paie_chaque_annee_et_une_liaison_impayee_descend_d_un_niveau()
     {
         var network = new RoadNetwork();
-        network.Set(new RoadLink("a", "b", RoadLevel.Road, [new(0, 0), new(100, 0)], 100, 20, "pref"));
+        network.Set(new RoadLink("a", "b", RoadLevel.Road, [new(0, 0), new(100, 0)], 10, 20, "pref"));
         var fund = new Treasury();
         var upkeep = Roads.Upkeep(network.Between("a", "b")!, Settings);
         fund.Deposit(upkeep);
@@ -110,7 +110,7 @@ public class RoadsTests
         Assert.Equal(RoadLevel.Path, network.LevelBetween("a", "b"));
     }
 
-    // Une carte d'altitude de 200 × 200 lieues (un pixel tous les 2 lieues), décrite par une fonction.
+    // Une carte d'altitude de 200 × 200 unités (20 × 20 km, un pixel tous les 200 m), décrite par une fonction.
     private static ReliefGrid Relief(Func<double, double, float> altitude)
     {
         var values = new float[100 * 100];
@@ -129,7 +129,7 @@ public class RoadsTests
 
         Assert.NotNull(plan);
         Assert.Contains(plan.Route, p => p.Y > 150);
-        Assert.True(plan.Length > 160);
+        Assert.True(plan.Length > 16); // km : plus long que la ligne droite (16 km)
     }
 
     [Fact]
@@ -157,7 +157,7 @@ public class RoadsTests
     [Fact]
     public void Le_trace_compte_la_montee()
     {
-        // Une pente douce : 10 m par lieue vers l'est.
+        // Une pente douce : 10 m par unité (10 %) vers l'est.
         var slope = Relief((x, _) => (float)(x * 0.1));
         var plan = new RoadPlanner(slope, Settings).Plan(new(10, 100), new(190, 100), [])!;
         Assert.InRange(plan.Climb, 15, 20);

@@ -9,7 +9,7 @@ namespace Demos.Game.Map.Layers;
 /// Les biomes naturels (forêts, terres fertiles, marais, plages, falaises, déserts, glaciers) et les arbres des forêts.
 /// Vue Monde : une teinte légère posée sur le terrain coloré, estompée sous les filtres Politique et Production et
 /// transport. Filtre Biomes : une couleur nette par type de biome (<see cref="MapPalette.BiomeCrisp"/>).
-/// Les arbres (feuillus, et conifères en altitude) sont posés une fois pour la partie, en lieues, et dessinés d'un coup
+/// Les arbres (feuillus, et conifères en altitude) sont posés une fois pour la partie, en unités de carte, et dessinés d'un coup
 /// par la carte graphique avec leur ombre (<see cref="MapSprites"/>) : un déplacement ou un zoom ne les recalcule pas.
 /// </summary>
 public sealed class BiomesLayer : MapLayer
@@ -105,8 +105,10 @@ public sealed class BiomesLayer : MapLayer
 
     /// <summary>
     /// La place des arbres, une fois pour la partie : une grille d'un point tous les <see cref="MapPalette.TreeSpacing"/>
-    /// lieues, un peu déplacé au hasard (toujours le même), gardé s'il est dans une forêt et hors de ses clairières ;
-    /// un conifère au-dessus de <see cref="MapPalette.ConiferAltitude"/> m, un feuillu dessous.
+    /// unités, gardé s'il est dans une forêt et hors de ses clairières, puis un peu déplacé au hasard (toujours le même) ;
+    /// un conifère au-dessus de <see cref="MapPalette.ConiferAltitude"/> m, un feuillu dessous. Pour aller vite, chaque
+    /// ligne de la grille est balayée une fois : on calcule où elle coupe le bord de la forêt et de ses clairières (règle
+    /// pair-impair), et les points entre deux coupures sont dans la forêt.
     /// </summary>
     private static (List<(Vector2, float)> Leafy, List<(Vector2, float)> Conifers) PlaceTrees(MapDrawContext c)
     {
@@ -115,23 +117,37 @@ public sealed class BiomesLayer : MapLayer
         var forests = (c.VectorMap?.AllBiomes ?? []).Where(b => b.Kind is "foret" or "forest" && b.Boundary.Count >= 3);
         var random = new Random(1900);
         var step = MapPalette.TreeSpacing;
+        var crossings = new List<float>();
         foreach (var forest in forests)
         {
-            var outline = c.Geometry.World(forest.Boundary);
-            var holes = (forest.Holes ?? []).Where(h => h.Count >= 3).Select(c.Geometry.World)
-                .Select(h => (Points: h, Box: MapGeometry.BoundsOf(h))).ToList();
-            var box = MapGeometry.BoundsOf(outline);
+            var rings = new List<Vector2[]> { c.Geometry.World(forest.Boundary) };
+            rings.AddRange((forest.Holes ?? []).Where(h => h.Count >= 3).Select(c.Geometry.World));
+            var box = MapGeometry.BoundsOf(rings[0]);
             for (var y = box.Position.Y + step * 0.5f; y < box.End.Y; y += step)
-                for (var x = box.Position.X + step * 0.5f; x < box.End.X; x += step)
+            {
+                crossings.Clear();
+                foreach (var ring in rings)
+                    for (var i = 0; i < ring.Length; i++)
+                    {
+                        var p = ring[i];
+                        var q = ring[(i + 1) % ring.Length];
+                        if ((p.Y <= y && q.Y > y) || (q.Y <= y && p.Y > y))
+                            crossings.Add(p.X + (y - p.Y) / (q.Y - p.Y) * (q.X - p.X));
+                    }
+                crossings.Sort();
+                for (var k = 0; k + 1 < crossings.Count; k += 2)
                 {
-                    var point = new Vector2(x + (random.NextSingle() - 0.5f) * step * 0.7f, y + (random.NextSingle() - 0.5f) * step * 0.7f);
-                    var size = MapPalette.TreeSize * (0.8f + random.NextSingle() * 0.4f);
-                    if (!Geometry2D.IsPointInPolygon(point, outline)
-                        || holes.Any(h => h.Box.HasPoint(point) && Geometry2D.IsPointInPolygon(point, h.Points)))
-                        continue;
-                    var conifer = c.Data.Relief is { } relief && relief.AltitudeAt(point) > MapPalette.ConiferAltitude;
-                    (conifer ? conifers : leafy).Add((point, conifer ? size * 0.85f : size));
+                    // Les points de la grille (alignés sur la boîte de la forêt) entre deux coupures.
+                    var first = box.Position.X + step * (MathF.Ceiling((crossings[k] - box.Position.X) / step - 0.5f) + 0.5f);
+                    for (var x = first; x <= crossings[k + 1]; x += step)
+                    {
+                        var point = new Vector2(x + (random.NextSingle() - 0.5f) * step * 0.7f, y + (random.NextSingle() - 0.5f) * step * 0.7f);
+                        var size = MapPalette.TreeSize * (0.8f + random.NextSingle() * 0.4f);
+                        var conifer = c.Data.Relief is { } relief && relief.AltitudeAt(point) > MapPalette.ConiferAltitude;
+                        (conifer ? conifers : leafy).Add((point, conifer ? size * 0.85f : size));
+                    }
                 }
+            }
         }
         return (leafy, conifers);
     }

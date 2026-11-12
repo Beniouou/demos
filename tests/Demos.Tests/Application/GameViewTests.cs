@@ -82,7 +82,7 @@ public class GameViewTests
             var building = world.Structures[id];
             var position = Assert.Contains(id, world.BuildingPositions);
             Assert.Null(world.ExtractionSiteProblem(building.TypeId, building.Production?.ProductId, PrototypeScenario.FirstCommuneId, position));
-            Assert.True(position.DistanceTo(capital) <= Demos.Domain.Economy.Balance.Current.ExtractionMaxDistance);
+            Assert.True(Demos.Domain.Map.MapScale.KmBetween(position, capital) <= Demos.Domain.Economy.Balance.Current.ExtractionMaxDistance);
         }
     }
 

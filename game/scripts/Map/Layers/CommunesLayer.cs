@@ -125,7 +125,7 @@ public sealed class CommunesLayer : MapLayer
             return;
         }
 
-        var s = c.Zoom;
+        var s = c.SymbolScale;
         foreach (var (_, center, rank, _) in Communes(c))
         {
             switch (rank)
@@ -207,7 +207,7 @@ public sealed class CommunesLayer : MapLayer
 
     private static void DrawCommuneBadge(MapDrawContext c, Vector2 center, string text, Color textColor, Color bgColor)
     {
-        var s = c.Zoom;
+        var s = c.SymbolScale;
         var fontSize = (int)Math.Clamp(10 * s, 9, 13);
         var textSize = c.Font.GetStringSize(text, HorizontalAlignment.Left, -1, fontSize);
         var padding = new Vector2(6 * s, 3 * s);

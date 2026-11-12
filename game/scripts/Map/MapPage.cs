@@ -100,7 +100,7 @@ public partial class MapPage : ScrollContainer, IMenuPage
 
         var lines = new List<string>
         {
-            $"Monde : {(vMap != null ? $"{vMap.Width:F0} × {vMap.Height:F0}" : "1 000 × 640")} lieues, {communesCount} commune(s).",
+            $"Monde : {(vMap != null ? $"{Demos.Domain.Map.MapScale.ToKm(vMap.Width):N0} × {Demos.Domain.Map.MapScale.ToKm(vMap.Height):N0}" : "100 × 64")} km, {communesCount} commune(s).",
         };
         if (_map.HasFilter(MapFilters.Physical))
             lines.Add($"Géographie physique : {vMap?.Contours.Count ?? 0} courbes de niveau, {vMap?.SpotElevations.Count ?? 0} points cotés, {vMap?.AllRivers.Count ?? 0} cours d'eau.");
@@ -133,6 +133,11 @@ public partial class MapPage : ScrollContainer, IMenuPage
         Item(MapPalette.CommuneMark, "Commune et son nom");
         Item(Layers.ProductionLayer.ZoneColor(null), "Bâtiment d'extraction, de la couleur de sa zone (nom au survol)");
         Item(MapPalette.RoadSurface, "Sentier, chemin, route : le trafic entre communes les crée");
+        _legend.AddChild(new Label
+        {
+            Text = "Un toit figure un îlot de maisons (environ 100 m), un arbre un bosquet.",
+            AutowrapMode = TextServer.AutowrapMode.WordSmart,
+        });
 
         if (_map.HasFilter(MapFilters.Physical))
         {

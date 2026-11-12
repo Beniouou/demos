@@ -49,7 +49,7 @@ public static class Program
             ApplicationConfiguration.Initialize();
             var form = new MapEditorForm(dataDir);
             form.Show();
-            Application.DoEvents();
+            System.Windows.Forms.Application.DoEvents();
             var success = form.TestSlidersSync(out var report);
             File.WriteAllText(Path.Combine(dataDir, "slider_test_result.txt"), report);
             Console.WriteLine(report);
@@ -162,7 +162,7 @@ public static class Program
             }
 
             form.Show();
-            Application.DoEvents();
+            System.Windows.Forms.Application.DoEvents();
 
             using var bmp = new System.Drawing.Bitmap(form.Width, form.Height);
             form.DrawToBitmap(bmp, new System.Drawing.Rectangle(0, 0, form.Width, form.Height));
@@ -204,7 +204,7 @@ public static class Program
             File.WriteAllText(targetPath, json);
 
             Console.WriteLine($"✓ Carte générée avec succès : {targetPath}");
-            Console.WriteLine($"  • Dimensions : {map.Width} × {map.Height} lieues (espace continu vectoriel)");
+            Console.WriteLine($"  • Dimensions : {MapScale.ToKm(map.Width):N0} × {MapScale.ToKm(map.Height):N0} km (espace continu vectoriel)");
             Console.WriteLine($"  • Courbes de niveau (isohypses) : {map.Contours.Count} polylignes (Marching Squares)");
             Console.WriteLine($"  • Altitude maximale : {heightmap.MaxElevation:F0} m");
             Console.WriteLine($"  • Points cotés : {map.SpotElevations.Count} sommets répertoriés");

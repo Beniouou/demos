@@ -106,11 +106,11 @@ public sealed partial class MapEditorForm
         UpdateCommuneLabels();
         UpdateRiverContextButtons();
 
-        _statusDimensions.Text = $"{w:N0} × {h:N0} lieues";
+        _statusDimensions.Text = $"{MapScale.ToKm(w):N0} × {MapScale.ToKm(h):N0} km";
         _statusStats.Text = "Carte vierge (toile blanche)";
         var msg = isInitial
-            ? $"📄 Carte vierge initialisée par défaut ({w:N0} × {h:N0} lieues). Prête pour vos créations !"
-            : $"📄 Carte réinitialisée en mode vierge ({w:N0} × {h:N0} lieues).";
+            ? $"📄 Carte vierge initialisée par défaut ({MapScale.ToKm(w):N0} × {MapScale.ToKm(h):N0} km). Prête pour vos créations !"
+            : $"📄 Carte réinitialisée en mode vierge ({MapScale.ToKm(w):N0} × {MapScale.ToKm(h):N0} km).";
         Log(msg);
     }
 
@@ -146,9 +146,9 @@ public sealed partial class MapEditorForm
             IslandMorphology.Fjords => "Fjords & Baies",
             _ => "Île naturelle"
         };
-        _statusDimensions.Text = $"{w:N0} × {h:N0} lieues";
+        _statusDimensions.Text = $"{MapScale.ToKm(w):N0} × {MapScale.ToKm(h):N0} km";
         _statusStats.Text = $"{morphDesc} ({_currentMap.Contours.Count} courbes, alt. max {_currentHeightmap.MaxElevation:F0} m, {_currentMap.AllBiomes.Count} biomes)";
-        Log($"🏝️ Mode Île initialisé ({morphDesc}, graine {seed}, plafond {maxAlt:F0} m, {w:N0} × {h:N0} lieues).");
+        Log($"🏝️ Mode Île initialisé ({morphDesc}, graine {seed}, plafond {maxAlt:F0} m, {MapScale.ToKm(w):N0} × {MapScale.ToKm(h):N0} km).");
     }
 
     /// <summary>
@@ -173,7 +173,9 @@ public sealed partial class MapEditorForm
             var (w, h) = (loaded.Width, loaded.Height);
             var cols = Math.Clamp((int)Math.Round(w / 6.25), 100, 360);
             var rows = Math.Clamp((int)Math.Round(h / 6.25), 64, 230);
-            _currentHeightmap = new Heightmap(cols, rows, w, h);
+            // Le relief de la carte elle-même (celui du jeu), pas un relief recalculé au hasard.
+            var (relief, reliefSource) = LoadMapRelief(loaded);
+            _currentHeightmap = Heightmap.FromRelief(relief, cols, rows, w, h);
 
             var sanitizedWater = loaded.WaterBodies
                 .Where(wb => !wb.IsErroneousGlobalSea(w, h))
@@ -189,14 +191,38 @@ public sealed partial class MapEditorForm
             UpdateCommuneLabels();
             UpdateRiverContextButtons();
 
-            _statusDimensions.Text = $"{w:N0} × {h:N0} lieues";
+            _statusDimensions.Text = $"{MapScale.ToKm(w):N0} × {MapScale.ToKm(h):N0} km";
             _statusStats.Text = $"Chargée : {_currentMap.Contours.Count} courbes, {_currentMap.Forests.Count} forêts";
             Log($"📂 Carte chargée depuis {_targetJsonPath} ({_currentMap.Contours.Count} courbes, {_currentMap.Forests.Count} forêts, {_currentMap.SpotElevations.Count} sommets).");
+            Log($"⛰️ Relief : {reliefSource}, altitude de {_currentHeightmap.MinElevation:F0} à {_currentHeightmap.MaxElevation:F0} m.");
         }
         catch (Exception ex)
         {
             MessageBox.Show($"Erreur lors de la lecture de carte.json :\n{ex.Message}", "Erreur de chargement", MessageBoxButtons.OK, MessageBoxIcon.Error);
         }
+    }
+
+    /// <summary>
+    /// Le relief d'une carte chargée : les images du jeu (relief.json, relief-altitude.png) si elles sont plus récentes
+    /// que carte.json, sinon recalculé depuis les courbes de niveau (quelques secondes), comme le fait <c>--relief</c>.
+    /// </summary>
+    private (ReliefGrid Relief, string Source) LoadMapRelief(VectorMapDefinition map)
+    {
+        var dataDir = Path.GetDirectoryName(_targetJsonPath)!;
+        var reliefJson = Path.Combine(dataDir, "relief.json");
+        var reliefPng = Path.Combine(dataDir, "relief-altitude.png");
+        if (File.Exists(reliefJson) && File.Exists(reliefPng)
+            && File.GetLastWriteTimeUtc(reliefPng) >= File.GetLastWriteTimeUtc(_targetJsonPath))
+        {
+            var content = new Demos.Infrastructure.JsonContentSource(
+                file => File.ReadAllText(Path.Combine(dataDir, file)), file => File.ReadAllBytes(Path.Combine(dataDir, file)));
+            if (content.LoadRelief() is { } saved)
+                return (saved, "images du jeu (relief-altitude.png)");
+        }
+
+        var sw = Stopwatch.StartNew();
+        var built = ReliefBuilder.Build(map, new ReliefSettings());
+        return (built, $"recalculé depuis les courbes en {sw.ElapsedMilliseconds} ms (lancez --relief pour mettre le jeu à jour)");
     }
 
     private void RecalculateMap(bool isInitial = false)
@@ -227,7 +253,7 @@ public sealed partial class MapEditorForm
         UpdateCommuneLabels();
         UpdateRiverContextButtons();
 
-        _statusDimensions.Text = $"{w:N0} × {h:N0} lieues";
+        _statusDimensions.Text = $"{MapScale.ToKm(w):N0} × {MapScale.ToKm(h):N0} km";
         _statusStats.Text = $"Isohypses : {_currentMap.Contours.Count} | Sommets : {_currentMap.SpotElevations.Count} | Alt. max : {_currentHeightmap.MaxElevation:F0} m";
 
         var msg = isInitial
@@ -271,7 +297,7 @@ public sealed partial class MapEditorForm
             MessageBox.Show(
                 $"La carte a été enregistrée avec succès !\n\n" +
                 $"Fichier : {_targetJsonPath}\n" +
-                $"Dimensions : {_currentMap.Width:N0} × {_currentMap.Height:N0} lieues\n" +
+                $"Dimensions : {MapScale.ToKm(_currentMap.Width):N0} × {MapScale.ToKm(_currentMap.Height):N0} km\n" +
                 $"Courbes de niveau : {_currentMap.Contours.Count} polylignes\n" +
                 $"Communes & localités : {_currentMap.AllCommunes.Count}\n" +
                 $"Réseau hydrographique : {_currentMap.AllRivers.Count} cours d'eau\n" +

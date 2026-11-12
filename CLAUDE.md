@@ -83,7 +83,7 @@ désactivés : TVA sur la valeur ajoutée, épargne progressive des entreprises.
 ## Carte & Géographie : état actuel (résumé)
 
 - Données produites dans `game/data/carte.json` (`VectorMapDefinition` dans `src/Demos.Domain/Map/MapVectorData.cs`) :
-  carte vectorielle continue (3 600 × 2 250 lieues), 1 567 contours d'isohypses Marching Squares, 17 cours d'eau thalweg (`AllRivers`), 150 biomes naturels avec trous polygonaux intérieurs (`Biomes` et `Forests`), 66 gisements de sol (`ResourceZones`, `Resources`), communes et toponymie.
+  carte vectorielle continue (3 600 × 2 250 unités de 100 m, soit 360 × 225 km), 1 567 contours d'isohypses Marching Squares, 17 cours d'eau thalweg (`AllRivers`), 150 biomes naturels avec trous polygonaux intérieurs (`Biomes` et `Forests`), 66 gisements de sol (`ResourceZones`, `Resources`), communes et toponymie.
 - Le moteur Godot affiche la carte vectorielle IGN Pastel au centre de l'écran (`game/scripts/Map/MapCanvas.cs`, `game/scripts/Hud.cs` et menu Carte `game/scripts/MainMenu.cs`) :
   - Enveloppes départementales continues des préfectures fusionnées dynamiquement sans grille (`Geometry2D.MergePolygons`).
   - Liaisons administratives pointillées (`DrawDashedLine`) reliant chaque commune membre au chef-lieu de préfecture.
@@ -92,12 +92,21 @@ désactivés : TVA sur la valeur ajoutée, épargne progressive des entreprises.
     suit) : Géographie physique, Biomes, Ressources minières et sols, Politique, Production et transport. Dessin en
     calques, un par fichier, dans `game/scripts/Map/Layers/` (plan : `plan-refonte-carte.md`, à côté du dépôt).
 - Calculs géographiques branchés dans la simulation :
-  - Terme de distance administrative dans `src/Demos.Domain/Politics/Extension.cs` via `AdministrativeDistance.cs` (2 000 lieues par point de charge, réglage `extensionDistancePerLoad`).
-  - Pertes de transport dans `Trade.cs` (5 % à 60 %, réglages `transport…`) et dispersion de pollution dans `Pollution.cs` (loi en $1/(1+(d/250)^2)$) via `GeographicEconomics.cs`.
+  - Terme de distance administrative dans `src/Demos.Domain/Politics/Extension.cs` via `AdministrativeDistance.cs` (200 km par point de charge, réglage `extensionDistancePerLoad`).
+  - Pertes de transport dans `Trade.cs` (5 % à 60 %, réglages `transport…`) et dispersion de pollution dans `Pollution.cs` (part ÷ (1 + (d ÷ 25 km)²)) via `GeographicEconomics.cs`.
   - Coordonnées géographiques exposées dans `GameView.cs` (`CommunePositions()`, `CommunePosition(id)`).
-- Bâtiments d'extraction posés sur la carte (décidé le 10 novembre 2026) : sur une zone qui convient, à 240 lieues de la
+- Bâtiments d'extraction posés sur la carte (décidé le 10 novembre 2026) : sur une zone qui convient, à 20 km de la
   commune au plus (`extractionMaxDistance`) ; règle dans `Map/ExtractionSites.cs`, mode placement dans
   `game/scripts/Map/MapCanvas.Placement.cs` (Production → Construire ouvre la carte).
+- Échelle (décidé le 12 novembre 2026, remplace la « lieue ») : une unité de carte vaut 100 m (`Map/MapScale.cs`), la
+  carte fait 360 × 225 km. Les règles et les réglages de distance sont **en km** (`equilibrage.json`, tableur) ; les
+  coordonnées restent en unités et sont converties par `MapScale` (`KmBetween`, `ToKm`, `ToUnits`, `Format`). Ne plus
+  écrire « lieue ». Ressorts : commune 8 km, préfecture 40 km autour du chef-lieu (`communeJurisdictionRadius`,
+  `prefectureJurisdictionRadius`). Maisons et arbres presque à l'échelle (tailles dans `MapPalette`). Barre
+  d'échelle : `game/scripts/Map/MapCanvas.Scale.cs`.
+- Éditeur de carte : au chargement, il prend le relief de la carte (`relief-altitude.png` s'il est plus récent que
+  `carte.json`, sinon `ReliefBuilder`), échantillonné en `Heightmap.FromRelief`. Pentes des biomes en vrais % (seuils
+  `ZoneMaskGrid.CliffMinSlope`… : falaise ≥ 8 %, fertile < 10 %, marais < 1 %, désert et plage < 2 % ; 12 novembre 2026).
 - Routes (décidé et codé le 10 novembre 2026, `src/Demos.Domain/Map/Roads.cs`) : le trafic entre communes crée sentier, chemin,
   route (un niveau par mois) ; tracé le moins cher sur la carte d'altitude (`game/data/relief-*.png`, lue par
   `JsonContentSource.LoadRelief`) ; un chemin retire 25 % de la perte de transport, une route 50 % ; construction et

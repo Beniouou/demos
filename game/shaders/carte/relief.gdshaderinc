@@ -1,5 +1,5 @@
 // Ce que partagent les shaders de la carte : la caméra et la carte d'altitude (game/data/relief-altitude.png).
-// Un point de l'écran (en pixels) est sur la carte en (écran − pan) / zoom, en lieues.
+// Un point de l'écran (en pixels) est sur la carte en (écran − pan) / zoom, en unités de carte.
 
 uniform vec2 pan = vec2(0.0);
 uniform float zoom = 1.0;
@@ -21,7 +21,7 @@ float altitude_texel(ivec2 p) {
 	return (floor(t.r * 255.0 + 0.5) * 256.0 + floor(t.g * 255.0 + 0.5)) / 10.0 - 1000.0;
 }
 
-// L'altitude en un point de la carte (lieues), interpolée entre les quatre pixels voisins (après le décodage : on ne
+// L'altitude en un point de la carte (unités de carte), interpolée entre les quatre pixels voisins (après le décodage : on ne
 // peut pas laisser la carte graphique mélanger les octets).
 float altitude_at(vec2 world) {
 	vec2 f = world / cell_size - 0.5;

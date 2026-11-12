@@ -23,7 +23,7 @@ public partial class MapCanvas
         string Label,
         IReadOnlyList<string> Kinds,
         string CommuneId,
-        double MaxDistance,
+        double MaxDistance, // en km
         Func<Point2D, string?> ProblemAt,
         Action<Point2D> Place);
 
@@ -101,7 +101,7 @@ public partial class MapCanvas
         }
 
         if (_data.CommunePosition(request.CommuneId) is { } commune)
-            DrawArc(_camera.ToScreen(commune), (float)request.MaxDistance * _camera.Zoom, 0, Mathf.Tau, 96, new Color(accent, 0.9f), 2f, antialiased: true);
+            DrawArc(_camera.ToScreen(commune), (float)MapScale.ToUnits(request.MaxDistance) * _camera.Zoom, 0, Mathf.Tau, 96, new Color(accent, 0.9f), 2f, antialiased: true);
 
         string hint;
         if (_hoveredWorldPos is { } hovered)

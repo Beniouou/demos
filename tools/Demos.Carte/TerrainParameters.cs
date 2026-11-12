@@ -6,10 +6,10 @@ namespace Demos.Carte;
 /// </summary>
 public sealed record TerrainParameters
 {
-    /// <summary>Largeur du monde en lieues (défaut 2400.0 - échelle Petit Pays).</summary>
+    /// <summary>Largeur du monde en unités de carte (100 m) (défaut 2400.0 - échelle Petit Pays).</summary>
     public double WorldWidth { get; init; } = 2400.0;
 
-    /// <summary>Hauteur du monde en lieues (défaut 1500.0 - échelle Petit Pays).</summary>
+    /// <summary>Hauteur du monde en unités de carte (100 m) (défaut 1500.0 - échelle Petit Pays).</summary>
     public double WorldHeight { get; init; } = 1500.0;
 
     /// <summary>Altitude maximale de référence du sommet principal (en mètres, défaut 700 m).</summary>

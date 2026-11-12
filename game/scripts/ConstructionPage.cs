@@ -150,7 +150,7 @@ public partial class ConstructionPage : HBoxContainer, IMenuPage
         var place = string.Join(" ou ", zones.Select(Demos.Domain.Map.ExtractionSites.ZoneName));
         _closeMenu();
         _map.BeginPlacement(new MapCanvas.PlacementRequest(
-            $"{name}, sur {place}, à {_view.ExtractionMaxDistance:0} lieues de la commune au plus",
+            $"{name}, sur {place}, à {Demos.Domain.Map.MapScale.Format(_view.ExtractionMaxDistance)} de la commune au plus",
             zones,
             communeId,
             _view.ExtractionMaxDistance,
@@ -198,7 +198,7 @@ public partial class ConstructionPage : HBoxContainer, IMenuPage
         {
             text.Append(SheetText.Section("Emplacement"));
             text.AppendLine($"Sur la carte, sur {string.Join(" ou ", zones.Select(Demos.Domain.Map.ExtractionSites.ZoneName))}, "
-                + $"à {_view.ExtractionMaxDistance:0} lieues de la commune au plus. Le bouton ouvre la carte pour le choisir.");
+                + $"à {Demos.Domain.Map.MapScale.Format(_view.ExtractionMaxDistance)} de la commune au plus. Le bouton ouvre la carte pour le choisir.");
         }
 
         text.Append(SheetText.Section("Coût"));
