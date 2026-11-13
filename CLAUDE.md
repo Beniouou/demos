@@ -46,9 +46,10 @@ Jeu solo de construction de nation (Godot .NET 4.7, C#, .NET 10), en français. 
 | Petites images de la carte | `dotnet run --project tools/Demos.Carte -- --images` (dessine celles qui manquent dans `game/assets/carte/` ; `--forcer` les redessine toutes) |
 
 Le tableur (`equilibrage demos.xlsx`) et le rapport (`rapport simulation.html`) sont **à côté** du dossier `demos/`,
-hors du dépôt. Référence actuelle de la simulation : trésor **252 207** la 3e année (`simuler`, 3 ans, départ préréglé, depuis l'atelier
-de matériaux d'État du 10 novembre 2026 ; avant : 258 846 ; le chiffre sans loi, 410 815, date d'avant l'atelier).
-Avec une deuxième commune (`simuler 3 commune`) : **116 018** depuis les routes (10 novembre 2026 ; 141 622 avant).
+hors du dépôt. Référence actuelle de la simulation : trésor **251 177** la 3e année (`simuler`, 3 ans, départ préréglé, depuis les
+routes des bâtiments du 12 novembre 2026 ; avant : 252 207 depuis l'atelier de matériaux d'État, 258 846 avant lui ; le chiffre
+sans loi, 410 815, date d'avant l'atelier). Avec une deuxième commune (`simuler 3 commune`) : **114 989** depuis les routes
+des bâtiments (116 018 avant, 141 622 avant les routes).
 
 ## Architecture et données
 
@@ -114,9 +115,14 @@ désactivés : TVA sur la valeur ajoutée, épargne progressive des entreprises.
   route (un niveau par mois) ; tracé le moins cher sur la carte d'altitude (`game/data/relief-*.png`, lue par
   `JsonContentSource.LoadRelief`) ; un chemin retire 25 % de la perte de transport, une route 50 % ; construction et
   entretien payés par la plus petite structure qui contient les deux communes (préfecture : l'État paie pour l'instant).
-  Chiffres : réglages `road…` de `BalanceSettings` (validés le 11 novembre 2026).
+  Chiffres : réglages `road…` de `BalanceSettings` (validés le 11 novembre 2026). Routes des bâtiments (décidé le
+  12 novembre 2026) : ce que produit un bâtiment posé sur la carte fait du trafic avec sa commune
+  (`Simulation.AddBuildingTraffic`), mêmes seuils, payé par la commune, **sans perte de transport** ; `GameView.TradeFlows`
+  ne garde que les paires de communes.
+- Fonder une commune (décidé le 12 novembre 2026, `Map/CommuneSites.cs`, `World.CommuneSiteProblem`, contrôlé par
+  `TryFoundCommune`) : sur la carte, pas sur l'eau (altitude sous 0), une falaise ou un glacier, et à 16 km au moins de
+  toute autre commune (`communeMinDistance`) ; pas de distance maximale. Légitimité du camp : `baseCampLegitimacyCost` (20).
 - Chantiers suivants ouverts :
-  - Pose interactive d'une commune par clic sur la carte avec validation du terrain constructible.
   - Bonus logistique de transport fluvial le long des 17 cours d'eau navigables.
 
 ## Interface Godot : état actuel (résumé)
@@ -125,8 +131,31 @@ désactivés : TVA sur la valeur ajoutée, épargne progressive des entreprises.
   par fichier (`*Page.cs`) ; `Coming(...)` = entrée grisée « à venir ». Lecture de la partie par `GameView`
   (`src/Demos.Application/GameView.cs`), **actions du joueur par `PlayerDesk`** (`game/scripts/PlayerDesk.cs`, qui
   appelle `Simulation`) ; textes de partie dans `WorldText.cs`, couleurs et styles dans `UiTheme.cs`.
-- Codé dans `Simulation` mais **pas encore branché** à l'interface (relevé du 12 novembre 2026) : la commission des
-  lois (`DraftFromTemplate`, `DraftAmendment`, `DraftRepeal`, `UpdateDraft`, `DeleteDraft`, `CostOf`, `TryVote`,
-  `CancelVote` ; `LawCommissionPage` ne fait qu'afficher), les taux d'impôt (`SetStateTaxRate`, `SetCommuneTaxRate`),
-  les messages des routes (`RoadChanges`), la fondation d'une commune autrement que par la touche C au survol.
+- Commission des lois branchée (12 novembre 2026) : actions dans `PlayerDesk.Laws.cs` (`PlayerDesk` est une classe
+  partielle) ; `LawCommissionPage` crée un brouillon depuis un modèle (niveau au choix) ou une loi vierge (éditeur
+  libre, décidé le 12 novembre 2026 : `Simulation.DraftBlank`, nom, domaine, niveau), renomme, ajoute ou retire des
+  briques (3 au plus, du domaine), choisit leur sujet, règle curseurs et cases « verrouillée », vote, supprime, annule
+  un vote ; `CivilCodePage` a « Amender » et « Abroger ». Bulles d'aide des fiches de lois (hérité, bornes, écart,
+  verrouillée, pôles, coût…) : textes dans `LawHints.cs`, balise `[hint]` via `SheetText.Hint`.
+- Impôts (décidé le 12 novembre 2026) : ils ne se changent que par une loi (domaine Impôts). `SetStateTaxRate` et
+  `SetCommuneTaxRate` ne sont volontairement pas branchés ; `RevenuePage` reste en lecture, avec un raccourci
+  « Préparer une loi d'impôt » (`PlayerDesk.DraftTaxLaw` : brouillon au niveau de l'entité, brique impôt à 0 %).
+- Routes : après chaque bilan (`GameView.RoadChanges`, liste remplacée à chaque bilan), `Main` met les changements dans
+  la barre du bas (textes dans `RoadText.cs`) ; Production → Transport (`TransportPage`) liste les liaisons, le dernier
+  bilan et la règle.
+- Lois entrées en vigueur : au 1er du mois, `Main` écoute `LawsEnacted` : pause et fenêtre `LawsEnactedDialog` (sans
+  « qui accepte, qui rejette » : pas de règle).
+- Menu Structure (13 novembre 2026) : « Gestion des entités politiques » (`StructurePage` : arbre, fiche, et
+  « Rattacher » sous la fiche d'une commune ou d'une préfecture, `StructurePage.Attach.cs`), « Création d'entité
+  politique » (`EntityCreationPage` : Commune ou Préfecture ; remplace `PrefecturesPage` et l'ancienne fenêtre de
+  fondation), « Organisme » (à venir).
+- Fonder une commune : Structure → Création d'entité politique, formulaire Commune (nom, commune qui paie, charte, coût) ;
+  la touche C et le bouton « Camp de base » y mènent (`MainMenu.ShowCommuneCreation`). Puis la carte passe en mode pose
+  (`MapCanvas.PlacementRequest`, sans zones, avec `ExclusionRadius` : cercles rouges autour des communes) ;
+  `PlayerDesk.FoundCommune` (`PlayerDesk.Communes.cs`) fonde et explique un refus.
+- Événements (13 novembre 2026) : `Main` écoute `BuildingCompleted`, `CompaniesNationalizedByLaw`, `SeasonPassed`,
+  `YearPassed` (bilan : trésor et habitants depuis le 1er janvier) et le bilan des routes ; les messages d'une même image
+  vont ensemble dans la barre du bas (textes dans `EventText.cs` ; le message entier au survol). La charte de fondation
+  (`GameView.CharterOf`) s'affiche dans la fiche d'une commune, avec son effet sur les migrations en bulle d'aide.
+- Pas branché, volontairement : `SetPrice` (prix fixés par le joueur : question ouverte des prix dynamiques).
   Prompt de la session d'intégration : `prompt-integration-interface.md`, à côté du dépôt.

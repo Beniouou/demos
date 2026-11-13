@@ -16,7 +16,7 @@ public enum RoadLevel
 }
 
 /// <summary>
-/// Une liaison entre deux lieux (deux communes) : son niveau, son tracé sur la carte (en unités de carte), sa longueur (en km) et sa
+/// Une liaison entre deux lieux (deux communes, ou un bâtiment posé sur la carte et sa commune) : son niveau, son tracé sur la carte (en unités de carte), sa longueur (en km) et sa
 /// montée (la somme des dénivelés, en mètres), et la structure qui la paie.
 /// </summary>
 public sealed record RoadLink(string A, string B, RoadLevel Level, IReadOnlyList<Point2D> Route, double Length, double Climb, string PayerId)

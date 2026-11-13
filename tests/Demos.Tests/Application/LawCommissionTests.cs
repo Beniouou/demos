@@ -61,6 +61,29 @@ public class LawCommissionTests
     }
 
     [Fact]
+    public void Une_loi_vierge_ne_se_vote_qu_une_fois_qu_elle_a_une_brique()
+    {
+        var simulation = WithoutLaws();
+        simulation.World.Legitimacy.Add(EG, 100);
+        simulation.World.Legitimacy.Add(PR, 100);
+        var state = simulation.World.Structures.Values.Single(s => s.IsNational).Id;
+
+        Assert.Null(simulation.DraftBlank("Essai", "domaine-inconnu", state));
+        var draftId = simulation.DraftBlank("Salaire des ouvriers", "travail", state)!;
+        var draft = simulation.World.LawCommission.DraftOf(draftId)!;
+        Assert.Empty(draft.Law.Bricks);
+        Assert.Equal(LawVoteOutcome.Invalid, simulation.TryVote(draftId));
+
+        simulation.UpdateDraft(draftId, draft.Law with
+        {
+            Bricks = [new BrickSetting("salaire-minimum", new LawSubject(SubjectKind.Rank, "Workers"), 3)],
+        });
+        Assert.Equal(LawVoteOutcome.Voted, simulation.TryVote(draftId));
+        AdvanceDays(simulation, 31);
+        Assert.Equal("Salaire des ouvriers", simulation.World.Laws.Single().Name);
+    }
+
+    [Fact]
     public void Une_loi_votee_est_payee_tout_de_suite_et_entre_en_vigueur_le_1er_du_mois_suivant()
     {
         var simulation = WithoutLaws();

@@ -12,19 +12,24 @@ namespace Demos.Game;
 /// Ressources → Revenus, en lecture seule : les impôts se règlent par les lois (brique « Impôt sur la richesse »), plus
 /// ici. À gauche, le choix de l'entité politique (l'État ou une commune), son trésor ou sa caisse, ses taux de base et les
 /// lois sur l'impôt qui s'y appliquent. À droite, pour chaque classe, son impôt du jour selon les lois et ce qu'elle a
-/// payé depuis le début de la saison.
+/// payé depuis le début de la saison. Un raccourci prépare une loi d'impôt au niveau de l'entité choisie : le brouillon
+/// se règle et se vote dans Lois → Éditeur de lois.
 /// </summary>
 public partial class RevenuePage : HBoxContainer, IMenuPage
 {
     private readonly GameView _view = null!;
+    private readonly PlayerDesk _desk = null!;
     private OptionButton _entity = null!;
     private readonly List<string> _entityIds = [];
     private RichTextLabel _summary = null!;
     private RichTextLabel _classes = null!;
+    private Button _taxLaw = null!;
+    private Label _message = null!;
 
-    public RevenuePage(GameView view)
+    public RevenuePage(GameView view, PlayerDesk desk)
     {
         _view = view;
+        _desk = desk;
         AddThemeConstantOverride("separation", 12);
 
         var left = new VBoxContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill, SizeFlagsVertical = SizeFlags.ExpandFill };
@@ -41,8 +46,21 @@ public partial class RevenuePage : HBoxContainer, IMenuPage
         };
         row.AddChild(_entity);
         left.AddChild(row);
+        _entity.ItemSelected += _ => _message.Visible = false;
         _summary = Sheet();
         left.AddChild(_summary);
+        _taxLaw = new Button { FocusMode = FocusModeEnum.None, TooltipText = "Crée un brouillon de loi d'impôt à ce niveau, à régler et voter dans Lois → Éditeur de lois." };
+        _taxLaw.Pressed += () =>
+        {
+            if (SelectedEntity() is not { } entityId)
+                return;
+            _message.Text = _desk.DraftTaxLaw(entityId).Message;
+            _message.Visible = true;
+        };
+        left.AddChild(_taxLaw);
+        _message = new Label { AutowrapMode = TextServer.AutowrapMode.WordSmart, Visible = false };
+        _message.AddThemeColorOverride("font_color", UiTheme.Accent);
+        left.AddChild(_message);
         AddChild(left);
 
         AddChild(new VSeparator());
@@ -57,13 +75,18 @@ public partial class RevenuePage : HBoxContainer, IMenuPage
     {
         var communes = _view.Communes();
         FillEntities(communes);
-        var entityId = _entity.Selected >= 0 && _entity.Selected < _entityIds.Count ? _entityIds[_entity.Selected] : null;
+        var entityId = SelectedEntity();
         var commune = communes.FirstOrDefault(c => c.Id == entityId);
+        _taxLaw.Text = commune is null ? "Préparer une loi d'impôt pour l'État" : $"Préparer une loi d'impôt pour {commune.Name}";
+        _taxLaw.Disabled = entityId is null;
 
         _summary.Text = Summary(entityId, commune);
         // L'État prélève dans toutes les communes ; une commune, chez elle seulement.
         _classes.Text = Classes(commune is null ? communes : [commune], commune is not null);
     }
+
+    private string? SelectedEntity() =>
+        _entity.Selected >= 0 && _entity.Selected < _entityIds.Count ? _entityIds[_entity.Selected] : null;
 
     /// <summary>L'État puis chaque commune ; refait quand une commune est fondée, le choix en cours gardé.</summary>
     private void FillEntities(IReadOnlyList<CommuneView> communes)

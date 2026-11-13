@@ -12,17 +12,23 @@ namespace Demos.Game;
 /// Lois → Code civil : les lois en vigueur. À gauche, rangées par domaine du droit dans des boîtes repliables, avec un
 /// filtre qui descend la hiérarchie : entité politique → organisme → bâtiment ; on voit les lois votées au niveau le
 /// plus précis choisi. À droite, la fiche de la loi choisie : domaine, niveau, et chaque brique avec son sujet, son
-/// curseur, la valeur héritée des niveaux au-dessus, ses bornes et ses pôles.
+/// curseur, la valeur héritée des niveaux au-dessus, ses bornes et ses pôles. Sous la fiche, amender ou abroger la loi :
+/// un brouillon part dans l'éditeur de lois, où on le règle et le vote.
 /// </summary>
 public partial class CivilCodePage : HBoxContainer, IMenuPage
 {
     private readonly GameView _view = null!;
+    private readonly PlayerDesk _desk = null!;
     private readonly TreeSheet _schema = null!;
     private readonly StructurePicker _picker = null!;
+    private readonly HBoxContainer _actions = null!;
+    private readonly Label _message = null!;
+    private string? _shownKey;
 
-    public CivilCodePage(GameView view)
+    public CivilCodePage(GameView view, PlayerDesk desk)
     {
         _view = view;
+        _desk = desk;
         AddThemeConstantOverride("separation", 12);
         _schema = new TreeSheet { Build = Build, Describe = Describe };
 
@@ -34,7 +40,39 @@ public partial class CivilCodePage : HBoxContainer, IMenuPage
         AddChild(left);
 
         AddChild(new VSeparator());
-        AddChild(_schema.Sheet);
+
+        var right = new VBoxContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill, SizeFlagsVertical = SizeFlags.ExpandFill };
+        right.AddThemeConstantOverride("separation", 8);
+        right.AddChild(_schema.Sheet);
+        _actions = new HBoxContainer { Visible = false };
+        _actions.AddThemeConstantOverride("separation", 8);
+        _actions.AddChild(ActionButton("Amender (brouillon)", "Un brouillon qui change les curseurs de cette loi, à régler et voter dans l'éditeur de lois.",
+            () => Draft(_desk.DraftAmendment)));
+        _actions.AddChild(ActionButton("Abroger (brouillon)", "Un brouillon qui supprime cette loi, à voter dans l'éditeur de lois.",
+            () => Draft(_desk.DraftRepeal)));
+        right.AddChild(_actions);
+        _message = new Label { AutowrapMode = TextServer.AutowrapMode.WordSmart, Visible = false };
+        _message.AddThemeColorOverride("font_color", UiTheme.Accent);
+        right.AddChild(_message);
+        AddChild(right);
+    }
+
+    private void Draft(System.Func<string, DeskAnswer> draft)
+    {
+        if (SelectedLaw() is not { } lawId)
+            return;
+        _message.Text = draft(lawId).Message;
+        _message.Visible = true;
+    }
+
+    private string? SelectedLaw() =>
+        _schema.Selected is { } key && key.StartsWith("loi:") && _view.Laws().Any(l => l.Id == key[4..]) ? key[4..] : null;
+
+    private static Button ActionButton(string text, string tooltip, System.Action pressed)
+    {
+        var button = new Button { Text = text, TooltipText = tooltip, FocusMode = FocusModeEnum.None };
+        button.Pressed += pressed;
+        return button;
     }
 
     // Godot recrée les nœuds C# par ce constructeur sans paramètre (rechargement des scripts).
@@ -53,6 +91,12 @@ public partial class CivilCodePage : HBoxContainer, IMenuPage
         }
 
         _schema.Refresh($"{_picker.MostPrecise}|{string.Join(";", laws.Select(l => $"{l.Id}:{string.Join(",", l.Orientations.Select(o => o.Code))}"))}");
+        _actions.Visible = SelectedLaw() is not null;
+        if (_schema.Selected != _shownKey)
+        {
+            _shownKey = _schema.Selected;
+            _message.Visible = false;
+        }
     }
 
     /// <summary>Les lois votées dans la structure la plus précise choisie, ou toutes les lois sans choix.</summary>
@@ -105,15 +149,17 @@ public partial class CivilCodePage : HBoxContainer, IMenuPage
     {
         var text = new StringBuilder(SheetText.Heading((title ?? law.Name).ToUpperInvariant()));
         text.AppendLine(SheetText.Chips(law.Orientations));
-        text.AppendLine($"Niveau : {SheetText.Escape(law.StructureName)}");
+        text.AppendLine($"{SheetText.Hint("Niveau", LawHints.Level)} : {SheetText.Escape(law.StructureName)}");
         if (law.RegalianBelowState)
-            text.AppendLine("Loi régalienne votée sous l'État : elle a coûté deux fois plus cher.");
+            text.AppendLine(SheetText.Hint("Loi régalienne votée sous l'État : elle coûte deux fois plus cher.", LawHints.Regalian));
 
         text.Append(SheetText.Section("Briques"));
+        if ((law.Bricks ?? []).Count == 0)
+            text.AppendLine(SheetText.Muted($"Aucune : ajoutez-en une à {LawCatalogue.MaxBricksPerLaw} pour pouvoir voter la loi."));
         foreach (var brick in law.Bricks ?? [])
             text.Append(DescribeBrick(brick, catalogue.FirstOrDefault(b => b.Id == brick.Id)));
 
-        text.Append(SheetText.Section("S'applique à"));
+        text.Append(SheetText.Section("S'applique à", LawHints.AppliesTo));
         text.AppendLine($"{SheetText.Escape(law.StructureName)}, et tout ce que ce niveau contient.");
         return text.ToString();
     }
@@ -122,17 +168,21 @@ public partial class CivilCodePage : HBoxContainer, IMenuPage
     {
         var family = definition?.Family ?? BrickFamily.Parameter;
         var text = new StringBuilder();
-        text.AppendLine($"{SheetText.Escape(brick.Name)} · {SheetText.Escape(SheetText.Subject(brick.Subject))}");
+        text.AppendLine($"{SheetText.Hint(SheetText.Escape(brick.Name), definition?.Description ?? brick.Name)} · "
+            + SheetText.Hint(SheetText.Escape(SheetText.Subject(brick.Subject)), LawHints.Subject));
         text.Append($"    {SheetText.Value(family, brick.Value)}");
         if (definition is not null)
-            text.Append(SheetText.Muted(family == BrickFamily.Permission
-                ? $"   (hérité : {SheetText.Value(family, brick.Reference)})"
-                : $"   (hérité : {SheetText.Value(family, brick.Reference)} ; de {SheetText.Value(family, definition.Min)} à {SheetText.Value(family, definition.Max)})"));
+        {
+            text.Append(SheetText.Muted($"   (hérité : {SheetText.Value(family, brick.Reference)}", LawHints.Inherited(family)));
+            if (family != BrickFamily.Permission)
+                text.Append(SheetText.Muted($" ; de {SheetText.Value(family, definition.Min)} à {SheetText.Value(family, definition.Max)}", LawHints.Bounds));
+            text.Append(SheetText.Muted(")"));
+        }
         text.AppendLine();
-        text.Append($"    écart {brick.Intensity:P0}");
-        text.Append(brick.Locked ? " · verrouillée" : " · non verrouillée");
+        text.Append("    ").Append(SheetText.Hint($"écart {brick.Intensity:P0}", LawHints.Intensity));
+        text.Append(" · ").Append(SheetText.Hint(brick.Locked ? "verrouillée" : "non verrouillée", LawHints.Locked(brick.Locked)));
         if (brick.Poles.Count > 0)
-            text.Append($" · {SheetText.Chips(brick.Poles)}");
+            text.Append(" · ").Append(SheetText.Hint("pôles", LawHints.Poles)).Append(' ').Append(SheetText.Chips(brick.Poles));
         text.AppendLine();
         if (definition?.Description is { } description)
             text.AppendLine(SheetText.Muted($"    {description}"));

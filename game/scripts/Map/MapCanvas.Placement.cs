@@ -16,8 +16,10 @@ namespace Demos.Game.Map;
 public partial class MapCanvas
 {
     /// <summary>
-    /// Une demande de placement : ce qu'on pose (pour le joueur), les zones qui conviennent, la commune et sa portée, la
-    /// règle (ce qui empêche de poser à une position, ou null) et ce qu'on fait de la position choisie.
+    /// Une demande de placement : ce qu'on pose (pour le joueur), les zones qui conviennent (aucune : pas de surlignage),
+    /// la commune et sa portée (0 : pas de cercle), la règle (ce qui empêche de poser à une position, ou null) et ce qu'on
+    /// fait de la position choisie. Avec une distance d'exclusion (fonder une commune), un cercle rouge autour de chaque
+    /// commune montre où l'on ne peut pas poser.
     /// </summary>
     public sealed record PlacementRequest(
         string Label,
@@ -25,7 +27,8 @@ public partial class MapCanvas
         string CommuneId,
         double MaxDistance, // en km
         Func<Point2D, string?> ProblemAt,
-        Action<Point2D> Place);
+        Action<Point2D> Place,
+        double ExclusionRadius = 0); // en km
 
     private PlacementRequest? _placement;
 
@@ -100,7 +103,12 @@ public partial class MapCanvas
             DrawPolyline([.. points, points[0]], accent, 2f, antialiased: true);
         }
 
-        if (_data.CommunePosition(request.CommuneId) is { } commune)
+        if (request.ExclusionRadius > 0)
+            foreach (var other in _data.Communes())
+                DrawArc(_camera.ToScreen(other.WorldPos), (float)MapScale.ToUnits(request.ExclusionRadius) * _camera.Zoom, 0, Mathf.Tau, 96,
+                    new Color("#d33d3d", 0.8f), 2f, antialiased: true);
+
+        if (request.MaxDistance > 0 && _data.CommunePosition(request.CommuneId) is { } commune)
             DrawArc(_camera.ToScreen(commune), (float)MapScale.ToUnits(request.MaxDistance) * _camera.Zoom, 0, Mathf.Tau, 96, new Color(accent, 0.9f), 2f, antialiased: true);
 
         string hint;

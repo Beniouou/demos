@@ -52,7 +52,12 @@ public partial class Hud : Control
         layout.AddChild(BuildBottomBar());
     }
 
-    public void ShowMessage(string message) => _message.Text = message;
+    /// <summary>Le dernier message ; coupé s'il est trop long pour la barre, il se lit en entier au survol.</summary>
+    public void ShowMessage(string message)
+    {
+        _message.Text = message;
+        _message.TooltipText = message;
+    }
 
     private Control BuildBottomBar()
     {
@@ -61,7 +66,13 @@ public partial class Hud : Control
         row.AddThemeConstantOverride("separation", 8);
         bar.AddChild(row);
 
-        _message = new Label { SizeFlagsHorizontal = SizeFlags.ExpandFill, TextOverrunBehavior = TextServer.OverrunBehavior.TrimEllipsis };
+        _message = new Label
+        {
+            SizeFlagsHorizontal = SizeFlags.ExpandFill,
+            TextOverrunBehavior = TextServer.OverrunBehavior.TrimEllipsis,
+            // Pour la bulle du message entier au survol (un Label ignore la souris par défaut).
+            MouseFilter = MouseFilterEnum.Pass,
+        };
         row.AddChild(_message);
 
         row.AddChild(UiTheme.Caption("Démonstration :"));

@@ -26,7 +26,7 @@ public partial class MainMenu : HBoxContainer
     private const string HelpText =
         "Espace : pause ou reprise\n" +
         "1 à 4 : vitesse (un jour dure 5 s en ×1)\n" +
-        "C : bâtir un camp de base, qui fonde une nouvelle commune (là où est la souris sur la carte)\n" +
+        "C : fonder une commune (Structure → Création d'entité politique), puis choisir l'emplacement sur la carte\n" +
         "Échap : fermer le menu ouvert\n" +
         "Clic sur une commune ou une préfecture de la carte : sa fiche dans le menu Structure\n\n" +
         "Un bâtiment se construit dans Production → Construire, et se gère dans Production → Unités de production : " +
@@ -46,6 +46,25 @@ public partial class MainMenu : HBoxContainer
     /// <summary>Un message pour la barre du bas (le résultat d'une action finie menu fermé, comme un placement sur la carte).</summary>
     public event System.Action<string>? Message;
 
+    /// <summary>
+    /// Fonder une commune (Structure → Création d'entité politique) : le formulaire est rempli (nom, commune qui paie,
+    /// charte) ; reste à choisir l'emplacement sur la carte.
+    /// </summary>
+    public event System.Action<string, string, Demos.Domain.Politics.Orientation>? CommuneSiteRequested;
+
+    /// <summary>Ouvre Structure → Création d'entité politique sur le formulaire de la commune (touche C, bouton Camp de base).</summary>
+    public void ShowCommuneCreation()
+    {
+        var structure = System.Array.FindIndex(_menus, m => m.Title == "Structure");
+        if (structure < 0)
+            return;
+        if (_open != structure)
+            Toggle(structure);
+        _tabs.CurrentTab = 1;
+        if (_tabs.GetCurrentTabControl() is EntityCreationPage page)
+            page.ShowCommune();
+    }
+
     public void Init(GameView view, PlayerDesk desk, MapCanvas map)
     {
         _menus =
@@ -56,19 +75,21 @@ public partial class MainMenu : HBoxContainer
             ]),
             new("Lois",
             [
-                new("Code civil", () => new CivilCodePage(view)),
-                new("Éditeur de lois", () => new LawCommissionPage(view)),
+                new("Code civil", () => new CivilCodePage(view, desk)),
+                new("Éditeur de lois", () => new LawCommissionPage(view, desk)),
             ], Wide: true),
             new("Structure",
             [
-                new("Entité politique", () => new StructurePage(view, desk)),
-                new("Préfectures", () => new PrefecturesPage(view, desk)),
+                new("Gestion des entités politiques", () => new StructurePage(view, desk)),
+                new("Création d'entité politique", () => new EntityCreationPage(view, desk,
+                    (name, payerId, pole) => CommuneSiteRequested?.Invoke(name, payerId, pole))),
                 Coming("Organisme", "Les organismes : domaine d'application, pouvoir, postes et fonctionnement."),
             ], Wide: true),
             new("Production",
             [
                 new("Unités de production", () => new BuildingsPage(view, desk)),
                 new("Construire", () => new ConstructionPage(view, desk, map, Close, message => Message?.Invoke(message))),
+                new("Transport", () => new TransportPage(view)),
                 Coming("Chaîne de production", "Des matières premières aux produits : quelles recettes, quels bâtiments."),
                 Coming("Statistiques", "La production et la consommation de chaque produit dans le temps."),
             ], Wide: true),
@@ -80,7 +101,7 @@ public partial class MainMenu : HBoxContainer
             new("Ressources",
             [
                 Text("Stocks", () => WorldText.Stocks(view)),
-                new("Revenus", () => new RevenuePage(view)),
+                new("Revenus", () => new RevenuePage(view, desk)),
             ], Wide: true),
             new("Aide", [Text("Commandes", () => HelpText)]),
         ];

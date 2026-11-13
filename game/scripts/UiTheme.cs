@@ -123,6 +123,30 @@ public static class UiTheme
         return label;
     }
 
+    /// <summary>Largeur maximale d'une bulle d'aide, en pixels : au-delà, le texte va à la ligne.</summary>
+    public const int TooltipWidth = 420;
+
+    /// <summary>
+    /// Le contenu d'une bulle d'aide qui va à la ligne (Godot la place dans son panneau de bulle). Un texte court garde
+    /// sa largeur ; un long texte est coupé à <see cref="TooltipWidth"/>.
+    /// </summary>
+    public static Control? Tooltip(string text)
+    {
+        if (string.IsNullOrEmpty(text))
+            return null;
+
+        var label = new Label { Text = text };
+        label.AddThemeColorOverride("font_color", Text);
+        label.AddThemeFontSizeOverride("font_size", FontSize - 1);
+        var width = label.GetThemeDefaultFont().GetStringSize(text, fontSize: FontSize - 1).X;
+        if (width > TooltipWidth)
+        {
+            label.AutowrapMode = TextServer.AutowrapMode.WordSmart;
+            label.CustomMinimumSize = new Vector2(TooltipWidth, 0);
+        }
+        return label;
+    }
+
     /// <summary>Une marge égale sur les quatre côtés.</summary>
     public static MarginContainer Margin(int size)
     {

@@ -42,7 +42,7 @@ public sealed class TreeSheet
                 _expanded.Add(key);
         };
 
-        _sheet = new RichTextLabel
+        _sheet = new HintText
         {
             BbcodeEnabled = true,
             SizeFlagsHorizontal = Control.SizeFlags.ExpandFill,

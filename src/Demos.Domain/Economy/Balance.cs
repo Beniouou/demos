@@ -158,6 +158,12 @@ public sealed record BalanceSettings
     public double CommuneJurisdictionRadius { get; init; } = 8;
 
     /// <summary>
+    /// Distance minimale, en km, entre une commune qu'on fonde et une autre commune : deux ressorts de commune, pour qu'ils
+    /// ne se chevauchent pas (décidé le 12 novembre 2026).
+    /// </summary>
+    public double CommuneMinDistance { get; init; } = 16;
+
+    /// <summary>
     /// Ressort d'une préfecture : le rayon, en km, de son territoire autour de son chef-lieu ; il s'ajoute aux ressorts
     /// de ses communes (12 novembre 2026).
     /// </summary>
@@ -218,6 +224,9 @@ public sealed record BalanceSettings
 
     /// <summary>Dotation d'une nouvelle commune, en jours de salaires de son camp de base.</summary>
     public int FoundingGrantDays { get; init; } = 60;
+
+    /// <summary>Légitimité que coûte un camp de base (fonder une commune), dans le pôle choisi, qui devient sa charte (décidé).</summary>
+    public double BaseCampLegitimacyCost { get; init; } = 20;
 
     /// <summary>
     /// Proposition : réserve de chantier d'une commune à sa fondation (et de la première commune au départ), en

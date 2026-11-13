@@ -233,7 +233,8 @@ public sealed class Simulation(World world, GameClock clock)
     /// légitimité (dans le pôle choisi), et la dotation que l'État verse du trésor à la caisse de la nouvelle commune.
     /// La commune est fondée tout de suite ; son camp de base est en chantier. Elle reçoit sa réserve de chantier de
     /// fondation. Le pôle choisi devient la charte de fondation de la commune : il attire les classes du même pôle
-    /// et repousse celles du pôle opposé.
+    /// et repousse celles du pôle opposé. Une position sur la carte doit être permise (<see cref="World.CommuneSiteProblem"/> :
+    /// ni l'eau, ni une falaise, ni un glacier, ni trop près d'une autre commune).
     /// Renvoie la nouvelle commune, ou null, sans rien dépenser, si c'est impossible.
     /// </summary>
     public Structure? TryFoundCommune(
@@ -252,6 +253,7 @@ public sealed class Simulation(World world, GameClock clock)
         var grant = FoundingGrantOf(campType);
 
         if (World.IsIdTaken(commune.Id)
+            || (position is { } site && World.CommuneSiteProblem(site) is not null)
             || !campType.CanBeBuilt
             || World.Legitimacy[legitimacyPole] < legitimacyCost
             || !World.Treasury.TrySpend(grant))
@@ -430,6 +432,22 @@ public sealed class Simulation(World world, GameClock clock)
         return draft.Id;
     }
 
+    /// <summary>
+    /// Commission des lois, éditeur libre (décidé le 12 novembre 2026) : un brouillon de loi vierge, nommé, dans un domaine
+    /// et à un niveau, sans brique ; il ne se vote qu'une fois qu'il en a une. Renvoie l'identifiant du brouillon, ou null
+    /// si le domaine ou le niveau n'existe pas.
+    /// </summary>
+    public string? DraftBlank(string name, string domainId, string levelId)
+    {
+        if (World.LawCatalogue.DomainOf(domainId) is null || !World.Structures.ContainsKey(levelId))
+            return null;
+
+        var draft = new LawDraft(World.LawCommission.NewId("brouillon"), LawChangeKind.Enact,
+            new Law(World.LawCommission.NewId("loi"), name, domainId, levelId, []));
+        World.LawCommission.Add(draft);
+        return draft.Id;
+    }
+
     /// <summary>Commission des lois : un brouillon qui change les curseurs d'une loi en vigueur (au départ, les mêmes).</summary>
     public string? DraftAmendment(string lawId) => DraftChange(lawId, LawChangeKind.Amend);
 
@@ -602,6 +620,7 @@ public sealed class Simulation(World world, GameClock clock)
         var fundsAtDayStart = World.Structures.Values.Where(Companies.HasCompanyFund).ToDictionary(b => b.Id, b => World.CompanyFundOf(b).Balance);
         World.Produced = WorkDay.Run(World.Structures, World.Workers, World.Classes, World.Treasury, World.MarketOf, World.CommuneFundOf, World.Wages,
             World.CompanyFundOf, World.EnergyEffectOf, World.PublicEfficiencyOf);
+        AddBuildingTraffic();
         World.EnergyShares = Energy.RunDaily(World.Structures, World.TierOf, Clock.Season, World.MarketOf, World.Treasury, World.CommuneFundOf,
             World.CompanyFundOf, World.ClassesById, World.FuelStockOf, World.HeatsAllYear);
         Trade.RunDaily(
@@ -669,6 +688,28 @@ public sealed class Simulation(World world, GameClock clock)
         }
     }
 
+    /// <summary>
+    /// Routes des bâtiments (décidé le 12 novembre 2026) : ce que produit un bâtiment posé sur la carte fait du trafic
+    /// entre lui et sa commune, qui crée sentier, chemin et route comme entre deux communes (mêmes seuils, payés par la
+    /// commune). Ce trafic ne donne pas de perte de transport : la production entre toujours entière au marché.
+    /// </summary>
+    private void AddBuildingTraffic()
+    {
+        foreach (var (buildingId, quantity) in World.Produced)
+        {
+            if (quantity <= 0 || !World.BuildingPositions.ContainsKey(buildingId)
+                || !World.Structures.TryGetValue(buildingId, out var building) || World.CommuneOf(building) is not { } communeId)
+                continue;
+            World.RoadTraffic.Add(buildingId, communeId, quantity);
+        }
+    }
+
+    /// <summary>La position d'un lieu relié par les routes : une commune, ou un bâtiment posé sur la carte.</summary>
+    private Point2D? PlaceOf(string placeId) =>
+        World.CommunePositions.TryGetValue(placeId, out var commune) ? commune
+        : World.BuildingPositions.TryGetValue(placeId, out var building) ? building
+        : null;
+
     // Promotions par l'éducation, puis bilan fiscal et statistique (à écrire).
     private void RunYearlyCalculations()
     {
@@ -686,10 +727,9 @@ public sealed class Simulation(World world, GameClock clock)
     {
         EnactVotedLaws();
 
-        // Le trafic du mois fini crée ou améliore les routes, si la structure qui les paie en a les moyens.
-        RoadChanges = Roads.RunMonthly(World.Roads, World.RoadTraffic.EndMonth(),
-            communeId => World.CommunePositions.TryGetValue(communeId, out var position) ? position : null,
-            World.RoadPlanner, World.RoadPayerOf, World.FundOf, Balance.Current);
+        // Le trafic du mois fini (entre communes, et entre un bâtiment posé et sa commune) crée ou améliore les routes,
+        // si la structure qui les paie en a les moyens.
+        RoadChanges = Roads.RunMonthly(World.Roads, World.RoadTraffic.EndMonth(), PlaceOf, World.RoadPlanner, World.RoadPayerOf, World.FundOf, Balance.Current);
 
         foreach (var building in Layoffs.RunMonthly(World.Structures, World.MarketOf, World.Wages, World.CompanyFundOf))
             World.UpdateStructure(building);

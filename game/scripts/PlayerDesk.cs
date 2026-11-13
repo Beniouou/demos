@@ -12,9 +12,12 @@ namespace Demos.Game;
 /// (vente, nationalisation, postes ouverts, recette, chauffage, impôts). Les écrans n'ont que ce bureau et
 /// <see cref="GameView"/> : ils ne touchent jamais le moteur, et chaque décision passe par <see cref="Simulation"/>.
 /// </summary>
-public sealed class PlayerDesk(Simulation simulation)
+public sealed partial class PlayerDesk(Simulation simulation)
 {
     private World World => simulation.World;
+
+    // Pour les autres parties de la classe (PlayerDesk.Laws.cs) : le paramètre du constructeur n'y est pas visible.
+    private Simulation Simulation => simulation;
 
     public BuildingSheet? SheetOf(string buildingId)
     {

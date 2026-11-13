@@ -157,6 +157,22 @@ public class SimulationTests
     }
 
     [Fact]
+    public void Une_commune_ne_se_fonde_pas_trop_pres_d_une_autre_et_rien_n_est_depense()
+    {
+        var simulation = CreatePrototype();
+        AdvanceDays(simulation, 10);
+        simulation.World.Legitimacy.Add(new Orientation(IdeologicalAxis.Property, Pole.B), 20);
+        var capital = simulation.World.CommunePositions["commune-1"];
+        var near = new Demos.Domain.Map.Point2D(capital.X + 20, capital.Y);
+        var treasuryBefore = simulation.World.Treasury.Balance;
+
+        Assert.StartsWith("trop près", simulation.World.CommuneSiteProblem(near));
+        Assert.Null(simulation.TryFoundCommune("Trop proche", "commune-1", PaymentMode.StockFirst,
+            new Orientation(IdeologicalAxis.Property, Pole.B), 2, near));
+        Assert.Equal(treasuryBefore, simulation.World.Treasury.Balance, precision: 6);
+    }
+
+    [Fact]
     public void Sans_assez_d_argent_pour_la_dotation_aucune_commune_n_est_fondee()
     {
         var simulation = CreatePrototype();

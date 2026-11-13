@@ -39,13 +39,37 @@ public sealed class GameView(Simulation simulation)
     public IReadOnlyList<RoadLink> Roads() => World.Roads.Links.ToList();
 
     /// <summary>
+    /// Ce que les routes ont changé au dernier bilan (1er du mois : construction ; 1er janvier : aussi l'entretien). La liste
+    /// est remplacée à chaque bilan : une nouvelle liste veut dire un nouveau bilan.
+    /// </summary>
+    public IReadOnlyList<RoadChange> RoadChanges => simulation.RoadChanges;
+
+    /// <summary>La commune d'une structure (un bâtiment, un organisme), ou null.</summary>
+    public string? CommuneOf(string structureId) =>
+        World.Structures.TryGetValue(structureId, out var structure) ? World.CommuneOf(structure) : null;
+
+    /// <summary>
+    /// La charte de fondation d'une commune : le pôle payé à sa fondation, qui attire les classes de ce pôle et repousse
+    /// celles du pôle opposé dans la migration. Null pour une commune de départ.
+    /// </summary>
+    public Orientation? CharterOf(string communeId) => World.CharterOf(communeId);
+
+    /// <summary>Le nombre d'habitants de toutes les communes.</summary>
+    public double TotalResidents => World.Communes.Sum(c => World.Residents(c.Id));
+
+    /// <summary>Le nom d'une structure (commune, préfecture, État), ou son identifiant si elle n'existe plus.</summary>
+    public string NameOf(string structureId) => World.Structures.TryGetValue(structureId, out var structure) ? structure.Name : structureId;
+
+    /// <summary>
     /// Les échanges entre communes : pour chaque paire, ce qui a circulé (dans les deux sens) le dernier mois fini, ou
     /// depuis le début du mois si aucun mois n'est encore fini, et la perte de transport entre elles (route comprise).
     /// </summary>
     public IReadOnlyList<TradeFlowView> TradeFlows()
     {
         var traffic = World.RoadTraffic.LastMonth.Count > 0 ? World.RoadTraffic.LastMonth : World.RoadTraffic.ThisMonth;
-        return traffic.Select(t => new TradeFlowView(t.Key.Item1, t.Key.Item2, t.Value,
+        // Le trafic entre un bâtiment et sa commune fait des routes, mais ce n'est pas un échange entre communes.
+        var communes = World.Communes.Select(c => c.Id).ToHashSet();
+        return traffic.Where(t => communes.Contains(t.Key.Item1) && communes.Contains(t.Key.Item2)).Select(t => new TradeFlowView(t.Key.Item1, t.Key.Item2, t.Value,
                 GeographicEconomics.TransportLoss(t.Key.Item1, t.Key.Item2, World.CommunePositions) * World.Roads.LossFactor(t.Key.Item1, t.Key.Item2)))
             .ToList();
     }

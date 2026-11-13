@@ -17,13 +17,30 @@ public static class SheetText
 
     public static string Muted(string text) => $"[color=#{UiTheme.Muted.ToHtml(false)}]{Escape(text)}[/color]";
 
-    public static string Chip(Orientation pole) => $"[color=#{UiTheme.PoleColor(pole).ToHtml(false)}]■[/color]";
+    /// <summary>Un texte discret avec une bulle d'aide au survol.</summary>
+    public static string Muted(string text, string hint) => Hint(Muted(text), hint);
 
-    /// <summary>Les pastilles de plusieurs pôles, suivies de leurs codes : « ■■ EG PR ».</summary>
+    /// <summary>Un titre de section avec une bulle d'aide au survol.</summary>
+    public static string Section(string text, string hint) =>
+        $"\n{Hint($"[color=#{UiTheme.Muted.ToHtml(false)}]{Escape(text.ToUpperInvariant())}[/color]", hint)}\n";
+
+    /// <summary>
+    /// Une bulle d'aide au survol d'un texte BBCode déjà mis en forme. Le texte de la bulle ne peut contenir ni
+    /// guillemet ni crochet (ils fermeraient la balise) : ils sont remplacés.
+    /// </summary>
+    public static string Hint(string bbcode, string hint) =>
+        $"[hint=\"{hint.Replace("\"", "'").Replace("[", "(").Replace("]", ")")}\"]{bbcode}[/hint]";
+
+    public static string Chip(Orientation pole) =>
+        Hint($"[color=#{UiTheme.PoleColor(pole).ToHtml(false)}]■[/color]", $"{pole.Code} : pôle {WorldText.PoleName(pole)}");
+
+    /// <summary>Les pastilles de plusieurs pôles, suivies de leurs codes : « ■■ EG PR » ; le nom de chaque pôle au survol.</summary>
     public static string Chips(IEnumerable<Orientation> poles)
     {
         var list = poles.ToList();
-        return list.Count == 0 ? "" : $"{string.Concat(list.Select(Chip))} {string.Join(" ", list.Select(p => p.Code))}";
+        return list.Count == 0
+            ? ""
+            : $"{string.Concat(list.Select(Chip))} {string.Join(" ", list.Select(p => Hint(p.Code, $"{p.Code} : pôle {WorldText.PoleName(p)}")))}";
     }
 
     // Un crochet ouvrant serait lu comme une balise BBCode.

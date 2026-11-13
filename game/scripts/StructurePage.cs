@@ -7,7 +7,7 @@ using Godot;
 namespace Demos.Game;
 
 /// <summary>
-/// Structure → Entité politique, d'après la section « Implication de l'idéologie » du canevas : à gauche, le schéma des
+/// Structure → Gestion des entités politiques, d'après la section « Implication de l'idéologie » du canevas : à gauche, le schéma des
 /// structures emboîtées (État, communes, organismes, bâtiments) et des lois créées à chaque niveau ; à droite, la
 /// fiche de ce qu'on a choisi, avec toutes les lois qui s'y appliquent. Chaque boîte se replie sur son titre ; un clic
 /// sur le titre la déroule (ou la replie) et affiche sa fiche.
@@ -63,7 +63,7 @@ public partial class StructurePage : HBoxContainer, IMenuPage
 
         AddChild(new VSeparator());
 
-        _sheet = new RichTextLabel
+        _sheet = new HintText
         {
             BbcodeEnabled = true,
             SizeFlagsHorizontal = SizeFlags.ExpandFill,
@@ -71,7 +71,12 @@ public partial class StructurePage : HBoxContainer, IMenuPage
             SelectionEnabled = false,
         };
         _sheet.AddThemeColorOverride("default_color", UiTheme.Text);
-        AddChild(_sheet);
+        // À droite : la fiche, et dessous, pour une commune ou une préfecture, « Rattacher » (StructurePage.Attach.cs).
+        var right = new VBoxContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill, SizeFlagsVertical = SizeFlags.ExpandFill };
+        right.AddThemeConstantOverride("separation", 8);
+        right.AddChild(_sheet);
+        right.AddChild(BuildAttachPanel());
+        AddChild(right);
     }
 
     // Godot recrée les nœuds C# par ce constructeur sans paramètre (rechargement des scripts).
@@ -99,6 +104,7 @@ public partial class StructurePage : HBoxContainer, IMenuPage
         }
 
         _sheet.Text = Describe(_selected, roots);
+        RefreshAttach(roots);
     }
 
     /// <summary>
@@ -285,6 +291,7 @@ public partial class StructurePage : HBoxContainer, IMenuPage
                 DescribePrefecture(text, prefecture, All(_view.StructureTree()).ToList());
                 break;
             case StructureNodeKind.Commune when _view.Communes().FirstOrDefault(c => c.Id == node.Id) is { } commune:
+                text.AppendLine(EventText.Charter(_view.CharterOf(commune.Id)));
                 text.AppendLine(Escape(WorldText.Commune(commune)));
                 break;
             case StructureNodeKind.Building when _desk.SheetOf(node.Id) is { } sheet:

@@ -121,6 +121,15 @@ public sealed class World
         return ExtractionSites.ProblemWith(kinds, position, commune, Balance.Current.ExtractionMaxDistance, MapZones);
     }
 
+    /// <summary>
+    /// Ce qui empêche de fonder une commune à cette position (l'eau, une falaise, un glacier, une autre commune trop
+    /// proche), ou null si c'est permis.
+    /// </summary>
+    public string? CommuneSiteProblem(Point2D position) =>
+        CommuneSites.ProblemWith(position, MapZones, Relief,
+            _communePositions.Where(p => _structures.ContainsKey(p.Key)).Select(p => (_structures[p.Key].Name, p.Value)),
+            Balance.Current.CommuneMinDistance);
+
     /// <summary>Vrai si ce type de bâtiment, avec cette recette, doit être posé sur une zone de la carte (une carte chargée).</summary>
     public bool NeedsExtractionSite(string? typeId, string? productId) =>
         MapZones.Count > 0 && ExtractionSites.ZonesFor(typeId, productId).Count > 0;
