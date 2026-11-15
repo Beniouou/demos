@@ -338,6 +338,12 @@ public sealed class World
     /// <summary>Ce que chaque lieu de travail a produit le dernier jour (après le manque d'énergie et de matières).</summary>
     public IReadOnlyDictionary<string, double> Produced { get; set; } = new Dictionary<string, double>();
 
+    /// <summary>
+    /// Part de sa production que chaque lieu de travail à recette a pu faire avec ses matières le dernier jour (1 sans
+    /// manque). Retenue pour l'interface ; la journée de travail l'a déjà appliquée.
+    /// </summary>
+    public IReadOnlyDictionary<string, double> SupplyShares { get; set; } = new Dictionary<string, double>();
+
     // Commune → produit → quantité produite depuis le début de la partie (statistiques).
     private readonly Dictionary<string, Dictionary<string, double>> _producedTotals = [];
 

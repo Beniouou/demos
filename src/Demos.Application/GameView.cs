@@ -100,6 +100,42 @@ public sealed class GameView(Simulation simulation)
         return flows;
     }
 
+    /// <summary>
+    /// La chaîne de production d'une commune : chaque bâtiment qui a une recette, ce qu'il produit, ses matières (par
+    /// unité produite, ce qu'il en faudrait à plein régime le dernier jour, et le stock de la commune), ses travailleurs
+    /// de production, sa production du dernier jour, et la part que ses matières et son énergie ont permise.
+    /// </summary>
+    public IReadOnlyList<ChainBuildingView> ProductionChain(string communeId)
+    {
+        World.Markets.TryGetValue(communeId, out var market);
+        var names = World.Products.ToDictionary(p => p.Id, p => p.Name);
+        string NameOfProduct(string id) => names.GetValueOrDefault(id, id);
+
+        return World.Structures.Values
+            .Where(s => s.Production is not null && s.Jobs > 0 && World.CommuneOf(s) == communeId)
+            .Select(building =>
+            {
+                var recipe = building.Production!.Value;
+                var workers = World.Workers.GetValueOrDefault(building.Id);
+                var fullOutput = recipe.QuantityPerWorker * workers;
+                return new ChainBuildingView(
+                    building.Id,
+                    building.Name,
+                    building.Ownership,
+                    recipe.ProductId,
+                    NameOfProduct(recipe.ProductId),
+                    World.Products.FirstOrDefault(p => p.Id == recipe.ProductId)?.Need?.Id,
+                    recipe.Materials.Select(m => new ChainInputView(m.ProductId, NameOfProduct(m.ProductId), m.Quantity,
+                        fullOutput * m.Quantity, market?.QuantityOf(m.ProductId) ?? 0)).ToList(),
+                    workers,
+                    World.Produced.GetValueOrDefault(building.Id),
+                    World.SupplyShares.GetValueOrDefault(building.Id, 1),
+                    World.EnergyShareOf(building));
+            })
+            .OrderBy(b => b.Name)
+            .ToList();
+    }
+
     /// <summary>Distance maximale, en km, entre un bâtiment d'extraction et sa commune.</summary>
     public double ExtractionMaxDistance => Balance.Current.ExtractionMaxDistance;
 
@@ -506,6 +542,27 @@ public sealed record PrefectureCostView(
 
 /// <summary>Ce qui circule entre deux communes en un mois (produits, dans les deux sens) et la perte de transport entre elles.</summary>
 public sealed record TradeFlowView(string A, string B, double MonthlyQuantity, double Loss);
+
+/// <summary>
+/// Un bâtiment de la chaîne de production d'une commune : son produit (et le besoin des habitants qu'il couvre, s'il y
+/// en a un), ses matières, ses travailleurs de production, sa production du dernier jour, et la part de sa production
+/// que ses matières (<see cref="SupplyShare"/>) et son énergie (<see cref="EnergyShare"/>) ont permise.
+/// </summary>
+public sealed record ChainBuildingView(
+    string Id,
+    string Name,
+    Ownership Ownership,
+    string ProductId,
+    string ProductName,
+    string? NeedId,
+    IReadOnlyList<ChainInputView> Inputs,
+    double Workers,
+    double ProducedToday,
+    double SupplyShare,
+    double EnergyShare);
+
+/// <summary>Une matière d'une recette : par unité produite, ce qu'il en faudrait à plein régime par jour, et le stock de la commune.</summary>
+public sealed record ChainInputView(string ProductId, string ProductName, double PerUnit, double NeededPerDay, double Stock);
 
 /// <summary>
 /// Un produit dans une commune, en totaux depuis le début de la partie : produit, utilisé, envoyé vers une autre commune,

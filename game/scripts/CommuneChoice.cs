@@ -6,10 +6,11 @@ using Godot;
 namespace Demos.Game;
 
 /// <summary>
-/// Un menu « Toutes les communes » puis chaque commune, refait quand une commune est fondée (le choix en cours gardé).
-/// <see cref="SelectedId"/> est null pour toutes les communes.
+/// Un menu « Toutes les communes » (sauf si <c>allowAll</c> est faux) puis chaque commune, refait quand une commune est
+/// fondée (le choix en cours gardé).
+/// <see cref="SelectedId"/> est null pour toutes les communes (sans « Toutes », la première commune est choisie au départ).
 /// </summary>
-public sealed class CommuneChoice
+public sealed class CommuneChoice(bool allowAll = true)
 {
     private readonly List<string> _ids = [];
 
@@ -21,7 +22,10 @@ public sealed class CommuneChoice
         ClipText = true,
     };
 
-    public string? SelectedId => Button.Selected > 0 && Button.Selected <= _ids.Count ? _ids[Button.Selected - 1] : null;
+    // Le décalage entre la ligne du menu et la commune : 1 avec « Toutes les communes » en tête.
+    private int Offset => allowAll ? 1 : 0;
+
+    public string? SelectedId => Button.Selected - Offset is var index && index >= 0 && index < _ids.Count ? _ids[index] : null;
 
     /// <summary>Une ligne « Commune [menu] » à mettre en haut d'une page.</summary>
     public HBoxContainer Row()
@@ -42,9 +46,10 @@ public sealed class CommuneChoice
         _ids.Clear();
         _ids.AddRange(communes.Select(c => c.Id));
         Button.Clear();
-        Button.AddItem("Toutes les communes");
+        if (allowAll)
+            Button.AddItem("Toutes les communes");
         foreach (var commune in communes)
             Button.AddItem(commune.Name);
-        Button.Select(selected is null ? 0 : _ids.IndexOf(selected) + 1);
+        Button.Select(selected is null ? 0 : System.Math.Max(0, _ids.IndexOf(selected) + Offset));
     }
 }

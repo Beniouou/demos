@@ -96,7 +96,7 @@ public partial class MainMenu : HBoxContainer
                 new("Unités de production", () => new BuildingsPage(view, desk)),
                 new("Construire", () => new ConstructionPage(view, desk, map, Close, message => Message?.Invoke(message))),
                 new("Transport", () => new TransportPage(view)),
-                Coming("Chaîne de production", "Des matières premières aux produits : quelles recettes, quels bâtiments."),
+                new("Chaîne de production", () => new ProductionChainPage(view, desk, ShowBuilding)),
                 new("Statistiques", () => new ProductionStatsPage(view, ProductionHistory)),
             ], Wide: true),
             new("Recherche",
@@ -205,6 +205,19 @@ public partial class MainMenu : HBoxContainer
         _tabs.CurrentTab = 0;
         if (_tabs.GetCurrentTabControl() is StructurePage page)
             page.Show(structureId);
+    }
+
+    /// <summary>Ouvre Production → Unités de production sur un bâtiment (depuis la Chaîne de production).</summary>
+    public void ShowBuilding(string buildingId)
+    {
+        var production = System.Array.FindIndex(_menus, m => m.Title == "Production");
+        if (production < 0)
+            return;
+        if (_open != production)
+            Toggle(production);
+        _tabs.CurrentTab = 0;
+        if (_tabs.GetCurrentTabControl() is BuildingsPage page)
+            page.Show(buildingId);
     }
 
     private void Toggle(int menu)

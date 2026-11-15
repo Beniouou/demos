@@ -618,8 +618,10 @@ public sealed class Simulation(World world, GameClock clock)
                 : null);
         // La caisse de chaque entreprise au début de la journée : son bénéfice du jour décide de ce qu'elle verse.
         var fundsAtDayStart = World.Structures.Values.Where(Companies.HasCompanyFund).ToDictionary(b => b.Id, b => World.CompanyFundOf(b).Balance);
+        var supplyShares = new Dictionary<string, double>();
         World.Produced = WorkDay.Run(World.Structures, World.Workers, World.Classes, World.Treasury, World.MarketOf, World.CommuneFundOf, World.Wages,
-            World.CompanyFundOf, World.EnergyEffectOf, World.PublicEfficiencyOf);
+            World.CompanyFundOf, World.EnergyEffectOf, World.PublicEfficiencyOf, supplyShares);
+        World.SupplyShares = supplyShares;
         AddBuildingTraffic();
         CountProduction();
         World.EnergyShares = Energy.RunDaily(World.Structures, World.TierOf, Clock.Season, World.MarketOf, World.Treasury, World.CommuneFundOf,

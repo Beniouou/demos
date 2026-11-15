@@ -39,6 +39,25 @@ public class GameViewTests
     }
 
     [Fact]
+    public void La_chaine_de_production_donne_les_batiments_a_recette_de_la_commune_et_leurs_matieres()
+    {
+        var simulation = PrototypeScenario.Create(GameData.Content());
+        var view = new GameView(simulation);
+        simulation.AdvanceDay();
+
+        var chain = view.ProductionChain(PrototypeScenario.FirstCommuneId);
+
+        Assert.NotEmpty(chain);
+        // Le moulin de la partie de départ fait de la farine avec du blé, que la ferme de la commune produit.
+        var mill = chain.Single(b => b.ProductId == "farine");
+        Assert.Contains(mill.Inputs, i => i.ProductId == "ble" && i.NeededPerDay > 0);
+        Assert.Contains(chain, b => b.ProductId == "ble");
+        Assert.All(chain, b => Assert.InRange(b.SupplyShare, 0, 1));
+        Assert.Empty(view.ProductionChain("commune-inconnue"));
+        Assert.False(simulation.World.Markets.ContainsKey("commune-inconnue"));
+    }
+
+    [Fact]
     public void La_vue_est_une_copie_que_la_suite_de_la_partie_ne_change_pas()
     {
         var simulation = PrototypeScenario.Create(GameData.Content());

@@ -175,5 +175,13 @@ désactivés : TVA sur la valeur ajoutée, épargne progressive des entreprises.
   `Simulation.CountProduction` après la journée de travail) ; lecture par `GameView.ProductFlows` (totaux depuis le
   début). Relevé mensuel par l'interface (`ProductionHistory`, `MainMenu.ProductionHistory`), pris avec celui de la
   population ; un mois = différence entre deux relevés.
+- Production → Chaîne de production (15 novembre 2026, `ProductionChainPage`) : schéma d'une commune (`ChainDiagram`,
+  dessiné par Godot : colonnes selon la profondeur dans la chaîne, flèches producteur → utilisateur dans la commune
+  puis → besoins des habitants, cadre orange quand les matières ont manqué, « Suivre » un produit estompe le reste) ;
+  clic sur un bâtiment : fiche (matières à plein régime, stock, parts matières et énergie), recette changeable
+  (`PlayerDesk.SetRecipe`, comme dans Unités de production) et bouton vers Unités de production
+  (`MainMenu.ShowBuilding` → `BuildingsPage.Show`). Lecture : `GameView.ProductionChain(communeId)`. La part que les
+  matières ont permise est retenue par `WorkDay.Run(…, supplyShares)` dans `World.SupplyShares` (sans effet sur la
+  partie). Les lignes d'approvisionnement entre bâtiments ne sont pas faites : règle à décider (À trancher, Logistique).
 - Pas branché, volontairement : `SetPrice` (prix fixés par le joueur : question ouverte des prix dynamiques).
   Prompt de la session d'intégration : `prompt-integration-interface.md`, à côté du dépôt.

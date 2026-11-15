@@ -79,6 +79,14 @@ public partial class BuildingsPage : HBoxContainer, IMenuPage
     // Godot recrée les nœuds C# par ce constructeur sans paramètre (rechargement des scripts).
     public BuildingsPage() { }
 
+    /// <summary>Choisit un bâtiment et montre ses réglages (depuis Production → Chaîne de production).</summary>
+    public void Show(string buildingId)
+    {
+        _picker.Refresh(_view.StructureTree());
+        _picker.SelectBuilding(buildingId);
+        ShowSheet();
+    }
+
     public void Refresh()
     {
         // Une commune fondée ou un bâtiment construit : les menus déroulants sont refaits, le choix en cours gardé.

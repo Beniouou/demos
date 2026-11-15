@@ -68,6 +68,24 @@ public class ProductionChainTests
     }
 
     [Fact]
+    public void La_journee_de_travail_retient_la_part_que_les_matieres_ont_permise()
+    {
+        var (structures, workers) = Town();
+        var market = new Market(Products);
+        market.Offer("ble", 30, "ferme");
+        var fund = new Treasury();
+        fund.Deposit(1_000);
+        var shares = new Dictionary<string, double>();
+
+        WorkDay.Run(structures, Employment.Assign(structures, [workers]), [workers], new Treasury(), _ => market,
+            companyFundOf: _ => fund, supplyShares: shares);
+
+        // 30 blés pour les 100 farines prévues : 30 % de la production.
+        Assert.Equal(0.3, shares["moulin"], precision: 6);
+        Assert.Equal(30, market.QuantityOf("farine"), precision: 6);
+    }
+
+    [Fact]
     public void La_journee_de_travail_renvoie_ce_que_chaque_batiment_a_produit()
     {
         var (structures, workers) = Town();
