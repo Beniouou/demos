@@ -1,24 +1,28 @@
+using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using Demos.Application;
+using Demos.Domain.Population;
 using Godot;
 
 namespace Demos.Game;
 
 /// <summary>
-/// Population → Groupes sociaux, en lecture : à gauche les communes et leurs groupes locaux (une classe dans une
-/// commune), avec les pastilles de leurs pôles ; à droite la fiche du groupe choisi : rang, idéologie, membres et
-/// chômeurs, richesse, revenus et impôts de la saison, besoins, manques, adhésion, éducation et lieux de travail. La
-/// fiche d'une commune liste ses groupes.
+/// Population → Groupes sociaux, en lecture : à gauche les communes, leurs rangs (ouvriers, professions
+/// intermédiaires, cadres), chacun repliable, et dans chaque rang ses groupes locaux (une classe dans une commune) avec
+/// les pastilles de leurs pôles ; à droite la fiche de ce qui est choisi. La fiche d'une commune ou d'un rang liste ses
+/// groupes ; celle d'un groupe donne son rang, son idéologie, ses membres et chômeurs, sa richesse, ses revenus et
+/// impôts de la saison, ses besoins, ses manques, son adhésion, son éducation et ses lieux de travail.
 /// </summary>
 public partial class PopulationGroupsPage : HBoxContainer, IMenuPage
 {
     private const string CommuneKey = "commune:";
+    private const string RankKey = "rang:";
     private const string GroupKey = "groupe:";
 
     private readonly GameView _view = null!;
     private readonly TreeSheet _sheet = new();
-    private System.Collections.Generic.IReadOnlyList<CommuneView> _communes = [];
+    private IReadOnlyList<CommuneView> _communes = [];
 
     public PopulationGroupsPage(GameView view)
     {
@@ -46,41 +50,67 @@ public partial class PopulationGroupsPage : HBoxContainer, IMenuPage
         _sheet.Refresh("groupes|" + string.Join("|", _communes.Select(c => c.Id + ":" + string.Join(",", c.Classes.Select(g => g.Id)))));
     }
 
+    private static string KeyOf(CommuneView commune, Rank rank) => $"{RankKey}{commune.Id}:{rank}";
+
+    private static IEnumerable<SocialClassView> Ordered(IEnumerable<SocialClassView> groups) =>
+        groups.OrderBy(g => g.Rank).ThenByDescending(g => g.Population);
+
     private void Build(TreeItem root)
     {
         foreach (var commune in _communes)
         {
             var item = _sheet.Item(root, CommuneKey + commune.Id, $"{commune.Name} ({commune.Classes.Count})");
-            foreach (var group in commune.Classes.OrderBy(g => g.Rank).ThenByDescending(g => g.Population))
+            // Un rang par branche repliable, seulement s'il a des groupes dans la commune.
+            foreach (var rank in commune.Classes.Select(g => g.Rank).Distinct().Order())
             {
-                var groupItem = _sheet.Item(item, GroupKey + group.Id, group.Name);
-                TreeSheet.AddPoleChips(groupItem, group.Poles ?? [], "Pôle du groupe");
+                var groups = commune.Classes.Where(g => g.Rank == rank).ToList();
+                var rankItem = _sheet.Item(item, KeyOf(commune, rank),
+                    $"{ClassTransitions.RankName(rank)} ({groups.Count}) · {groups.Sum(g => g.Population):N0}");
+                foreach (var group in Ordered(groups))
+                {
+                    var groupItem = _sheet.Item(rankItem, GroupKey + group.Id, $"{group.IdeologyName} ({group.Population:N0})");
+                    TreeSheet.AddPoleChips(groupItem, group.Poles ?? [], "Pôle du groupe");
+                }
             }
         }
     }
 
     private string Describe(string key)
     {
-        if (key.StartsWith(CommuneKey) && _communes.FirstOrDefault(c => CommuneKey + c.Id == key) is { } commune)
-            return DescribeCommune(commune);
-        foreach (var home in _communes)
-            if (home.Classes.FirstOrDefault(g => GroupKey + g.Id == key) is { } group)
-                return DescribeGroup(home, group);
+        foreach (var commune in _communes)
+        {
+            if (key == CommuneKey + commune.Id)
+                return DescribeGroups(commune.Name.ToUpperInvariant(), commune.Classes, "Aucun groupe local : personne n'habite ici.");
+            foreach (var rank in System.Enum.GetValues<Rank>())
+                if (key == KeyOf(commune, rank))
+                    return DescribeGroups($"{ClassTransitions.RankName(rank)} — {commune.Name}", commune.Classes.Where(g => g.Rank == rank).ToList(),
+                        "Plus aucun groupe de ce rang dans la commune.", PopulationText.Rank(rank), byIdeology: true);
+            if (commune.Classes.FirstOrDefault(g => GroupKey + g.Id == key) is { } group)
+                return DescribeGroup(commune, group);
+        }
         return SheetText.Muted("Ce groupe n'existe plus : ses membres ont rejoint d'autres classes ou d'autres communes.");
     }
 
-    private static string DescribeCommune(CommuneView commune)
+    /// <summary>
+    /// La fiche d'une commune ou d'un rang : ses groupes, leurs membres, leurs besoins et leur adhésion. Dans un rang, un
+    /// groupe se nomme par son idéologie (le rang est dans le titre).
+    /// </summary>
+    private static string DescribeGroups(string title, IReadOnlyList<SocialClassView> groups, string empty, string? hint = null, bool byIdeology = false)
     {
-        var text = new StringBuilder(SheetText.Heading(commune.Name.ToUpperInvariant()));
-        if (commune.Classes.Count == 0)
-            return text + SheetText.Muted("Aucun groupe local : personne n'habite ici.");
+        var text = new StringBuilder(SheetText.Heading(title));
+        if (hint is not null)
+            text.AppendLine(SheetText.Muted(hint)).AppendLine();
+        if (groups.Count == 0)
+            return text + SheetText.Muted(empty);
 
+        text.AppendLine($"{SheetText.Hint("Membres", PopulationText.Members)} {groups.Sum(g => g.Population):N0} · "
+            + $"{SheetText.Hint("chômeurs", PopulationText.Unemployed)} {groups.Sum(g => g.Unemployed):N0}");
         text.Append("[table=4]");
         foreach (var header in new[] { "Groupe", "Membres", "Besoins", "Adhésion" })
             text.Append(PopulationText.Cell(header, header: true));
-        foreach (var group in commune.Classes.OrderBy(g => g.Rank).ThenByDescending(g => g.Population))
+        foreach (var group in Ordered(groups))
         {
-            text.Append(PopulationText.Cell($"{SheetText.Chips(group.Poles ?? [])}  {SheetText.Escape(group.Name)}"));
+            text.Append(PopulationText.Cell($"{SheetText.Chips(group.Poles ?? [])}  {SheetText.Escape(byIdeology ? group.IdeologyName : group.Name)}"));
             text.Append(PopulationText.Cell($"{group.Population:N0}"));
             text.Append(PopulationText.Cell($"{group.NeedsSatisfaction:P0}"));
             text.Append(PopulationText.Cell($"{group.Adhesion:P0}"));

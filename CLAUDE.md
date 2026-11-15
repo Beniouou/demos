@@ -159,8 +159,8 @@ désactivés : TVA sur la valeur ajoutée, épargne progressive des entreprises.
   (`GameView.CharterOf`) s'affiche dans la fiche d'une commune, avec son effet sur les migrations en bulle d'aide.
 - Menu Population (13 novembre 2026), en lecture : « Vue d'ensemble » (`PopulationOverviewPage` : toutes les communes ou
   une seule ; habitants, logements, emplois, chômeurs, moyennes des besoins, logés et adhésion, barres des membres par
-  rang et par pôle, tableau par commune), « Groupes sociaux » (`PopulationGroupsPage` : arbre communes → groupes
-  locaux, fiche du groupe : idéologie, chômeurs, richesse, revenus et impôts de la saison, manques, éducation, lieux de
+  rang et par pôle, tableau par commune), « Groupes sociaux » (`PopulationGroupsPage` : arbre communes → rangs
+  repliables → groupes locaux nommés par leur idéologie ; fiche d'un rang : ses groupes ; fiche du groupe : idéologie, chômeurs, richesse, revenus et impôts de la saison, manques, éducation, lieux de
   travail), « Évolution » (`PopulationHistoryPage` : courbe de la mesure choisie, une par commune, un point par mois ;
   tableau d'une ligne par saison). Chiffres agrégés dans `PopulationStats.cs`, bulles d'aide (règles et constantes du
   moteur) dans `PopulationText.cs`. Graphiques dessinés par Godot, réutilisables : `LineChart` (courbes, axe serré
