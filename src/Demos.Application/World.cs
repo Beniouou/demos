@@ -338,6 +338,20 @@ public sealed class World
     /// <summary>Ce que chaque lieu de travail a produit le dernier jour (après le manque d'énergie et de matières).</summary>
     public IReadOnlyDictionary<string, double> Produced { get; set; } = new Dictionary<string, double>();
 
+    // Commune → produit → quantité produite depuis le début de la partie (statistiques).
+    private readonly Dictionary<string, Dictionary<string, double>> _producedTotals = [];
+
+    public void CountProduced(string communeId, string productId, double quantity)
+    {
+        if (!_producedTotals.TryGetValue(communeId, out var totals))
+            _producedTotals[communeId] = totals = [];
+        totals[productId] = totals.GetValueOrDefault(productId) + quantity;
+    }
+
+    /// <summary>Ce qu'une commune a produit de chaque produit depuis le début de la partie (paiement en nature compris).</summary>
+    public IReadOnlyDictionary<string, double> ProducedTotalsOf(string communeId) =>
+        _producedTotals.TryGetValue(communeId, out var totals) ? totals : new Dictionary<string, double>();
+
     /// <summary>
     /// Part de ses besoins en énergie que chaque bâtiment a couverte le dernier jour (1 s'il n'en a pas besoin).
     /// </summary>

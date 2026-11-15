@@ -621,6 +621,7 @@ public sealed class Simulation(World world, GameClock clock)
         World.Produced = WorkDay.Run(World.Structures, World.Workers, World.Classes, World.Treasury, World.MarketOf, World.CommuneFundOf, World.Wages,
             World.CompanyFundOf, World.EnergyEffectOf, World.PublicEfficiencyOf);
         AddBuildingTraffic();
+        CountProduction();
         World.EnergyShares = Energy.RunDaily(World.Structures, World.TierOf, Clock.Season, World.MarketOf, World.Treasury, World.CommuneFundOf,
             World.CompanyFundOf, World.ClassesById, World.FuelStockOf, World.HeatsAllYear);
         Trade.RunDaily(
@@ -701,6 +702,18 @@ public sealed class Simulation(World world, GameClock clock)
                 || !World.Structures.TryGetValue(buildingId, out var building) || World.CommuneOf(building) is not { } communeId)
                 continue;
             World.RoadTraffic.Add(buildingId, communeId, quantity);
+        }
+    }
+
+    /// <summary>Ajoute la production du jour aux totaux par commune et par produit (statistiques ; aucune règle).</summary>
+    private void CountProduction()
+    {
+        foreach (var (buildingId, quantity) in World.Produced)
+        {
+            if (quantity <= 0 || !World.Structures.TryGetValue(buildingId, out var building)
+                || building.Production is not { } production || World.CommuneOf(building) is not { } communeId)
+                continue;
+            World.CountProduced(communeId, production.ProductId, quantity);
         }
     }
 

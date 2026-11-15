@@ -16,16 +16,13 @@ public sealed class PopulationHistory
     public sealed record Snapshot(System.DateOnly Date, PopulationStats All, IReadOnlyDictionary<string, PopulationStats> ByCommune)
     {
         /// <summary>« janv. 1900 », pour l'axe du graphique.</summary>
-        public string MonthLabel => $"{MonthNames[Date.Month - 1]} {Date.Year}";
+        public string MonthLabel => WorldText.MonthLabel(Date);
 
         public Season Season => GameClock.SeasonOf(Date);
 
         /// <summary>« Hiver 1901 » : l'hiver commence en décembre, il prend le nom de l'année qui suit.</summary>
         public string SeasonLabel => $"{WorldText.SeasonName(Season)} {(Date.Month == 12 ? Date.Year + 1 : Date.Year)}";
     }
-
-    private static readonly string[] MonthNames =
-        ["janv.", "févr.", "mars", "avr.", "mai", "juin", "juil.", "août", "sept.", "oct.", "nov.", "déc."];
 
     private readonly List<Snapshot> _snapshots = [];
 

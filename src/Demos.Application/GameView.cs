@@ -74,6 +74,32 @@ public sealed class GameView(Simulation simulation)
             .ToList();
     }
 
+    /// <summary>
+    /// Les totaux de chaque produit dans chaque commune depuis le début de la partie : produit, utilisé (achats des
+    /// habitants, matières et énergie des bâtiments, chantiers), envoyé vers une autre commune, perdu ; et le stock et le
+    /// prix du moment. Seuls les produits qui ont servi ou qui sont en stock y sont. Ne crée aucun marché.
+    /// </summary>
+    public IReadOnlyList<ProductFlowView> ProductFlows()
+    {
+        var flows = new List<ProductFlowView>();
+        foreach (var commune in World.Communes)
+        {
+            var produced = World.ProducedTotalsOf(commune.Id);
+            World.Markets.TryGetValue(commune.Id, out var market);
+            foreach (var product in World.Products)
+            {
+                var tally = market?.TallyOf(product.Id) ?? default;
+                var stock = market?.QuantityOf(product.Id) ?? 0;
+                var made = produced.GetValueOrDefault(product.Id);
+                if (made <= 0 && stock <= 0 && tally.Used <= 0 && tally.Sent <= 0 && tally.Lost <= 0)
+                    continue;
+                flows.Add(new ProductFlowView(commune.Id, product.Id, product.Name, made, tally.Used, tally.Sent, tally.Lost, stock,
+                    market?.PriceOf(product.Id) ?? product.BasePrice));
+            }
+        }
+        return flows;
+    }
+
     /// <summary>Distance maximale, en km, entre un bâtiment d'extraction et sa commune.</summary>
     public double ExtractionMaxDistance => Balance.Current.ExtractionMaxDistance;
 
@@ -480,3 +506,18 @@ public sealed record PrefectureCostView(
 
 /// <summary>Ce qui circule entre deux communes en un mois (produits, dans les deux sens) et la perte de transport entre elles.</summary>
 public sealed record TradeFlowView(string A, string B, double MonthlyQuantity, double Loss);
+
+/// <summary>
+/// Un produit dans une commune, en totaux depuis le début de la partie : produit, utilisé, envoyé vers une autre commune,
+/// perdu ; et son stock et son prix du moment.
+/// </summary>
+public sealed record ProductFlowView(
+    string CommuneId,
+    string ProductId,
+    string ProductName,
+    double Produced,
+    double Used,
+    double Sent,
+    double Lost,
+    double Stock,
+    double Price);

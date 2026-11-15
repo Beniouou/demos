@@ -168,5 +168,12 @@ désactivés : TVA sur la valeur ajoutée, épargne progressive des entreprises.
   La simulation ne garde pas d'historique : le relevé (`PopulationHistory`, `MainMenu.History`) est pris par `Main`
   après le premier jour joué puis le 1er de chaque mois (décidé le 15 novembre 2026), et ne dure que la partie. `SocialClassView` porte aussi les pôles, le nom de l'idéologie, les chômeurs, les revenus
   et manques de la saison, la richesse par membre et les lieux de travail (`WorkplaceView`).
+- Production → Statistiques (15 novembre 2026), en lecture (`ProductionStatsPage`) : pour toutes les communes ou une
+  seule, courbe mois par mois du produit choisi (production, utilisé, envoyé, perdu, stock en fin de mois) et tableau
+  de tous les produits pour le dernier mois fini. Compteurs sans effet sur la partie : `Market.TallyOf` (utilisé =
+  `TryBuy` + `TryWithdraw`, envoyé = `Take`, perdu = `Keep`) et `World.CountProduced` (appelé par
+  `Simulation.CountProduction` après la journée de travail) ; lecture par `GameView.ProductFlows` (totaux depuis le
+  début). Relevé mensuel par l'interface (`ProductionHistory`, `MainMenu.ProductionHistory`), pris avec celui de la
+  population ; un mois = différence entre deux relevés.
 - Pas branché, volontairement : `SetPrice` (prix fixés par le joueur : question ouverte des prix dynamiques).
   Prompt de la session d'intégration : `prompt-integration-interface.md`, à côté du dépôt.

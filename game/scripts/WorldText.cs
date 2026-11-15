@@ -23,6 +23,12 @@ public static class WorldText
         _ => "libéral",
     };
 
+    private static readonly string[] MonthNames =
+        ["janv.", "févr.", "mars", "avr.", "mai", "juin", "juil.", "août", "sept.", "oct.", "nov.", "déc."];
+
+    /// <summary>« janv. 1900 », pour l'axe d'un graphique.</summary>
+    public static string MonthLabel(System.DateOnly date) => $"{MonthNames[date.Month - 1]} {date.Year}";
+
     public static string SeasonName(Season season) => season switch
     {
         Season.Winter => "Hiver",

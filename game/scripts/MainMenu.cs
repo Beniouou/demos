@@ -97,7 +97,7 @@ public partial class MainMenu : HBoxContainer
                 new("Construire", () => new ConstructionPage(view, desk, map, Close, message => Message?.Invoke(message))),
                 new("Transport", () => new TransportPage(view)),
                 Coming("Chaîne de production", "Des matières premières aux produits : quelles recettes, quels bâtiments."),
-                Coming("Statistiques", "La production et la consommation de chaque produit dans le temps."),
+                new("Statistiques", () => new ProductionStatsPage(view, ProductionHistory)),
             ], Wide: true),
             new("Recherche",
             [
@@ -163,6 +163,9 @@ public partial class MainMenu : HBoxContainer
 
     /// <summary>Le relevé mensuel de la population, montré dans Population → Évolution (pris par <see cref="Main"/>).</summary>
     public PopulationHistory History { get; } = new();
+
+    /// <summary>Le relevé mensuel des produits, montré dans Production → Statistiques (pris par <see cref="Main"/>).</summary>
+    public ProductionHistory ProductionHistory { get; } = new();
 
     public void Close()
     {

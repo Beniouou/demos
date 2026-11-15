@@ -22,6 +22,23 @@ public class GameViewTests
     }
 
     [Fact]
+    public void Les_totaux_des_produits_suivent_la_production_et_ce_qui_sort_du_stockage()
+    {
+        var simulation = PrototypeScenario.Create(GameData.Content());
+        var view = new GameView(simulation);
+
+        for (var day = 0; day < 10; day++)
+            simulation.AdvanceDay();
+
+        var flows = view.ProductFlows().Where(f => f.CommuneId == PrototypeScenario.FirstCommuneId).ToList();
+        // La production comptée est celle des bâtiments de la commune, jour après jour.
+        Assert.Contains(flows, f => f.Produced > 0);
+        // Les habitants achètent de quoi se nourrir : ça sort du stockage comme utilisé.
+        Assert.Contains(flows, f => f.Used > 0);
+        Assert.All(flows, f => Assert.True(f.Produced >= 0 && f.Used >= 0 && f.Sent >= 0 && f.Lost >= 0 && f.Stock >= 0));
+    }
+
+    [Fact]
     public void La_vue_est_une_copie_que_la_suite_de_la_partie_ne_change_pas()
     {
         var simulation = PrototypeScenario.Create(GameData.Content());

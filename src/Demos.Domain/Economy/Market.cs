@@ -17,6 +17,16 @@ public sealed class Market(IEnumerable<ProductDefinition> products)
     // Vendeur → argent gagné depuis le dernier versement.
     private readonly Dictionary<string, double> _earnings = [];
 
+    // Compteurs depuis le début de la partie, pour les statistiques ; ils ne changent rien au marché.
+    // Produit → quantité sortie pour être utilisée (achetée, ou reprise par son vendeur).
+    private readonly Dictionary<string, double> _used = [];
+
+    // Produit → quantité retirée pour partir vers une autre commune.
+    private readonly Dictionary<string, double> _sent = [];
+
+    // Produit → quantité perdue (faute de place pour stocker, ou périmée).
+    private readonly Dictionary<string, double> _lost = [];
+
     /// <summary>Nom de vendeur de l'État dans une commune : ses ventes vont à la caisse de cette commune.</summary>
     public static string StateSellerId(string communeId) => $"etat:{communeId}";
 
@@ -81,6 +91,7 @@ public sealed class Market(IEnumerable<ProductDefinition> products)
             _earnings[sellerId] = _earnings.GetValueOrDefault(sellerId) + CostOf(productId, taken);
         }
 
+        Count(_used, productId, quantity);
         return true;
     }
 
@@ -103,6 +114,7 @@ public sealed class Market(IEnumerable<ProductDefinition> products)
             offers[sellerId] -= taken[sellerId];
         }
 
+        Count(_sent, productId, taken.Values.Sum());
         return taken;
     }
 
@@ -115,6 +127,7 @@ public sealed class Market(IEnumerable<ProductDefinition> products)
             return false;
 
         _offers[productId][sellerId] -= quantity;
+        Count(_used, productId, quantity);
         return true;
     }
 
@@ -124,6 +137,7 @@ public sealed class Market(IEnumerable<ProductDefinition> products)
         if (!_offers.TryGetValue(productId, out var offers))
             return;
 
+        Count(_lost, productId, offers.Values.Sum() * (1 - share));
         foreach (var sellerId in offers.Keys.ToList())
             offers[sellerId] *= share;
     }
@@ -135,4 +149,20 @@ public sealed class Market(IEnumerable<ProductDefinition> products)
         _earnings.Clear();
         return earnings;
     }
+
+    /// <summary>
+    /// Ce qui est sorti du marché depuis le début de la partie, pour les statistiques : utilisé (acheté par les habitants,
+    /// pris comme matière ou énergie par un bâtiment, pour un chantier), envoyé vers une autre commune, ou perdu.
+    /// </summary>
+    public MarketTally TallyOf(string productId) =>
+        new(_used.GetValueOrDefault(productId), _sent.GetValueOrDefault(productId), _lost.GetValueOrDefault(productId));
+
+    private static void Count(Dictionary<string, double> tally, string productId, double quantity)
+    {
+        if (quantity > 0)
+            tally[productId] = tally.GetValueOrDefault(productId) + quantity;
+    }
 }
+
+/// <summary>Ce qui est sorti du marché d'une commune pour un produit, depuis le début de la partie.</summary>
+public readonly record struct MarketTally(double Used, double Sent, double Lost);
