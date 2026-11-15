@@ -105,6 +105,27 @@ public sealed class Simulation(World world, GameClock clock)
     /// </summary>
     public void UpdateBuilding(Structure building) => World.UpdateStructure(building);
 
+    /// <summary>
+    /// Crée une ligne d'approvisionnement du fournisseur vers le client (règle dans <see cref="SupplyLines"/>). Renvoie
+    /// la ligne, ou le problème qui l'empêche.
+    /// </summary>
+    public (SupplyLine? Line, string? Problem) TryAddSupplyLine(string supplierId, string clientId, double share = SupplyLines.DefaultShare)
+    {
+        var problem = SupplyLines.ProblemWith(World.Structures.GetValueOrDefault(supplierId), World.Structures.GetValueOrDefault(clientId), World.SupplyLines);
+        return problem is not null ? (null, problem) : (World.AddSupplyLine(supplierId, clientId, Math.Clamp(share, 0.05, 1)), null);
+    }
+
+    public bool RemoveSupplyLine(string lineId) => World.RemoveSupplyLine(lineId);
+
+    /// <summary>Change la part de la production du fournisseur que la ligne envoie (de 5 % à 100 %).</summary>
+    public bool SetSupplyLineShare(string lineId, double share) => World.SetSupplyLineShare(lineId, Math.Clamp(share, 0.05, 1));
+
+    /// <summary>La perte de transport entre deux communes, réduite par un chemin ou une route (20 % sans carte).</summary>
+    public double TransportLossBetween(string from, string to) =>
+        World.CommunePositions.Count > 0
+            ? GeographicEconomics.TransportLoss(from, to, World.CommunePositions) * World.Roads.LossFactor(from, to)
+            : Trade.TransportLoss;
+
     /// <summary>Outil d'administration : règle l'impôt d'État (part de la richesse versée chaque jour).</summary>
     public void SetStateTaxRate(double rate) => World.StateTaxRate = rate;
 
@@ -620,8 +641,13 @@ public sealed class Simulation(World world, GameClock clock)
         var fundsAtDayStart = World.Structures.Values.Where(Companies.HasCompanyFund).ToDictionary(b => b.Id, b => World.CompanyFundOf(b).Balance);
         var supplyShares = new Dictionary<string, double>();
         World.Produced = WorkDay.Run(World.Structures, World.Workers, World.Classes, World.Treasury, World.MarketOf, World.CommuneFundOf, World.Wages,
-            World.CompanyFundOf, World.EnergyEffectOf, World.PublicEfficiencyOf, supplyShares);
+            World.CompanyFundOf, World.EnergyEffectOf, World.PublicEfficiencyOf, supplyShares,
+            id => World.ReserveContentsOf(id).Count > 0 ? World.ReserveOf(id) : null);
         World.SupplyShares = supplyShares;
+        // Les lignes d'approvisionnement : une part de la production du jour part d'abord aux clients.
+        if (World.SupplyLines.Count > 0)
+            World.SupplyLineDeliveries = SupplyLines.RunDaily(World.SupplyLines, World.Structures, World.Produced, World.Workers,
+                World.MarketOf, World.ReserveOf, World.Treasury, World.CommuneFundOf, TransportLossBetween, World.RoadTraffic.Add);
         AddBuildingTraffic();
         CountProduction();
         World.EnergyShares = Energy.RunDaily(World.Structures, World.TierOf, Clock.Season, World.MarketOf, World.Treasury, World.CommuneFundOf,

@@ -5,7 +5,8 @@ namespace Demos.Domain.Economy;
 
 /// <summary>
 /// Approvisionnement en matières d'un bâtiment de transformation, chaque jour, avant de produire. Il prend ses
-/// matières dans le stockage de sa commune : d'abord ce qu'il y possède lui-même (pour l'État, ce que l'État y a
+/// matières d'abord dans sa réserve (ce que ses lignes d'approvisionnement lui ont livré, voir <see cref="SupplyLines"/>),
+/// puis dans le stockage de sa commune : ce qu'il y possède lui-même (pour l'État, ce que l'État y a
 /// produit), puis il achète le reste aux autres vendeurs, avec l'argent de son propriétaire (caisse de la commune puis
 /// trésor pour un bâtiment public, caisse de l'entreprise sinon). Quand une matière manque, ou l'argent pour
 /// l'acheter, la production baisse en proportion.
@@ -25,7 +26,8 @@ public static class Supply
         Treasury treasury,
         Treasury? communeFund,
         Func<Structure, Treasury>? companyFundOf,
-        IReadOnlyDictionary<string, SocialClass> classesById)
+        IReadOnlyDictionary<string, SocialClass> classesById,
+        Inventory? reserved = null)
     {
         var materials = recipe.Materials;
         if (materials.Count == 0 || plannedOutput <= 0)
@@ -34,17 +36,21 @@ public static class Supply
         var payer = PayerOf(workplace, communeId, treasury, communeFund, companyFundOf, classesById);
         var needs = materials.Select(m => (m.ProductId, Needed: plannedOutput * m.Quantity)).ToList();
 
+        // Ce que le bâtiment a déjà, sans rien payer : sa réserve (livrée par ses lignes d'approvisionnement, déjà
+        // payée), puis ce qu'il possède dans le stockage.
+        double Owned(string productId) => (reserved?.QuantityOf(productId) ?? 0) + market.QuantityOf(productId, payer.SellerId);
+
         // Part possible avec ce qui est en stock…
         var share = 1.0;
         foreach (var (productId, needed) in needs)
         {
             if (needed > 0)
-                share = Math.Min(share, (market.QuantityOf(productId, payer.SellerId) + market.QuantityOfOthers(productId, payer.SellerId)) / needed);
+                share = Math.Min(share, (Owned(productId) + market.QuantityOfOthers(productId, payer.SellerId)) / needed);
         }
 
         // … puis avec l'argent pour acheter ce que le bâtiment ne possède pas déjà.
         double CostOf(double part) => needs.Sum(n =>
-            Math.Max(0, n.Needed * part - market.QuantityOf(n.ProductId, payer.SellerId)) * market.PriceOf(n.ProductId));
+            Math.Max(0, n.Needed * part - Owned(n.ProductId)) * market.PriceOf(n.ProductId));
 
         var money = payer.Available();
         if (CostOf(share) > money)
@@ -70,6 +76,9 @@ public static class Supply
         foreach (var (productId, needed) in needs)
         {
             var taken = needed * share;
+            var fromReserve = Math.Min(taken, reserved?.QuantityOf(productId) ?? 0);
+            reserved?.TryRemove(productId, fromReserve);
+            taken -= fromReserve;
             var own = Math.Min(taken, market.QuantityOf(productId, payer.SellerId));
             market.TryWithdraw(productId, own, payer.SellerId);
             var bought = Math.Min(taken - own, market.QuantityOfOthers(productId, payer.SellerId));
@@ -80,9 +89,9 @@ public static class Supply
         return share;
     }
 
-    private sealed record Payer(string SellerId, Func<double> Available, Action<double> Spend);
+    internal sealed record Payer(string SellerId, Func<double> Available, Action<double> Spend);
 
-    private static Payer PayerOf(
+    internal static Payer PayerOf(
         Structure workplace,
         string communeId,
         Treasury treasury,

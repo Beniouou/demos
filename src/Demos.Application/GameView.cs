@@ -126,13 +126,59 @@ public sealed class GameView(Simulation simulation)
                     NameOfProduct(recipe.ProductId),
                     World.Products.FirstOrDefault(p => p.Id == recipe.ProductId)?.Need?.Id,
                     recipe.Materials.Select(m => new ChainInputView(m.ProductId, NameOfProduct(m.ProductId), m.Quantity,
-                        fullOutput * m.Quantity, market?.QuantityOf(m.ProductId) ?? 0)).ToList(),
+                        fullOutput * m.Quantity, market?.QuantityOf(m.ProductId) ?? 0,
+                        World.ReserveContentsOf(building.Id).GetValueOrDefault(m.ProductId))).ToList(),
                     workers,
                     World.Produced.GetValueOrDefault(building.Id),
                     World.SupplyShares.GetValueOrDefault(building.Id, 1),
                     World.EnergyShareOf(building));
             })
             .OrderBy(b => b.Name)
+            .ToList();
+    }
+
+    /// <summary>Les lignes d'approvisionnement, de la plus ancienne à la plus récente.</summary>
+    public IReadOnlyList<SupplyLineView> SupplyLines() => World.SupplyLines.Select(line =>
+        {
+            var supplier = World.Structures.GetValueOrDefault(line.SupplierId);
+            var client = World.Structures.GetValueOrDefault(line.ClientId);
+            var from = supplier is null ? null : World.CommuneOf(supplier);
+            var to = client is null ? null : World.CommuneOf(client);
+            var productId = supplier?.Production?.ProductId;
+            return new SupplyLineView(
+                line.Id,
+                line.SupplierId,
+                NameOf(line.SupplierId),
+                from is null ? "" : NameOf(from),
+                line.ClientId,
+                NameOf(line.ClientId),
+                to is null ? "" : NameOf(to),
+                productId is null ? "" : World.Products.FirstOrDefault(p => p.Id == productId)?.Name ?? productId,
+                line.Share,
+                World.SupplyLineDeliveries.GetValueOrDefault(line.Id),
+                from is null || to is null || from == to ? 0 : simulation.TransportLossBetween(from, to),
+                client is not null && productId is not null && Demos.Domain.Economy.SupplyLines.Uses(client, productId));
+        }).ToList();
+
+    /// <summary>
+    /// Les fournisseurs possibles d'un bâtiment : les bâtiments publics, dans toutes les communes, qui produisent une de
+    /// ses matières et qui ne le livrent pas déjà (vide si le bâtiment n'est pas public).
+    /// </summary>
+    public IReadOnlyList<SupplierCandidateView> SupplierCandidates(string clientId)
+    {
+        if (!World.Structures.TryGetValue(clientId, out var client) || World.CommuneOf(client) is not { } to)
+            return [];
+        return World.Structures.Values
+            .Where(s => s.Kind == StructureKind.Building && Demos.Domain.Economy.SupplyLines.ProblemWith(s, client, World.SupplyLines) is null)
+            .Select(s =>
+            {
+                var from = World.CommuneOf(s);
+                var productId = s.Production!.Value.ProductId;
+                return new SupplierCandidateView(s.Id, s.Name, from is null ? "" : NameOf(from),
+                    World.Products.FirstOrDefault(p => p.Id == productId)?.Name ?? productId,
+                    from is null || from == to ? 0 : simulation.TransportLossBetween(from, to));
+            })
+            .OrderBy(c => c.Loss).ThenBy(c => c.Name)
             .ToList();
     }
 
@@ -561,8 +607,33 @@ public sealed record ChainBuildingView(
     double SupplyShare,
     double EnergyShare);
 
-/// <summary>Une matière d'une recette : par unité produite, ce qu'il en faudrait à plein régime par jour, et le stock de la commune.</summary>
-public sealed record ChainInputView(string ProductId, string ProductName, double PerUnit, double NeededPerDay, double Stock);
+/// <summary>
+/// Une matière d'une recette : par unité produite, ce qu'il en faudrait à plein régime par jour, le stock de la commune,
+/// et la réserve du bâtiment (livrée par ses lignes d'approvisionnement).
+/// </summary>
+public sealed record ChainInputView(string ProductId, string ProductName, double PerUnit, double NeededPerDay, double Stock, double Reserved = 0);
+
+/// <summary>
+/// Une ligne d'approvisionnement vue par le joueur : le fournisseur et le client (avec leurs communes), le produit, la
+/// part de la production envoyée, ce qui est arrivé le dernier jour, la perte de transport (0 dans la même commune) et
+/// si elle livre (la recette du client utilise encore le produit).
+/// </summary>
+public sealed record SupplyLineView(
+    string Id,
+    string SupplierId,
+    string SupplierName,
+    string SupplierCommune,
+    string ClientId,
+    string ClientName,
+    string ClientCommune,
+    string ProductName,
+    double Share,
+    double DeliveredLastDay,
+    double Loss,
+    bool IsActive);
+
+/// <summary>Un fournisseur possible pour un client : un bâtiment public qui produit une de ses matières, et la perte en route.</summary>
+public sealed record SupplierCandidateView(string Id, string Name, string CommuneName, string ProductName, double Loss);
 
 /// <summary>
 /// Un produit dans une commune, en totaux depuis le début de la partie : produit, utilisé, envoyé vers une autre commune,

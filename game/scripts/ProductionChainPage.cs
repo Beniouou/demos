@@ -7,10 +7,11 @@ using Godot;
 namespace Demos.Game;
 
 /// <summary>
-/// Production → Chaîne de production : le schéma de la chaîne d'une commune (un bâtiment s'approvisionne dans sa propre
-/// commune), un produit à suivre, et la fiche du bâtiment choisi d'un clic : sa recette, à changer ici comme dans Unités
+/// Production → Chaîne de production : le schéma de la chaîne d'une commune (sans ligne, un bâtiment s'approvisionne dans sa
+/// propre commune), un produit à suivre, et la fiche du bâtiment choisi d'un clic : sa recette, à changer ici comme dans Unités
 /// de production, sa production, ses matières (à plein régime, en stock) et la part de production que ses matières et
-/// son énergie ont permise ; un bouton ouvre ses autres réglages dans Unités de production.
+/// son énergie ont permise, ses lignes d'approvisionnement (ProductionChainPage.Supply.cs) ; un bouton ouvre ses autres
+/// réglages dans Unités de production.
 /// </summary>
 public partial class ProductionChainPage : VBoxContainer, IMenuPage
 {
@@ -47,9 +48,12 @@ public partial class ProductionChainPage : VBoxContainer, IMenuPage
         var legend = UiTheme.OwnershipLegend();
         legend.AddChild(new TextureRect { Texture = UiTheme.Square(UiTheme.Accent, 12, 12), StretchMode = TextureRect.StretchModeEnum.KeepCentered });
         legend.AddChild(UiTheme.Caption("cadre orange : des matières ont manqué le dernier jour"));
+        legend.AddChild(new Control { CustomMinimumSize = new Vector2(8, 0) });
+        legend.AddChild(new TextureRect { Texture = UiTheme.Square(UiTheme.Text, 16, 3), StretchMode = TextureRect.StretchModeEnum.KeepCentered });
+        legend.AddChild(UiTheme.Caption("ligne d'approvisionnement"));
         AddChild(legend);
 
-        var scroll = new ScrollContainer { SizeFlagsVertical = SizeFlags.ExpandFill, SizeFlagsStretchRatio = 2 };
+        var scroll = new ScrollContainer { SizeFlagsVertical = SizeFlags.ExpandFill };
         scroll.AddChild(_diagram);
         AddChild(scroll);
         _diagram.BuildingChosen += _ => ShowRecipe(force: true);
@@ -82,10 +86,12 @@ public partial class ProductionChainPage : VBoxContainer, IMenuPage
             _message.Text = _desk.SetRecipe(id, (int)index);
             _message.Visible = true;
             _chainKey = "";
+            _supplyKey = "";
             ShowRecipe(force: true);
         };
         _recipeRow.AddChild(_recipe);
         column.AddChild(_recipeRow);
+        column.AddChild(BuildSupplyPanel());
 
         _manageButton = new Button { Text = "Gérer dans Unités de production", FocusMode = FocusModeEnum.None, SizeFlagsHorizontal = SizeFlags.ShrinkBegin };
         _manageButton.Pressed += () =>
@@ -113,11 +119,12 @@ public partial class ProductionChainPage : VBoxContainer, IMenuPage
             _diagram.Selected = null;
 
         // Le schéma n'est refait que quand ses chiffres ou les choix changent (une fois par jour au plus).
-        var key = $"{_commune.SelectedId}|{FollowedProduct}|{_view.Today}|{string.Join(",", chain.Select(b => b.Id + b.ProductId))}";
+        var links = LinksIn(chain);
+        var key = $"{_commune.SelectedId}|{FollowedProduct}|{_view.Today}|{string.Join(",", chain.Select(b => b.Id + b.ProductId))}|{string.Join(",", links)}";
         if (key != _chainKey)
         {
             _chainKey = key;
-            _diagram.SetChain(chain, NeedName, FollowedProduct);
+            _diagram.SetChain(chain, NeedName, FollowedProduct, links);
         }
 
         var building = chain.FirstOrDefault(b => b.Id == _diagram.Selected);
@@ -126,6 +133,7 @@ public partial class ProductionChainPage : VBoxContainer, IMenuPage
             _sheet.Text = text;
         _manageButton.Visible = building is not null;
         ShowRecipe(force: false);
+        RefreshSupply(building);
     }
 
     private string? FollowedProduct => _follow.Selected > 0 && _follow.Selected <= _followIds.Count ? _followIds[_follow.Selected - 1] : null;
@@ -182,7 +190,7 @@ public partial class ProductionChainPage : VBoxContainer, IMenuPage
             text.AppendLine(SheetText.Muted("Aucune : il produit à partir de rien d'autre que son travail."));
         foreach (var input in building.Inputs)
             text.AppendLine($"{SheetText.Escape(input.ProductName)} : {input.PerUnit:0.##} par unité · {input.NeededPerDay:N0} par jour à plein régime · "
-                + $"{input.Stock:N0} en stock dans la commune");
+                + $"{input.Stock:N0} en stock dans la commune" + (input.Reserved > 0 ? $" · {input.Reserved:N0} en réserve (livrés par ses lignes)" : ""));
         if (building.Inputs.Count > 0)
             text.AppendLine(building.SupplyShare < 0.995
                 ? $"[color=#{UiTheme.Accent.ToHtml(false)}]Les matières n'ont permis que {building.SupplyShare:P0} de la production le dernier jour.[/color]"

@@ -182,6 +182,16 @@ désactivés : TVA sur la valeur ajoutée, épargne progressive des entreprises.
   (`PlayerDesk.SetRecipe`, comme dans Unités de production) et bouton vers Unités de production
   (`MainMenu.ShowBuilding` → `BuildingsPage.Show`). Lecture : `GameView.ProductionChain(communeId)`. La part que les
   matières ont permise est retenue par `WorkDay.Run(…, supplyShares)` dans `World.SupplyShares` (sans effet sur la
-  partie). Les lignes d'approvisionnement entre bâtiments ne sont pas faites : règle à décider (À trancher, Logistique).
+  partie).
+- Lignes d'approvisionnement (règle décidée le 15 novembre 2026, dans le document des règles, Économie →
+  Approvisionnement) : `SupplyLines` (domaine) — `ProblemWith` (deux bâtiments publics, le client utilise le produit,
+  pas de doublon), `RunDaily` après la journée de travail (part de la production du jour, 50 % par défaut, plafonnée
+  au besoin du client pour un jour moins sa réserve ; payée au prix du marché entre communes, gratuite dans la même ;
+  perte de transport et trafic de routes entre communes ; lignes les plus anciennes d'abord). La réserve du client
+  (`World.ReserveOf`) passe en premier dans `Supply.Acquire`. `Market.TryDeliver` cède les produits d'un vendeur.
+  Actions : `Simulation.TryAddSupplyLine` / `RemoveSupplyLine` / `SetSupplyLineShare` (5 % à 100 %), par
+  `PlayerDesk.Supply.cs`. Lecture : `GameView.SupplyLines`, `SupplierCandidates`. Interface : fiche de la Chaîne de
+  production (`ProductionChainPage.Supply.cs`), flèches blanches épaisses sur le schéma. Sans ligne, rien ne change
+  (référence 3 ans : 251 177).
 - Pas branché, volontairement : `SetPrice` (prix fixés par le joueur : question ouverte des prix dynamiques).
   Prompt de la session d'intégration : `prompt-integration-interface.md`, à côté du dépôt.

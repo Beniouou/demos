@@ -344,6 +344,47 @@ public sealed class World
     /// </summary>
     public IReadOnlyDictionary<string, double> SupplyShares { get; set; } = new Dictionary<string, double>();
 
+    // Les lignes d'approvisionnement, de la plus ancienne à la plus récente (l'ordre compte : les plus anciennes
+    // passent d'abord), et la réserve de chaque bâtiment client.
+    private readonly List<SupplyLine> _supplyLines = [];
+    private readonly Dictionary<string, Inventory> _reserves = [];
+    private int _nextSupplyLine = 1;
+
+    public IReadOnlyList<SupplyLine> SupplyLines => _supplyLines;
+
+    /// <summary>Ce que chaque ligne a livré le dernier jour (arrivé chez le client).</summary>
+    public IReadOnlyDictionary<string, double> SupplyLineDeliveries { get; set; } = new Dictionary<string, double>();
+
+    public SupplyLine AddSupplyLine(string supplierId, string clientId, double share)
+    {
+        var line = new SupplyLine($"ligne-{_nextSupplyLine++}", supplierId, clientId, share);
+        _supplyLines.Add(line);
+        return line;
+    }
+
+    public bool RemoveSupplyLine(string lineId) => _supplyLines.RemoveAll(l => l.Id == lineId) > 0;
+
+    public bool SetSupplyLineShare(string lineId, double share)
+    {
+        var index = _supplyLines.FindIndex(l => l.Id == lineId);
+        if (index < 0)
+            return false;
+        _supplyLines[index] = _supplyLines[index] with { Share = share };
+        return true;
+    }
+
+    /// <summary>La réserve d'un bâtiment (ce que ses lignes lui ont livré), créée au besoin.</summary>
+    public Inventory ReserveOf(string buildingId)
+    {
+        if (!_reserves.TryGetValue(buildingId, out var reserve))
+            _reserves[buildingId] = reserve = new Inventory();
+        return reserve;
+    }
+
+    /// <summary>La réserve d'un bâtiment, sans la créer (vide s'il n'en a pas).</summary>
+    public IReadOnlyDictionary<string, double> ReserveContentsOf(string buildingId) =>
+        _reserves.TryGetValue(buildingId, out var reserve) ? reserve.Contents : new Dictionary<string, double>();
+
     // Commune → produit → quantité produite depuis le début de la partie (statistiques).
     private readonly Dictionary<string, Dictionary<string, double>> _producedTotals = [];
 

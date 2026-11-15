@@ -10,8 +10,8 @@ namespace Demos.Game;
 /// une colonne selon sa profondeur dans la chaîne (0 : sans matière ; sinon un de plus que ses fournisseurs), avec la
 /// couleur de son propriétaire à gauche et un cadre orange quand ses matières ont manqué. Une flèche va du bâtiment
 /// qui produit une matière à ceux qui l'utilisent dans la commune ; la dernière colonne montre les besoins que les
-/// produits couvrent. Un produit suivi garde ses fournisseurs et ses clients en vue, le reste s'estompe. Un clic choisit
-/// un bâtiment.
+/// produits couvrent. Les lignes d'approvisionnement du joueur sont des flèches blanches épaisses. Un produit suivi
+/// garde ses fournisseurs et ses clients en vue, le reste s'estompe. Un clic choisit un bâtiment.
 /// </summary>
 public partial class ChainDiagram : Control
 {
@@ -33,6 +33,7 @@ public partial class ChainDiagram : Control
     private List<Node> _nodes = [];
     private List<Edge> _edges = [];
     private List<string> _columns = [];
+    private IReadOnlyList<(string From, string To)> _links = [];
     private HashSet<string>? _followed;
     private string? _selected;
 
@@ -57,8 +58,10 @@ public partial class ChainDiagram : Control
     /// <summary>
     /// Change les données : les bâtiments de la commune, le nom de chaque besoin, et le produit suivi (null : tous).
     /// </summary>
-    public void SetChain(IReadOnlyList<ChainBuildingView> buildings, System.Func<string, string> needName, string? followedProduct)
+    public void SetChain(IReadOnlyList<ChainBuildingView> buildings, System.Func<string, string> needName, string? followedProduct,
+        IReadOnlyList<(string From, string To)>? supplyLinks = null)
     {
+        _links = supplyLinks ?? [];
         var producersOf = buildings.GroupBy(b => b.ProductId).ToDictionary(g => g.Key, g => g.ToList());
         var depth = new Dictionary<string, int>();
         int DepthOf(ChainBuildingView building, HashSet<string> visiting)
@@ -195,6 +198,15 @@ public partial class ChainDiagram : Control
             DrawArrow(new Vector2(from.End.X, from.GetCenter().Y), new Vector2(to.Position.X, to.GetCenter().Y), color);
         }
 
+        // Les lignes d'approvisionnement entre bâtiments de la commune, en blanc et plus épaisses, par-dessus.
+        foreach (var (fromKey, toKey) in _links)
+        {
+            if (!boxes.TryGetValue(fromKey, out var from) || !boxes.TryGetValue(toKey, out var to))
+                continue;
+            var color = Dimmed(fromKey) || Dimmed(toKey) ? UiTheme.Muted : UiTheme.Text;
+            DrawArrow(new Vector2(from.End.X, from.GetCenter().Y), new Vector2(to.Position.X, to.GetCenter().Y), color, 3);
+        }
+
         foreach (var node in _nodes)
         {
             var alpha = Dimmed(node.Key) ? 0.35f : 1f;
@@ -213,7 +225,7 @@ public partial class ChainDiagram : Control
     }
 
     /// <summary>Une courbe douce d'une boîte à l'autre, avec une pointe à l'arrivée.</summary>
-    private void DrawArrow(Vector2 from, Vector2 to, Color color)
+    private void DrawArrow(Vector2 from, Vector2 to, Color color, float width = 1.5f)
     {
         var bend = System.Math.Max(30, (to.X - from.X) / 2);
         var points = new Vector2[17];
@@ -223,7 +235,7 @@ public partial class ChainDiagram : Control
             var u = 1 - t;
             points[index] = u * u * u * from + 3 * u * u * t * (from + new Vector2(bend, 0)) + 3 * u * t * t * (to - new Vector2(bend, 0)) + t * t * t * to;
         }
-        DrawPolyline(points, color, 1.5f, antialiased: true);
+        DrawPolyline(points, color, width, antialiased: true);
         DrawColoredPolygon([to, to + new Vector2(-8, -4), to + new Vector2(-8, 4)], color);
     }
 }

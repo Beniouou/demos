@@ -131,6 +131,25 @@ public sealed class Market(IEnumerable<ProductDefinition> products)
         return true;
     }
 
+    /// <summary>
+    /// Un vendeur cède une partie de ses propres produits par une ligne d'approvisionnement : ils quittent le marché, le
+    /// vendeur gagne <paramref name="payment"/> (versé avec ses ventes). Comptés comme envoyés s'ils partent vers une autre
+    /// commune, sinon comme utilisés. Renvoie false, sans rien céder, si le vendeur n'en a pas assez.
+    /// </summary>
+    public bool TryDeliver(string productId, double quantity, string sellerId, double payment, bool toOtherCommune)
+    {
+        if (quantity <= 0)
+            return true;
+        if (QuantityOf(productId, sellerId) < quantity)
+            return false;
+
+        _offers[productId][sellerId] -= quantity;
+        if (payment > 0)
+            _earnings[sellerId] = _earnings.GetValueOrDefault(sellerId) + payment;
+        Count(toOtherCommune ? _sent : _used, productId, quantity);
+        return true;
+    }
+
     /// <summary>Ne garde qu'une part des offres d'un produit (le reste est perdu, par exemple faute de place pour stocker).</summary>
     public void Keep(string productId, double share)
     {
