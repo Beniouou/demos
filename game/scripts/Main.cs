@@ -92,6 +92,10 @@ public partial class Main : Node
             {
                 _pendingDays -= 1;
                 _simulation.AdvanceDay();
+                // Le relevé de la population (Population → Évolution) : le 1er de chaque mois, et après le premier jour
+                // joué (avant, les emplois ne sont pas encore répartis : tout le monde serait chômeur).
+                if (_view.Today.Day == 1 || _hud.Menu.History.Snapshots.Count == 0)
+                    _hud.Menu.History.Record(_view);
                 ShowRoadChanges();
             }
 

@@ -85,6 +85,12 @@ public partial class MainMenu : HBoxContainer
                     (name, payerId, pole) => CommuneSiteRequested?.Invoke(name, payerId, pole))),
                 Coming("Organisme", "Les organismes : domaine d'application, pouvoir, postes et fonctionnement."),
             ], Wide: true),
+            new("Population",
+            [
+                new("Vue d'ensemble", () => new PopulationOverviewPage(view)),
+                new("Groupes sociaux", () => new PopulationGroupsPage(view)),
+                new("Évolution", () => new PopulationHistoryPage(view, History)),
+            ], Wide: true),
             new("Production",
             [
                 new("Unités de production", () => new BuildingsPage(view, desk)),
@@ -154,6 +160,9 @@ public partial class MainMenu : HBoxContainer
     }
 
     public bool IsOpen => _open >= 0;
+
+    /// <summary>Le relevé mensuel de la population, montré dans Population → Évolution (pris par <see cref="Main"/>).</summary>
+    public PopulationHistory History { get; } = new();
 
     public void Close()
     {

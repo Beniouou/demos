@@ -127,7 +127,7 @@ désactivés : TVA sur la valeur ajoutée, épargne progressive des entreprises.
 
 ## Interface Godot : état actuel (résumé)
 
-- Menus dans `game/scripts/MainMenu.cs` (Carte, Lois, Structure, Production, Recherche, Ressources, Aide) ; une page
+- Menus dans `game/scripts/MainMenu.cs` (Carte, Lois, Structure, Population, Production, Recherche, Ressources, Aide) ; une page
   par fichier (`*Page.cs`) ; `Coming(...)` = entrée grisée « à venir ». Lecture de la partie par `GameView`
   (`src/Demos.Application/GameView.cs`), **actions du joueur par `PlayerDesk`** (`game/scripts/PlayerDesk.cs`, qui
   appelle `Simulation`) ; textes de partie dans `WorldText.cs`, couleurs et styles dans `UiTheme.cs`.
@@ -157,5 +157,16 @@ désactivés : TVA sur la valeur ajoutée, épargne progressive des entreprises.
   `YearPassed` (bilan : trésor et habitants depuis le 1er janvier) et le bilan des routes ; les messages d'une même image
   vont ensemble dans la barre du bas (textes dans `EventText.cs` ; le message entier au survol). La charte de fondation
   (`GameView.CharterOf`) s'affiche dans la fiche d'une commune, avec son effet sur les migrations en bulle d'aide.
+- Menu Population (13 novembre 2026), en lecture : « Vue d'ensemble » (`PopulationOverviewPage` : toutes les communes ou
+  une seule ; habitants, logements, emplois, chômeurs, moyennes des besoins, logés et adhésion, barres des membres par
+  rang et par pôle, tableau par commune), « Groupes sociaux » (`PopulationGroupsPage` : arbre communes → groupes
+  locaux, fiche du groupe : idéologie, chômeurs, richesse, revenus et impôts de la saison, manques, éducation, lieux de
+  travail), « Évolution » (`PopulationHistoryPage` : courbe de la mesure choisie, une par commune, un point par mois ;
+  tableau d'une ligne par saison). Chiffres agrégés dans `PopulationStats.cs`, bulles d'aide (règles et constantes du
+  moteur) dans `PopulationText.cs`. Graphiques dessinés par Godot, réutilisables : `LineChart` (courbes, axe serré
+  autour des relevés sauf pour une part, survol) et `StackedBar` (barre en parts) ; couleurs `UiTheme.SeriesColor`.
+  La simulation ne garde pas d'historique : le relevé (`PopulationHistory`, `MainMenu.History`) est pris par `Main`
+  après le premier jour joué puis le 1er de chaque mois (décidé le 15 novembre 2026), et ne dure que la partie. `SocialClassView` porte aussi les pôles, le nom de l'idéologie, les chômeurs, les revenus
+  et manques de la saison, la richesse par membre et les lieux de travail (`WorkplaceView`).
 - Pas branché, volontairement : `SetPrice` (prix fixés par le joueur : question ouverte des prix dynamiques).
   Prompt de la session d'intégration : `prompt-integration-interface.md`, à côté du dépôt.

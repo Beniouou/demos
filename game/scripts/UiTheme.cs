@@ -32,6 +32,16 @@ public static class UiTheme
         ["LI"] = new("#f5c542"),
     };
 
+    // Couleurs des courbes et des barres d'un graphique (une par commune, un par rang…), distinctes sur le fond sombre.
+    private static readonly Color[] SeriesColors =
+    [
+        new("#d9a441"), new("#4c8df6"), new("#30a46c"), new("#e5484d"), new("#9a6ce0"), new("#3dd6b5"),
+        new("#f08a4b"), new("#c4c9d2"),
+    ];
+
+    /// <summary>La couleur de la série n° <paramref name="index"/> d'un graphique ; au-delà de huit, les couleurs reviennent.</summary>
+    public static Color SeriesColor(int index) => SeriesColors[index % SeriesColors.Length];
+
     public const int FontSize = 15;
     public const int TitleSize = 19;
 

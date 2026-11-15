@@ -214,7 +214,12 @@ public sealed class GameView(Simulation simulation)
             new Dictionary<string, double>(World.StateHoldingsOf(commune.Id)),
             World.Classes.Where(c => c.CommuneId == commune.Id && c.Population > 0).Select(c => new SocialClassView(
                 c.Id, c.Name, c.Population, c.Wealth, c.NeedsSatisfaction, c.HousingCoverage, c.Adhesion,
-                c.EducationPoints, c.AdvancedEducationPoints, c.Rank, laws.TaxFactorOf(c), c.SeasonTaxes)).ToList());
+                c.EducationPoints, c.AdvancedEducationPoints, c.Rank, laws.TaxFactorOf(c), c.SeasonTaxes,
+                Enum.GetValues<IdeologicalAxis>().Select(axis => new Orientation(axis, c.Ideology[axis])).ToList(),
+                c.Ideology.Name, c.UnemployedMembers, c.SeasonIncome, c.SeasonMoneyShortfall, c.SeasonSupplyShortage,
+                c.HousingPlaceShortage, c.WealthPerMember,
+                c.Employment.Where(e => e.Value > 0).OrderByDescending(e => e.Value)
+                    .Select(e => new WorkplaceView(e.Key, NameOf(e.Key), c.Population * e.Value)).ToList())).ToList());
     }
 
     /// <summary>
@@ -393,7 +398,10 @@ public sealed record ConstructionSiteView(string BuildingId, string Name, string
 
 /// <summary>
 /// Un groupe local (une classe dans sa commune) vu par le joueur, à un instant donné : son rang, le multiplicateur de
-/// son impôt fixé par les lois (1,5 = +50 %), et les impôts (État et commune) payés depuis le début de la saison.
+/// son impôt fixé par les lois (1,5 = +50 %), et les impôts (État et commune) payés depuis le début de la saison ; son
+/// idéologie (un pôle par axe, et son nom), ses chômeurs, ses revenus de la saison, la part moyenne de ses besoins non
+/// couverte faute d'argent et faute de produits depuis le début de la saison, la part de ses membres sans logement faute
+/// de places, sa richesse par membre et ses lieux de travail.
 /// </summary>
 public sealed record SocialClassView(
     string Id,
@@ -407,7 +415,19 @@ public sealed record SocialClassView(
     double AdvancedEducationPoints,
     Rank Rank = Rank.Workers,
     double TaxFactor = 1,
-    double SeasonTaxes = 0);
+    double SeasonTaxes = 0,
+    IReadOnlyList<Orientation>? Poles = null,
+    string IdeologyName = "",
+    double Unemployed = 0,
+    double SeasonIncome = 0,
+    double MoneyShortfall = 0,
+    double SupplyShortage = 0,
+    double HousingPlaceShortage = 0,
+    double WealthPerMember = 0,
+    IReadOnlyList<WorkplaceView>? Workplaces = null);
+
+/// <summary>Un lieu de travail d'un groupe local : la structure et le nombre de membres qui y travaillent.</summary>
+public sealed record WorkplaceView(string StructureId, string Name, double Members);
 
 /// <summary>
 /// Extension d'une entité politique vue par le joueur : ce qu'elle gère (population comptée, bâtiments publics en
