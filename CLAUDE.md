@@ -176,8 +176,11 @@ désactivés : TVA sur la valeur ajoutée, épargne progressive des entreprises.
   début). Relevé mensuel par l'interface (`ProductionHistory`, `MainMenu.ProductionHistory`), pris avec celui de la
   population ; un mois = différence entre deux relevés.
 - Production → Chaîne de production (15 novembre 2026, `ProductionChainPage`) : schéma d'une commune (`ChainDiagram`,
-  dessiné par Godot : colonnes selon la profondeur dans la chaîne, flèches producteur → utilisateur dans la commune
-  puis → besoins des habitants, cadre orange quand les matières ont manqué, « Suivre » un produit estompe le reste) ;
+  dessiné par Godot, en bandes depuis le 19 novembre 2026 : une bande par besoin nourri — Se nourrir, Se distraire,
+  S'habiller, Se meubler, puis Chantiers, Énergie, Services, Autres —, un bâtiment dans la première qu'il nourrit, sans
+  doublon ; dans chaque bande, colonnes selon la profondeur, ce qui va droit au besoin dans la dernière ; produit
+  écrit sur les flèches ; bande « Sans recette » en bas, lue par `GameView.BuildingsWithoutRecipe` ; cadre orange
+  quand les matières ont manqué, « Suivre » un produit estompe le reste) ;
   clic sur un bâtiment : fiche (matières à plein régime, stock, parts matières et énergie), recette changeable
   (`PlayerDesk.SetRecipe`, comme dans Unités de production) et bouton vers Unités de production
   (`MainMenu.ShowBuilding` → `BuildingsPage.Show`). Lecture : `GameView.ProductionChain(communeId)`. La part que les

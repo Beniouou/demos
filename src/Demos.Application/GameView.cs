@@ -135,11 +135,22 @@ public sealed class GameView(Simulation simulation)
                     workers,
                     World.Produced.GetValueOrDefault(building.Id),
                     World.SupplyShares.GetValueOrDefault(building.Id, 1),
-                    World.EnergyShareOf(building));
+                    World.EnergyShareOf(building),
+                    Energy.HeatingFuels.Contains(recipe.ProductId) || recipe.ProductId == Energy.Water);
             })
             .OrderBy(b => b.Name)
             .ToList();
     }
+
+    /// <summary>
+    /// Les bâtiments d'une commune qui n'ont pas de recette (logements, écoles, entrepôts, camp de base…) et ce qu'ils
+    /// offrent : places de logement, places d'école, capacité de stockage.
+    /// </summary>
+    public IReadOnlyList<PlainBuildingView> BuildingsWithoutRecipe(string communeId) => World.Structures.Values
+        .Where(s => s.Kind == StructureKind.Building && s.Production is null && World.CommuneOf(s) == communeId)
+        .Select(s => new PlainBuildingView(s.Id, World.DisplayNameOf(s), s.Ownership, s.HousingPlaces, s.SchoolPlaces, s.StorageCapacity))
+        .OrderBy(b => b.Name)
+        .ToList();
 
     /// <summary>Les lignes d'approvisionnement, de la plus ancienne à la plus récente.</summary>
     public IReadOnlyList<SupplyLineView> SupplyLines() => World.SupplyLines.Select(line =>
@@ -609,7 +620,11 @@ public sealed record ChainBuildingView(
     double Workers,
     double ProducedToday,
     double SupplyShare,
-    double EnergyShare);
+    double EnergyShare,
+    bool FuelsBuildings = false);
+
+/// <summary>Un bâtiment sans recette et ce qu'il offre : places de logement, places d'école, capacité de stockage.</summary>
+public sealed record PlainBuildingView(string Id, string Name, Ownership Ownership, int HousingPlaces, int SchoolPlaces, int StorageCapacity);
 
 /// <summary>
 /// Une matière d'une recette : par unité produite, ce qu'il en faudrait à plein régime par jour, le stock de la commune,

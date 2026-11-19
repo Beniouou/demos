@@ -113,25 +113,30 @@ public partial class ProductionChainPage : VBoxContainer, IMenuPage
     {
         _commune.Fill(_view.Communes());
         var chain = _commune.SelectedId is { } communeId ? _view.ProductionChain(communeId) : [];
+        var plain = _commune.SelectedId is { } id ? _view.BuildingsWithoutRecipe(id) : [];
         FillFollow(chain);
         // Si le bâtiment choisi n'est plus dans la commune montrée (autre commune choisie), plus de fiche.
-        if (_diagram.Selected is { } selected && chain.All(b => b.Id != selected))
+        if (_diagram.Selected is { } selected && chain.All(b => b.Id != selected) && plain.All(b => b.Id != selected))
             _diagram.Selected = null;
 
         // Le schéma n'est refait que quand ses chiffres ou les choix changent (une fois par jour au plus).
         var links = LinksIn(chain);
-        var key = $"{_commune.SelectedId}|{FollowedProduct}|{_view.Today}|{string.Join(",", chain.Select(b => b.Id + b.ProductId))}|{string.Join(",", links)}";
+        var key = $"{_commune.SelectedId}|{FollowedProduct}|{_view.Today}|{string.Join(",", chain.Select(b => b.Id + b.ProductId))}"
+            + $"|{string.Join(",", plain.Select(b => b.Id))}|{string.Join(",", links)}";
         if (key != _chainKey)
         {
             _chainKey = key;
-            _diagram.SetChain(chain, NeedName, FollowedProduct, links);
+            _diagram.SetChain(chain, plain, NeedName, FollowedProduct, links);
         }
 
         var building = chain.FirstOrDefault(b => b.Id == _diagram.Selected);
-        var text = building is null ? SheetText.Muted("Cliquez sur un bâtiment du schéma pour voir sa fiche et changer sa recette.") : Describe(building);
+        var plainBuilding = plain.FirstOrDefault(b => b.Id == _diagram.Selected);
+        var text = building is not null ? Describe(building)
+            : plainBuilding is not null ? DescribePlain(plainBuilding)
+            : SheetText.Muted("Cliquez sur un bâtiment du schéma pour voir sa fiche et changer sa recette.");
         if (text != _sheet.Text)
             _sheet.Text = text;
-        _manageButton.Visible = building is not null;
+        _manageButton.Visible = building is not null || plainBuilding is not null;
         ShowRecipe(force: false);
         RefreshSupply(building);
     }
@@ -196,6 +201,20 @@ public partial class ProductionChainPage : VBoxContainer, IMenuPage
                 ? $"[color=#{UiTheme.Accent.ToHtml(false)}]Les matières n'ont permis que {building.SupplyShare:P0} de la production le dernier jour.[/color]"
                 : "Les matières ont suffi le dernier jour.");
         text.AppendLine($"Énergie couverte : {building.EnergyShare:P0}");
+        return text.ToString();
+    }
+
+    /// <summary>La fiche d'un bâtiment sans recette : ce qu'il offre ; ses réglages sont dans Unités de production.</summary>
+    private static string DescribePlain(PlainBuildingView building)
+    {
+        var text = new StringBuilder(SheetText.OwnerSquare(building.Ownership)).Append(' ').Append(SheetText.Heading(building.Name));
+        if (building.HousingPlaces > 0)
+            text.AppendLine($"Places de logement : {building.HousingPlaces:N0}");
+        if (building.SchoolPlaces > 0)
+            text.AppendLine($"Places d'école : {building.SchoolPlaces:N0}");
+        if (building.StorageCapacity > 0)
+            text.AppendLine($"Capacité de stockage : {building.StorageCapacity:N0}");
+        text.AppendLine(SheetText.Muted("Pas de recette : ce bâtiment ne produit rien. Ses réglages sont dans Unités de production."));
         return text.ToString();
     }
 
