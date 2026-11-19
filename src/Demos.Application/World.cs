@@ -309,6 +309,38 @@ public sealed class World
     /// <summary>Commune où se trouve une structure (la sienne si c'est une commune).</summary>
     public string? CommuneOf(Structure structure) => Domain.Politics.Communes.CommuneOf(structure, _structures);
 
+    /// <summary>
+    /// Le nom affiché d'une structure (décidé le 19 novembre 2026). Un bâtiment n'a pas de nom propre : son type, puis
+    /// entre parenthèses le produit de sa recette en cours (« Atelier (Farine) ») ; sans produit, son type seul
+    /// (« Logements »). Si plusieurs bâtiments de la même commune portent ce nom, ceux qui suivent le premier (par ordre
+    /// de création) prennent un numéro : « Atelier (Farine) 2 ». Une commune, une préfecture ou un organisme garde son nom.
+    /// </summary>
+    public string DisplayNameOf(Structure structure)
+    {
+        if (structure.Kind != StructureKind.Building)
+            return structure.Name;
+
+        var name = BaseNameOf(structure);
+        var commune = CommuneOf(structure);
+        var rank = 1;
+        foreach (var other in _structures.Values)
+        {
+            if (other.Id == structure.Id)
+                break;
+            if (other.Kind == StructureKind.Building && CommuneOf(other) == commune && BaseNameOf(other) == name)
+                rank++;
+        }
+        return rank == 1 ? name : $"{name} {rank}";
+    }
+
+    private string BaseNameOf(Structure building)
+    {
+        var type = building.TypeId is { } typeId ? BuildingTypes.GetValueOrDefault(typeId)?.Name : null;
+        var productId = building.Production?.ProductId;
+        var product = productId is null ? null : Products.FirstOrDefault(p => p.Id == productId)?.Name ?? productId;
+        return product is null ? type ?? building.Name : $"{type ?? building.Name} ({product})";
+    }
+
     /// <summary>Capacité de stockage d'une commune : la somme de ses bâtiments de stockage.</summary>
     public int StorageCapacity(string communeId) => Storage.CapacityOf(communeId, _structures);
 

@@ -179,7 +179,7 @@ public partial class ProductionChainPage : VBoxContainer, IMenuPage
 
     private static string Describe(ChainBuildingView building)
     {
-        var text = new StringBuilder(SheetText.Heading(building.Name));
+        var text = new StringBuilder(SheetText.OwnerSquare(building.Ownership)).Append(' ').Append(SheetText.Heading(building.Name));
         text.AppendLine($"Produit : {SheetText.Escape(building.ProductName)} · {building.ProducedToday:N0} le dernier jour · "
             + $"{building.Workers:N0} travailleurs de production");
         if (building.NeedId is { } need)

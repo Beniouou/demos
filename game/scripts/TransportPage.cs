@@ -58,7 +58,7 @@ public partial class TransportPage : VBoxContainer, IMenuPage
                 text.Append($"[cell padding=0,0,16,4][color=#{muted}]{header}[/color][/cell]");
             foreach (var link in links)
             {
-                text.Append($"[cell padding=0,0,16,2]{SheetText.Escape(RoadText.Link(_view, link))}[/cell]");
+                text.Append($"[cell padding=0,0,16,2]{SheetText.Structure(_view, link.A)} – {SheetText.Structure(_view, link.B)}[/cell]");
                 text.Append($"[cell padding=0,0,16,2]{RoadText.LevelName(link.Level)}[/cell]");
                 text.Append($"[cell padding=0,0,16,2]{link.Length:0.#} km[/cell]");
                 text.Append($"[cell padding=0,0,16,2]{link.Climb:N0} m[/cell]");

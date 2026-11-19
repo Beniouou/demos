@@ -58,7 +58,11 @@ public sealed class GameView(Simulation simulation)
     public double TotalResidents => World.Communes.Sum(c => World.Residents(c.Id));
 
     /// <summary>Le nom d'une structure (commune, préfecture, État), ou son identifiant si elle n'existe plus.</summary>
-    public string NameOf(string structureId) => World.Structures.TryGetValue(structureId, out var structure) ? structure.Name : structureId;
+    public string NameOf(string structureId) => World.Structures.TryGetValue(structureId, out var structure) ? World.DisplayNameOf(structure) : structureId;
+
+    /// <summary>Le propriétaire d'un bâtiment (pour son carré de couleur), ou null si ce n'est pas un bâtiment.</summary>
+    public Ownership? OwnershipOf(string structureId) =>
+        World.Structures.TryGetValue(structureId, out var structure) && structure.Kind == StructureKind.Building ? structure.Ownership : null;
 
     /// <summary>
     /// Les échanges entre communes : pour chaque paire, ce qui a circulé (dans les deux sens) le dernier mois fini, ou
@@ -120,7 +124,7 @@ public sealed class GameView(Simulation simulation)
                 var fullOutput = recipe.QuantityPerWorker * workers;
                 return new ChainBuildingView(
                     building.Id,
-                    building.Name,
+                    World.DisplayNameOf(building),
                     building.Ownership,
                     recipe.ProductId,
                     NameOfProduct(recipe.ProductId),
@@ -174,7 +178,7 @@ public sealed class GameView(Simulation simulation)
             {
                 var from = World.CommuneOf(s);
                 var productId = s.Production!.Value.ProductId;
-                return new SupplierCandidateView(s.Id, s.Name, from is null ? "" : NameOf(from),
+                return new SupplierCandidateView(s.Id, World.DisplayNameOf(s), from is null ? "" : NameOf(from),
                     World.Products.FirstOrDefault(p => p.Id == productId)?.Name ?? productId,
                     from is null || from == to ? 0 : simulation.TransportLossBetween(from, to));
             })
@@ -210,7 +214,7 @@ public sealed class GameView(Simulation simulation)
     public IReadOnlyList<ConstructionSiteView> ConstructionSites() => World.ConstructionSites
         .Select(site => new ConstructionSiteView(
             site.Building.Id,
-            site.Building.Name,
+            World.DisplayNameOf(site.Building),
             site.Building.TypeId,
             World.CommuneOf(site.Building),
             site.DaysLeft))
@@ -339,7 +343,7 @@ public sealed class GameView(Simulation simulation)
 
     private StructureNode DescribeNode(Structure structure) => new(
         structure.Id,
-        structure.Name,
+        World.DisplayNameOf(structure),
         structure.Kind switch
         {
             StructureKind.PoliticalEntity => structure.Level switch

@@ -95,7 +95,7 @@ public partial class ChainDiagram : Control
             var row = 0;
             foreach (var building in buildings.Where(b => depth[b.Id] == column).OrderBy(b => b.ProductName).ThenBy(b => b.Name))
             {
-                var detail = $"{building.ProductName} · {building.ProducedToday:N0}/j";
+                var detail = $"{building.ProducedToday:N0} par jour";
                 _nodes.Add(new Node(building.Id, building.Name, detail, UiTheme.OwnershipColor(building.Ownership),
                     building.SupplyShare < 0.995, building, BoxAt(column, row++)));
             }
@@ -169,7 +169,7 @@ public partial class ChainDiagram : Control
             return "";
         var lines = new List<string>
         {
-            $"{building.Name} : {building.ProductName}, {building.ProducedToday:N0} le dernier jour ({building.Workers:N0} travailleurs de production).",
+            $"{building.Name} : {building.ProducedToday:N0} le dernier jour ({building.Workers:N0} travailleurs de production).",
         };
         if (building.Inputs.Count > 0)
             lines.Add($"Matières : {string.Join(", ", building.Inputs.Select(i => i.ProductName))} ; elles ont permis {building.SupplyShare:P0} de la production.");

@@ -31,6 +31,23 @@ public static class SheetText
     public static string Hint(string bbcode, string hint) =>
         $"[hint=\"{hint.Replace("\"", "'").Replace("[", "(").Replace("]", ")")}\"]{bbcode}[/hint]";
 
+    /// <summary>Le carré de couleur du propriétaire d'un bâtiment (État, SCOP, privé), avec son nom au survol.</summary>
+    public static string OwnerSquare(Ownership ownership) =>
+        Hint($"[color=#{UiTheme.OwnershipColor(ownership).ToHtml(false)}]■[/color]", ownership switch
+        {
+            Ownership.Public => "Bâtiment d'État",
+            Ownership.Cooperative => "SCOP (coopérative)",
+            _ => "Entreprise privée",
+        });
+
+    /// <summary>
+    /// Le nom affiché d'une structure ; pour un bâtiment, précédé du carré de son propriétaire : « ■ Atelier (Farine) ».
+    /// </summary>
+    public static string Structure(GameView view, string structureId) =>
+        view.OwnershipOf(structureId) is { } ownership
+            ? $"{OwnerSquare(ownership)} {Escape(view.NameOf(structureId))}"
+            : Escape(view.NameOf(structureId));
+
     public static string Chip(Orientation pole) =>
         Hint($"[color=#{UiTheme.PoleColor(pole).ToHtml(false)}]■[/color]", $"{pole.Code} : pôle {WorldText.PoleName(pole)}");
 

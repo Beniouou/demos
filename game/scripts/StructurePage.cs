@@ -275,7 +275,11 @@ public partial class StructurePage : HBoxContainer, IMenuPage
 
     private void DescribeStructure(StringBuilder text, StructureNode node)
     {
-        text.Append(Heading(node.Name.ToUpperInvariant()));
+        // Un bâtiment : le carré de son propriétaire devant son nom.
+        if (_view.OwnershipOf(node.Id) is { } ownership)
+            text.Append(SheetText.OwnerSquare(ownership)).Append(' ').Append(Heading(node.Name));
+        else
+            text.Append(Heading(node.Name.ToUpperInvariant()));
         switch (node.Kind)
         {
             case StructureNodeKind.State:

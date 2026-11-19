@@ -72,7 +72,7 @@ public partial class Main : Node
         _yearStartTreasury = _view.TreasuryBalance;
         _yearStartResidents = _view.TotalResidents;
         _simulation.BuildingCompleted += building => _events.Add(EventText.BuildingCompleted(_view, building));
-        _simulation.CompaniesNationalizedByLaw += taken => _events.Add(EventText.NationalizedByLaw(taken));
+        _simulation.CompaniesNationalizedByLaw += taken => _events.Add(EventText.NationalizedByLaw(_view, taken));
         _simulation.SeasonPassed += () => _events.Add(EventText.SeasonStarted(_view));
         _simulation.YearPassed += () =>
         {

@@ -22,5 +22,5 @@ public sealed partial class PlayerDesk
         new(Simulation.SetSupplyLineShare(lineId, share) ? $"Part envoyée : {System.Math.Clamp(share, 0.05, 1):P0}." : "Ligne inconnue.");
 
     private string Name(string structureId) =>
-        World.Structures.TryGetValue(structureId, out var structure) ? structure.Name : structureId;
+        World.Structures.TryGetValue(structureId, out var structure) ? World.DisplayNameOf(structure) : structureId;
 }

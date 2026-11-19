@@ -87,7 +87,7 @@ internal static class SimulationReport
     /// <summary>Une route construite, entretenue ou délaissée, pour le rapport.</summary>
     private static string DescribeRoad(World world, Demos.Domain.Map.RoadChange change)
     {
-        string Name(string id) => world.Structures.TryGetValue(id, out var s) ? s.Name : id;
+        string Name(string id) => world.Structures.TryGetValue(id, out var s) ? world.DisplayNameOf(s) : id;
         // Le nom du niveau, avec son article (« le sentier », « la route »).
         string Level(Demos.Domain.Map.RoadLevel level, bool article = false) => level switch
         {
@@ -209,7 +209,7 @@ internal static class SimulationReport
                 var workers = world.Workers.GetValueOrDefault(b.Id);
                 double? perDay = output is not null && b.Production is not null ? output.GetValueOrDefault(b.Id) / 365 : null;
                 double? potential = b.Production is { } r ? r.QuantityPerWorker * b.Jobs : null;
-                return new BuildingLine(b.Name, b.TypeId ?? "", CommuneName(world.CommuneOf(b)), owner, b.Jobs, workers, perDay, potential,
+                return new BuildingLine(world.DisplayNameOf(b), b.TypeId ?? "", CommuneName(world.CommuneOf(b)), owner, b.Jobs, workers, perDay, potential,
                     b.Production?.ProductId, energy?.GetValueOrDefault(b.Id) / 365 ?? world.EnergyShareOf(b), world.Wages.PaidShare(b.Id),
                     simulation.IsStruggling(b), Companies.HasCompanyFund(b) ? world.CompanyFundOf(b).Balance : null, b.JobCapacity, b.WageCut);
             }).ToList();

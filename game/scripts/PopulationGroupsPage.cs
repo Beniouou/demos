@@ -119,7 +119,7 @@ public partial class PopulationGroupsPage : HBoxContainer, IMenuPage
         return text.ToString();
     }
 
-    private static string DescribeGroup(CommuneView commune, SocialClassView group)
+    private string DescribeGroup(CommuneView commune, SocialClassView group)
     {
         var text = new StringBuilder(SheetText.Heading($"{group.Name} — {commune.Name}"));
         text.AppendLine($"{SheetText.Hint("Rang", PopulationText.Rank(group.Rank))} {PopulationText.RankName(group.Rank)} · "
@@ -147,7 +147,7 @@ public partial class PopulationGroupsPage : HBoxContainer, IMenuPage
         var workplaces = group.Workplaces ?? [];
         text.AppendLine(workplaces.Count == 0
             ? SheetText.Muted("Nulle part pour l'instant.")
-            : string.Join(" · ", workplaces.Select(w => $"{SheetText.Escape(w.Name)} {w.Members:N0}")));
+            : string.Join(" · ", workplaces.Select(w => $"{SheetText.Structure(_view, w.StructureId)} {w.Members:N0}")));
         return text.ToString();
     }
 }

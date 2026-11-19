@@ -17,12 +17,12 @@ public static class EventText
     public static string BuildingCompleted(GameView view, Structure building)
     {
         var commune = view.CommuneOf(building.Id) is { } communeId ? $" ({view.NameOf(communeId)})" : "";
-        return $"Chantier terminé : {building.Name}{commune}, en service demain.";
+        return $"Chantier terminé : {view.NameOf(building.Id)}{commune}, en service demain.";
     }
 
     /// <summary>Les entreprises privées que les lois interdisent, reprises par l'État sans indemnité.</summary>
-    public static string NationalizedByLaw(IReadOnlyList<Structure> buildings) =>
-        $"Les lois interdisent ces entreprises privées : l'État les reprend sans indemnité ({string.Join(", ", buildings.Select(b => b.Name))}).";
+    public static string NationalizedByLaw(GameView view, IReadOnlyList<Structure> buildings) =>
+        $"Les lois interdisent ces entreprises privées : l'État les reprend sans indemnité ({string.Join(", ", buildings.Select(b => view.NameOf(b.Id)))}).";
 
     public static string SeasonStarted(GameView view) =>
         $"{WorldText.SeasonName(view.Season)} {view.Today.Year} : nouvelle saison (migrations et évolutions lentes).";

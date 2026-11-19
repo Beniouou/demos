@@ -193,5 +193,11 @@ désactivés : TVA sur la valeur ajoutée, épargne progressive des entreprises.
   `PlayerDesk.Supply.cs`. Lecture : `GameView.SupplyLines`, `SupplierCandidates`. Interface : fiche de la Chaîne de
   production (`ProductionChainPage.Supply.cs`), flèches blanches épaisses sur le schéma. Sans ligne, rien ne change
   (référence 3 ans : 251 177).
+- Noms des bâtiments (décidé le 19 novembre 2026) : calculés, jamais écrits à la main. `World.DisplayNameOf` : type,
+  puis le produit de la recette en cours entre parenthèses (« Atelier (Farine) ») ; sans produit, le type seul ;
+  doublon dans la même commune : numéro à partir du deuxième (« Atelier (Farine) 2 »). Communes, préfectures et
+  organismes gardent leur nom. `GameView.NameOf` et le schéma Structure l'utilisent, `PlayerDesk` aussi ; plus de
+  `name` pour les bâtiments dans `partie-depart.json`. Le carré du propriétaire : `SheetText.OwnerSquare` /
+  `SheetText.Structure` dans les fiches (BBCode), icônes dans les arbres et menus, rien dans la barre de messages.
 - Pas branché, volontairement : `SetPrice` (prix fixés par le joueur : question ouverte des prix dynamiques).
   Prompt de la session d'intégration : `prompt-integration-interface.md`, à côté du dépôt.

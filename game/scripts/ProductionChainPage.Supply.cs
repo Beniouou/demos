@@ -71,7 +71,7 @@ public partial class ProductionChainPage
         add.AddThemeConstantOverride("separation", 8);
         var choice = new OptionButton { SizeFlagsHorizontal = SizeFlags.ExpandFill, FocusMode = FocusModeEnum.None, FitToLongestItem = false, ClipText = true };
         foreach (var candidate in candidates)
-            choice.AddItem($"{candidate.Name} ({candidate.CommuneName}) · {candidate.ProductName}"
+            choice.AddIconItem(UiTheme.Square(UiTheme.OwnershipColor(Ownership.Public), 12, 12), $"{candidate.Name} ({candidate.CommuneName})"
                 + (candidate.Loss > 0 ? $" · perte {candidate.Loss:P0}" : ""));
         var create = new Button { Text = "Ajouter ce fournisseur", FocusMode = FocusModeEnum.None, Disabled = candidates.Count == 0 };
         create.Pressed += () =>
@@ -92,7 +92,9 @@ public partial class ProductionChainPage
     {
         var row = new HBoxContainer();
         row.AddThemeConstantOverride("separation", 6);
-        var text = $"{who} · {line.ProductName} · arrivé hier {line.DeliveredLastDay:N0}"
+        // Les lignes ne relient que des bâtiments d'État : le carré de l'État devant l'autre bâtiment.
+        row.AddChild(new TextureRect { Texture = UiTheme.Square(UiTheme.OwnershipColor(Ownership.Public), 12, 12), StretchMode = TextureRect.StretchModeEnum.KeepCentered });
+        var text = $"{who} · arrivé hier {line.DeliveredLastDay:N0}"
             + (line.Loss > 0 ? $" · perte {line.Loss:P0}" : "")
             + (line.IsActive ? "" : " · ne livre plus (recette changée)");
         row.AddChild(new Label { Text = text, SizeFlagsHorizontal = SizeFlags.ExpandFill, ClipText = true, TooltipText = text, MouseFilter = MouseFilterEnum.Pass });

@@ -33,7 +33,7 @@ public sealed partial class PlayerDesk(Simulation simulation)
 
         return new BuildingSheet(
             building.Id,
-            building.Name,
+            World.DisplayNameOf(building),
             InfoOf(building),
             isPublic,
             building.Jobs,
@@ -193,7 +193,7 @@ public sealed partial class PlayerDesk(Simulation simulation)
                 return $"Emplacement impossible : {problem}.";
         }
         if (simulation.TryBuild(building, PaymentMode.StockFirst, position))
-            return $"Chantier lancé : {building.Name}, {cost.Days} jours. Les matériaux sont payés.";
+            return $"Chantier lancé : {World.DisplayNameOf(building)}, {cost.Days} jours. Les matériaux sont payés.";
 
         var available = AvailabilityOf(communeId, cost.ProductId);
         return $"Construction impossible : il faut {cost.Quantity:N0} {ProductName(cost.ProductId)}. Il y a {available.Reserve:N0} en réserve "
