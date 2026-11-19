@@ -88,7 +88,11 @@ désactivés : TVA sur la valeur ajoutée, épargne progressive des entreprises.
 - Le moteur Godot affiche la carte vectorielle IGN Pastel au centre de l'écran (`game/scripts/Map/MapCanvas.cs`, `game/scripts/Hud.cs` et menu Carte `game/scripts/MainMenu.cs`) :
   - Enveloppes départementales continues des préfectures fusionnées dynamiquement sans grille (`Geometry2D.MergePolygons`).
   - Liaisons administratives pointillées (`DrawDashedLine`) reliant chaque commune membre au chef-lieu de préfecture.
-  - Distinction visuelle entre Capitale nationale (blason or et carmin), Chef-lieu de préfecture (sceau pourpre civique) et Communes ordinaires.
+  - Blason rond de chaque commune, dans toutes les vues (19 novembre 2026, `Map/Layers/CommuneBlason.cs`, dessiné avec
+    les écritures, au-dessus des bâtiments) : champ en deux émaux (un métal, une couleur, `MapPalette.HeraldicMetals` /
+    `HeraldicColours`) et partage (coupé, parti, tranché, écartelé) tirés du nom ; figure selon le produit le plus
+    fabriqué en valeur depuis le début (épi, arbre, tour, marteau, goutte, flamme ; étoile sans production), relue une
+    fois par jour ; bordure or pour la capitale, pourpre pour un chef-lieu, argent sinon. Remplace les anciens sceaux.
   - Une vue de base, Monde, et des filtres qu'on superpose (`MapFilters`, cases à cocher du menu Carte, légende qui
     suit) : Géographie physique, Biomes, Ressources minières et sols, Politique, Production et transport. Dessin en
     calques, un par fichier, dans `game/scripts/Map/Layers/` (plan : `plan-refonte-carte.md`, à côté du dépôt).

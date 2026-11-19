@@ -118,6 +118,17 @@ public static class MapPalette
     public static readonly Color BlasonRed = new("#9E352B");
     public static readonly Color BlasonGold = new("#D4AF37");
     public static readonly Color InfluenceBorder = new("#A84C42");
+
+    // Les émaux des blasons des communes : deux métaux (or, argent) et cinq couleurs (gueules, azur, sinople, sable,
+    // pourpre) ; la bordure dit le rang (or : capitale, pourpre : chef-lieu, argent : commune).
+    public static readonly Color[] HeraldicMetals = [new("#D9B347"), new("#ECE8DC")];
+    public static readonly Color[] HeraldicColours = [new("#B0302A"), new("#2F5DA8"), new("#2E7D4A"), new("#2B2724"), new("#7A3B7A")];
+    public static readonly Color HeraldicOutline = new("#2B2724");
+    public static readonly Color BlasonSilver = new("#ECE8DC");
+
+    /// <summary>Rayon du blason d'une commune au zoom 1, et son minimum pour rester lisible de loin (pixels).</summary>
+    public const float BlasonRadius = 13f;
+    public const float BlasonMinRadius = 9f;
     public static readonly Color TerraIncognitaHatch = new(0.55f, 0.48f, 0.40f, 0.25f);
 
     // Préfectures, Juridictions & Frontières départementales

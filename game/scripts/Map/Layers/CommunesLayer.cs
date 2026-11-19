@@ -7,7 +7,8 @@ namespace Demos.Game.Map.Layers;
 
 /// <summary>
 /// Les communes. Vue Monde : des toits (leur nombre suit les habitants, voir <see cref="MapPalette.ResidentsPerHouse"/>)
-/// et le nom de chaque commune. Filtre Politique : par-dessus les toits, capitale (sceau or et carmin), chefs-lieux de préfecture (sceau pourpre) et communes ordinaires, ou le
+/// et le nom de chaque commune ; dans toutes les vues, le blason rond de chaque commune sur son village (voir
+/// <see cref="CommuneBlason"/> : bordure or pour la capitale, pourpre pour un chef-lieu, argent sinon), ou le
 /// plan cadastral de l'ancienne maquette ; écritures : le badge de chaque commune (rang, nom et habitants).
 /// </summary>
 public sealed class CommunesLayer : MapLayer
@@ -119,39 +120,48 @@ public sealed class CommunesLayer : MapLayer
 
     public override void Draw(MapDrawContext c)
     {
+        // Sur la carte d'un pays, le calque ne dessine que ses toits (des nœuds) ; les blasons vont avec les écritures,
+        // au-dessus des bâtiments posés sur le village.
         if (!IsNational(c))
-        {
             DrawLegacyCadastralTown(c);
-            return;
-        }
+    }
 
-        var s = c.SymbolScale;
-        foreach (var (_, center, rank, _) in Communes(c))
+    /// <summary>Le blason de chaque commune, dans toutes les vues, sur son village : son rang se lit à la bordure.</summary>
+    private void DrawBlasons(MapDrawContext c)
+    {
+        RefreshCharges(c);
+        var radius = Math.Max(MapPalette.BlasonMinRadius, MapPalette.BlasonRadius * c.SymbolScale);
+        var seatIds = c.GameView?.Prefectures().Where(p => p.SeatId is not null).Select(p => p.SeatId!).ToHashSet() ?? [];
+        foreach (var commune in c.Data.Communes())
         {
-            switch (rank)
-            {
-                case Rank.Capital:
-                    // 1. Capitale nationale : Sceau or et carmin
-                    c.Pen.DrawCircle(center, 9.0f * s, MapPalette.BlasonGold);
-                    c.Pen.DrawCircle(center, 7.5f * s, MapPalette.BlasonRed);
-                    c.Pen.DrawCircle(center, 4.0f * s, MapPalette.BlasonGold);
-                    c.Pen.DrawCircle(center, 2.0f * s, Colors.White);
-                    break;
-                case Rank.PrefectureSeat:
-                    // 2. Chef-lieu de préfecture : Sceau civique pourpre
-                    c.Pen.DrawCircle(center, 8.0f * s, MapPalette.PrefectureSeat);
-                    c.Pen.DrawCircle(center, 6.0f * s, Colors.White);
-                    c.Pen.DrawCircle(center, 3.5f * s, MapPalette.PrefectureSeat);
-                    break;
-                default:
-                    // 3. Commune ordinaire : Disque bicolore sobre (en vue Monde, ses toits suffisent)
-                    if (_roofs.Count > 0 && !c.Has(MapFilters.Politics))
-                        break;
-                    c.Pen.DrawCircle(center, 6.0f * s, MapPalette.CommuneMark);
-                    c.Pen.DrawCircle(center, 4.0f * s, MapPalette.CommuneMarkInner);
-                    c.Pen.DrawCircle(center, 2.0f * s, MapPalette.CommuneMark);
-                    break;
-            }
+            var border = commune.Id == c.GameView?.CapitalId ? MapPalette.BlasonGold
+                : seatIds.Contains(commune.Id) ? MapPalette.PrefectureSeat
+                : MapPalette.BlasonSilver;
+            // Juste au-dessus de l'étiquette du nom (qui commence 12 points sous le centre du village).
+            var center = c.ToScreen(commune.WorldPos) + new Vector2(0, 12 * c.SymbolScale - radius - 3);
+            CommuneBlason.Draw(c.Pen, center, radius, StableHash(commune.Name),
+                _charges.GetValueOrDefault(commune.Id, CommuneBlason.Charge.Star), border);
+        }
+    }
+
+    // La figure du blason de chaque commune (son activité principale), relue une fois par jour de jeu.
+    private readonly Dictionary<string, CommuneBlason.Charge> _charges = [];
+    private DateOnly? _chargesDay;
+
+    /// <summary>
+    /// L'activité principale de chaque commune : le produit qu'elle a le plus fabriqué depuis le début de la partie, en
+    /// valeur (quantité × prix) ; rien de fabriqué, une étoile.
+    /// </summary>
+    private void RefreshCharges(MapDrawContext c)
+    {
+        if (c.GameView is not { } view || view.Today == _chargesDay)
+            return;
+        _chargesDay = view.Today;
+        _charges.Clear();
+        foreach (var commune in view.ProductFlows().GroupBy(f => f.CommuneId))
+        {
+            var main = commune.Where(f => f.Produced > 0).OrderByDescending(f => f.Produced * f.Price).FirstOrDefault();
+            _charges[commune.Key] = CommuneBlason.ChargeOf(main?.ProductId);
         }
     }
 
@@ -163,6 +173,7 @@ public sealed class CommunesLayer : MapLayer
             return;
         }
 
+        DrawBlasons(c);
         if (c.Zoom < 0.5f)
             return;
         foreach (var (commune, center, rank, popText) in Communes(c))
