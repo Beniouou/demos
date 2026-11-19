@@ -80,7 +80,7 @@ public partial class MainMenu : HBoxContainer
             ], Wide: true),
             new("Structure",
             [
-                new("Gestion des entités politiques", () => new StructurePage(view, desk)),
+                new("Gestion des entités politiques", () => new StructurePage(view, desk, ProductionHistory)),
                 new("Création d'entité politique", () => new EntityCreationPage(view, desk,
                     (name, payerId, pole) => CommuneSiteRequested?.Invoke(name, payerId, pole))),
                 Coming("Organisme", "Les organismes : domaine d'application, pouvoir, postes et fonctionnement."),
@@ -93,10 +93,10 @@ public partial class MainMenu : HBoxContainer
             ], Wide: true),
             new("Production",
             [
-                new("Unités de production", () => new BuildingsPage(view, desk)),
+                new("Unités de production", () => new BuildingsPage(view, desk, ProductionHistory)),
                 new("Construire", () => new ConstructionPage(view, desk, map, Close, message => Message?.Invoke(message))),
                 new("Transport", () => new TransportPage(view)),
-                new("Chaîne de production", () => new ProductionChainPage(view, desk, ShowBuilding)),
+                new("Chaîne de production", () => new ProductionChainPage(view, ShowBuilding)),
                 new("Statistiques", () => new ProductionStatsPage(view, ProductionHistory)),
             ], Wide: true),
             new("Recherche",

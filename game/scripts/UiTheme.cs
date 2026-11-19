@@ -42,6 +42,33 @@ public static class UiTheme
     /// <summary>La couleur de la série n° <paramref name="index"/> d'un graphique ; au-delà de huit, les couleurs reviennent.</summary>
     public static Color SeriesColor(int index) => SeriesColors[index % SeriesColors.Length];
 
+    // Le cadre d'un fournisseur ou d'un client hors de la commune : bleu dans une autre commune de la même préfecture,
+    // violet dans une autre préfecture.
+    public static readonly Color OtherCommune = new("#4c8df6");
+    public static readonly Color OtherPrefecture = new("#b07cf0");
+
+    /// <summary>La couleur du cadre d'un bout de flux selon où il se trouve (null : dans la même commune, cadre normal).</summary>
+    public static Color? RelationColor(Demos.Application.PlaceRelation relation) => relation switch
+    {
+        Demos.Application.PlaceRelation.OtherCommune => OtherCommune,
+        Demos.Application.PlaceRelation.OtherPrefecture => OtherPrefecture,
+        _ => null,
+    };
+
+    /// <summary>La légende des cadres de couleur : autre commune, autre préfecture.</summary>
+    public static HBoxContainer RelationLegend()
+    {
+        var legend = new HBoxContainer();
+        legend.AddThemeConstantOverride("separation", 6);
+        foreach (var (color, name) in new[] { (OtherCommune, "cadre bleu : autre commune"), (OtherPrefecture, "cadre violet : autre préfecture") })
+        {
+            legend.AddChild(new TextureRect { Texture = Square(color, 12, 12), StretchMode = TextureRect.StretchModeEnum.KeepCentered });
+            legend.AddChild(Caption(name));
+            legend.AddChild(new Control { CustomMinimumSize = new Vector2(8, 0) });
+        }
+        return legend;
+    }
+
     public const int FontSize = 15;
     public const int TitleSize = 19;
 

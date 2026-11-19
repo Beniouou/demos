@@ -16,7 +16,8 @@ namespace Demos.Game;
 /// la couleur de son propriétaire à gauche, un cadre orange quand ses matières ont manqué ; les lignes
 /// d'approvisionnement du joueur sont des flèches blanches épaisses. En bas, une bande « Sans recette » montre les
 /// bâtiments qui ne produisent rien et ce qu'ils offrent. Un produit suivi garde ses fournisseurs et ses clients en vue,
-/// le reste s'estompe. Un clic choisit un bâtiment (avec ou sans recette).
+/// le reste s'estompe. Un bâtiment relié par une ligne à une autre commune a un cadre extérieur bleu (même préfecture)
+/// ou violet (autre préfecture). Un clic choisit un bâtiment (avec ou sans recette).
 /// </summary>
 public partial class ChainDiagram : Control
 {
@@ -66,6 +67,7 @@ public partial class ChainDiagram : Control
     private List<string> _columns = [];
     private float _plainTop;
     private IReadOnlyList<(string From, string To)> _links = [];
+    private IReadOnlyDictionary<string, PlaceRelation> _outside = new Dictionary<string, PlaceRelation>();
     private HashSet<string>? _followed;
     private string? _selected;
 
@@ -92,9 +94,11 @@ public partial class ChainDiagram : Control
     /// suivi (null : tous) et les lignes d'approvisionnement entre bâtiments de la commune.
     /// </summary>
     public void SetChain(IReadOnlyList<ChainBuildingView> buildings, IReadOnlyList<PlainBuildingView> plain,
-        System.Func<string, string> needName, string? followedProduct, IReadOnlyList<(string From, string To)>? supplyLinks = null)
+        System.Func<string, string> needName, string? followedProduct, IReadOnlyList<(string From, string To)>? supplyLinks = null,
+        IReadOnlyDictionary<string, PlaceRelation>? outside = null)
     {
         _links = supplyLinks ?? [];
+        _outside = outside ?? new Dictionary<string, PlaceRelation>();
         var producersOf = buildings.GroupBy(b => b.ProductId).ToDictionary(g => g.Key, g => g.ToList());
         var consumersOf = buildings.SelectMany(b => b.Inputs.Select(i => (i.ProductId, Building: b)))
             .GroupBy(x => x.ProductId).ToDictionary(g => g.Key, g => g.Select(x => x.Building).Distinct().ToList());
@@ -338,6 +342,9 @@ public partial class ChainDiagram : Control
             DrawRect(new Rect2(box.Position, new Vector2(5, box.Size.Y)), node.Strip with { A = alpha });
             if (node.Short)
                 DrawRect(box, UiTheme.Accent with { A = alpha }, filled: false, width: 2);
+            // Un bâtiment relié par une ligne à une autre commune : un cadre extérieur bleu ou violet.
+            if (_outside.TryGetValue(node.Key, out var relation) && UiTheme.RelationColor(relation) is { } frame)
+                DrawRect(box.Grow(3), frame with { A = alpha }, filled: false, width: 2);
             if (node.Key == _selected)
                 DrawRect(box.Grow(2), UiTheme.Text, filled: false, width: 2);
             DrawString(font, box.Position + new Vector2(12, small ? 17 : 19), node.Title, HorizontalAlignment.Left, box.Size.X - 18,

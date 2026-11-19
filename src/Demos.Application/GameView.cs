@@ -152,6 +152,82 @@ public sealed class GameView(Simulation simulation)
         .OrderBy(b => b.Name)
         .ToList();
 
+    /// <summary>
+    /// D'où viennent les matières d'un bâtiment et où part sa production (null si ce n'est pas un bâtiment). Sources :
+    /// ses lignes d'approvisionnement, puis les producteurs de ses matières dans sa commune (ou « aucun producteur »).
+    /// Destinations : ses lignes, les bâtiments de sa commune qui utilisent son produit, les habitants si c'est un
+    /// besoin, et les autres communes (les échanges entre communes ; la quantité se lit dans les statistiques).
+    /// </summary>
+    public BuildingFlowView? BuildingFlows(string buildingId)
+    {
+        if (!World.Structures.TryGetValue(buildingId, out var building) || building.Kind != StructureKind.Building
+            || World.CommuneOf(building) is not { } communeId)
+            return null;
+
+        var lines = SupplyLines();
+        var inCommune = World.Structures.Values
+            .Where(s => s.Kind == StructureKind.Building && s.Id != building.Id && s.Production is not null && World.CommuneOf(s) == communeId)
+            .ToList();
+        string ProductName(string id) => World.Products.FirstOrDefault(p => p.Id == id)?.Name ?? id;
+        Ownership? OwnerOf(string id) => OwnershipOf(id);
+        PlaceRelation RelationTo(string otherId) =>
+            World.Structures.TryGetValue(otherId, out var other) && World.CommuneOf(other) is { } otherCommune
+                ? RelationBetween(communeId, otherCommune)
+                : PlaceRelation.SameCommune;
+
+        var sources = new List<FlowEndView>();
+        var materials = building.Production?.Materials ?? [];
+        foreach (var material in materials)
+        {
+            var product = ProductName(material.ProductId);
+            var fed = lines.Where(l => l.ClientId == building.Id && World.Structures.GetValueOrDefault(l.SupplierId)?.Production?.ProductId == material.ProductId).ToList();
+            foreach (var line in fed)
+                sources.Add(new FlowEndView(line.SupplierId, line.SupplierName, OwnerOf(line.SupplierId), product,
+                    $"ligne {line.Share:P0} · arrivé hier {line.DeliveredLastDay:N0}", RelationTo(line.SupplierId), FlowKind.Line));
+            var producers = inCommune.Where(s => s.Production!.Value.ProductId == material.ProductId && fed.All(l => l.SupplierId != s.Id)).ToList();
+            foreach (var producer in producers)
+                sources.Add(new FlowEndView(producer.Id, World.DisplayNameOf(producer), producer.Ownership, product,
+                    $"{World.Produced.GetValueOrDefault(producer.Id):N0} par jour, au marché de la commune", PlaceRelation.SameCommune, FlowKind.Market));
+            if (fed.Count == 0 && producers.Count == 0)
+                sources.Add(new FlowEndView(null, "Aucun producteur ici", null, product,
+                    "seulement ce qui arrive des autres communes par les échanges", PlaceRelation.SameCommune, FlowKind.Missing));
+        }
+
+        var destinations = new List<FlowEndView>();
+        if (building.Production is { } recipe)
+        {
+            var product = ProductName(recipe.ProductId);
+            var serving = lines.Where(l => l.SupplierId == building.Id).ToList();
+            foreach (var line in serving)
+                destinations.Add(new FlowEndView(line.ClientId, line.ClientName, OwnerOf(line.ClientId), product,
+                    $"ligne {line.Share:P0} · livré hier {line.DeliveredLastDay:N0}", RelationTo(line.ClientId), FlowKind.Line));
+            foreach (var user in inCommune.Where(s => Demos.Domain.Economy.SupplyLines.Uses(s, recipe.ProductId) && serving.All(l => l.ClientId != s.Id)))
+                destinations.Add(new FlowEndView(user.Id, World.DisplayNameOf(user), user.Ownership, product,
+                    "l'achète au marché de la commune", PlaceRelation.SameCommune, FlowKind.Market));
+            if (World.Products.FirstOrDefault(p => p.Id == recipe.ProductId)?.Need is { } need)
+                destinations.Add(new FlowEndView(null, $"Habitants de {NameOf(communeId)}", null, product, need.Id,
+                    PlaceRelation.SameCommune, FlowKind.Habitants));
+            if (World.Products.FirstOrDefault(p => p.Id == recipe.ProductId) is { Stockable: true, Need: not null })
+                destinations.Add(new FlowEndView(null, "Autres communes", null, product, "échanges entre communes",
+                    PlaceRelation.OtherCommune, FlowKind.Export));
+        }
+
+        return new BuildingFlowView(building.Id, communeId, building.Production?.ProductId, sources, destinations, materials.Count > 0);
+    }
+
+    /// <summary>
+    /// Où se trouve une commune par rapport à une autre : la même, une autre de la même préfecture (ou toutes deux
+    /// directement sous l'État), ou une autre préfecture.
+    /// </summary>
+    public PlaceRelation RelationBetween(string communeId, string otherCommuneId)
+    {
+        if (communeId == otherCommuneId)
+            return PlaceRelation.SameCommune;
+        var parent = World.Structures.GetValueOrDefault(communeId)?.ParentId;
+        var otherParent = World.Structures.GetValueOrDefault(otherCommuneId)?.ParentId;
+        return parent == otherParent ? PlaceRelation.OtherCommune : PlaceRelation.OtherPrefecture;
+    }
+
     /// <summary>Les lignes d'approvisionnement, de la plus ancienne à la plus récente.</summary>
     public IReadOnlyList<SupplyLineView> SupplyLines() => World.SupplyLines.Select(line =>
         {
@@ -622,6 +698,38 @@ public sealed record ChainBuildingView(
     double SupplyShare,
     double EnergyShare,
     bool FuelsBuildings = false);
+
+/// <summary>Où se trouve un autre bâtiment ou une autre commune : la même commune, une autre de la même préfecture, une autre préfecture.</summary>
+public enum PlaceRelation
+{
+    SameCommune,
+    OtherCommune,
+    OtherPrefecture,
+}
+
+/// <summary>
+/// La sorte d'un bout de flux : une ligne d'approvisionnement, un bâtiment qui passe par le marché de la commune, les
+/// habitants (un besoin), les autres communes (échanges), ou aucun producteur.
+/// </summary>
+public enum FlowKind
+{
+    Line,
+    Market,
+    Habitants,
+    Export,
+    Missing,
+}
+
+/// <summary>
+/// Un bout de flux d'un bâtiment : l'autre bâtiment (ou null : habitants, autres communes, aucun producteur), son nom,
+/// son propriétaire, le produit, un détail (pour les habitants : l'identifiant du besoin), et où il se trouve.
+/// </summary>
+public sealed record FlowEndView(string? StructureId, string Name, Ownership? Ownership, string ProductName, string Detail,
+    PlaceRelation Relation, FlowKind Kind);
+
+/// <summary>D'où viennent les matières d'un bâtiment et où part sa production.</summary>
+public sealed record BuildingFlowView(string BuildingId, string CommuneId, string? ProductId, IReadOnlyList<FlowEndView> Sources,
+    IReadOnlyList<FlowEndView> Destinations, bool HasMaterials);
 
 /// <summary>Un bâtiment sans recette et ce qu'il offre : places de logement, places d'école, capacité de stockage.</summary>
 public sealed record PlainBuildingView(string Id, string Name, Ownership Ownership, int HousingPlaces, int SchoolPlaces, int StorageCapacity);

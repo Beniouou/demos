@@ -22,16 +22,18 @@ public partial class StructurePage : HBoxContainer, IMenuPage
 
     private readonly GameView _view = null!;
     private readonly PlayerDesk _desk = null!;
+    private readonly ProductionHistory _history = null!;
     private Tree _tree = null!;
     private RichTextLabel _sheet = null!;
     private readonly HashSet<string> _expanded = [];
     private string? _selected;
     private string _shape = "";
 
-    public StructurePage(GameView view, PlayerDesk desk)
+    public StructurePage(GameView view, PlayerDesk desk, ProductionHistory history)
     {
         _view = view;
         _desk = desk;
+        _history = history;
         AddThemeConstantOverride("separation", 12);
 
         _tree = new Tree
@@ -302,6 +304,8 @@ public partial class StructurePage : HBoxContainer, IMenuPage
                 foreach (var line in sheet.Info)
                     text.AppendLine(Escape(line));
                 text.AppendLine();
+                if (_view.BuildingFlows(node.Id) is { } flows)
+                    text.Append(FlowText.Sections(_view, _history, flows)).AppendLine();
                 text.AppendLine(Muted("Les décisions sur ce bâtiment se prennent dans Production → Unités de production."));
                 break;
         }

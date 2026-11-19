@@ -58,6 +58,44 @@ public class GameViewTests
     }
 
     [Fact]
+    public void Les_flux_d_un_batiment_disent_d_ou_viennent_ses_matieres_et_ou_part_sa_production()
+    {
+        var simulation = PrototypeScenario.Create(GameData.Content());
+        var view = new GameView(simulation);
+        simulation.AdvanceDay();
+        var mill = view.ProductionChain(PrototypeScenario.FirstCommuneId).Single(b => b.ProductId == "farine");
+
+        var flows = view.BuildingFlows(mill.Id)!;
+
+        // Le blé vient de la ferme de la commune ; la farine part aux ateliers qui l'utilisent (pain, alcool).
+        Assert.Contains(flows.Sources, s => s.Kind == FlowKind.Market && s.ProductName == "Blé" && s.Relation == PlaceRelation.SameCommune);
+        Assert.True(flows.Destinations.Count(d => d.Kind == FlowKind.Market) >= 2);
+        Assert.True(flows.HasMaterials);
+        Assert.Null(view.BuildingFlows(PrototypeScenario.FirstCommuneId));
+    }
+
+    [Fact]
+    public void Un_fournisseur_d_une_autre_commune_est_marque_comme_tel()
+    {
+        var simulation = PrototypeScenario.Create(GameData.Content());
+        var world = simulation.World;
+        world.AddStructure(new Structure("commune-b", "Commune B", StructureKind.PoliticalEntity, PrototypeScenario.StateId));
+        var sawmill = world.Structures.Values.Single(b => b.Ownership == Ownership.Public && b.Production?.ProductId == "planche");
+        world.AddStructure(sawmill with { Id = "scierie-b", ParentId = "commune-b" });
+        var camp = world.Structures.Values.Single(b => b.Ownership == Ownership.Public && b.Production?.ProductId == "bois");
+        Assert.Null(simulation.TryAddSupplyLine(camp.Id, "scierie-b").Problem);
+        var view = new GameView(simulation);
+
+        var source = view.BuildingFlows("scierie-b")!.Sources.Single(s => s.Kind == FlowKind.Line);
+        var destination = view.BuildingFlows(camp.Id)!.Destinations.Single(d => d.Kind == FlowKind.Line);
+
+        // Les deux communes sont directement sous l'État : même « préfecture », autre commune.
+        Assert.Equal(PlaceRelation.OtherCommune, source.Relation);
+        Assert.Equal(PlaceRelation.OtherCommune, destination.Relation);
+        Assert.Equal(PlaceRelation.SameCommune, view.RelationBetween("commune-b", "commune-b"));
+    }
+
+    [Fact]
     public void La_vue_est_une_copie_que_la_suite_de_la_partie_ne_change_pas()
     {
         var simulation = PrototypeScenario.Create(GameData.Content());

@@ -1,4 +1,3 @@
-using System.Collections.Generic;
 using System.Linq;
 using Demos.Application;
 using Demos.Domain.Politics;
@@ -7,11 +6,12 @@ using Godot;
 namespace Demos.Game;
 
 /// <summary>
-/// Les lignes d'approvisionnement dans la fiche d'un bâtiment de la Chaîne de production : celles qui le livrent
-/// (avec la part envoyée, à changer par pas de 10 %, et un bouton pour la retirer), celles qu'il livre, et l'ajout d'un
-/// fournisseur parmi les bâtiments publics, de toutes les communes, qui produisent une de ses matières.
+/// Les lignes d'approvisionnement d'un bâtiment, dans Production → Unités de production : celles qui le livrent (avec
+/// la part envoyée, à changer par pas de 10 %, et un bouton pour la retirer), celles qu'il livre, et l'ajout d'un
+/// fournisseur parmi les bâtiments publics, de toutes les communes, qui produisent une de ses matières. Le résultat
+/// d'une action remonte par <see cref="Message"/>.
 /// </summary>
-public partial class ProductionChainPage
+public partial class SupplyLinesPanel : VBoxContainer
 {
     private const string SupplyHint =
         "Une ligne relie deux bâtiments publics : chaque jour, une part de la production du fournisseur part d'abord au "
@@ -19,53 +19,62 @@ public partial class ProductionChainPage
         + "moins sa réserve ; le reste reste en vente. Il paie au prix du marché, sauf dans sa propre commune. Entre "
         + "communes, une part se perd en route (moins avec un chemin ou une route). Les lignes les plus anciennes passent d'abord.";
 
-    private VBoxContainer _supply = null!;
-    private string _supplyKey = "";
+    private readonly GameView _view = null!;
+    private readonly PlayerDesk _desk = null!;
+    private string _key = "";
 
-    /// <summary>La boîte des lignes, sous la recette ; remplie par <see cref="RefreshSupply"/>.</summary>
-    private Control BuildSupplyPanel()
+    /// <summary>Le résultat d'une action (ligne créée, retirée, part changée).</summary>
+    public event System.Action<string>? Message;
+
+    public SupplyLinesPanel(GameView view, PlayerDesk desk)
     {
-        _supply = new VBoxContainer();
-        _supply.AddThemeConstantOverride("separation", 4);
-        return _supply;
+        _view = view;
+        _desk = desk;
+        AddThemeConstantOverride("separation", 4);
     }
 
-    /// <summary>Refait la boîte des lignes quand le bâtiment choisi ou ses lignes changent (une fois par jour au plus).</summary>
-    private void RefreshSupply(ChainBuildingView? building)
-    {
-        var lines = building is null ? [] : _view.SupplyLines().Where(l => l.ClientId == building.Id || l.SupplierId == building.Id).ToList();
-        var candidates = building is { Ownership: Ownership.Public } ? _view.SupplierCandidates(building.Id) : [];
-        var key = building is null ? "" : $"{building.Id}|{_view.Today}|{string.Join(",", lines.Select(l => $"{l.Id}:{l.Share}"))}|{candidates.Count}";
-        if (key == _supplyKey)
-            return;
-        _supplyKey = key;
+    // Godot recrée les nœuds C# par ce constructeur sans paramètre (rechargement des scripts).
+    public SupplyLinesPanel() { }
 
-        foreach (var child in _supply.GetChildren())
+    /// <summary>Refait la boîte quand le bâtiment ou ses lignes changent (une fois par jour au plus).</summary>
+    public void Refresh(string? buildingId)
+    {
+        var flows = buildingId is null ? null : _view.BuildingFlows(buildingId);
+        var ownership = buildingId is null ? null : _view.OwnershipOf(buildingId);
+        var lines = flows is null ? [] : _view.SupplyLines().Where(l => l.ClientId == buildingId || l.SupplierId == buildingId).ToList();
+        var candidates = flows is not null && ownership == Ownership.Public ? _view.SupplierCandidates(buildingId!) : [];
+        var key = flows is null ? "" : $"{buildingId}|{flows.ProductId}|{_view.Today}|{string.Join(",", lines.Select(l => $"{l.Id}:{l.Share}"))}|{candidates.Count}";
+        if (key == _key)
+            return;
+        _key = key;
+
+        foreach (var child in GetChildren())
             child.QueueFree();
-        if (building is null)
+        Visible = flows is not null && (flows.ProductId is not null || lines.Count > 0);
+        if (!Visible)
             return;
 
         var title = new HintText { BbcodeEnabled = true, FitContent = true, SizeFlagsHorizontal = SizeFlags.ExpandFill };
         title.AddThemeColorOverride("default_color", UiTheme.Text);
         title.Text = SheetText.Section("Lignes d'approvisionnement", SupplyHint);
-        _supply.AddChild(title);
+        AddChild(title);
 
-        if (building.Ownership != Ownership.Public)
+        if (ownership != Ownership.Public)
         {
-            _supply.AddChild(UiTheme.Caption("Les lignes ne relient que des bâtiments publics : ce bâtiment achète ses matières sur le marché."));
+            AddChild(Note("Les lignes ne relient que des bâtiments publics : ce bâtiment achète ses matières sur le marché."));
             return;
         }
 
-        var incoming = lines.Where(l => l.ClientId == building.Id).ToList();
-        var outgoing = lines.Where(l => l.SupplierId == building.Id).ToList();
+        var incoming = lines.Where(l => l.ClientId == buildingId).ToList();
+        var outgoing = lines.Where(l => l.SupplierId == buildingId).ToList();
         if (incoming.Count == 0 && outgoing.Count == 0)
-            _supply.AddChild(UiTheme.Caption("Aucune ligne : il achète ses matières sur le marché de sa commune."));
+            AddChild(Note("Aucune ligne : il achète ses matières et vend sa production sur le marché de sa commune."));
         foreach (var line in incoming)
-            _supply.AddChild(LineRow(line, $"← {line.SupplierName} ({line.SupplierCommune})"));
+            AddChild(LineRow(line, $"← {line.SupplierName} ({line.SupplierCommune})"));
         foreach (var line in outgoing)
-            _supply.AddChild(LineRow(line, $"→ {line.ClientName} ({line.ClientCommune})"));
+            AddChild(LineRow(line, $"→ {line.ClientName} ({line.ClientCommune})"));
 
-        if (building.Inputs.Count == 0)
+        if (!flows!.HasMaterials)
             return;
         var add = new HBoxContainer();
         add.AddThemeConstantOverride("separation", 8);
@@ -73,21 +82,27 @@ public partial class ProductionChainPage
         foreach (var candidate in candidates)
             choice.AddIconItem(UiTheme.Square(UiTheme.OwnershipColor(Ownership.Public), 12, 12), $"{candidate.Name} ({candidate.CommuneName})"
                 + (candidate.Loss > 0 ? $" · perte {candidate.Loss:P0}" : ""));
+        if (candidates.Count == 0)
+            choice.AddItem(incoming.Count > 0 ? "Aucun autre bâtiment public ne produit ses matières" : "Aucun bâtiment public ne produit ses matières");
         var create = new Button { Text = "Ajouter ce fournisseur", FocusMode = FocusModeEnum.None, Disabled = candidates.Count == 0 };
         create.Pressed += () =>
         {
-            if (choice.Selected < 0 || choice.Selected >= candidates.Count)
-                return;
-            Report(_desk.AddSupplyLine(candidates[choice.Selected].Id, building.Id).Message);
+            if (choice.Selected >= 0 && choice.Selected < candidates.Count)
+                Report(_desk.AddSupplyLine(candidates[choice.Selected].Id, buildingId!).Message);
         };
-        if (candidates.Count == 0)
-            choice.AddItem(incoming.Count > 0 ? "Aucun autre bâtiment public ne produit ses matières" : "Aucun bâtiment public ne produit ses matières");
         add.AddChild(choice);
         add.AddChild(create);
-        _supply.AddChild(add);
+        AddChild(add);
     }
 
-    /// <summary>Une ligne : de qui ou vers qui, le produit, la part (− / +), ce qui est arrivé hier, la perte, Retirer.</summary>
+    private static Label Note(string text)
+    {
+        var label = UiTheme.Caption(text);
+        label.AutowrapMode = TextServer.AutowrapMode.WordSmart;
+        return label;
+    }
+
+    /// <summary>Une ligne : de qui ou vers qui, ce qui est arrivé hier, la perte, la part (− / +), Retirer.</summary>
     private Control LineRow(SupplyLineView line, string who)
     {
         var row = new HBoxContainer();
@@ -114,22 +129,10 @@ public partial class ProductionChainPage
         return row;
     }
 
-    /// <summary>
-    /// Le résultat d'une action, sous la fiche ; la boîte et le schéma se refont à l'image suivante. Différé : l'action
-    /// vient d'un bouton de la boîte qui va être refaite.
-    /// </summary>
+    /// <summary>Le résultat d'une action ; la boîte se refait à l'image suivante (elle contient le bouton pressé).</summary>
     private void Report(string message)
     {
-        _message.Text = message;
-        _message.Visible = true;
-        _supplyKey = "";
-        _chainKey = "";
-    }
-
-    /// <summary>Les lignes entre deux bâtiments de la commune montrée, pour les flèches du schéma.</summary>
-    private IReadOnlyList<(string From, string To)> LinksIn(IReadOnlyList<ChainBuildingView> chain)
-    {
-        var ids = chain.Select(b => b.Id).ToHashSet();
-        return _view.SupplyLines().Where(l => ids.Contains(l.SupplierId) && ids.Contains(l.ClientId)).Select(l => (l.SupplierId, l.ClientId)).ToList();
+        _key = "";
+        Message?.Invoke(message);
     }
 }

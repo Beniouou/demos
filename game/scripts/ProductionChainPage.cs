@@ -1,39 +1,29 @@
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
 using Demos.Application;
 using Godot;
 
 namespace Demos.Game;
 
 /// <summary>
-/// Production → Chaîne de production : le schéma de la chaîne d'une commune (sans ligne, un bâtiment s'approvisionne dans sa
-/// propre commune), un produit à suivre, et la fiche du bâtiment choisi d'un clic : sa recette, à changer ici comme dans Unités
-/// de production, sa production, ses matières (à plein régime, en stock) et la part de production que ses matières et
-/// son énergie ont permise, ses lignes d'approvisionnement (ProductionChainPage.Supply.cs) ; un bouton ouvre ses autres
-/// réglages dans Unités de production.
+/// Production → Chaîne de production, en lecture (décidé le 19 novembre 2026) : le schéma de la chaîne d'une commune,
+/// en bandes par besoin, et un produit à suivre. Un clic sur un bâtiment ouvre Production → Unités de production sur
+/// lui : c'est là qu'il se règle (recette, lignes d'approvisionnement…). Un bâtiment qui a une ligne
+/// d'approvisionnement avec une autre commune a un cadre extérieur bleu (même préfecture) ou violet (autre préfecture).
 /// </summary>
 public partial class ProductionChainPage : VBoxContainer, IMenuPage
 {
     private readonly GameView _view = null!;
-    private readonly PlayerDesk _desk = null!;
     private readonly System.Action<string> _manage = null!;
     private readonly CommuneChoice _commune = new(allowAll: false);
     private readonly OptionButton _follow = null!;
     private readonly List<string> _followIds = [];
     private readonly ChainDiagram _diagram = new();
-    private readonly RichTextLabel _sheet = null!;
-    private readonly HBoxContainer _recipeRow = null!;
-    private readonly OptionButton _recipe = null!;
-    private readonly Button _manageButton = null!;
-    private readonly Label _message = null!;
     private string _chainKey = "";
-    private string? _recipeShownFor = "\0";
 
-    public ProductionChainPage(GameView view, PlayerDesk desk, System.Action<string> manage)
+    public ProductionChainPage(GameView view, System.Action<string> manage)
     {
         _view = view;
-        _desk = desk;
         _manage = manage;
         AddThemeConstantOverride("separation", 8);
         AddChild(_commune.Row());
@@ -48,62 +38,21 @@ public partial class ProductionChainPage : VBoxContainer, IMenuPage
         var legend = UiTheme.OwnershipLegend();
         legend.AddChild(new TextureRect { Texture = UiTheme.Square(UiTheme.Accent, 12, 12), StretchMode = TextureRect.StretchModeEnum.KeepCentered });
         legend.AddChild(UiTheme.Caption("cadre orange : des matières ont manqué le dernier jour"));
-        legend.AddChild(new Control { CustomMinimumSize = new Vector2(8, 0) });
-        legend.AddChild(new TextureRect { Texture = UiTheme.Square(UiTheme.Text, 16, 3), StretchMode = TextureRect.StretchModeEnum.KeepCentered });
-        legend.AddChild(UiTheme.Caption("ligne d'approvisionnement"));
         AddChild(legend);
+        var lines = UiTheme.RelationLegend();
+        lines.AddChild(new TextureRect { Texture = UiTheme.Square(UiTheme.Text, 16, 3), StretchMode = TextureRect.StretchModeEnum.KeepCentered });
+        lines.AddChild(UiTheme.Caption("ligne d'approvisionnement"));
+        AddChild(lines);
 
         var scroll = new ScrollContainer { SizeFlagsVertical = SizeFlags.ExpandFill };
         scroll.AddChild(_diagram);
         AddChild(scroll);
-        _diagram.BuildingChosen += _ => ShowRecipe(force: true);
+        // Un clic sur un bâtiment : il se règle dans Unités de production.
+        _diagram.BuildingChosen += id => _manage(id);
 
-        AddChild(new HSeparator());
-        var details = new ScrollContainer { SizeFlagsVertical = SizeFlags.ExpandFill, HorizontalScrollMode = ScrollContainer.ScrollMode.Disabled };
-        var column = new VBoxContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill };
-        column.AddThemeConstantOverride("separation", 6);
-        details.AddChild(column);
-        AddChild(details);
-
-        _sheet = new HintText
-        {
-            BbcodeEnabled = true,
-            FitContent = true,
-            SizeFlagsHorizontal = SizeFlags.ExpandFill,
-            SelectionEnabled = false,
-        };
-        _sheet.AddThemeColorOverride("default_color", UiTheme.Text);
-        column.AddChild(_sheet);
-
-        _recipeRow = new HBoxContainer();
-        _recipeRow.AddThemeConstantOverride("separation", 8);
-        _recipeRow.AddChild(new Label { Text = "Recette", CustomMinimumSize = new Vector2(90, 0) });
-        _recipe = new OptionButton { SizeFlagsHorizontal = SizeFlags.ExpandFill, FocusMode = FocusModeEnum.None, FitToLongestItem = false };
-        _recipe.ItemSelected += index =>
-        {
-            if (_diagram.Selected is not { } id)
-                return;
-            _message.Text = _desk.SetRecipe(id, (int)index);
-            _message.Visible = true;
-            _chainKey = "";
-            _supplyKey = "";
-            ShowRecipe(force: true);
-        };
-        _recipeRow.AddChild(_recipe);
-        column.AddChild(_recipeRow);
-        column.AddChild(BuildSupplyPanel());
-
-        _manageButton = new Button { Text = "Gérer dans Unités de production", FocusMode = FocusModeEnum.None, SizeFlagsHorizontal = SizeFlags.ShrinkBegin };
-        _manageButton.Pressed += () =>
-        {
-            if (_diagram.Selected is { } id)
-                _manage(id);
-        };
-        column.AddChild(_manageButton);
-
-        _message = new Label { AutowrapMode = TextServer.AutowrapMode.WordSmart, Visible = false };
-        _message.AddThemeColorOverride("font_color", UiTheme.Accent);
-        column.AddChild(_message);
+        var hint = UiTheme.Caption("Cliquez sur un bâtiment pour le régler dans Unités de production (recette, lignes d'approvisionnement, postes…).");
+        hint.AutowrapMode = TextServer.AutowrapMode.WordSmart;
+        AddChild(hint);
     }
 
     // Godot recrée les nœuds C# par ce constructeur sans paramètre (rechargement des scripts).
@@ -112,33 +61,48 @@ public partial class ProductionChainPage : VBoxContainer, IMenuPage
     public void Refresh()
     {
         _commune.Fill(_view.Communes());
-        var chain = _commune.SelectedId is { } communeId ? _view.ProductionChain(communeId) : [];
-        var plain = _commune.SelectedId is { } id ? _view.BuildingsWithoutRecipe(id) : [];
+        var communeId = _commune.SelectedId;
+        var chain = communeId is null ? [] : _view.ProductionChain(communeId);
+        var plain = communeId is null ? [] : _view.BuildingsWithoutRecipe(communeId);
         FillFollow(chain);
-        // Si le bâtiment choisi n'est plus dans la commune montrée (autre commune choisie), plus de fiche.
-        if (_diagram.Selected is { } selected && chain.All(b => b.Id != selected) && plain.All(b => b.Id != selected))
-            _diagram.Selected = null;
 
         // Le schéma n'est refait que quand ses chiffres ou les choix changent (une fois par jour au plus).
-        var links = LinksIn(chain);
-        var key = $"{_commune.SelectedId}|{FollowedProduct}|{_view.Today}|{string.Join(",", chain.Select(b => b.Id + b.ProductId))}"
-            + $"|{string.Join(",", plain.Select(b => b.Id))}|{string.Join(",", links)}";
-        if (key != _chainKey)
-        {
-            _chainKey = key;
-            _diagram.SetChain(chain, plain, NeedName, FollowedProduct, links);
-        }
+        var (links, outside) = Lines(chain, communeId);
+        var key = $"{communeId}|{FollowedProduct}|{_view.Today}|{string.Join(",", chain.Select(b => b.Id + b.ProductId))}"
+            + $"|{string.Join(",", plain.Select(b => b.Id))}|{string.Join(",", links)}|{string.Join(",", outside)}";
+        if (key == _chainKey)
+            return;
+        _chainKey = key;
+        _diagram.SetChain(chain, plain, FlowText.NeedName, FollowedProduct, links, outside);
+    }
 
-        var building = chain.FirstOrDefault(b => b.Id == _diagram.Selected);
-        var plainBuilding = plain.FirstOrDefault(b => b.Id == _diagram.Selected);
-        var text = building is not null ? Describe(building)
-            : plainBuilding is not null ? DescribePlain(plainBuilding)
-            : SheetText.Muted("Cliquez sur un bâtiment du schéma pour voir sa fiche et changer sa recette.");
-        if (text != _sheet.Text)
-            _sheet.Text = text;
-        _manageButton.Visible = building is not null || plainBuilding is not null;
-        ShowRecipe(force: false);
-        RefreshSupply(building);
+    /// <summary>
+    /// Les lignes entre deux bâtiments de la commune (flèches blanches), et pour chaque bâtiment relié à une autre
+    /// commune, la plus lointaine de ces communes (son cadre extérieur).
+    /// </summary>
+    private (IReadOnlyList<(string From, string To)> Links, IReadOnlyDictionary<string, PlaceRelation> Outside) Lines(
+        IReadOnlyList<ChainBuildingView> chain, string? communeId)
+    {
+        var ids = chain.Select(b => b.Id).ToHashSet();
+        var links = new List<(string, string)>();
+        var outside = new Dictionary<string, PlaceRelation>();
+        foreach (var line in _view.SupplyLines())
+        {
+            if (ids.Contains(line.SupplierId) && ids.Contains(line.ClientId))
+            {
+                links.Add((line.SupplierId, line.ClientId));
+                continue;
+            }
+            foreach (var (here, there) in new[] { (line.SupplierId, line.ClientId), (line.ClientId, line.SupplierId) })
+            {
+                if (!ids.Contains(here) || communeId is null || _view.CommuneOf(there) is not { } otherCommune)
+                    continue;
+                var relation = _view.RelationBetween(communeId, otherCommune);
+                if (relation > outside.GetValueOrDefault(here))
+                    outside[here] = relation;
+            }
+        }
+        return (links, outside);
     }
 
     private string? FollowedProduct => _follow.Selected > 0 && _follow.Selected <= _followIds.Count ? _followIds[_follow.Selected - 1] : null;
@@ -161,75 +125,4 @@ public partial class ProductionChainPage : VBoxContainer, IMenuPage
             _follow.AddItem(name);
         _follow.Select(selected is null ? 0 : System.Math.Max(0, _followIds.IndexOf(selected) + 1));
     }
-
-    /// <summary>Le menu des recettes du bâtiment choisi ; caché s'il n'en a qu'une. Refait quand le choix change.</summary>
-    private void ShowRecipe(bool force)
-    {
-        var id = _diagram.Selected;
-        if (!force && id == _recipeShownFor)
-            return;
-        if (id != _recipeShownFor)
-            _message.Visible = false;
-        _recipeShownFor = id;
-
-        var sheet = id is null ? null : _desk.SheetOf(id);
-        _recipeRow.Visible = sheet is { Recipes.Count: > 1 };
-        if (sheet is null)
-            return;
-        _recipe.Clear();
-        foreach (var recipe in sheet.Recipes)
-            _recipe.AddItem(recipe);
-        _recipe.Select(sheet.RecipeIndex);
-    }
-
-    private static string Describe(ChainBuildingView building)
-    {
-        var text = new StringBuilder(SheetText.OwnerSquare(building.Ownership)).Append(' ').Append(SheetText.Heading(building.Name));
-        text.AppendLine($"Produit : {SheetText.Escape(building.ProductName)} · {building.ProducedToday:N0} le dernier jour · "
-            + $"{building.Workers:N0} travailleurs de production");
-        if (building.NeedId is { } need)
-            text.AppendLine(SheetText.Muted($"Couvre le besoin des habitants : {NeedName(need).ToLowerInvariant()}."));
-
-        text.Append(SheetText.Section("Matières", "Un bâtiment prend ses matières dans le stockage de sa commune : d'abord ce qu'il y possède, puis il achète le reste. Sans matière ou sans argent, il produit moins, en proportion."));
-        if (building.Inputs.Count == 0)
-            text.AppendLine(SheetText.Muted("Aucune : il produit à partir de rien d'autre que son travail."));
-        foreach (var input in building.Inputs)
-            text.AppendLine($"{SheetText.Escape(input.ProductName)} : {input.PerUnit:0.##} par unité · {input.NeededPerDay:N0} par jour à plein régime · "
-                + $"{input.Stock:N0} en stock dans la commune" + (input.Reserved > 0 ? $" · {input.Reserved:N0} en réserve (livrés par ses lignes)" : ""));
-        if (building.Inputs.Count > 0)
-            text.AppendLine(building.SupplyShare < 0.995
-                ? $"[color=#{UiTheme.Accent.ToHtml(false)}]Les matières n'ont permis que {building.SupplyShare:P0} de la production le dernier jour.[/color]"
-                : "Les matières ont suffi le dernier jour.");
-        text.AppendLine($"Énergie couverte : {building.EnergyShare:P0}");
-        return text.ToString();
-    }
-
-    /// <summary>La fiche d'un bâtiment sans recette : ce qu'il offre ; ses réglages sont dans Unités de production.</summary>
-    private static string DescribePlain(PlainBuildingView building)
-    {
-        var text = new StringBuilder(SheetText.OwnerSquare(building.Ownership)).Append(' ').Append(SheetText.Heading(building.Name));
-        if (building.HousingPlaces > 0)
-            text.AppendLine($"Places de logement : {building.HousingPlaces:N0}");
-        if (building.SchoolPlaces > 0)
-            text.AppendLine($"Places d'école : {building.SchoolPlaces:N0}");
-        if (building.StorageCapacity > 0)
-            text.AppendLine($"Capacité de stockage : {building.StorageCapacity:N0}");
-        text.AppendLine(SheetText.Muted("Pas de recette : ce bâtiment ne produit rien. Ses réglages sont dans Unités de production."));
-        return text.ToString();
-    }
-
-    /// <summary>Le nom d'un besoin des habitants, pour la dernière colonne du schéma.</summary>
-    private static string NeedName(string needId) => needId switch
-    {
-        "Food" => "Se nourrir",
-        "Clothing" => "S'habiller",
-        "Furniture" => "Se meubler",
-        "Housing" => "Se loger",
-        "Administration" => "Administration",
-        "Security" => "Sécurité",
-        "Energy" => "Énergie (bâtiments)",
-        "Leisure" => "Se distraire",
-        "Comfort" => "Confort",
-        _ => needId,
-    };
 }

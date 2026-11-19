@@ -181,9 +181,9 @@ désactivés : TVA sur la valeur ajoutée, épargne progressive des entreprises.
   doublon ; dans chaque bande, colonnes selon la profondeur, ce qui va droit au besoin dans la dernière ; produit
   écrit sur les flèches ; bande « Sans recette » en bas, lue par `GameView.BuildingsWithoutRecipe` ; cadre orange
   quand les matières ont manqué, « Suivre » un produit estompe le reste) ;
-  clic sur un bâtiment : fiche (matières à plein régime, stock, parts matières et énergie), recette changeable
-  (`PlayerDesk.SetRecipe`, comme dans Unités de production) et bouton vers Unités de production
-  (`MainMenu.ShowBuilding` → `BuildingsPage.Show`). Lecture : `GameView.ProductionChain(communeId)`. La part que les
+  en lecture seule depuis le 19 novembre 2026 : un clic sur un bâtiment ouvre Unités de production sur lui
+  (`MainMenu.ShowBuilding` → `BuildingsPage.Show`) ; cadre extérieur bleu ou violet pour un bâtiment relié par une ligne
+  à une autre commune. Lecture : `GameView.ProductionChain(communeId)`. La part que les
   matières ont permise est retenue par `WorkDay.Run(…, supplyShares)` dans `World.SupplyShares` (sans effet sur la
   partie).
 - Lignes d'approvisionnement (règle décidée le 15 novembre 2026, dans le document des règles, Économie →
@@ -193,8 +193,8 @@ désactivés : TVA sur la valeur ajoutée, épargne progressive des entreprises.
   perte de transport et trafic de routes entre communes ; lignes les plus anciennes d'abord). La réserve du client
   (`World.ReserveOf`) passe en premier dans `Supply.Acquire`. `Market.TryDeliver` cède les produits d'un vendeur.
   Actions : `Simulation.TryAddSupplyLine` / `RemoveSupplyLine` / `SetSupplyLineShare` (5 % à 100 %), par
-  `PlayerDesk.Supply.cs`. Lecture : `GameView.SupplyLines`, `SupplierCandidates`. Interface : fiche de la Chaîne de
-  production (`ProductionChainPage.Supply.cs`), flèches blanches épaisses sur le schéma. Sans ligne, rien ne change
+  `PlayerDesk.Supply.cs`. Lecture : `GameView.SupplyLines`, `SupplierCandidates`. Interface : Unités de production
+  (`SupplyLinesPanel`), flèches blanches épaisses sur le schéma. Sans ligne, rien ne change
   (référence 3 ans : 251 177).
 - Noms des bâtiments (décidé le 19 novembre 2026) : calculés, jamais écrits à la main. `World.DisplayNameOf` : type,
   puis le produit de la recette en cours entre parenthèses (« Atelier (Farine) ») ; sans produit, le type seul ;
@@ -202,5 +202,15 @@ désactivés : TVA sur la valeur ajoutée, épargne progressive des entreprises.
   organismes gardent leur nom. `GameView.NameOf` et le schéma Structure l'utilisent, `PlayerDesk` aussi ; plus de
   `name` pour les bâtiments dans `partie-depart.json`. Le carré du propriétaire : `SheetText.OwnerSquare` /
   `SheetText.Structure` dans les fiches (BBCode), icônes dans les arbres et menus, rien dans la barre de messages.
+- Flux d'un bâtiment (19 novembre 2026) : `GameView.BuildingFlows` — sources (ses lignes, puis les producteurs de ses
+  matières dans la commune, ou « aucun producteur ») et destinations (ses lignes, les bâtiments de la commune qui
+  utilisent son produit, les habitants pour un besoin, les autres communes par les échanges), chacune avec
+  `PlaceRelation` (même commune, autre commune de la même préfecture, autre préfecture : `GameView.RelationBetween`).
+  Textes partagés dans `FlowText.cs` (la quantité envoyée aux autres communes vient du relevé mensuel). Structure →
+  fiche d'un bâtiment : sections « D'où viennent ses matières » et « Où part sa production ». Unités de production :
+  petit schéma `FlowDiagram` (sources | bâtiment | destinations, cadre bleu ou violet hors de la commune, clic sur un
+  autre bâtiment pour le choisir), puis recette, lignes d'approvisionnement (`SupplyLinesPanel`), postes, chauffage,
+  vente, nationalisation. Couleurs : `UiTheme.RelationColor`, légende `UiTheme.RelationLegend`. Étape B à décider
+  (priorité d'achat, interdictions, réserve de vente, pas d'export) : propositions faites le 19 novembre 2026.
 - Pas branché, volontairement : `SetPrice` (prix fixés par le joueur : question ouverte des prix dynamiques).
   Prompt de la session d'intégration : `prompt-integration-interface.md`, à côté du dépôt.

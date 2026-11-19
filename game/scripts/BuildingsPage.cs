@@ -8,14 +8,20 @@ namespace Demos.Game;
 /// <summary>
 /// Production → Unités de production, en deux boîtes comme le menu Structure. À gauche, les réglages : en haut le choix
 /// du bâtiment en descendant la hiérarchie (entité politique → organisme → bâtiment), et en dessous les décisions du
-/// joueur sur ce bâtiment (postes ouverts d'un bâtiment public, recette, chauffage, vente au privé, nationalisation).
-/// À droite, les informations du bâtiment, en direct.
+/// joueur sur ce bâtiment (postes ouverts d'un bâtiment public, recette, lignes d'approvisionnement, chauffage, vente au
+/// privé, nationalisation).
+/// À droite, un petit schéma (d'où viennent ses matières, où part sa production ; cadre bleu ou violet hors de la commune ;
+/// un clic sur un autre bâtiment le choisit), puis les informations du bâtiment, en direct.
 /// </summary>
 public partial class BuildingsPage : HBoxContainer, IMenuPage
 {
     private readonly GameView _view = null!;
     private readonly PlayerDesk _desk = null!;
     private readonly StructurePicker _picker = null!;
+    private readonly ProductionHistory _history = null!;
+    private FlowDiagram _flows = null!;
+    private SupplyLinesPanel _supply = null!;
+    private string _flowsKey = "";
     // Le bâtiment dont les réglages sont remplis ; au départ, aucun (même pas « aucun bâtiment »).
     private string? _shownId = "\0";
     private Label _name = null!;
@@ -39,10 +45,11 @@ public partial class BuildingsPage : HBoxContainer, IMenuPage
     private Label _nationalizationNote = null!;
     private Label _noDecision = null!;
 
-    public BuildingsPage(GameView view, PlayerDesk desk)
+    public BuildingsPage(GameView view, PlayerDesk desk, ProductionHistory history)
     {
         _view = view;
         _desk = desk;
+        _history = history;
         AddThemeConstantOverride("separation", 12);
 
         // Boîte de gauche : le choix du bâtiment, de l'entité politique au bâtiment, puis les réglages.
@@ -59,6 +66,14 @@ public partial class BuildingsPage : HBoxContainer, IMenuPage
 
         BuildJobs(settings);
         BuildRecipe(settings);
+        _supply = new SupplyLinesPanel(view, desk);
+        _supply.Message += message =>
+        {
+            _message.Text = message;
+            _message.Visible = true;
+            _flowsKey = "";
+        };
+        settings.AddChild(_supply);
         BuildHeating(settings);
         BuildSale(settings);
         BuildNationalization(settings);
@@ -72,6 +87,11 @@ public partial class BuildingsPage : HBoxContainer, IMenuPage
         var information = Column(this);
         _name = UiTheme.Title("");
         information.AddChild(_name);
+        // Le petit schéma : d'où viennent ses matières, où part sa production ; un clic sur un autre bâtiment le choisit.
+        _flows = new FlowDiagram();
+        _flows.BuildingChosen += Show;
+        information.AddChild(_flows);
+        information.AddChild(UiTheme.RelationLegend());
         _info = new Label { AutowrapMode = TextServer.AutowrapMode.WordSmart };
         information.AddChild(_info);
     }
@@ -93,6 +113,16 @@ public partial class BuildingsPage : HBoxContainer, IMenuPage
         _picker.Refresh(_view.StructureTree());
         if (SelectedId() != _shownId)
             ShowSheet();
+
+        // Le petit schéma suit la partie une fois par jour ; les lignes d'approvisionnement se refont quand elles changent.
+        var selected = SelectedId();
+        _supply.Refresh(selected);
+        var flowsKey = $"{selected}|{_view.Today}";
+        if (flowsKey != _flowsKey)
+        {
+            _flowsKey = flowsKey;
+            _flows.SetFlows(_view, _history, selected is null ? null : _view.BuildingFlows(selected));
+        }
 
         if (SelectedId() is not { } id || _desk.SheetOf(id) is not { } sheet)
         {
@@ -123,6 +153,7 @@ public partial class BuildingsPage : HBoxContainer, IMenuPage
     private void ShowSheet()
     {
         _message.Visible = false;
+        _flowsKey = "";
         _shownId = SelectedId();
         var sheet = _shownId is { } id ? _desk.SheetOf(id) : null;
         _name.Text = sheet?.Name ?? "";
