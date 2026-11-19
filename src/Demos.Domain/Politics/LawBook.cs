@@ -17,6 +17,7 @@ public static class Bricks
     public const string ReservedHousing = "logements-reserves";
     public const string Production = "production";
     public const string Pollution = "pollution";
+    public const string SupplierChoice = "choix-fournisseurs";
 }
 
 /// <summary>
@@ -105,7 +106,8 @@ public sealed class LawBook(
 
     /// <summary>
     /// Ce que les lois imposent à un bâtiment : salaire minimum et niveau des salaires de chaque rang, production,
-    /// pollution, facilité de licencier, loyer maximum, paiement en nature, impôt des entreprises.
+    /// pollution, facilité de licencier, loyer maximum, paiement en nature, impôt des entreprises, et si un bâtiment public
+    /// peut refuser d'acheter aux entreprises privées ou aux SCOP.
     /// </summary>
     public AppliedLaws RulesFor(Structure building)
     {
@@ -131,7 +133,16 @@ public sealed class LawBook(
             Factor(Bricks.Layoffs),
             LegislatedValue(Bricks.MaximumRent, building.Id, Targeted),
             ValueFor(Bricks.PaymentInKind, building) >= 0.5,
-            Factor(Bricks.CompanyTax));
+            Factor(Bricks.CompanyTax),
+            MayRefuse(Ownership.Private),
+            MayRefuse(Ownership.Cooperative));
+
+        // La brique « Choix des fournisseurs publics » : son sujet est la sorte de vendeur refusée, pas le bâtiment.
+        // Sans loi, le refus est permis.
+        bool MayRefuse(Ownership seller) =>
+            (LegislatedValue(Bricks.SupplierChoice, building.Id,
+                subject => subject.Kind == SubjectKind.Everyone
+                    || subject.Kind == SubjectKind.Ownership && subject.Values.Contains(seller.ToString())) ?? 1) >= 0.5;
     }
 
     /// <summary>Vrai si les lois de la commune d'une classe réservent des logements à son rang : elle est logée d'abord.</summary>

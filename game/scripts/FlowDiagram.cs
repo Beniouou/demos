@@ -9,7 +9,8 @@ namespace Demos.Game;
 /// Le petit schéma d'un bâtiment dans Production → Unités de production, dessiné par Godot : à gauche d'où viennent
 /// ses matières, au milieu le bâtiment, à droite où part sa production ; une flèche porte le produit. Le cadre d'une
 /// boîte est bleu dans une autre commune, violet dans une autre préfecture ; une ligne d'approvisionnement est une
-/// flèche blanche épaisse. Les boîtes prennent toute la largeur disponible. Un clic sur un autre bâtiment le choisit.
+/// flèche blanche épaisse ; un fournisseur que ses réglages d'achat écartent est voilé et barré, sans flèche. Les boîtes
+/// prennent toute la largeur disponible. Un clic sur un autre bâtiment le choisit.
 /// </summary>
 public partial class FlowDiagram : Control
 {
@@ -21,7 +22,11 @@ public partial class FlowDiagram : Control
     private const float CenterShare = 0.8f;
 
     /// <summary>Une boîte : sa colonne (-1 gauche, 0 milieu, 1 droite), sa ligne, ce qu'elle écrit et dessine.</summary>
-    private sealed record Box(int Column, int Row, string Title, string Detail, Color? Strip, Color? Frame, string? StructureId, bool Line);
+    private sealed record Box(int Column, int Row, string Title, string Detail, Color? Strip, Color? Frame, string? StructureId, bool Line)
+    {
+        /// <summary>Un fournisseur que les réglages d'achat écartent : estompé et barré.</summary>
+        public bool Blocked { get; init; }
+    }
 
     private readonly List<Box> _boxes = [];
     private int _rows = 1;
@@ -51,7 +56,7 @@ public partial class FlowDiagram : Control
         Box BoxOf(FlowEndView end, int column, int row) => new(column, row, TypeOf(end.Name),
             $"{end.ProductName} · {FlowText.Detail(view, history, flows, end)}",
             end.Ownership is { } ownership ? UiTheme.OwnershipColor(ownership) : null,
-            UiTheme.RelationColor(end.Relation), end.StructureId, end.Kind == FlowKind.Line);
+            UiTheme.RelationColor(end.Relation), end.StructureId, end.Kind == FlowKind.Line) { Blocked = end.Blocked };
 
         for (var row = 0; row < flows.Sources.Count; row++)
             _boxes.Add(BoxOf(flows.Sources[row], -1, row));
@@ -124,8 +129,10 @@ public partial class FlowDiagram : Control
         foreach (var box in _boxes.Where(b => b.Column != 0))
         {
             var rect = RectOf(box);
-            if (box.Column < 0)
+            if (box.Column < 0 && !box.Blocked)
                 DrawArrow(new Vector2(rect.End.X, rect.GetCenter().Y), new Vector2(middle.Position.X, middle.GetCenter().Y), box.Line);
+            else if (box.Column < 0)
+                continue;
             else
                 DrawArrow(new Vector2(middle.End.X, middle.GetCenter().Y), new Vector2(rect.Position.X, rect.GetCenter().Y), box.Line);
         }
@@ -142,6 +149,12 @@ public partial class FlowDiagram : Control
             DrawRect(rect, frame, filled: false, width: 2);
         DrawString(font, rect.Position + new Vector2(12, 18), box.Title, HorizontalAlignment.Left, rect.Size.X - 18, size, UiTheme.Text);
         DrawString(font, rect.Position + new Vector2(12, 36), box.Detail, HorizontalAlignment.Left, rect.Size.X - 18, size - 2, UiTheme.Muted);
+        // Un fournisseur écarté par les réglages d'achat : voilé et barré.
+        if (box.Blocked)
+        {
+            DrawRect(rect, UiTheme.Background with { A = 0.55f });
+            DrawLine(rect.Position + new Vector2(6, rect.Size.Y - 6), rect.End - new Vector2(6, rect.Size.Y - 6), UiTheme.Danger, 2);
+        }
     }
 
     /// <summary>Une courbe douce avec une pointe ; plus épaisse et blanche pour une ligne d'approvisionnement.</summary>

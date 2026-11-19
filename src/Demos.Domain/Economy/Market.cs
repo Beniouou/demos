@@ -56,6 +56,66 @@ public sealed class Market(IEnumerable<ProductDefinition> products)
     /// <summary>Quantité d'un produit en vente chez les autres vendeurs.</summary>
     public double QuantityOfOthers(string productId, string sellerId) => QuantityOf(productId) - QuantityOf(productId, sellerId);
 
+    // Produit → vendeur → quantité gardée hors vente (la réserve des bâtiments publics, voir SupplySettings) : ni les
+    // acheteurs ni les échanges ne la prennent ; le vendeur lui-même et ses lignes d'approvisionnement, si.
+    private readonly Dictionary<string, Dictionary<string, double>> _held = [];
+
+    // Produit → vendeurs dont les échanges entre communes ne prennent rien.
+    private readonly Dictionary<string, HashSet<string>> _notExported = [];
+
+    /// <summary>Garde une quantité d'un vendeur hors vente (0 : plus rien de gardé).</summary>
+    public void SetHeld(string productId, string sellerId, double quantity)
+    {
+        if (quantity > 0)
+        {
+            if (!_held.TryGetValue(productId, out var held))
+                _held[productId] = held = [];
+            held[sellerId] = quantity;
+        }
+        else if (_held.TryGetValue(productId, out var held))
+        {
+            held.Remove(sellerId);
+            if (held.Count == 0)
+                _held.Remove(productId);
+        }
+    }
+
+    /// <summary>Ce qu'un vendeur garde hors vente de ce qu'il a, au plus tout ce qu'il a.</summary>
+    public double HeldOf(string productId, string sellerId) =>
+        _held.TryGetValue(productId, out var held) ? Math.Min(held.GetValueOrDefault(sellerId), QuantityOf(productId, sellerId)) : 0;
+
+    /// <summary>Les échanges entre communes ne prennent plus (ou de nouveau) ce produit chez ce vendeur.</summary>
+    public void SetNotExported(string productId, string sellerId, bool notExported)
+    {
+        if (notExported)
+        {
+            if (!_notExported.TryGetValue(productId, out var sellers))
+                _notExported[productId] = sellers = [];
+            sellers.Add(sellerId);
+        }
+        else if (_notExported.TryGetValue(productId, out var sellers))
+        {
+            sellers.Remove(sellerId);
+            if (sellers.Count == 0)
+                _notExported.Remove(productId);
+        }
+    }
+
+    private double ForSale(string productId, string sellerId) => QuantityOf(productId, sellerId) - HeldOf(productId, sellerId);
+
+    /// <summary>
+    /// Ce qui est à vendre d'un produit : chez tous les vendeurs sauf <paramref name="exceptSellerId"/>, parmi ceux que
+    /// <paramref name="allowed"/> retient, sans ce qu'ils gardent hors vente.
+    /// </summary>
+    public double QuantityForSale(string productId, string? exceptSellerId = null, Func<string, bool>? allowed = null)
+    {
+        if (!_held.ContainsKey(productId) && allowed is null)
+            return exceptSellerId is null ? QuantityOf(productId) : QuantityOfOthers(productId, exceptSellerId);
+        return _offers.TryGetValue(productId, out var offers)
+            ? offers.Keys.Where(s => s != exceptSellerId && (allowed?.Invoke(s) ?? true)).Sum(s => ForSale(productId, s))
+            : 0;
+    }
+
     /// <summary>Quantités d'un vendeur, par produit.</summary>
     public IReadOnlyDictionary<string, double> ContentsOf(string sellerId) =>
         _offers.Where(o => o.Value.GetValueOrDefault(sellerId) > 0).ToDictionary(o => o.Key, o => o.Value[sellerId]);
@@ -72,21 +132,23 @@ public sealed class Market(IEnumerable<ProductDefinition> products)
     }
 
     /// <summary>
-    /// Achète une quantité, prise chez les vendeurs au prorata de leur offre. Le paiement de l'acheteur
-    /// est à la charge de l'appelant. Renvoie false, sans rien acheter, si l'offre est insuffisante.
+    /// Achète une quantité, prise chez les vendeurs au prorata de ce qu'ils ont à vendre (sans ce qu'ils gardent hors
+    /// vente), parmi ceux que <paramref name="allowed"/> retient. Le paiement de l'acheteur est à la charge de
+    /// l'appelant. Renvoie false, sans rien acheter, si l'offre est insuffisante.
     /// </summary>
-    public bool TryBuy(string productId, double quantity, string? exceptSellerId = null)
+    public bool TryBuy(string productId, double quantity, string? exceptSellerId = null, Func<string, bool>? allowed = null)
     {
-        var available = exceptSellerId is null ? QuantityOf(productId) : QuantityOfOthers(productId, exceptSellerId);
+        var available = QuantityForSale(productId, exceptSellerId, allowed);
         if (quantity <= 0)
             return true;
         if (available < quantity)
             return false;
 
         var offers = _offers[productId];
-        foreach (var sellerId in offers.Keys.Where(s => s != exceptSellerId).ToList())
+        var simple = !_held.ContainsKey(productId) && allowed is null;
+        foreach (var sellerId in offers.Keys.Where(s => s != exceptSellerId && (allowed?.Invoke(s) ?? true)).ToList())
         {
-            var taken = quantity * offers[sellerId] / available;
+            var taken = quantity * (simple ? offers[sellerId] : ForSale(productId, sellerId)) / available;
             offers[sellerId] -= taken;
             _earnings[sellerId] = _earnings.GetValueOrDefault(sellerId) + CostOf(productId, taken);
         }
@@ -97,20 +159,23 @@ public sealed class Market(IEnumerable<ProductDefinition> products)
 
     /// <summary>
     /// Retire des produits du marché sans les payer, pris chez les vendeurs au prorata de leur offre (pour les
-    /// envoyer dans une autre commune). Renvoie la quantité retirée à chaque vendeur.
+    /// envoyer dans une autre commune), sans ce qu'ils gardent hors vente ni rien chez ceux qui refusent l'envoi.
+    /// Renvoie la quantité retirée à chaque vendeur.
     /// </summary>
     public Dictionary<string, double> Take(string productId, double quantity)
     {
         var taken = new Dictionary<string, double>();
-        var available = QuantityOf(productId);
+        var simple = !_held.ContainsKey(productId) && !_notExported.ContainsKey(productId);
+        var kept = _notExported.GetValueOrDefault(productId);
+        var available = simple ? QuantityOf(productId) : QuantityForSale(productId, allowed: s => kept?.Contains(s) != true);
         if (quantity <= 0 || available <= 0)
             return taken;
 
         var share = Math.Min(1, quantity / available);
         var offers = _offers[productId];
-        foreach (var sellerId in offers.Keys.ToList())
+        foreach (var sellerId in offers.Keys.Where(s => kept?.Contains(s) != true).ToList())
         {
-            taken[sellerId] = offers[sellerId] * share;
+            taken[sellerId] = (simple ? offers[sellerId] : ForSale(productId, sellerId)) * share;
             offers[sellerId] -= taken[sellerId];
         }
 

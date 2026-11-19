@@ -16,7 +16,8 @@ public sealed record SupplyLine(string Id, string SupplierId, string ClientId, d
 /// d'acheter (voir <see cref="Supply"/>). Le client paie au prix du marché, sauf dans sa propre commune (c'est déjà la
 /// production de l'État de la commune). Entre communes, la perte de transport s'applique et le trafic compte pour les
 /// routes. Le client ne reçoit que ce dont il a besoin à plein régime pour une journée, moins sa réserve ; le reste
-/// reste en vente. Les lignes les plus anciennes passent d'abord. Pas de délai.
+/// reste en vente. Les lignes passent dans l'ordre de la liste : la plus ancienne d'abord, sauf si le joueur change la
+/// priorité des lignes d'un client (World.MoveSupplyLine). Pas de délai.
 /// </summary>
 public static class SupplyLines
 {
@@ -50,7 +51,7 @@ public static class SupplyLines
         building.Production is { } recipe && recipe.Materials.Any(m => m.ProductId == productId);
 
     /// <summary>
-    /// Fait passer la production du jour par les lignes, de la plus ancienne à la plus récente. Renvoie ce que chaque
+    /// Fait passer la production du jour par les lignes, dans l'ordre de la liste (leur priorité). Renvoie ce que chaque
     /// ligne a livré (arrivé chez le client) dans la journée.
     /// </summary>
     public static Dictionary<string, double> RunDaily(

@@ -190,7 +190,8 @@ désactivés : TVA sur la valeur ajoutée, épargne progressive des entreprises.
   Approvisionnement) : `SupplyLines` (domaine) — `ProblemWith` (deux bâtiments publics, le client utilise le produit,
   pas de doublon), `RunDaily` après la journée de travail (part de la production du jour, 50 % par défaut, plafonnée
   au besoin du client pour un jour moins sa réserve ; payée au prix du marché entre communes, gratuite dans la même ;
-  perte de transport et trafic de routes entre communes ; lignes les plus anciennes d'abord). La réserve du client
+  perte de transport et trafic de routes entre communes ; lignes dans l'ordre de la liste, la plus ancienne d'abord sauf
+  priorité changée par `World.MoveSupplyLine`). La réserve du client
   (`World.ReserveOf`) passe en premier dans `Supply.Acquire`. `Market.TryDeliver` cède les produits d'un vendeur.
   Actions : `Simulation.TryAddSupplyLine` / `RemoveSupplyLine` / `SetSupplyLineShare` (5 % à 100 %), par
   `PlayerDesk.Supply.cs`. Lecture : `GameView.SupplyLines`, `SupplierCandidates`. Interface : Unités de production
@@ -210,7 +211,18 @@ désactivés : TVA sur la valeur ajoutée, épargne progressive des entreprises.
   fiche d'un bâtiment : sections « D'où viennent ses matières » et « Où part sa production ». Unités de production :
   petit schéma `FlowDiagram` (sources | bâtiment | destinations, cadre bleu ou violet hors de la commune, clic sur un
   autre bâtiment pour le choisir), puis recette, lignes d'approvisionnement (`SupplyLinesPanel`), postes, chauffage,
-  vente, nationalisation. Couleurs : `UiTheme.RelationColor`, légende `UiTheme.RelationLegend`. Étape B à décider
-  (priorité d'achat, interdictions, réserve de vente, pas d'export) : propositions faites le 19 novembre 2026.
+  vente, nationalisation. Couleurs : `UiTheme.RelationColor`, légende `UiTheme.RelationLegend`. Étape B
+  (réglages d'achat et de vente) : voir le point suivant.
+- Réglages d'achat et de vente des bâtiments publics (étape B, décidée le 19 novembre 2026, dans le document des
+  règles, Économie) : `SupplySettings` (domaine) — `OnlyFromLines`, `RefusePrivate`, `RefuseCooperative`,
+  `ReserveDays` (0 à 30), `NoExport` ; `PurchaseRulesFor` donne à `Supply.Acquire` (par `WorkDay`) les `PurchaseRules`
+  (marché permis, vendeurs permis) ; `ApplySales` met chaque jour au marché la réserve de l'État (`Market.SetHeld` :
+  ni achats ni échanges, mais l'État et ses lignes si) et le refus d'envoi (`Market.SetNotExported`), par commune et
+  produit. Acheteurs : `Market.QuantityForSale` / `TryBuy(…, allowed)` ; sans réglage, chemin identique à avant
+  (référence 3 ans : 251 177). Brique de loi `choix-fournisseurs` (« Choix des fournisseurs publics », Permission
+  autorisée par défaut, sujet = la sorte de vendeur) → `AppliedLaws.MayRefusePrivate` / `MayRefuseCooperative`.
+  Priorité des lignes : `World.MoveSupplyLine`. Actions : `Simulation.SetSupplySettings`, `MoveSupplyLine`, par
+  `PlayerDesk.Supply.cs`. Interface : `PurchaseSalePanel` et ↑ ↓ dans `SupplyLinesPanel` (Unités de production) ;
+  fournisseur écarté barré dans `FlowDiagram` (`FlowEndView.Blocked`). Lecture : `GameView.SupplySettingsOf`.
 - Pas branché, volontairement : `SetPrice` (prix fixés par le joueur : question ouverte des prix dynamiques).
   Prompt de la session d'intégration : `prompt-integration-interface.md`, à côté du dépôt.

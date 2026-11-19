@@ -56,7 +56,7 @@ public static class Construction
                 : 0;
             var bought = item.Quantity - fromReserve - fromState;
 
-            if (market.QuantityOfOthers(item.ProductId, stateSellerId) < bought)
+            if (market.QuantityForSale(item.ProductId, stateSellerId) < bought)
                 return false;
 
             money += market.CostOf(item.ProductId, bought);

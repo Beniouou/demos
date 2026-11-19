@@ -27,7 +27,8 @@ public static class WorkDay
         Func<Structure, double>? energyShareOf = null,
         Func<Structure, double>? publicEfficiencyOf = null,
         Dictionary<string, double>? supplyShares = null,
-        Func<string, Inventory?>? reserveOf = null)
+        Func<string, Inventory?>? reserveOf = null,
+        Func<Structure, PurchaseRules?>? purchaseRulesOf = null)
     {
         // Qui travaille où, rangé une fois par bâtiment, et les classes par identifiant : on ne parcourt pas toutes les
         // classes du pays pour chaque bâtiment.
@@ -79,7 +80,7 @@ public static class WorkDay
             if (workplace.Production is { } recipe)
             {
                 var supplied = Supply.Acquire(workplace, recipe, produced, market, communeId, treasury, communeFundOf?.Invoke(communeId), companyFundOf,
-                    classesById, reserveOf?.Invoke(workplace.Id));
+                    classesById, reserveOf?.Invoke(workplace.Id), purchaseRulesOf?.Invoke(workplace));
                 produced *= supplied;
                 // Retenu pour l'interface (la part que les matières ont permise) ; aucun effet sur la journée.
                 if (supplyShares is not null)

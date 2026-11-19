@@ -8,8 +8,8 @@ namespace Demos.Game;
 /// <summary>
 /// Production → Unités de production, en deux boîtes comme le menu Structure. À gauche, les réglages : en haut le choix
 /// du bâtiment en descendant la hiérarchie (entité politique → organisme → bâtiment), et en dessous les décisions du
-/// joueur sur ce bâtiment (postes ouverts d'un bâtiment public, recette, lignes d'approvisionnement, chauffage, vente au
-/// privé, nationalisation).
+/// joueur sur ce bâtiment (postes ouverts d'un bâtiment public, recette, lignes d'approvisionnement, achats et ventes
+/// d'un bâtiment public, chauffage, vente au privé, nationalisation).
 /// À droite, un petit schéma (d'où viennent ses matières, où part sa production ; cadre bleu ou violet hors de la commune ;
 /// un clic sur un autre bâtiment le choisit), puis les informations du bâtiment, en direct.
 /// </summary>
@@ -21,6 +21,7 @@ public partial class BuildingsPage : HBoxContainer, IMenuPage
     private readonly ProductionHistory _history = null!;
     private FlowDiagram _flows = null!;
     private SupplyLinesPanel _supply = null!;
+    private PurchaseSalePanel _purchase = null!;
     private string _flowsKey = "";
     // Le bâtiment dont les réglages sont remplis ; au départ, aucun (même pas « aucun bâtiment »).
     private string? _shownId = "\0";
@@ -74,6 +75,14 @@ public partial class BuildingsPage : HBoxContainer, IMenuPage
             _flowsKey = "";
         };
         settings.AddChild(_supply);
+        _purchase = new PurchaseSalePanel(view, desk);
+        _purchase.Message += message =>
+        {
+            _message.Text = message;
+            _message.Visible = true;
+            _flowsKey = "";
+        };
+        settings.AddChild(_purchase);
         BuildHeating(settings);
         BuildSale(settings);
         BuildNationalization(settings);
@@ -117,6 +126,7 @@ public partial class BuildingsPage : HBoxContainer, IMenuPage
         // Le petit schéma suit la partie une fois par jour ; les lignes d'approvisionnement se refont quand elles changent.
         var selected = SelectedId();
         _supply.Refresh(selected);
+        _purchase.Refresh(selected);
         var flowsKey = $"{selected}|{_view.Today}";
         if (flowsKey != _flowsKey)
         {

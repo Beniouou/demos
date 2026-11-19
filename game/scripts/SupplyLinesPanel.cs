@@ -7,7 +7,7 @@ namespace Demos.Game;
 
 /// <summary>
 /// Les lignes d'approvisionnement d'un bâtiment, dans Production → Unités de production : celles qui le livrent (avec
-/// la part envoyée, à changer par pas de 10 %, et un bouton pour la retirer), celles qu'il livre, et l'ajout d'un
+/// la part envoyée, à changer par pas de 10 %, leur priorité ↑ ↓, et un bouton pour la retirer), celles qu'il livre, et l'ajout d'un
 /// fournisseur parmi les bâtiments publics, de toutes les communes, qui produisent une de ses matières. Le résultat
 /// d'une action remonte par <see cref="Message"/>.
 /// </summary>
@@ -17,7 +17,7 @@ public partial class SupplyLinesPanel : VBoxContainer
         "Une ligne relie deux bâtiments publics : chaque jour, une part de la production du fournisseur part d'abord au "
         + "client, avant d'être mise en vente. Le client ne reçoit que ce qu'il lui faut pour une journée à plein régime, "
         + "moins sa réserve ; le reste reste en vente. Il paie au prix du marché, sauf dans sa propre commune. Entre "
-        + "communes, une part se perd en route (moins avec un chemin ou une route). Les lignes les plus anciennes passent d'abord.";
+        + "communes, une part se perd en route (moins avec un chemin ou une route). Les lignes d'un client passent dans l'ordre de leur priorité (↑ ↓).";
 
     private readonly GameView _view = null!;
     private readonly PlayerDesk _desk = null!;
@@ -69,8 +69,12 @@ public partial class SupplyLinesPanel : VBoxContainer
         var outgoing = lines.Where(l => l.SupplierId == buildingId).ToList();
         if (incoming.Count == 0 && outgoing.Count == 0)
             AddChild(Note("Aucune ligne : il achète ses matières et vend sa production sur le marché de sa commune."));
-        foreach (var line in incoming)
-            AddChild(LineRow(line, $"← {line.SupplierName} ({line.SupplierCommune})"));
+        // Les lignes qui le livrent, dans l'ordre de leur priorité ; ↑ ↓ le changent s'il en a plusieurs.
+        for (var index = 0; index < incoming.Count; index++)
+        {
+            var line = incoming[index];
+            AddChild(LineRow(line, $"← {line.SupplierName} ({line.SupplierCommune})", incoming.Count > 1 ? (index > 0, index < incoming.Count - 1) : null));
+        }
         foreach (var line in outgoing)
             AddChild(LineRow(line, $"→ {line.ClientName} ({line.ClientCommune})"));
 
@@ -103,10 +107,19 @@ public partial class SupplyLinesPanel : VBoxContainer
     }
 
     /// <summary>Une ligne : de qui ou vers qui, ce qui est arrivé hier, la perte, la part (− / +), Retirer.</summary>
-    private Control LineRow(SupplyLineView line, string who)
+    private Control LineRow(SupplyLineView line, string who, (bool Up, bool Down)? order = null)
     {
         var row = new HBoxContainer();
         row.AddThemeConstantOverride("separation", 6);
+        if (order is { } moves)
+        {
+            var up = new Button { Text = "↑", FocusMode = FocusModeEnum.None, TooltipText = "Priorité plus haute : cette ligne passe avant", Disabled = !moves.Up };
+            up.Pressed += () => Report(_desk.MoveSupplyLine(line.Id, earlier: true).Message);
+            row.AddChild(up);
+            var down = new Button { Text = "↓", FocusMode = FocusModeEnum.None, TooltipText = "Priorité plus basse : cette ligne passe après", Disabled = !moves.Down };
+            down.Pressed += () => Report(_desk.MoveSupplyLine(line.Id, earlier: false).Message);
+            row.AddChild(down);
+        }
         // Les lignes ne relient que des bâtiments d'État : le carré de l'État devant l'autre bâtiment.
         row.AddChild(new TextureRect { Texture = UiTheme.Square(UiTheme.OwnershipColor(Ownership.Public), 12, 12), StretchMode = TextureRect.StretchModeEnum.KeepCentered });
         var text = $"{who} · arrivé hier {line.DeliveredLastDay:N0}"

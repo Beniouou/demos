@@ -117,6 +117,29 @@ public sealed class Simulation(World world, GameClock clock)
 
     public bool RemoveSupplyLine(string lineId) => World.RemoveSupplyLine(lineId);
 
+    /// <summary>Fait passer une ligne avant (ou après) une autre ligne du même client : sa priorité d'achat.</summary>
+    public bool MoveSupplyLine(string lineId, bool earlier) => World.MoveSupplyLine(lineId, earlier);
+
+    /// <summary>
+    /// Change les réglages d'achat et de vente d'un bâtiment public (règle dans <see cref="SupplySettings"/>). Renvoie
+    /// le problème qui l'empêche, ou null : seuls les bâtiments publics en ont, et un refus de vendeur que les lois
+    /// interdisent ne peut pas être ajouté.
+    /// </summary>
+    public string? SetSupplySettings(string buildingId, SupplySettings settings)
+    {
+        if (!World.Structures.TryGetValue(buildingId, out var building) || building.Kind != StructureKind.Building)
+            return "bâtiment inconnu";
+        if (building.Ownership != Ownership.Public)
+            return "seuls les bâtiments publics ont ces réglages : le privé et les SCOP décident seuls";
+        var current = World.SupplySettingsOf(buildingId);
+        if (settings.RefusePrivate && !current.RefusePrivate && !building.Rules.MayRefusePrivate)
+            return "une loi interdit ici de refuser les entreprises privées (Choix des fournisseurs publics)";
+        if (settings.RefuseCooperative && !current.RefuseCooperative && !building.Rules.MayRefuseCooperative)
+            return "une loi interdit ici de refuser les SCOP (Choix des fournisseurs publics)";
+        World.SetSupplySettings(buildingId, settings with { ReserveDays = Math.Clamp(settings.ReserveDays, 0, SupplySettings.MaxReserveDays) });
+        return null;
+    }
+
     /// <summary>Change la part de la production du fournisseur que la ligne envoie (de 5 % à 100 %).</summary>
     public bool SetSupplyLineShare(string lineId, double share) => World.SetSupplyLineShare(lineId, Math.Clamp(share, 0.05, 1));
 
@@ -642,12 +665,17 @@ public sealed class Simulation(World world, GameClock clock)
         var supplyShares = new Dictionary<string, double>();
         World.Produced = WorkDay.Run(World.Structures, World.Workers, World.Classes, World.Treasury, World.MarketOf, World.CommuneFundOf, World.Wages,
             World.CompanyFundOf, World.EnergyEffectOf, World.PublicEfficiencyOf, supplyShares,
-            id => World.ReserveContentsOf(id).Count > 0 ? World.ReserveOf(id) : null);
+            id => World.ReserveContentsOf(id).Count > 0 ? World.ReserveOf(id) : null,
+            // Les réglages d'achat des bâtiments publics (n'acheter que par ses lignes, vendeurs refusés).
+            World.HasSupplySettings ? building => World.SupplySettingsOf(building.Id).PurchaseRulesFor(building, World.Structures) : null);
         World.SupplyShares = supplyShares;
         // Les lignes d'approvisionnement : une part de la production du jour part d'abord aux clients.
         if (World.SupplyLines.Count > 0)
             World.SupplyLineDeliveries = SupplyLines.RunDaily(World.SupplyLines, World.Structures, World.Produced, World.Workers,
                 World.MarketOf, World.ReserveOf, World.Treasury, World.CommuneFundOf, TransportLossBetween, World.RoadTraffic.Add);
+        // Les réglages de vente : réserve hors vente et refus d'envoi, sur la production du jour.
+        if (World.HasSupplySettings || World.AppliedSales.Count > 0)
+            World.AppliedSales = SupplySettings.ApplySales(World.Structures, World.SupplySettingsOf, World.Produced, World.MarketOf, World.AppliedSales);
         AddBuildingTraffic();
         CountProduction();
         World.EnergyShares = Energy.RunDaily(World.Structures, World.TierOf, Clock.Season, World.MarketOf, World.Treasury, World.CommuneFundOf,

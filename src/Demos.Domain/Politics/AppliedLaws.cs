@@ -14,6 +14,8 @@ namespace Demos.Domain.Politics;
 /// <param name="MaximumRent">Loyer maximum d'une place par jour, quand une loi en fixe un.</param>
 /// <param name="PaidInKind">Vrai si le travail peut être payé avec les produits du bâtiment.</param>
 /// <param name="CompanyTaxFactor">Impôt (TVA) de l'entreprise, par rapport au taux de base (0 = exonérée).</param>
+/// <param name="MayRefusePrivate">Vrai si le bâtiment (public) peut refuser d'acheter aux entreprises privées (brique « Choix des fournisseurs publics »).</param>
+/// <param name="MayRefuseCooperative">De même pour les SCOP.</param>
 public sealed record AppliedLaws(
     IReadOnlyDictionary<Rank, double>? MinimumWages = null,
     IReadOnlyDictionary<Rank, double>? WageFactors = null,
@@ -22,7 +24,9 @@ public sealed record AppliedLaws(
     double LayoffFactor = 1,
     double? MaximumRent = null,
     bool PaidInKind = false,
-    double CompanyTaxFactor = 1)
+    double CompanyTaxFactor = 1,
+    bool MayRefusePrivate = true,
+    bool MayRefuseCooperative = true)
 {
     public static readonly AppliedLaws None = new();
 

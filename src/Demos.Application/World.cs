@@ -376,8 +376,8 @@ public sealed class World
     /// </summary>
     public IReadOnlyDictionary<string, double> SupplyShares { get; set; } = new Dictionary<string, double>();
 
-    // Les lignes d'approvisionnement, de la plus ancienne à la plus récente (l'ordre compte : les plus anciennes
-    // passent d'abord), et la réserve de chaque bâtiment client.
+    // Les lignes d'approvisionnement, dans l'ordre où elles passent (la plus ancienne d'abord, sauf si le joueur change la
+    // priorité des lignes d'un client), et la réserve de chaque bâtiment client.
     private readonly List<SupplyLine> _supplyLines = [];
     private readonly Dictionary<string, Inventory> _reserves = [];
     private int _nextSupplyLine = 1;
@@ -395,6 +395,43 @@ public sealed class World
     }
 
     public bool RemoveSupplyLine(string lineId) => _supplyLines.RemoveAll(l => l.Id == lineId) > 0;
+
+    /// <summary>
+    /// Fait passer une ligne avant (ou après) la ligne précédente (ou suivante) du même client : l'ordre des lignes d'un
+    /// client est sa priorité d'achat. Faux si elle est déjà en tête (ou en queue).
+    /// </summary>
+    public bool MoveSupplyLine(string lineId, bool earlier)
+    {
+        var index = _supplyLines.FindIndex(l => l.Id == lineId);
+        if (index < 0)
+            return false;
+        var client = _supplyLines[index].ClientId;
+        var other = earlier
+            ? _supplyLines.FindLastIndex(index - 1 < 0 ? 0 : index - 1, index, l => l.ClientId == client)
+            : _supplyLines.FindIndex(index + 1, l => l.ClientId == client);
+        if (other < 0 || other == index)
+            return false;
+        (_supplyLines[index], _supplyLines[other]) = (_supplyLines[other], _supplyLines[index]);
+        return true;
+    }
+
+    // Les réglages d'achat et de vente des bâtiments publics (absent : aucun réglage), et les couples (commune, produit)
+    // dont la réserve ou le refus d'envoi ont été appliqués au marché le dernier jour.
+    private readonly Dictionary<string, SupplySettings> _supplySettings = [];
+
+    public IReadOnlySet<(string Commune, string Product)> AppliedSales { get; set; } = new HashSet<(string, string)>();
+
+    public SupplySettings SupplySettingsOf(string buildingId) => _supplySettings.GetValueOrDefault(buildingId, SupplySettings.None);
+
+    public bool HasSupplySettings => _supplySettings.Count > 0;
+
+    public void SetSupplySettings(string buildingId, SupplySettings settings)
+    {
+        if (settings.IsNone)
+            _supplySettings.Remove(buildingId);
+        else
+            _supplySettings[buildingId] = settings;
+    }
 
     public bool SetSupplyLineShare(string lineId, double share)
     {

@@ -27,9 +27,11 @@ public static class Supply
         Treasury? communeFund,
         Func<Structure, Treasury>? companyFundOf,
         IReadOnlyDictionary<string, SocialClass> classesById,
-        Inventory? reserved = null)
+        Inventory? reserved = null,
+        PurchaseRules? rules = null)
     {
         var materials = recipe.Materials;
+        rules ??= PurchaseRules.Free;
         if (materials.Count == 0 || plannedOutput <= 0)
             return 1;
 
@@ -40,12 +42,16 @@ public static class Supply
         // payée), puis ce qu'il possède dans le stockage.
         double Owned(string productId) => (reserved?.QuantityOf(productId) ?? 0) + market.QuantityOf(productId, payer.SellerId);
 
+        // Ce qu'il peut acheter : rien s'il n'achète que par ses lignes, sinon chez les vendeurs permis.
+        double OnSale(string productId) =>
+            rules.MarketAllowed ? market.QuantityForSale(productId, payer.SellerId, rules.SellerAllowed) : 0;
+
         // Part possible avec ce qui est en stock…
         var share = 1.0;
         foreach (var (productId, needed) in needs)
         {
             if (needed > 0)
-                share = Math.Min(share, (Owned(productId) + market.QuantityOfOthers(productId, payer.SellerId)) / needed);
+                share = Math.Min(share, (Owned(productId) + OnSale(productId)) / needed);
         }
 
         // … puis avec l'argent pour acheter ce que le bâtiment ne possède pas déjà.
@@ -81,9 +87,9 @@ public static class Supply
             taken -= fromReserve;
             var own = Math.Min(taken, market.QuantityOf(productId, payer.SellerId));
             market.TryWithdraw(productId, own, payer.SellerId);
-            var bought = Math.Min(taken - own, market.QuantityOfOthers(productId, payer.SellerId));
+            var bought = Math.Min(taken - own, OnSale(productId));
             if (bought > 0)
-                market.TryBuy(productId, bought, exceptSellerId: payer.SellerId);
+                market.TryBuy(productId, bought, exceptSellerId: payer.SellerId, allowed: rules.SellerAllowed);
         }
 
         return share;
@@ -121,4 +127,14 @@ public static class Supply
             () => Math.Max(0, owner?.Wealth ?? 0),
             amount => { if (owner is not null) owner.Wealth -= amount; });
     }
+}
+
+/// <summary>
+/// Ce qu'un bâtiment s'autorise à acheter au marché de sa commune (réglages des bâtiments publics, décidés le 19
+/// novembre 2026) : rien s'il n'achète que par ses lignes d'approvisionnement, sinon chez les vendeurs que
+/// <see cref="SellerAllowed"/> retient (null : tous).
+/// </summary>
+public sealed record PurchaseRules(bool MarketAllowed = true, Func<string, bool>? SellerAllowed = null)
+{
+    public static readonly PurchaseRules Free = new();
 }

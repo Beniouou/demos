@@ -41,7 +41,7 @@ public static class Trade
                 {
                     var market = marketOf(communeId);
                     var demand = classes.Sum(c => c.MembersLivingIn(communeId) * Consumption.NeedsOf(c.Rank).GetValueOrDefault(need));
-                    return market.QuantityOf(product.Id) - Math.Max(0, demand - substitutes.Sum(market.QuantityOf));
+                    return market.QuantityForSale(product.Id) - Math.Max(0, demand - substitutes.Sum(s => market.QuantityForSale(s)));
                 });
 
             var surplus = balance.Where(b => b.Value > 0).ToDictionary(b => b.Key, b => b.Value);

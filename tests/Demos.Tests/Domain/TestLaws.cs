@@ -32,10 +32,14 @@ internal static class TestLaws
         [SubjectKind.Everyone, SubjectKind.Rank], 0, -1, 1,
         [new([PR], [LI]), new([EG, PR], [SE, LI], new LawSubject(SubjectKind.Rank, "Executives"))]);
 
+    /// <summary>Choix des fournisseurs publics : permis par défaut ; PR quand on le permet, LI quand on l'interdit.</summary>
+    public static readonly BrickDefinition SupplierChoice = new(Bricks.SupplierChoice, "Choix des fournisseurs publics", "propriete",
+        BrickFamily.Permission, [SubjectKind.Everyone, SubjectKind.Ownership], 1, 0, 1, [new([PR], [LI])], Weight: 0.5);
+
     public static readonly LawCatalogue Catalogue = new(
         [new("travail", "Travail"), new("environnement", "Environnement"), new("propriete", "Propriété"), new("impots", "Impôts"),
          new("douanes", "Douanes", Regalian: true)],
-        [MinimumWage, PaymentInKind, ProductionBrick, PrivateCompanies, Tax],
+        [MinimumWage, PaymentInKind, ProductionBrick, PrivateCompanies, Tax, SupplierChoice],
         [new("salaire-minimum-ouvrier", "Salaire minimum ouvrier", "travail", "commune",
             [new("salaire-minimum", new LawSubject(SubjectKind.Rank, "Workers"), 2.5)])]);
 

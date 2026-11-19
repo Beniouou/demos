@@ -177,6 +177,7 @@ public sealed class GameView(Simulation simulation)
 
         var sources = new List<FlowEndView>();
         var materials = building.Production?.Materials ?? [];
+        var purchase = World.SupplySettingsOf(building.Id).PurchaseRulesFor(building, World.Structures);
         foreach (var material in materials)
         {
             var product = ProductName(material.ProductId);
@@ -186,8 +187,14 @@ public sealed class GameView(Simulation simulation)
                     $"ligne {line.Share:P0} · arrivé hier {line.DeliveredLastDay:N0}", RelationTo(line.SupplierId), FlowKind.Line));
             var producers = inCommune.Where(s => s.Production!.Value.ProductId == material.ProductId && fed.All(l => l.SupplierId != s.Id)).ToList();
             foreach (var producer in producers)
+            {
+                // Un producteur que les réglages d'achat écartent (n'acheter que par ses lignes, vendeur refusé) est barré.
+                var blocked = purchase.MarketAllowed is false
+                    || producer.Ownership != Ownership.Public && purchase.SellerAllowed?.Invoke(SellerIdOf(producer, communeId)) == false;
                 sources.Add(new FlowEndView(producer.Id, World.DisplayNameOf(producer), producer.Ownership, product,
-                    $"{World.Produced.GetValueOrDefault(producer.Id):N0} par jour, au marché de la commune", PlaceRelation.SameCommune, FlowKind.Market));
+                    blocked ? "refusé par ses réglages d'achat" : $"{World.Produced.GetValueOrDefault(producer.Id):N0} par jour, au marché de la commune",
+                    PlaceRelation.SameCommune, FlowKind.Market, blocked));
+            }
             if (fed.Count == 0 && producers.Count == 0)
                 sources.Add(new FlowEndView(null, "Aucun producteur ici", null, product,
                     "seulement ce qui arrive des autres communes par les échanges", PlaceRelation.SameCommune, FlowKind.Missing));
@@ -215,6 +222,20 @@ public sealed class GameView(Simulation simulation)
         return new BuildingFlowView(building.Id, communeId, building.Production?.ProductId, sources, destinations, materials.Count > 0);
     }
 
+    /// <summary>Le nom de vendeur d'un bâtiment au marché : l'État de sa commune, ou son entreprise.</summary>
+    private static string SellerIdOf(Structure building, string communeId) =>
+        building.Ownership == Ownership.Public ? Market.StateSellerId(communeId) : Market.CompanySellerId(building.Id);
+
+    /// <summary>
+    /// Les réglages d'achat et de vente d'un bâtiment (null si ce n'est pas un bâtiment public), et si les lois lui
+    /// permettent de refuser les entreprises privées et les SCOP.
+    /// </summary>
+    public SupplySettingsView? SupplySettingsOf(string buildingId) =>
+        World.Structures.TryGetValue(buildingId, out var building) && building.Kind == StructureKind.Building && building.Ownership == Ownership.Public
+            ? new SupplySettingsView(World.SupplySettingsOf(buildingId), building.Rules.MayRefusePrivate, building.Rules.MayRefuseCooperative,
+                building.Production is not null, World.SupplyLines.Count(l => l.ClientId == buildingId))
+            : null;
+
     /// <summary>
     /// Où se trouve une commune par rapport à une autre : la même, une autre de la même préfecture (ou toutes deux
     /// directement sous l'État), ou une autre préfecture.
@@ -228,7 +249,7 @@ public sealed class GameView(Simulation simulation)
         return parent == otherParent ? PlaceRelation.OtherCommune : PlaceRelation.OtherPrefecture;
     }
 
-    /// <summary>Les lignes d'approvisionnement, de la plus ancienne à la plus récente.</summary>
+    /// <summary>Les lignes d'approvisionnement, dans l'ordre de leur priorité (la plus ancienne d'abord, sauf réglage).</summary>
     public IReadOnlyList<SupplyLineView> SupplyLines() => World.SupplyLines.Select(line =>
         {
             var supplier = World.Structures.GetValueOrDefault(line.SupplierId);
@@ -725,7 +746,13 @@ public enum FlowKind
 /// son propriétaire, le produit, un détail (pour les habitants : l'identifiant du besoin), et où il se trouve.
 /// </summary>
 public sealed record FlowEndView(string? StructureId, string Name, Ownership? Ownership, string ProductName, string Detail,
-    PlaceRelation Relation, FlowKind Kind);
+    PlaceRelation Relation, FlowKind Kind, bool Blocked = false);
+
+/// <summary>
+/// Les réglages d'achat et de vente d'un bâtiment public, si les lois lui permettent de refuser les entreprises privées
+/// et les SCOP, s'il a une recette, et combien de lignes d'approvisionnement le livrent.
+/// </summary>
+public sealed record SupplySettingsView(SupplySettings Settings, bool MayRefusePrivate, bool MayRefuseCooperative, bool HasRecipe, int IncomingLines);
 
 /// <summary>D'où viennent les matières d'un bâtiment et où part sa production.</summary>
 public sealed record BuildingFlowView(string BuildingId, string CommuneId, string? ProductId, IReadOnlyList<FlowEndView> Sources,

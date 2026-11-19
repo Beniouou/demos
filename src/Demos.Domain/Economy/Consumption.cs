@@ -73,10 +73,10 @@ public static class Consumption
                     });
 
                 var totalWanted = wanted.Values.Sum();
-                var servedRate = totalWanted > 0 ? Math.Min(1, market.QuantityOf(product.Id) / totalWanted) : 0;
+                var servedRate = totalWanted > 0 ? Math.Min(1, market.QuantityForSale(product.Id) / totalWanted) : 0;
                 foreach (var (socialClass, quantity) in wanted)
                 {
-                    var bought = Math.Min(quantity * servedRate, market.QuantityOf(product.Id));
+                    var bought = Math.Min(quantity * servedRate, market.QuantityForSale(product.Id));
                     if (bought <= 0 || !market.TryBuy(product.Id, bought))
                         continue;
 
