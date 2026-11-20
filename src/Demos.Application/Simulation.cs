@@ -641,7 +641,8 @@ public sealed class Simulation(World world, GameClock clock)
 
     // Ordre du document de règles : emplois, production et salaires, énergie des bâtiments, échanges entre communes,
     // logement, école, consommation, ventes, bénéfices des entreprises versés aux propriétaires, impôts, légitimité,
-    // puis perte de ce qui déborde du stockage ou se périme, et enfin les chantiers. L'énergie prise après la production d'un jour règle la
+    // puis perte de ce qui déborde du stockage ou se périme (y compris dans les stocks gardés hors des bâtiments de
+    // stockage), et enfin les chantiers. L'énergie prise après la production d'un jour règle la
     // production du lendemain, et le logement et l'école du jour même.
     // Les décisions du joueur et les événements restent à écrire.
     private void RunDailyCalculations()
@@ -653,6 +654,17 @@ public sealed class Simulation(World world, GameClock clock)
         var laws = World.LawBook;
         World.ApplyLaws(laws);
 
+        // Les chargements partis hier vers une autre commune arrivent (décidé le 20 novembre 2026).
+        if (World.ShipmentsInTransit.Count > 0)
+        {
+            var arriving = World.ShipmentsInTransit.ToList();
+            World.ShipmentsInTransit.Clear();
+            Trade.Arrive(arriving, World.Products, World.MarketOf);
+        }
+
+        // Deux communes n'échangent que si l'une a un bâtiment logistique ; lu une fois pour la journée.
+        var hasLogistics = communeIds.ToDictionary(c => c, World.HasLogisticsBuilding);
+        bool CanTrade(string from, string to) => Trade.CanTrade(from, to, c => hasLogistics.GetValueOrDefault(c));
 
         World.Workers = Employment.Assign(World.Structures, World.Classes);
         World.PollutionByCommune = Pollution.PerResidentByCommune(
@@ -663,16 +675,31 @@ public sealed class Simulation(World world, GameClock clock)
         // La caisse de chaque entreprise au début de la journée : son bénéfice du jour décide de ce qu'elle verse.
         var fundsAtDayStart = World.Structures.Values.Where(Companies.HasCompanyFund).ToDictionary(b => b.Id, b => World.CompanyFundOf(b).Balance);
         var supplyShares = new Dictionary<string, double>();
+        // Les lignes d'approvisionnement : une part de la production du jour part d'abord aux clients. Dans une même
+        // commune, après chaque étape de la chaîne, pour servir le jour même ; vers une autre commune, après la journée
+        // de travail, pour servir le lendemain (décidé le 20 novembre 2026).
+        var (localLines, distantLines) = SplitSupplyLines();
+        var deliveries = new Dictionary<string, double>();
+        void Deliver(IReadOnlyList<SupplyLine> lines, IReadOnlyDictionary<string, double> produced)
+        {
+            if (lines.Count == 0)
+                return;
+            foreach (var (lineId, quantity) in SupplyLines.RunDaily(lines, World.Structures, produced, World.Workers,
+                         World.MarketOf, World.ReserveOf, World.Treasury, World.CommuneFundOf, TransportLossBetween, World.RoadTraffic.Add, CanTrade))
+                deliveries[lineId] = deliveries.GetValueOrDefault(lineId) + quantity;
+        }
+
         World.Produced = WorkDay.Run(World.Structures, World.Workers, World.Classes, World.Treasury, World.MarketOf, World.CommuneFundOf, World.Wages,
             World.CompanyFundOf, World.EnergyEffectOf, World.PublicEfficiencyOf, supplyShares,
-            id => World.ReserveContentsOf(id).Count > 0 ? World.ReserveOf(id) : null,
+            // La réserve d'un bâtiment, s'il en a une, ou s'il peut en recevoir une dans la journée par une ligne de sa commune.
+            id => World.ReserveContentsOf(id).Count > 0 || localLines.Any(l => l.ClientId == id) ? World.ReserveOf(id) : null,
             // Les réglages d'achat des bâtiments publics (n'acheter que par ses lignes, vendeurs refusés).
-            World.HasSupplySettings ? building => World.SupplySettingsOf(building.Id).PurchaseRulesFor(building, World.Structures) : null);
+            World.HasSupplySettings ? building => World.SupplySettingsOf(building.Id).PurchaseRulesFor(building, World.Structures) : null,
+            stageOutput => Deliver(localLines, stageOutput));
         World.SupplyShares = supplyShares;
-        // Les lignes d'approvisionnement : une part de la production du jour part d'abord aux clients.
+        Deliver(distantLines, World.Produced);
         if (World.SupplyLines.Count > 0)
-            World.SupplyLineDeliveries = SupplyLines.RunDaily(World.SupplyLines, World.Structures, World.Produced, World.Workers,
-                World.MarketOf, World.ReserveOf, World.Treasury, World.CommuneFundOf, TransportLossBetween, World.RoadTraffic.Add);
+            World.SupplyLineDeliveries = deliveries;
         // Les réglages de vente : réserve hors vente et refus d'envoi, sur la production du jour.
         if (World.HasSupplySettings || World.AppliedSales.Count > 0)
             World.AppliedSales = SupplySettings.ApplySales(World.Structures, World.SupplySettingsOf, World.Produced, World.MarketOf, World.AppliedSales);
@@ -680,6 +707,23 @@ public sealed class Simulation(World world, GameClock clock)
         CountProduction();
         World.EnergyShares = Energy.RunDaily(World.Structures, World.TierOf, Clock.Season, World.MarketOf, World.Treasury, World.CommuneFundOf,
             World.CompanyFundOf, World.ClassesById, World.FuelStockOf, World.HeatsAllYear);
+        Housing.RunDaily(World.Structures, World.Classes, World.Treasury, World.CompanyFundOf, World.EnergyEffectOf, laws.HasHousingPriority);
+        Education.RunDaily(World.Structures, World.Classes, World.Treasury, World.CompanyFundOf, World.EnergyEffectOf);
+
+        foreach (var communeId in communeIds)
+            Consumption.RunDaily(World.Classes.Where(c => c.CommuneId == communeId).ToList(), World.Products, World.MarketOf(communeId));
+
+        // Les échanges entre communes, le soir, sur ce qui reste (décidé le 20 novembre 2026) : tous les produits qui se
+        // stockent, au-delà de ce qu'il faudra demain aux habitants et aux bâtiments de la commune. Ils arrivent le
+        // lendemain matin : partis avant les repas, ils compteraient deux fois (le jour même et pour le lendemain).
+        var buildingDemand = Trade.BuildingDemand(World.Structures, World.Workers, World.TierOf, Clock.Season, World.HeatsAllYear);
+        var producedToday = new Dictionary<(string, string), double>();
+        foreach (var (buildingId, quantity) in World.Produced)
+        {
+            if (quantity > 0 && World.Structures.TryGetValue(buildingId, out var building) && building.Production is { } production
+                && World.CommuneOf(building) is { } communeId)
+                producedToday[(communeId, production.ProductId)] = producedToday.GetValueOrDefault((communeId, production.ProductId)) + quantity;
+        }
         Trade.RunDaily(
             communeIds, World.Classes, World.Products, World.MarketOf,
             (communeId, productId) => World.StorageOf(communeId).FreeFor(productId),
@@ -687,12 +731,15 @@ public sealed class Simulation(World world, GameClock clock)
             World.CommunePositions.Count > 0
                 ? (from, to) => GeographicEconomics.TransportLoss(from, to, World.CommunePositions) * World.Roads.LossFactor(from, to)
                 : null,
-            World.RoadTraffic.Add);
-        Housing.RunDaily(World.Structures, World.Classes, World.Treasury, World.CompanyFundOf, World.EnergyEffectOf, laws.HasHousingPriority);
-        Education.RunDaily(World.Structures, World.Classes, World.Treasury, World.CompanyFundOf, World.EnergyEffectOf);
-
-        foreach (var communeId in communeIds)
-            Consumption.RunDaily(World.Classes.Where(c => c.CommuneId == communeId).ToList(), World.Products, World.MarketOf(communeId));
+            World.RoadTraffic.Add,
+            (communeId, productId) => buildingDemand.TryGetValue(communeId, out var byProduct) ? byProduct.GetValueOrDefault(productId) : 0,
+            CanTrade,
+            shipment =>
+            {
+                if (shipment.Quantity > 0)
+                    World.ShipmentsInTransit.Add(shipment);
+            },
+            (communeId, productId) => producedToday.TryGetValue((communeId, productId), out var quantity) ? quantity : 0);
 
         PaySellers();
         Companies.PayDividends(World.Structures, World.ClassesById, World.CompanyFundOf, World.PriceOf, b => fundsAtDayStart.GetValueOrDefault(b.Id));
@@ -700,6 +747,7 @@ public sealed class Simulation(World world, GameClock clock)
             World.StateCollectionIn, World.CommuneCollectionIn);
         LawEffects.ApplyDaily(World.Classes, laws, World.Legitimacy);
         Storage.ApplyDaily(communeIds, World.Structures, World.Products, World.MarketOf);
+        SpoilOutsideStorage();
 
         // Les chantiers finis en fin de journée : leurs bâtiments travaillent dès le lendemain.
         var completed = World.AdvanceConstructionSites();
@@ -758,6 +806,43 @@ public sealed class Simulation(World world, GameClock clock)
                 || !World.Structures.TryGetValue(buildingId, out var building) || World.CommuneOf(building) is not { } communeId)
                 continue;
             World.RoadTraffic.Add(buildingId, communeId, quantity);
+        }
+    }
+
+    /// <summary>
+    /// Les lignes d'approvisionnement entre deux bâtiments d'une même commune, et les autres (entre deux communes, ou
+    /// dont un bâtiment n'existe plus), chacune dans l'ordre de la liste.
+    /// </summary>
+    private (List<SupplyLine> Local, List<SupplyLine> Distant) SplitSupplyLines()
+    {
+        string? CommuneOfBuilding(string id) => World.Structures.TryGetValue(id, out var building) ? World.CommuneOf(building) : null;
+        var local = new List<SupplyLine>();
+        var distant = new List<SupplyLine>();
+        foreach (var line in World.SupplyLines)
+        {
+            var origin = CommuneOfBuilding(line.SupplierId);
+            if (origin is not null && origin == CommuneOfBuilding(line.ClientId))
+                local.Add(line);
+            else
+                distant.Add(line);
+        }
+
+        return (local, distant);
+    }
+
+    /// <summary>
+    /// Fin de journée (décidé le 20 novembre 2026) : les stocks gardés hors des bâtiments de stockage se périment comme
+    /// dans un stockage général ; ce qui s'y perd compte comme perdu au stockage dans leur commune.
+    /// </summary>
+    private void SpoilOutsideStorage()
+    {
+        foreach (var (communeId, stock) in World.StocksOutsideStorage())
+        {
+            var lost = Storage.SpoilOutsideStorage(stock, World.Products);
+            if (communeId is null || lost.Count == 0 || !World.Markets.TryGetValue(communeId, out var market))
+                continue;
+            foreach (var (productId, quantity) in lost)
+                market.CountLost(productId, quantity);
         }
     }
 

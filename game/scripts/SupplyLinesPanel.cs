@@ -17,7 +17,11 @@ public partial class SupplyLinesPanel : VBoxContainer
         "Une ligne relie deux bâtiments publics : chaque jour, une part de la production du fournisseur part d'abord au "
         + "client, avant d'être mise en vente. Le client ne reçoit que ce qu'il lui faut pour une journée à plein régime, "
         + "moins sa réserve ; le reste reste en vente. Il paie au prix du marché, sauf dans sa propre commune. Entre "
-        + "communes, une part se perd en route (moins avec un chemin ou une route). Les lignes d'un client passent dans l'ordre de leur priorité (↑ ↓).";
+        + "communes, une part se perd en route (moins avec un chemin ou une route), et il faut un bâtiment logistique (entrepôt, "
+        + "grenier, silo ou dépôt logistique) dans l'une des deux. Les lignes d'un client passent dans l'ordre de leur priorité (↑ ↓).";
+
+    private const string LogisticsWarning =
+        "il faut un bâtiment logistique (entrepôt, grenier, silo, dépôt) dans l'une des deux communes.";
 
     private readonly GameView _view = null!;
     private readonly PlayerDesk _desk = null!;
@@ -69,6 +73,14 @@ public partial class SupplyLinesPanel : VBoxContainer
         var outgoing = lines.Where(l => l.SupplierId == buildingId).ToList();
         if (incoming.Count == 0 && outgoing.Count == 0)
             AddChild(Note("Aucune ligne : il achète ses matières et vend sa production sur le marché de sa commune."));
+        // Les lignes entre deux communes sans bâtiment logistique ne livrent pas (décidé le 20 novembre 2026).
+        var blocked = incoming.Concat(outgoing).Count(l => l.MissingLogistics);
+        if (blocked > 0)
+        {
+            var warning = Note(blocked == 1 ? $"⚠ 1 ligne ne livre pas : {LogisticsWarning}" : $"⚠ {blocked} lignes ne livrent pas : {LogisticsWarning}");
+            warning.AddThemeColorOverride("font_color", UiTheme.Accent);
+            AddChild(warning);
+        }
         // Les lignes qui le livrent, dans l'ordre de leur priorité ; ↑ ↓ le changent s'il en a plusieurs.
         for (var index = 0; index < incoming.Count; index++)
         {
@@ -85,7 +97,8 @@ public partial class SupplyLinesPanel : VBoxContainer
         var choice = new OptionButton { SizeFlagsHorizontal = SizeFlags.ExpandFill, FocusMode = FocusModeEnum.None, FitToLongestItem = false, ClipText = true };
         foreach (var candidate in candidates)
             choice.AddIconItem(UiTheme.Square(UiTheme.OwnershipColor(Ownership.Public), 12, 12), $"{candidate.Name} ({candidate.CommuneName})"
-                + (candidate.Loss > 0 ? $" · perte {candidate.Loss:P0}" : ""));
+                + (candidate.Loss > 0 ? $" · perte {candidate.Loss:P0}" : "")
+                + (candidate.MissingLogistics ? " · sans bâtiment logistique" : ""));
         if (candidates.Count == 0)
             choice.AddItem(incoming.Count > 0 ? "Aucun autre bâtiment public ne produit ses matières" : "Aucun bâtiment public ne produit ses matières");
         var create = new Button { Text = "Ajouter ce fournisseur", FocusMode = FocusModeEnum.None, Disabled = candidates.Count == 0 };
@@ -122,10 +135,19 @@ public partial class SupplyLinesPanel : VBoxContainer
         }
         // Les lignes ne relient que des bâtiments d'État : le carré de l'État devant l'autre bâtiment.
         row.AddChild(new TextureRect { Texture = UiTheme.Square(UiTheme.OwnershipColor(Ownership.Public), 12, 12), StretchMode = TextureRect.StretchModeEnum.KeepCentered });
-        var text = $"{who} · arrivé hier {line.DeliveredLastDay:N0}"
-            + (line.Loss > 0 ? $" · perte {line.Loss:P0}" : "")
-            + (line.IsActive ? "" : " · ne livre plus (recette changée)");
-        row.AddChild(new Label { Text = text, SizeFlagsHorizontal = SizeFlags.ExpandFill, ClipText = true, TooltipText = text, MouseFilter = MouseFilterEnum.Pass });
+        var text = line.MissingLogistics
+            ? $"{who} · ne livre pas : aucun bâtiment logistique"
+            : $"{who} · arrivé hier {line.DeliveredLastDay:N0}"
+                + (line.Loss > 0 ? $" · perte {line.Loss:P0}" : "")
+                + (line.IsActive ? "" : " · ne livre plus (recette changée)");
+        var tooltip = line.MissingLogistics
+            ? $"{text}\nDeux communes n'échangent que si l'une a un entrepôt, un grenier, un silo ou un dépôt logistique. "
+                + $"Ni {line.SupplierCommune} ni {line.ClientCommune} n'en a : la ligne livrera dès que l'une en aura un."
+            : text;
+        var label = new Label { Text = text, SizeFlagsHorizontal = SizeFlags.ExpandFill, ClipText = true, TooltipText = tooltip, MouseFilter = MouseFilterEnum.Pass };
+        if (line.MissingLogistics)
+            label.AddThemeColorOverride("font_color", UiTheme.Accent);
+        row.AddChild(label);
 
         var less = new Button { Text = "−", FocusMode = FocusModeEnum.None, TooltipText = "Envoyer 10 % de sa production en moins", Disabled = line.Share <= 0.05 };
         less.Pressed += () => Report(_desk.SetSupplyLineShare(line.Id, System.Math.Round(line.Share - 0.1, 2)).Message);

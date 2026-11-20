@@ -80,7 +80,8 @@ public sealed class GameView(Simulation simulation)
 
     /// <summary>
     /// Les totaux de chaque produit dans chaque commune depuis le début de la partie : produit, utilisé (achats des
-    /// habitants, matières et énergie des bâtiments, chantiers), envoyé vers une autre commune, perdu ; et le stock et le
+    /// habitants, matières et énergie des bâtiments, chantiers), envoyé vers une autre commune, perdu au stockage, perdu en
+    /// route ; et le stock et le
     /// prix du moment. Seuls les produits qui ont servi ou qui sont en stock y sont. Ne crée aucun marché.
     /// </summary>
     public IReadOnlyList<ProductFlowView> ProductFlows()
@@ -95,9 +96,9 @@ public sealed class GameView(Simulation simulation)
                 var tally = market?.TallyOf(product.Id) ?? default;
                 var stock = market?.QuantityOf(product.Id) ?? 0;
                 var made = produced.GetValueOrDefault(product.Id);
-                if (made <= 0 && stock <= 0 && tally.Used <= 0 && tally.Sent <= 0 && tally.Lost <= 0)
+                if (made <= 0 && stock <= 0 && tally.Used <= 0 && tally.Sent <= 0 && tally.Lost <= 0 && tally.LostInTransit <= 0)
                     continue;
-                flows.Add(new ProductFlowView(commune.Id, product.Id, product.Name, made, tally.Used, tally.Sent, tally.Lost, stock,
+                flows.Add(new ProductFlowView(commune.Id, product.Id, product.Name, made, tally.Used, tally.Sent, tally.Lost, tally.LostInTransit, stock,
                     market?.PriceOf(product.Id) ?? product.BasePrice));
             }
         }
@@ -269,7 +270,8 @@ public sealed class GameView(Simulation simulation)
                 line.Share,
                 World.SupplyLineDeliveries.GetValueOrDefault(line.Id),
                 from is null || to is null || from == to ? 0 : simulation.TransportLossBetween(from, to),
-                client is not null && productId is not null && Demos.Domain.Economy.SupplyLines.Uses(client, productId));
+                client is not null && productId is not null && Demos.Domain.Economy.SupplyLines.Uses(client, productId),
+                from is not null && to is not null && !CanTrade(from, to));
         }).ToList();
 
     /// <summary>
@@ -288,11 +290,19 @@ public sealed class GameView(Simulation simulation)
                 var productId = s.Production!.Value.ProductId;
                 return new SupplierCandidateView(s.Id, World.DisplayNameOf(s), from is null ? "" : NameOf(from),
                     World.Products.FirstOrDefault(p => p.Id == productId)?.Name ?? productId,
-                    from is null || from == to ? 0 : simulation.TransportLossBetween(from, to));
+                    from is null || from == to ? 0 : simulation.TransportLossBetween(from, to),
+                    from is not null && !CanTrade(from, to));
             })
             .OrderBy(c => c.Loss).ThenBy(c => c.Name)
             .ToList();
     }
+
+    /// <summary>
+    /// Si deux communes peuvent échanger : l'une des deux a un bâtiment logistique (entrepôt, grenier, silo, dépôt
+    /// logistique), ou c'est la même commune (décidé le 20 novembre 2026).
+    /// </summary>
+    public bool CanTrade(string fromCommuneId, string toCommuneId) =>
+        Demos.Domain.Economy.Trade.CanTrade(fromCommuneId, toCommuneId, World.HasLogisticsBuilding);
 
     /// <summary>Distance maximale, en km, entre un bâtiment d'extraction et sa commune.</summary>
     public double ExtractionMaxDistance => Balance.Current.ExtractionMaxDistance;
@@ -770,7 +780,8 @@ public sealed record ChainInputView(string ProductId, string ProductName, double
 /// <summary>
 /// Une ligne d'approvisionnement vue par le joueur : le fournisseur et le client (avec leurs communes), le produit, la
 /// part de la production envoyée, ce qui est arrivé le dernier jour, la perte de transport (0 dans la même commune) et
-/// si elle livre (la recette du client utilise encore le produit).
+/// si elle livre (la recette du client utilise encore le produit ; <see cref="MissingLogistics"/> : entre deux communes dont
+/// aucune n'a de bâtiment logistique, elle ne livre pas).
 /// </summary>
 public sealed record SupplyLineView(
     string Id,
@@ -784,14 +795,19 @@ public sealed record SupplyLineView(
     double Share,
     double DeliveredLastDay,
     double Loss,
-    bool IsActive);
+    bool IsActive,
+    bool MissingLogistics = false);
 
-/// <summary>Un fournisseur possible pour un client : un bâtiment public qui produit une de ses matières, et la perte en route.</summary>
-public sealed record SupplierCandidateView(string Id, string Name, string CommuneName, string ProductName, double Loss);
+/// <summary>
+/// Un fournisseur possible pour un client : un bâtiment public qui produit une de ses matières, et la perte en route ;
+/// <see cref="MissingLogistics"/> si aucune des deux communes n'a de bâtiment logistique (la ligne ne livrerait pas encore).
+/// </summary>
+public sealed record SupplierCandidateView(string Id, string Name, string CommuneName, string ProductName, double Loss, bool MissingLogistics = false);
 
 /// <summary>
 /// Un produit dans une commune, en totaux depuis le début de la partie : produit, utilisé, envoyé vers une autre commune,
-/// perdu ; et son stock et son prix du moment.
+/// perdu au stockage (<see cref="Lost"/>), perdu en route depuis cette commune (<see cref="LostInTransit"/>, une part de
+/// l'envoyé) ; et son stock et son prix du moment.
 /// </summary>
 public sealed record ProductFlowView(
     string CommuneId,
@@ -801,5 +817,6 @@ public sealed record ProductFlowView(
     double Used,
     double Sent,
     double Lost,
+    double LostInTransit,
     double Stock,
     double Price);

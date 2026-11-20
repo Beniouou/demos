@@ -22,6 +22,21 @@ public class GameViewTests
     }
 
     [Fact]
+    public void Deux_communes_n_echangent_que_si_l_une_a_un_batiment_logistique()
+    {
+        var simulation = PrototypeScenario.Create(GameData.Content());
+        simulation.World.AddStructure(new Structure("vide-1", "Vide 1", StructureKind.PoliticalEntity, PrototypeScenario.StateId));
+        simulation.World.AddStructure(new Structure("vide-2", "Vide 2", StructureKind.PoliticalEntity, PrototypeScenario.StateId));
+        var view = new GameView(simulation);
+
+        // La première commune a un entrepôt et un grenier ; les deux communes vides n'ont rien.
+        Assert.True(simulation.World.HasLogisticsBuilding(PrototypeScenario.FirstCommuneId));
+        Assert.True(view.CanTrade(PrototypeScenario.FirstCommuneId, "vide-1"));
+        Assert.True(view.CanTrade("vide-1", "vide-1"));
+        Assert.False(view.CanTrade("vide-1", "vide-2"));
+    }
+
+    [Fact]
     public void Les_totaux_des_produits_suivent_la_production_et_ce_qui_sort_du_stockage()
     {
         var simulation = PrototypeScenario.Create(GameData.Content());

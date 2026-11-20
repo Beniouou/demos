@@ -525,6 +525,36 @@ public sealed class World
         return reserve;
     }
 
+    /// <summary>
+    /// Vrai si la commune a au moins un bâtiment logistique en service (catégorie Logistique du catalogue : entrepôt,
+    /// grenier, silo, dépôt logistique). Un bâtiment en chantier n'est pas encore dans la partie.
+    /// </summary>
+    public bool HasLogisticsBuilding(string communeId) => _structures.Values.Any(s =>
+        s.Kind == StructureKind.Building
+        && s.TypeId is { } typeId && BuildingTypes.TryGetValue(typeId, out var type) && type.Category == Trade.LogisticsCategory
+        && CommuneOf(s) == communeId);
+
+    /// <summary>Les chargements partis hier vers une autre commune, qui arrivent au début de la journée.</summary>
+    public List<Shipment> ShipmentsInTransit { get; } = [];
+
+    /// <summary>
+    /// Les stocks gardés hors des bâtiments de stockage, avec la commune où ils sont (null si on ne la connaît plus) :
+    /// réserves des lignes d'approvisionnement, réserves de combustible, réserves de chantier, produits des habitants.
+    /// </summary>
+    public IEnumerable<(string? CommuneId, Inventory Stock)> StocksOutsideStorage()
+    {
+        string? CommuneOfBuilding(string buildingId) => _structures.TryGetValue(buildingId, out var building) ? CommuneOf(building) : null;
+
+        foreach (var (buildingId, reserve) in _reserves)
+            yield return (CommuneOfBuilding(buildingId), reserve);
+        foreach (var (buildingId, stock) in _fuelStocks)
+            yield return (CommuneOfBuilding(buildingId), stock);
+        foreach (var (communeId, reserve) in _constructionReserves)
+            yield return (communeId, reserve);
+        foreach (var socialClass in Classes)
+            yield return (socialClass.CommuneId, socialClass.Goods);
+    }
+
     private readonly List<ConstructionSite> _constructionSites = [];
 
     /// <summary>Bâtiments en chantier : ils ne sont pas encore dans <see cref="Structures"/>.</summary>

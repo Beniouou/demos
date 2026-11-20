@@ -25,6 +25,25 @@ public class PerishableTests
         new("stockage", "Stockage", StructureKind.Building, "commune", StorageCapacity: 10_000, StorageKind: kind, StorageProductId: productId);
 
     [Fact]
+    public void Un_stock_hors_entrepot_se_perime_comme_dans_un_stockage_general()
+    {
+        var stock = new Inventory();
+        stock.Add("pain", 100);
+        stock.Add("ble", 180);
+        stock.Add("pierre", 50);
+
+        var lost = Storage.SpoilOutsideStorage(stock, Products);
+
+        // Pain : 1/10 par jour ; blé : 1/180 ; la pierre ne se périme pas.
+        Assert.Equal(90, stock.QuantityOf("pain"), 6);
+        Assert.Equal(179, stock.QuantityOf("ble"), 6);
+        Assert.Equal(50, stock.QuantityOf("pierre"));
+        Assert.Equal(10, lost["pain"], 6);
+        Assert.Equal(1, lost["ble"], 6);
+        Assert.False(lost.ContainsKey("pierre"));
+    }
+
+    [Fact]
     public void Le_pain_se_perime_plus_vite_dans_un_stockage_general_que_dans_un_grenier_ou_un_silo()
     {
         // Durée de vie du pain : 10 jours au camp de base, 20 au grenier, 30 dans un silo à pain.

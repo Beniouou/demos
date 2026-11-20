@@ -17,7 +17,8 @@ public sealed record SupplyLine(string Id, string SupplierId, string ClientId, d
 /// production de l'État de la commune). Entre communes, la perte de transport s'applique et le trafic compte pour les
 /// routes. Le client ne reçoit que ce dont il a besoin à plein régime pour une journée, moins sa réserve ; le reste
 /// reste en vente. Les lignes passent dans l'ordre de la liste : la plus ancienne d'abord, sauf si le joueur change la
-/// priorité des lignes d'un client (World.MoveSupplyLine). Pas de délai.
+/// priorité des lignes d'un client (World.MoveSupplyLine). Pas de délai. Entre deux communes, la ligne ne livre que si
+/// l'une des deux a un bâtiment logistique (<see cref="Trade.CanTrade"/>).
 /// </summary>
 public static class SupplyLines
 {
@@ -64,7 +65,8 @@ public static class SupplyLines
         Treasury treasury,
         Func<string, Treasury>? communeFundOf = null,
         Func<string, string, double>? transportLossOf = null,
-        Action<string, string, double>? shipped = null)
+        Action<string, string, double>? shipped = null,
+        Func<string, string, bool>? canTrade = null)
     {
         var delivered = new Dictionary<string, double>();
         var noClasses = new Dictionary<string, SocialClass>();
@@ -84,6 +86,9 @@ public static class SupplyLines
             var seller = Market.StateSellerId(origin);
             var reserve = reserveOf(client.Id);
             var sameCommune = origin == destination;
+            // Entre deux communes, il faut un bâtiment logistique dans l'une des deux (décidé le 20 novembre 2026).
+            if (!sameCommune && canTrade?.Invoke(origin, destination) == false)
+                continue;
             var loss = sameCommune ? 0 : transportLossOf?.Invoke(origin, destination) ?? Trade.TransportLoss;
 
             // Ce que la ligne peut prendre (sa part de la production du jour, dans ce qui est encore en stock), et ce
@@ -110,6 +115,7 @@ public static class SupplyLines
                 shipped?.Invoke(origin, destination, sent);
 
             var arrived = sent * (1 - loss);
+            originMarket.CountLostInTransit(productId, sent - arrived);
             reserve.Add(productId, arrived);
             delivered[line.Id] = arrived;
         }

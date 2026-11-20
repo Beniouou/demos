@@ -39,9 +39,38 @@ public class SupplyLinesTests
         public Inventory Reserve(string id) => Reserves.TryGetValue(id, out var reserve) ? reserve : Reserves[id] = new Inventory();
 
         public Dictionary<string, double> Run(IReadOnlyList<SupplyLine> lines, Dictionary<string, Structure> structures,
-            Dictionary<string, double> produced, double loss = 0.2) =>
+            Dictionary<string, double> produced, double loss = 0.2, Func<string, string, bool>? canTrade = null) =>
             SupplyLines.RunDaily(lines, structures, produced, new Dictionary<string, double> { ["scierie"] = 10 }, id => Markets[id],
-                Reserve, Treasury, id => Funds[id], (_, _) => loss, (from, to, quantity) => Shipped.Add((from, to, quantity)));
+                Reserve, Treasury, id => Funds[id], (_, _) => loss, (from, to, quantity) => Shipped.Add((from, to, quantity)), canTrade);
+    }
+
+    [Fact]
+    public void Sans_batiment_logistique_la_ligne_entre_communes_ne_livre_pas()
+    {
+        var game = new Game();
+        game.Markets["a"].Offer("bois", 100, Market.StateSellerId("a"));
+        game.Funds["b"].Deposit(1_000);
+        var line = new SupplyLine("l1", "camp", "scierie", 0.5);
+
+        var delivered = game.Run([line], Towns(sawmillCommune: "b"), new Dictionary<string, double> { ["camp"] = 100 },
+            canTrade: (from, to) => Trade.CanTrade(from, to, _ => false));
+
+        Assert.Equal(0, delivered["l1"]);
+        Assert.Equal(100, game.Markets["a"].QuantityOf("bois"), 6);
+        Assert.Empty(game.Shipped);
+    }
+
+    [Fact]
+    public void Sans_batiment_logistique_la_ligne_dans_la_commune_livre_quand_meme()
+    {
+        var game = new Game();
+        game.Markets["a"].Offer("bois", 100, Market.StateSellerId("a"));
+        var line = new SupplyLine("l1", "camp", "scierie", 0.5);
+
+        var delivered = game.Run([line], Towns(), new Dictionary<string, double> { ["camp"] = 100 },
+            canTrade: (from, to) => Trade.CanTrade(from, to, _ => false));
+
+        Assert.Equal(20, delivered["l1"], 6);
     }
 
     [Fact]
@@ -60,6 +89,7 @@ public class SupplyLinesTests
         Assert.Equal(0, game.Funds["a"].Balance);
         Assert.Empty(game.Shipped);
         Assert.Empty(game.Markets["a"].CollectEarnings());
+        Assert.Equal(0, game.Markets["a"].TallyOf("bois").LostInTransit);
     }
 
     [Fact]
@@ -75,6 +105,7 @@ public class SupplyLinesTests
         // Il faut 20 à l'arrivée : 25 partent (20 % perdus en route), payés 25 × 2 = 50 par la commune B.
         Assert.Equal(20, delivered["l1"], 6);
         Assert.Equal(25, game.Markets["a"].TallyOf("bois").Sent, 6);
+        Assert.Equal(5, game.Markets["a"].TallyOf("bois").LostInTransit, 6);
         Assert.Equal(950, game.Funds["b"].Balance, 6);
         Assert.Equal(50, game.Markets["a"].CollectEarnings()[Market.StateSellerId("a")], 6);
         Assert.Equal(("a", "b", 25.0), (game.Shipped[0].From, game.Shipped[0].To, Math.Round(game.Shipped[0].Quantity, 6)));

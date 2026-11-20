@@ -186,6 +186,28 @@ public static class Storage
         return result;
     }
 
+    /// <summary>
+    /// Un stock gardé hors des bâtiments de stockage (réserve d'une ligne d'approvisionnement, réserve de combustible,
+    /// réserve de chantier, produits reçus en nature par les habitants ; décidé le 20 novembre 2026) : il ne prend pas
+    /// de place, mais ses produits périssables se périment comme dans un stockage général, de 1 ÷ leur durée de vie de
+    /// base chaque jour. Renvoie ce qui s'est perdu, par produit.
+    /// </summary>
+    public static Dictionary<string, double> SpoilOutsideStorage(Inventory stock, IReadOnlyList<ProductDefinition> products)
+    {
+        var lost = new Dictionary<string, double>();
+        foreach (var (productId, quantity) in stock.Contents.ToList())
+        {
+            if (quantity <= 0 || products.FirstOrDefault(p => p.Id == productId) is not { IsPerishable: true } product)
+                continue;
+
+            var share = Math.Min(1, 1 / product.ShelfLifeDays!.Value);
+            stock.Keep(productId, 1 - share);
+            lost[productId] = quantity * share;
+        }
+
+        return lost;
+    }
+
     private static IEnumerable<Structure> StorageBuildings(string communeId, IReadOnlyDictionary<string, Structure> structures) =>
         structures.Values.Where(s => s.StorageCapacity > 0 && Communes.CommuneOf(s, structures) == communeId);
 }

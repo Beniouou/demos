@@ -46,10 +46,11 @@ Jeu solo de construction de nation (Godot .NET 4.7, C#, .NET 10), en français. 
 | Petites images de la carte | `dotnet run --project tools/Demos.Carte -- --images` (dessine celles qui manquent dans `game/assets/carte/` ; `--forcer` les redessine toutes) |
 
 Le tableur (`equilibrage demos.xlsx`) et le rapport (`rapport simulation.html`) sont **à côté** du dossier `demos/`,
-hors du dépôt. Référence actuelle de la simulation : trésor **251 177** la 3e année (`simuler`, 3 ans, départ préréglé, depuis les
-routes des bâtiments du 12 novembre 2026 ; avant : 252 207 depuis l'atelier de matériaux d'État, 258 846 avant lui ; le chiffre
-sans loi, 410 815, date d'avant l'atelier). Avec une deuxième commune (`simuler 3 commune`) : **114 989** depuis les routes
-des bâtiments (116 018 avant, 141 622 avant les routes).
+hors du dépôt. Référence actuelle de la simulation : trésor **251 118** la 3e année (`simuler`, 3 ans, départ préréglé, depuis l'ordre
+de la journée par étapes de la chaîne du 20 novembre 2026 ; avant : 251 177 depuis les routes des bâtiments, 252 207 depuis
+l'atelier de matériaux d'État, 258 846 avant lui ; le chiffre sans loi, 410 815, date d'avant l'atelier). Avec une deuxième
+commune (`simuler 3 commune`) : **114 271** depuis les échanges de matières du 20 novembre 2026 (114 954 avant eux,
+114 989 avant l'ordre par étapes, 116 018 avant les routes des bâtiments, 141 622 avant les routes).
 
 ## Architecture et données
 
@@ -74,7 +75,14 @@ des bâtiments (116 018 avant, 141 622 avant les routes).
 
 ## Économie : état actuel (résumé)
 
-Prix de départ = coût de revient du bâtiment de référence + 30 % ; entreprises privées et SCOP avec caisse propre
+Ordre de la journée (20 novembre 2026, `WorkDay.Run`) : les bâtiments travaillent par étapes de la chaîne
+(`WorkDay.ChainStages`), la production d'une étape sert la suivante le jour même ; dans une étape, une matière qui manque
+est partagée au prorata du besoin (`ShortageRatios`, plafond `marketCap` de `Supply.Acquire`), puis ce qui reste est
+offert aux autres. Échanges entre communes (`Trade.RunDaily`, le soir après les habitants) : tous les produits qui se
+stockent, au-delà de la demande de demain (habitants + `Trade.BuildingDemand`) moins la production du jour ; seulement si
+l'une des deux communes a un bâtiment de catégorie Logistique (`Trade.CanTrade`, `World.HasLogisticsBuilding`, aussi pour
+les lignes) ; les chargements (`Shipment`, `World.ShipmentsInTransit`) arrivent le lendemain matin (`Trade.Arrive`, péremption
+d'une nuit comptée en perdu en route). Prix de départ = coût de revient du bâtiment de référence + 30 % ; entreprises privées et SCOP avec caisse propre
 (réserve de 30 jours, le reste aux propriétaires) ; licenciements et embauches au changement de mois (public 2 %,
 SCOP 5 % après une baisse de salaire jusqu'à −20 %, privé 15 %), faillite sans argent ; énergie (chauffage, eau) payée
 par chaque bâtiment ; impôt sur la richesse des habitants (État 0,3 %, commune 0,2 % par jour). Écrits mais
@@ -174,9 +182,13 @@ désactivés : TVA sur la valeur ajoutée, épargne progressive des entreprises.
   et manques de la saison, la richesse par membre et les lieux de travail (`WorkplaceView`).
 - Communes → Statistiques (15 novembre 2026), en lecture (`ProductionStatsPage`) : pour la commune du menu (avant le
   20 novembre : toutes les communes ou une
-  seule, courbe mois par mois du produit choisi (production, utilisé, envoyé, perdu, stock en fin de mois) et tableau
-  de tous les produits pour le dernier mois fini. Compteurs sans effet sur la partie : `Market.TallyOf` (utilisé =
-  `TryBuy` + `TryWithdraw`, envoyé = `Take`, perdu = `Keep`) et `World.CountProduced` (appelé par
+  seule, courbe mois par mois du produit choisi (production, utilisé, envoyé, perdu en route, perdu au stockage, stock
+  en fin de mois) et tableau de tous les produits pour le dernier mois fini. Compteurs sans effet sur la partie :
+  `Market.TallyOf` (utilisé = `TryBuy` + `TryWithdraw`, envoyé = `Take`, perdu au stockage = `Keep`, perdu en route =
+  `CountLostInTransit`, appelé par `Trade` et `SupplyLines` dans la commune de départ, 20 novembre 2026 ; les stocks
+  hors entrepôt — réserves des lignes, combustible, réserve de chantier, produits des habitants, `World.StocksOutsideStorage` —
+  se périment en fin de journée par `Storage.SpoilOutsideStorage`, comptés par `Market.CountLost`) et
+  `World.CountProduced` (appelé par
   `Simulation.CountProduction` après la journée de travail) ; lecture par `GameView.ProductFlows` (totaux depuis le
   début). Relevé mensuel par l'interface (`ProductionHistory`, `MainMenu.ProductionHistory`), pris avec celui de la
   population ; un mois = différence entre deux relevés.
@@ -193,14 +205,18 @@ désactivés : TVA sur la valeur ajoutée, épargne progressive des entreprises.
   partie).
 - Lignes d'approvisionnement (règle décidée le 15 novembre 2026, dans le document des règles, Économie →
   Approvisionnement) : `SupplyLines` (domaine) — `ProblemWith` (deux bâtiments publics, le client utilise le produit,
-  pas de doublon), `RunDaily` après la journée de travail (part de la production du jour, 50 % par défaut, plafonnée
+  pas de doublon), `RunDaily` (dans la même commune après chaque étape de la chaîne, servi le jour même ; entre
+  communes après la journée de travail, servi le lendemain : `Simulation.SplitSupplyLines`, 20 novembre 2026 ; part de la production du jour, 50 % par défaut, plafonnée
   au besoin du client pour un jour moins sa réserve ; payée au prix du marché entre communes, gratuite dans la même ;
   perte de transport et trafic de routes entre communes ; lignes dans l'ordre de la liste, la plus ancienne d'abord sauf
   priorité changée par `World.MoveSupplyLine`). La réserve du client
   (`World.ReserveOf`) passe en premier dans `Supply.Acquire`. `Market.TryDeliver` cède les produits d'un vendeur.
   Actions : `Simulation.TryAddSupplyLine` / `RemoveSupplyLine` / `SetSupplyLineShare` (5 % à 100 %), par
   `PlayerDesk.Supply.cs`. Lecture : `GameView.SupplyLines`, `SupplierCandidates`. Interface : Unités de production
-  (`SupplyLinesPanel`), flèches blanches épaisses sur le schéma. Sans ligne, rien ne change
+  (`SupplyLinesPanel`), flèches blanches épaisses sur le schéma. Ligne bloquée faute de bâtiment logistique (20 novembre
+  2026, maquette 2) : `SupplyLineView.MissingLogistics` / `SupplierCandidateView.MissingLogistics` (`GameView.CanTrade`) ;
+  avertissement orange au-dessus des lignes, mention « ne livre pas : aucun bâtiment logistique » et bulle sur la ligne,
+  « sans bâtiment logistique » dans le menu des fournisseurs. Sans ligne, rien ne change
   (référence 3 ans : 251 177).
 - Noms des bâtiments (décidé le 19 novembre 2026) : calculés, jamais écrits à la main. `World.DisplayNameOf` : type,
   puis le produit de la recette en cours entre parenthèses (« Atelier (Farine) ») ; sans produit, le type seul ;

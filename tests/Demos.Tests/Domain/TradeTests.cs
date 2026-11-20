@@ -161,6 +161,105 @@ public class TradeTests
     }
 
     [Fact]
+    public void Les_matieres_voyagent_au_dela_de_ce_qu_utilisent_les_batiments_de_la_commune()
+    {
+        var markets = new Dictionary<string, Market> { ["a"] = new(Products), ["b"] = new(Products) };
+        markets["a"].Offer("bois", 500, "camp");
+        Dictionary<string, Dictionary<string, double>> demand = new() { ["a"] = new() { ["bois"] = 300 }, ["b"] = new() { ["bois"] = 160 } };
+
+        Trade.RunDaily(["a", "b"], [], Products, c => markets[c], (_, _) => 10_000, (_, _) => 0.20,
+            buildingDemandOf: (c, p) => demand[c].GetValueOrDefault(p));
+
+        // a garde les 300 de sa scierie ; b manque de 160 : 200 partent, 160 arrivent.
+        Assert.Equal(300, markets["a"].QuantityOf("bois"), precision: 6);
+        Assert.Equal(160, markets["b"].QuantityOf("bois"), precision: 6);
+    }
+
+    [Fact]
+    public void La_demande_des_batiments_compte_leurs_matieres_et_leur_combustible_du_jour()
+    {
+        var structures = new Structure[]
+        {
+            new("etat", "État", StructureKind.PoliticalEntity, null),
+            new("a", "Commune A", StructureKind.PoliticalEntity, "etat"),
+            new("scierie", "Scierie", StructureKind.Building, "a", Ownership.Public, null,
+                new Production("planche", 1, [new RecipeInput("bois", 2)]), Jobs: 10),
+        }.ToDictionary(s => s.Id);
+
+        var demand = Trade.BuildingDemand(structures, new Dictionary<string, double> { ["scierie"] = 8 }, _ => 1,
+            Demos.Domain.Shared.Season.Spring);
+
+        // Matières : 8 travailleurs × 1 × 2 = 16 bois ; chauffage : 10 emplois × 0,01 = 0,1 bois au printemps.
+        Assert.Equal(16 + 10 * Energy.HeatingPerUnit, demand["a"]["bois"], precision: 6);
+        Assert.Equal(10 * Energy.WaterPerUnit, demand["a"]["eau"], precision: 6);
+    }
+
+    [Fact]
+    public void Sans_batiment_logistique_dans_l_une_des_deux_communes_rien_ne_part()
+    {
+        var markets = new Dictionary<string, Market> { ["a"] = new(Products), ["b"] = new(Products), ["c"] = new(Products) };
+        markets["a"].Offer("pain", 1_000, "ferme");
+        SocialClass[] classes = [Residents("a", 200), Residents("b", 80), Residents("c", 80)];
+
+        // Seule c a un bâtiment logistique : a peut envoyer à c, pas à b.
+        Trade.RunDaily(["a", "b", "c"], classes, Products, c => markets[c], (_, _) => 10_000, (_, _) => 0.20,
+            canTrade: (from, to) => Trade.CanTrade(from, to, commune => commune == "c"));
+
+        Assert.Equal(0, markets["b"].QuantityOf("pain"));
+        Assert.Equal(80, markets["c"].QuantityOf("pain"), precision: 6);
+    }
+
+    [Fact]
+    public void Le_soir_une_commune_compte_sur_sa_production_de_demain()
+    {
+        var markets = new Dictionary<string, Market> { ["a"] = new(Products), ["b"] = new(Products) };
+        markets["a"].Offer("pain", 100, "ferme");
+        SocialClass[] classes = [Residents("a", 200), Residents("b", 80)];
+
+        // a a 100 pains le soir et en mangera 200 demain, mais en produira 250 : les 100 peuvent partir (80 sont demandés).
+        Trade.RunDaily(["a", "b"], classes, Products, c => markets[c], (_, _) => 10_000, (_, _) => 0.20,
+            expectedProductionOf: (c, p) => c == "a" && p == "pain" ? 250 : 0);
+
+        Assert.Equal(80, markets["b"].QuantityOf("pain"), precision: 6);
+        Assert.Equal(0, markets["a"].QuantityOf("pain"), precision: 6);
+    }
+
+    [Fact]
+    public void Les_chargements_arrivent_le_lendemain_et_se_periment_pendant_la_nuit()
+    {
+        ProductDefinition[] products = [new("pain", "Pain", NeedCategory.Food, 1, ShelfLifeDays: 10)];
+        var markets = new Dictionary<string, Market> { ["a"] = new(products), ["b"] = new(products) };
+        markets["a"].Offer("pain", 1_000, "ferme");
+        SocialClass[] classes = [Residents("a", 200), Residents("b", 80)];
+        var inTransit = new List<Shipment>();
+
+        Trade.RunDaily(["a", "b"], classes, products, c => markets[c], (_, _) => 10_000, (_, _) => 0.20, dispatch: inTransit.Add);
+
+        // Rien n'est encore arrivé ; le lendemain, 80 arrivent moins un dixième périmé dans la nuit (8, perdus en route à a).
+        Assert.Equal(0, markets["b"].QuantityOf("pain"));
+        Trade.Arrive(inTransit, products, c => markets[c]);
+        Assert.Equal(72, markets["b"].QuantityOf("pain"), precision: 6);
+        Assert.Equal(20 + 8, markets["a"].TallyOf("pain").LostInTransit, precision: 6);
+    }
+
+    [Fact]
+    public void La_perte_en_route_est_comptee_dans_la_commune_de_depart()
+    {
+        var markets = new Dictionary<string, Market> { ["a"] = new(Products), ["b"] = new(Products) };
+        markets["a"].Offer("pain", 1_000, "ferme");
+        SocialClass[] classes = [Residents("a", 200), Residents("b", 90)];
+
+        Trade.RunDaily(["a", "b"], classes, Products, c => markets[c], (_, _) => 10_000, (_, _) => 0.10);
+
+        // 100 pains partent de a, 10 se perdent en route : comptés à a, pas comme perdus au stockage.
+        var tally = markets["a"].TallyOf("pain");
+        Assert.Equal(100, tally.Sent, precision: 6);
+        Assert.Equal(10, tally.LostInTransit, precision: 6);
+        Assert.Equal(0, tally.Lost);
+        Assert.Equal(0, markets["b"].TallyOf("pain").LostInTransit);
+    }
+
+    [Fact]
     public void GeographicEconomics_Calcule_La_Perte_Selon_La_Distance()
     {
         var positions = new Dictionary<string, Demos.Domain.Map.Point2D>

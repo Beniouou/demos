@@ -8,7 +8,7 @@ namespace Demos.Game;
 
 /// <summary>
 /// Communes → Statistiques, en lecture : pour la commune du menu (au-dessus des onglets), la courbe mois par mois du produit
-/// choisi (production, utilisé, envoyé vers une autre commune, perdu, et le stock en fin de mois) ; dessous, un tableau
+/// choisi (production, utilisé, envoyé vers une autre commune, perdu en route, perdu au stockage, et le stock en fin de mois) ; dessous, un tableau
 /// de tous les produits pour le dernier mois fini (depuis le début de la partie tant qu'aucun mois n'est fini).
 /// </summary>
 public partial class ProductionStatsPage : VBoxContainer, IMenuPage
@@ -16,7 +16,8 @@ public partial class ProductionStatsPage : VBoxContainer, IMenuPage
     private const string ProducedHint = "Ce que les bâtiments de la commune ont produit, paiement en nature compris (ces produits vont droit aux travailleurs, sans passer par le stockage).";
     private const string UsedHint = "Ce qui est sorti du stockage pour servir : achats des habitants, matières et énergie des bâtiments, matériaux des chantiers.";
     private const string SentHint = "Ce qui est parti vers une autre commune (échanges entre communes), avant la perte de transport.";
-    private const string LostHint = "Ce qui a été perdu : faute de place pour stocker, ou parce que le produit s'est périmé.";
+    private const string LostInTransitHint = "La part de l'envoyé qui s'est perdue en route vers une autre commune (échanges et lignes d'approvisionnement), selon la distance ; un chemin ou une route la réduit.";
+    private const string LostHint = "Ce qui a été perdu dans la commune : faute de place pour stocker, ou parce que le produit s'est périmé.";
     private const string StockHint = "Ce qui est dans le stockage de la commune, en vente, à la fin de la période.";
     private const string PriceHint = "Le prix du produit ; pour l'instant, les prix restent les prix de départ.";
     private const string HistoryHint = "Un relevé le 1er de chaque mois, pris par l'interface pendant la partie : il repart de zéro à chaque lancement.";
@@ -119,7 +120,8 @@ public partial class ProductionStatsPage : VBoxContainer, IMenuPage
                 Series("Production", 2, f => f.Produced),
                 Series("Utilisé", 0, f => f.Used),
                 Series("Envoyé", 1, f => f.Sent),
-                Series("Perdu", 3, f => f.Lost),
+                Series("Perdu en route", 6, f => f.LostInTransit),
+                Series("Perdu au stockage", 3, f => f.Lost),
                 Series("Stock en fin de mois", 7, f => f.Stock),
             ],
             value => value.ToString("N0"));
@@ -141,22 +143,24 @@ public partial class ProductionStatsPage : VBoxContainer, IMenuPage
         if (products.Count == 0)
             return text + SheetText.Muted("Aucun produit encore.");
 
-        text.Append("[table=7]");
+        text.Append("[table=8]");
         foreach (var (header, hint) in new[]
                  {
-                     ("Produit", ""), ("Production", ProducedHint), ("Utilisé", UsedHint), ("Envoyé", SentHint), ("Perdu", LostHint),
-                     ("Stock", StockHint), ("Prix", PriceHint),
+                     ("Produit", ""), ("Production", ProducedHint), ("Utilisé", UsedHint), ("Envoyé", SentHint),
+                     ("Perdu en route", LostInTransitHint), ("Perdu au stockage", LostHint), ("Stock", StockHint), ("Prix", PriceHint),
                  })
             text.Append(PopulationText.Cell(hint == "" ? header : SheetText.Hint(header, hint), header: true));
         foreach (var (productId, name) in products)
         {
             var figures = ProductFigures.Of(now, productId, communeId).Since(ProductFigures.Of(before, productId, communeId));
-            if (figures.Produced <= 0 && figures.Used <= 0 && figures.Sent <= 0 && figures.Lost <= 0 && figures.Stock <= 0)
+            if (figures.Produced <= 0 && figures.Used <= 0 && figures.Sent <= 0 && figures.Lost <= 0 && figures.LostInTransit <= 0
+                && figures.Stock <= 0)
                 continue;
             text.Append(PopulationText.Cell(SheetText.Escape(name)));
             text.Append(PopulationText.Cell($"{figures.Produced:N0}"));
             text.Append(PopulationText.Cell($"{figures.Used:N0}"));
             text.Append(PopulationText.Cell($"{figures.Sent:N0}"));
+            text.Append(PopulationText.Cell($"{figures.LostInTransit:N0}"));
             text.Append(PopulationText.Cell($"{figures.Lost:N0}"));
             text.Append(PopulationText.Cell($"{figures.Stock:N0}"));
             text.Append(PopulationText.Cell($"{figures.Price:N2}"));

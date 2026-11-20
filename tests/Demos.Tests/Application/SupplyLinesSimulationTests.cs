@@ -26,7 +26,8 @@ public class SupplyLinesSimulationTests
             simulation.AdvanceDay();
 
         Assert.True(simulation.World.SupplyLineDeliveries[line!.Id] > 0);
-        Assert.True(simulation.World.ReserveContentsOf(sawmill).GetValueOrDefault("bois") > 0);
+        // Dans la même commune, le bois livré sert le jour même (décidé le 20 novembre 2026) : la scierie a travaillé.
+        Assert.True(simulation.World.SupplyShares.GetValueOrDefault(sawmill) > 0);
     }
 
     [Fact]

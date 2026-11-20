@@ -28,7 +28,8 @@ public static class Supply
         Func<Structure, Treasury>? companyFundOf,
         IReadOnlyDictionary<string, SocialClass> classesById,
         Inventory? reserved = null,
-        PurchaseRules? rules = null)
+        PurchaseRules? rules = null,
+        Func<string, double>? marketCap = null)
     {
         var materials = recipe.Materials;
         rules ??= PurchaseRules.Free;
@@ -38,13 +39,26 @@ public static class Supply
         var payer = PayerOf(workplace, communeId, treasury, communeFund, companyFundOf, classesById);
         var needs = materials.Select(m => (m.ProductId, Needed: plannedOutput * m.Quantity)).ToList();
 
+        // Ce que le bâtiment peut prendre au stockage de sa commune, produit par produit : ce qu'il y possède lui-même
+        // (pour l'État, ce que l'État y a produit), puis ce qu'il peut acheter (rien s'il n'achète que par ses lignes,
+        // sinon chez les vendeurs permis). Quand des bâtiments se partagent une matière qui manque, sa part
+        // (<paramref name="marketCap"/>, voir WorkDay) borne le tout. Calculé avant de rien prendre.
+        var ownOf = new Dictionary<string, double>();
+        var onSaleOf = new Dictionary<string, double>();
+        foreach (var (productId, _) in needs)
+        {
+            var cap = marketCap?.Invoke(productId) ?? double.PositiveInfinity;
+            var own = Math.Min(market.QuantityOf(productId, payer.SellerId), cap);
+            var onSale = rules.MarketAllowed ? market.QuantityForSale(productId, payer.SellerId, rules.SellerAllowed) : 0;
+            ownOf[productId] = own;
+            onSaleOf[productId] = Math.Min(onSale, Math.Max(0, cap - own));
+        }
+
         // Ce que le bâtiment a déjà, sans rien payer : sa réserve (livrée par ses lignes d'approvisionnement, déjà
         // payée), puis ce qu'il possède dans le stockage.
-        double Owned(string productId) => (reserved?.QuantityOf(productId) ?? 0) + market.QuantityOf(productId, payer.SellerId);
+        double Owned(string productId) => (reserved?.QuantityOf(productId) ?? 0) + ownOf[productId];
 
-        // Ce qu'il peut acheter : rien s'il n'achète que par ses lignes, sinon chez les vendeurs permis.
-        double OnSale(string productId) =>
-            rules.MarketAllowed ? market.QuantityForSale(productId, payer.SellerId, rules.SellerAllowed) : 0;
+        double OnSale(string productId) => onSaleOf[productId];
 
         // Part possible avec ce qui est en stock…
         var share = 1.0;
@@ -85,7 +99,7 @@ public static class Supply
             var fromReserve = Math.Min(taken, reserved?.QuantityOf(productId) ?? 0);
             reserved?.TryRemove(productId, fromReserve);
             taken -= fromReserve;
-            var own = Math.Min(taken, market.QuantityOf(productId, payer.SellerId));
+            var own = Math.Min(taken, ownOf[productId]);
             market.TryWithdraw(productId, own, payer.SellerId);
             var bought = Math.Min(taken - own, OnSale(productId));
             if (bought > 0)

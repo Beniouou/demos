@@ -24,8 +24,11 @@ public sealed class Market(IEnumerable<ProductDefinition> products)
     // Produit → quantité retirée pour partir vers une autre commune.
     private readonly Dictionary<string, double> _sent = [];
 
-    // Produit → quantité perdue (faute de place pour stocker, ou périmée).
+    // Produit → quantité perdue au stockage (faute de place pour stocker, ou périmée).
     private readonly Dictionary<string, double> _lost = [];
+
+    // Produit → quantité partie de cette commune et perdue en route (échanges et lignes d'approvisionnement).
+    private readonly Dictionary<string, double> _lostInTransit = [];
 
     /// <summary>Nom de vendeur de l'État dans une commune : ses ventes vont à la caisse de cette commune.</summary>
     public static string StateSellerId(string communeId) => $"etat:{communeId}";
@@ -235,11 +238,25 @@ public sealed class Market(IEnumerable<ProductDefinition> products)
     }
 
     /// <summary>
+    /// Compte une quantité partie de cette commune et perdue en route vers une autre (statistiques ; décidé le 20
+    /// novembre 2026). Elle a déjà quitté le marché : rien ne change au marché.
+    /// </summary>
+    public void CountLostInTransit(string productId, double quantity) => Count(_lostInTransit, productId, quantity);
+
+    /// <summary>
+    /// Compte comme perdue au stockage une quantité périmée dans un stock de la commune gardé hors du marché (réserve
+    /// d'un bâtiment, produits des habitants) : statistiques seulement, rien ne change au marché.
+    /// </summary>
+    public void CountLost(string productId, double quantity) => Count(_lost, productId, quantity);
+
+    /// <summary>
     /// Ce qui est sorti du marché depuis le début de la partie, pour les statistiques : utilisé (acheté par les habitants,
-    /// pris comme matière ou énergie par un bâtiment, pour un chantier), envoyé vers une autre commune, ou perdu.
+    /// pris comme matière ou énergie par un bâtiment, pour un chantier), envoyé vers une autre commune, perdu au stockage,
+    /// et, parmi ce qui a été envoyé, ce qui s'est perdu en route.
     /// </summary>
     public MarketTally TallyOf(string productId) =>
-        new(_used.GetValueOrDefault(productId), _sent.GetValueOrDefault(productId), _lost.GetValueOrDefault(productId));
+        new(_used.GetValueOrDefault(productId), _sent.GetValueOrDefault(productId), _lost.GetValueOrDefault(productId),
+            _lostInTransit.GetValueOrDefault(productId));
 
     private static void Count(Dictionary<string, double> tally, string productId, double quantity)
     {
@@ -248,5 +265,8 @@ public sealed class Market(IEnumerable<ProductDefinition> products)
     }
 }
 
-/// <summary>Ce qui est sorti du marché d'une commune pour un produit, depuis le début de la partie.</summary>
-public readonly record struct MarketTally(double Used, double Sent, double Lost);
+/// <summary>
+/// Ce qui est sorti du marché d'une commune pour un produit, depuis le début de la partie. <see cref="Lost"/> est perdu
+/// au stockage (débordement, péremption) ; <see cref="LostInTransit"/> est la part de <see cref="Sent"/> perdue en route.
+/// </summary>
+public readonly record struct MarketTally(double Used, double Sent, double Lost, double LostInTransit);
