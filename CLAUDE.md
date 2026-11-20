@@ -102,7 +102,7 @@ désactivés : TVA sur la valeur ajoutée, épargne progressive des entreprises.
   - Coordonnées géographiques exposées dans `GameView.cs` (`CommunePositions()`, `CommunePosition(id)`).
 - Bâtiments d'extraction posés sur la carte (décidé le 10 novembre 2026) : sur une zone qui convient, à 20 km de la
   commune au plus (`extractionMaxDistance`) ; règle dans `Map/ExtractionSites.cs`, mode placement dans
-  `game/scripts/Map/MapCanvas.Placement.cs` (Production → Construire ouvre la carte).
+  `game/scripts/Map/MapCanvas.Placement.cs` (Communes → Construire ouvre la carte).
 - Échelle (décidé le 12 novembre 2026, remplace la « lieue ») : une unité de carte vaut 100 m (`Map/MapScale.cs`), la
   carte fait 360 × 225 km. Les règles et les réglages de distance sont **en km** (`equilibrage.json`, tableur) ; les
   coordonnées restent en unités et sont converties par `MapScale` (`KmBetween`, `ToKm`, `ToUnits`, `Format`). Ne plus
@@ -131,7 +131,7 @@ désactivés : TVA sur la valeur ajoutée, épargne progressive des entreprises.
 
 ## Interface Godot : état actuel (résumé)
 
-- Menus dans `game/scripts/MainMenu.cs` (Carte, Lois, Structure, Population, Production, Recherche, Ressources, Aide) ; une page
+- Menus dans `game/scripts/MainMenu.cs` (Carte, Lois, Structure, Population, Communes, Recherche, Ressources, Aide) ; une page
   par fichier (`*Page.cs`) ; `Coming(...)` = entrée grisée « à venir ». Lecture de la partie par `GameView`
   (`src/Demos.Application/GameView.cs`), **actions du joueur par `PlayerDesk`** (`game/scripts/PlayerDesk.cs`, qui
   appelle `Simulation`) ; textes de partie dans `WorldText.cs`, couleurs et styles dans `UiTheme.cs`.
@@ -145,7 +145,7 @@ désactivés : TVA sur la valeur ajoutée, épargne progressive des entreprises.
   `SetCommuneTaxRate` ne sont volontairement pas branchés ; `RevenuePage` reste en lecture, avec un raccourci
   « Préparer une loi d'impôt » (`PlayerDesk.DraftTaxLaw` : brouillon au niveau de l'entité, brique impôt à 0 %).
 - Routes : après chaque bilan (`GameView.RoadChanges`, liste remplacée à chaque bilan), `Main` met les changements dans
-  la barre du bas (textes dans `RoadText.cs`) ; Production → Transport (`TransportPage`) liste les liaisons, le dernier
+  la barre du bas (textes dans `RoadText.cs`) ; Communes → Transport (`TransportPage`) liste les liaisons, le dernier
   bilan et la règle.
 - Lois entrées en vigueur : au 1er du mois, `Main` écoute `LawsEnacted` : pause et fenêtre `LawsEnactedDialog` (sans
   « qui accepte, qui rejette » : pas de règle).
@@ -172,14 +172,15 @@ désactivés : TVA sur la valeur ajoutée, épargne progressive des entreprises.
   La simulation ne garde pas d'historique : le relevé (`PopulationHistory`, `MainMenu.History`) est pris par `Main`
   après le premier jour joué puis le 1er de chaque mois (décidé le 15 novembre 2026), et ne dure que la partie. `SocialClassView` porte aussi les pôles, le nom de l'idéologie, les chômeurs, les revenus
   et manques de la saison, la richesse par membre et les lieux de travail (`WorkplaceView`).
-- Production → Statistiques (15 novembre 2026), en lecture (`ProductionStatsPage`) : pour toutes les communes ou une
+- Communes → Statistiques (15 novembre 2026), en lecture (`ProductionStatsPage`) : pour la commune du menu (avant le
+  20 novembre : toutes les communes ou une
   seule, courbe mois par mois du produit choisi (production, utilisé, envoyé, perdu, stock en fin de mois) et tableau
   de tous les produits pour le dernier mois fini. Compteurs sans effet sur la partie : `Market.TallyOf` (utilisé =
   `TryBuy` + `TryWithdraw`, envoyé = `Take`, perdu = `Keep`) et `World.CountProduced` (appelé par
   `Simulation.CountProduction` après la journée de travail) ; lecture par `GameView.ProductFlows` (totaux depuis le
   début). Relevé mensuel par l'interface (`ProductionHistory`, `MainMenu.ProductionHistory`), pris avec celui de la
   population ; un mois = différence entre deux relevés.
-- Production → Chaîne de production (15 novembre 2026, `ProductionChainPage`) : schéma d'une commune (`ChainDiagram`,
+- Communes → Chaîne de production (15 novembre 2026, `ProductionChainPage`) : schéma d'une commune (`ChainDiagram`,
   dessiné par Godot, en bandes depuis le 19 novembre 2026 : une bande par besoin nourri — Se nourrir, Se distraire,
   S'habiller, Se meubler, puis Chantiers, Énergie, Services, Autres —, un bâtiment dans la première qu'il nourrit, sans
   doublon ; dans chaque bande, colonnes selon la profondeur, ce qui va droit au besoin dans la dernière ; produit
@@ -228,5 +229,13 @@ désactivés : TVA sur la valeur ajoutée, épargne progressive des entreprises.
   Priorité des lignes : `World.MoveSupplyLine`. Actions : `Simulation.SetSupplySettings`, `MoveSupplyLine`, par
   `PlayerDesk.Supply.cs`. Interface : `PurchaseSalePanel` et ↑ ↓ dans `SupplyLinesPanel` (Unités de production) ;
   fournisseur écarté barré dans `FlowDiagram` (`FlowEndView.Blocked`). Lecture : `GameView.SupplySettingsOf`.
+- Menu Communes (20 novembre 2026, ex-menu Production) : ses cinq onglets (Unités de production, Construire, Transport,
+  Chaîne de production, Statistiques) montrent tous la commune choisie, affichée au-dessus d'eux avec ◀ ▶ pour passer
+  à une autre (`CommuneFocus`, `MainMenu.Focus`, gardée d'un onglet à l'autre et quand le menu se ferme). Plus de menu
+  déroulant de commune dans ces pages : Unités de production cache le menu « Entité » (`StructurePicker.FixEntity`),
+  Transport ne montre que les liaisons de la commune, Statistiques n'a plus « Toutes les communes ». Un clic sur une
+  commune de la carte ouvre ce menu sur elle (`MainMenu.ShowClicked` ; une préfecture ouvre toujours sa fiche dans
+  Structure) ; la carte se centre sur la commune à chaque changement et à l'ouverture du menu
+  (`MapCanvas.CenterOnCommune`, à l'image suivante pour tenir compte de l'élargissement du menu).
 - Pas branché, volontairement : `SetPrice` (prix fixés par le joueur : question ouverte des prix dynamiques).
   Prompt de la session d'intégration : `prompt-integration-interface.md`, à côté du dépôt.

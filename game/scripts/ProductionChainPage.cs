@@ -6,8 +6,8 @@ using Godot;
 namespace Demos.Game;
 
 /// <summary>
-/// Production → Chaîne de production, en lecture (décidé le 19 novembre 2026) : le schéma de la chaîne d'une commune,
-/// en bandes par besoin, et un produit à suivre. Un clic sur un bâtiment ouvre Production → Unités de production sur
+/// Communes → Chaîne de production, en lecture (décidé le 19 novembre 2026) : le schéma de la chaîne d'une commune,
+/// en bandes par besoin, et un produit à suivre. Un clic sur un bâtiment ouvre Communes → Unités de production sur
 /// lui : c'est là qu'il se règle (recette, lignes d'approvisionnement…). Un bâtiment qui a une ligne
 /// d'approvisionnement avec une autre commune a un cadre extérieur bleu (même préfecture) ou violet (autre préfecture).
 /// </summary>
@@ -15,18 +15,18 @@ public partial class ProductionChainPage : VBoxContainer, IMenuPage
 {
     private readonly GameView _view = null!;
     private readonly System.Action<string> _manage = null!;
-    private readonly CommuneChoice _commune = new(allowAll: false);
+    private readonly CommuneFocus _focus = null!;
     private readonly OptionButton _follow = null!;
     private readonly List<string> _followIds = [];
     private readonly ChainDiagram _diagram = new();
     private string _chainKey = "";
 
-    public ProductionChainPage(GameView view, System.Action<string> manage)
+    public ProductionChainPage(GameView view, System.Action<string> manage, CommuneFocus focus)
     {
         _view = view;
         _manage = manage;
         AddThemeConstantOverride("separation", 8);
-        AddChild(_commune.Row());
+        _focus = focus;
 
         var row = new HBoxContainer();
         row.AddThemeConstantOverride("separation", 8);
@@ -60,8 +60,8 @@ public partial class ProductionChainPage : VBoxContainer, IMenuPage
 
     public void Refresh()
     {
-        _commune.Fill(_view.Communes());
-        var communeId = _commune.SelectedId;
+        // La commune du menu Communes, au-dessus des onglets.
+        var communeId = _focus.Id;
         var chain = communeId is null ? [] : _view.ProductionChain(communeId);
         var plain = communeId is null ? [] : _view.BuildingsWithoutRecipe(communeId);
         FillFollow(chain);

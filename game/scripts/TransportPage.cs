@@ -8,18 +8,21 @@ using Godot;
 namespace Demos.Game;
 
 /// <summary>
-/// Production → Transport, en lecture : les liaisons entre communes (sentiers, chemins, routes) avec leur longueur, leur
+/// Communes → Transport, en lecture : les liaisons de la commune du menu (sentiers, chemins, routes, vers une autre
+/// commune ou vers un de ses bâtiments posés sur la carte) avec leur longueur, leur
 /// montée, qui les paie, la part de perte de transport qu'elles retirent et leur entretien ; puis ce qu'a changé le
 /// dernier bilan des routes, et la règle. Les routes naissent du trafic : le joueur ne les construit pas.
 /// </summary>
 public partial class TransportPage : VBoxContainer, IMenuPage
 {
     private readonly GameView _view = null!;
+    private readonly CommuneFocus _focus = null!;
     private readonly RichTextLabel _text = null!;
 
-    public TransportPage(GameView view)
+    public TransportPage(GameView view, CommuneFocus focus)
     {
         _view = view;
+        _focus = focus;
         _text = new HintText
         {
             BbcodeEnabled = true,
@@ -45,10 +48,12 @@ public partial class TransportPage : VBoxContainer, IMenuPage
     private string Describe()
     {
         var settings = Balance.Current;
-        var links = _view.Roads().OrderByDescending(l => l.Level).ThenBy(l => RoadText.Link(_view, l)).ToList();
+        // Les liaisons de la commune du menu : vers une autre commune, ou vers un de ses bâtiments posés sur la carte.
+        bool Touches(string place) => place == _focus.Id || _view.CommuneOf(place) == _focus.Id;
+        var links = _view.Roads().Where(l => Touches(l.A) || Touches(l.B)).OrderByDescending(l => l.Level).ThenBy(l => RoadText.Link(_view, l)).ToList();
         var text = new StringBuilder(SheetText.Heading($"LIAISONS ({links.Count})"));
         if (links.Count == 0)
-            text.AppendLine(SheetText.Muted("Aucune pour l'instant : un sentier s'ouvre quand deux communes échangent assez en un mois, ou quand un bâtiment posé sur la carte produit assez."));
+            text.AppendLine(SheetText.Muted("Aucune pour cette commune : un sentier s'ouvre quand deux communes échangent assez en un mois, ou quand un bâtiment posé sur la carte produit assez."));
         else
         {
             var muted = UiTheme.Muted.ToHtml(false);

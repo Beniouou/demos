@@ -5,7 +5,7 @@ using Godot;
 namespace Demos.Game;
 
 /// <summary>
-/// Les réglages d'achat et de vente d'un bâtiment public, dans Production → Unités de production (décidés le 19
+/// Les réglages d'achat et de vente d'un bâtiment public, dans Communes → Unités de production (décidés le 19
 /// novembre 2026) : n'acheter que par ses lignes, ne pas acheter aux entreprises privées ou aux SCOP (grisé si une loi
 /// l'interdit), garder des jours de production hors vente, ne pas envoyer vers d'autres communes. Caché pour un
 /// bâtiment privé ou une SCOP. Le résultat d'une action remonte par <see cref="Message"/>.

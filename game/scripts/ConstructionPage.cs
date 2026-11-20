@@ -8,8 +8,8 @@ using Godot;
 namespace Demos.Game;
 
 /// <summary>
-/// Production → Construire. À gauche, la commune où bâtir, puis le catalogue des bâtiments constructibles rangé par
-/// catégorie (boîtes repliables). À droite, la fiche du type choisi : ce qu'il coûte, ce qui peut le payer dans la
+/// Communes → Construire, dans la commune du menu (au-dessus des onglets). À gauche, le catalogue des bâtiments
+/// constructibles rangé par catégorie (boîtes repliables). À droite, la fiche du type choisi : ce qu'il coûte, ce qui peut le payer dans la
 /// commune (réserve de chantier, stock de l'État, achat avec le trésor), ce qu'il apporte ; le bouton pour lancer le
 /// chantier, et les chantiers en cours dans la commune. Un bâtiment d'extraction (camp de bûcheron, ferme, carrière, mine)
 /// se pose sur la carte : le bouton ferme le menu et passe la carte en mode placement. La construction passe par le
@@ -25,41 +25,25 @@ public partial class ConstructionPage : HBoxContainer, IMenuPage
     private readonly MapCanvas _map = null!;
     private readonly System.Action _closeMenu = null!;
     private readonly System.Action<string> _report = null!;
-    private OptionButton _commune = null!;
-    private readonly List<string> _communeIds = [];
+    private readonly CommuneFocus _focus = null!;
+    private string? _shownCommune;
     private Button _build = null!;
     private Label _message = null!;
     private Label _sites = null!;
 
-    public ConstructionPage(GameView view, PlayerDesk desk, MapCanvas map, System.Action closeMenu, System.Action<string> report)
+    public ConstructionPage(GameView view, PlayerDesk desk, MapCanvas map, System.Action closeMenu, System.Action<string> report, CommuneFocus focus)
     {
         _view = view;
         _desk = desk;
         _map = map;
         _closeMenu = closeMenu;
         _report = report;
+        _focus = focus;
         AddThemeConstantOverride("separation", 12);
         _schema = new TreeSheet { Build = Build, Describe = Describe };
 
         var left = new VBoxContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill, SizeFlagsVertical = SizeFlags.ExpandFill };
         left.AddThemeConstantOverride("separation", 8);
-        var row = new HBoxContainer();
-        row.AddThemeConstantOverride("separation", 8);
-        row.AddChild(new Label { Text = "Commune", CustomMinimumSize = new Vector2(90, 0) });
-        _commune = new OptionButton
-        {
-            SizeFlagsHorizontal = SizeFlags.ExpandFill,
-            FocusMode = FocusModeEnum.None,
-            FitToLongestItem = false,
-            ClipText = true,
-        };
-        _commune.ItemSelected += _ =>
-        {
-            _message.Visible = false;
-            _schema.Invalidate();
-        };
-        row.AddChild(_commune);
-        left.AddChild(row);
         left.AddChild(_schema.Tree);
         AddChild(left);
 
@@ -106,25 +90,18 @@ public partial class ConstructionPage : HBoxContainer, IMenuPage
             : string.Join("\n", sites.Select(s => $"{s.Name} : encore {s.DaysLeft} jour(s)"));
     }
 
+    /// <summary>Une autre commune choisie au-dessus des onglets : le message de la précédente s'efface.</summary>
     private void FillCommunes()
     {
-        var communes = _view.Communes();
-        if (communes.Select(c => c.Id).SequenceEqual(_communeIds))
+        if (SelectedCommune() == _shownCommune)
             return;
-
-        var selected = SelectedCommune();
-        _communeIds.Clear();
-        _communeIds.AddRange(communes.Select(c => c.Id));
-        _commune.Clear();
-        foreach (var commune in communes)
-            _commune.AddItem(commune.Name);
-        if (_communeIds.Count > 0)
-            _commune.Select(System.Math.Max(0, selected is null ? 0 : _communeIds.IndexOf(selected)));
+        _shownCommune = SelectedCommune();
+        _message.Visible = false;
         _schema.Invalidate();
     }
 
-    private string? SelectedCommune() =>
-        _commune.Selected >= 0 && _commune.Selected < _communeIds.Count ? _communeIds[_commune.Selected] : null;
+    /// <summary>La commune où bâtir : celle du menu Communes, au-dessus des onglets.</summary>
+    private string? SelectedCommune() => _focus.Id;
 
     private string? SelectedType() =>
         _schema.Selected is { } key && key.StartsWith("type:") ? key["type:".Length..] : null;
@@ -178,7 +155,7 @@ public partial class ConstructionPage : HBoxContainer, IMenuPage
             return SheetText.Heading(key["categorie:".Length..].ToUpperInvariant())
                 + SheetText.Muted("Choisissez un bâtiment de cette catégorie pour voir ce qu'il coûte et ce qu'il apporte.");
         return SheetText.Heading("CONSTRUIRE")
-            + "Choisissez la commune, puis un bâtiment dans le catalogue. Le chantier est payé tout de suite : d'abord la "
+            + "Choisissez un bâtiment dans le catalogue : il sera bâti dans la commune affichée au-dessus des onglets (◀ ▶ pour en changer). Le chantier est payé tout de suite : d'abord la "
             + "réserve de chantier de la commune, puis le stock de l'État, puis des achats avec le trésor. Le bâtiment arrive "
             + "à la fin du chantier.\n\n"
             + SheetText.Muted("En gris : les bâtiments qui n'ont pas encore d'effet dans le jeu (ni emplois, ni places, ni stockage).");

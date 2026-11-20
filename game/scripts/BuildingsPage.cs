@@ -6,7 +6,7 @@ using Godot;
 namespace Demos.Game;
 
 /// <summary>
-/// Production → Unités de production, en deux boîtes comme le menu Structure. À gauche, les réglages : en haut le choix
+/// Communes → Unités de production, en deux boîtes comme le menu Structure. À gauche, les réglages : en haut le choix
 /// du bâtiment en descendant la hiérarchie (entité politique → organisme → bâtiment), et en dessous les décisions du
 /// joueur sur ce bâtiment (postes ouverts d'un bâtiment public, recette, lignes d'approvisionnement, achats et ventes
 /// d'un bâtiment public, chauffage, vente au privé, nationalisation).
@@ -19,6 +19,7 @@ public partial class BuildingsPage : HBoxContainer, IMenuPage
     private readonly PlayerDesk _desk = null!;
     private readonly StructurePicker _picker = null!;
     private readonly ProductionHistory _history = null!;
+    private readonly CommuneFocus _focus = null!;
     private FlowDiagram _flows = null!;
     private SupplyLinesPanel _supply = null!;
     private PurchaseSalePanel _purchase = null!;
@@ -46,11 +47,12 @@ public partial class BuildingsPage : HBoxContainer, IMenuPage
     private Label _nationalizationNote = null!;
     private Label _noDecision = null!;
 
-    public BuildingsPage(GameView view, PlayerDesk desk, ProductionHistory history)
+    public BuildingsPage(GameView view, PlayerDesk desk, ProductionHistory history, CommuneFocus focus)
     {
         _view = view;
         _desk = desk;
         _history = history;
+        _focus = focus;
         AddThemeConstantOverride("separation", 12);
 
         // Boîte de gauche : le choix du bâtiment, de l'entité politique au bâtiment, puis les réglages.
@@ -108,10 +110,14 @@ public partial class BuildingsPage : HBoxContainer, IMenuPage
     // Godot recrée les nœuds C# par ce constructeur sans paramètre (rechargement des scripts).
     public BuildingsPage() { }
 
-    /// <summary>Choisit un bâtiment et montre ses réglages (depuis Production → Chaîne de production).</summary>
+    /// <summary>Choisit un bâtiment et montre ses réglages (depuis Communes → Chaîne de production).</summary>
     public void Show(string buildingId)
     {
+        // Un bâtiment d'une autre commune (cliqué dans le petit schéma) : le menu passe à sa commune.
+        if (_view.CommuneOf(buildingId) is { } communeId)
+            _focus.Select(communeId);
         _picker.Refresh(_view.StructureTree());
+        _picker.FixEntity(_focus.Id);
         _picker.SelectBuilding(buildingId);
         ShowSheet();
     }
@@ -120,6 +126,8 @@ public partial class BuildingsPage : HBoxContainer, IMenuPage
     {
         // Une commune fondée ou un bâtiment construit : les menus déroulants sont refaits, le choix en cours gardé.
         _picker.Refresh(_view.StructureTree());
+        // La commune est celle du menu Communes (au-dessus des onglets) : seuls ses bâtiments se choisissent ici.
+        _picker.FixEntity(_focus.Id);
         if (SelectedId() != _shownId)
             ShowSheet();
 

@@ -6,7 +6,7 @@ using Godot;
 namespace Demos.Game;
 
 /// <summary>
-/// Les lignes d'approvisionnement d'un bâtiment, dans Production → Unités de production : celles qui le livrent (avec
+/// Les lignes d'approvisionnement d'un bâtiment, dans Communes → Unités de production : celles qui le livrent (avec
 /// la part envoyée, à changer par pas de 10 %, leur priorité ↑ ↓, et un bouton pour la retirer), celles qu'il livre, et l'ajout d'un
 /// fournisseur parmi les bâtiments publics, de toutes les communes, qui produisent une de ses matières. Le résultat
 /// d'une action remonte par <see cref="Message"/>.

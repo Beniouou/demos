@@ -73,6 +73,22 @@ public sealed class StructurePicker
     /// <summary>La structure la plus précise choisie (bâtiment, puis organisme, puis entité), ou null pour toutes.</summary>
     public string? MostPrecise => BuildingId ?? (OrganizationId is { Length: > 0 } organization ? organization : null) ?? EntityId;
 
+    /// <summary>
+    /// Fixe l'entité : la commune du menu Communes. Le menu « Entité » est caché, les organismes et les bâtiments sont
+    /// ceux de cette commune ; quand elle change, ils sont refaits.
+    /// </summary>
+    public void FixEntity(string? entityId)
+    {
+        if (_entity.GetParent() is Control row)
+            row.Visible = false;
+        if (entityId is null || entityId == EntityId)
+            return;
+        FillEntities(entityId);
+        FillOrganizations(null);
+        FillBuildings(null);
+        Changed?.Invoke();
+    }
+
     /// <summary>Met à jour les menus quand une commune, un organisme ou un bâtiment apparaît ; les choix sont gardés.</summary>
     public void Refresh(IReadOnlyList<StructureNode> roots)
     {

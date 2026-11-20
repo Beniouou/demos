@@ -195,6 +195,18 @@ public partial class MapCanvas : Control
         }
     }
 
+    /// <summary>Centre la carte sur une commune (celle choisie dans le menu Communes) ; rien si elle n'a pas de place.</summary>
+    public void CenterOnCommune(string communeId)
+    {
+        foreach (var commune in _data.Communes())
+        {
+            if (commune.Id != communeId)
+                continue;
+            CenterOnWorld(commune.WorldPos);
+            return;
+        }
+    }
+
     public void CenterOn(MapCoordinates coord)
     {
         var mapWidth = (float)(_data.VectorMap?.Width ?? 1000.0);

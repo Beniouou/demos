@@ -50,8 +50,10 @@ public partial class Main : Node
         _hud.Init(_view, _desk, SpeedLabels);
         _hud.TopBar.PauseToggled += () => _paused = !_paused;
         _hud.TopBar.SpeedChosen += speed => _speedIndex = speed;
-        // Un clic sur une commune ou une préfecture de la carte ouvre sa fiche dans le menu Structure.
-        _hud.Map.StructureClicked += _hud.Menu.ShowStructure;
+        // Un clic sur une commune de la carte ouvre le menu Communes sur elle ; sur une préfecture, sa fiche dans Structure.
+        _hud.Map.StructureClicked += _hud.Menu.ShowClicked;
+        // La carte suit la commune du menu Communes (flèches, clic, bâtiment d'une autre commune).
+        _hud.Menu.Focus.Changed += _hud.Map.CenterOnCommune;
 
         // Fonder une commune : Structure → Création d'entité politique (aussi par la touche C ou le bouton Camp de base),
         // puis la carte pour l'emplacement.
@@ -92,7 +94,7 @@ public partial class Main : Node
             {
                 _pendingDays -= 1;
                 _simulation.AdvanceDay();
-                // Les relevés de la population (Population → Évolution) et des produits (Production → Statistiques) : le
+                // Les relevés de la population (Population → Évolution) et des produits (Communes → Statistiques) : le
                 // 1er de chaque mois, et après le premier jour joué (avant, les emplois ne sont pas encore répartis :
                 // tout le monde serait chômeur).
                 if (_view.Today.Day == 1 || _hud.Menu.History.Snapshots.Count == 0)

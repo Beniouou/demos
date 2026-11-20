@@ -7,7 +7,7 @@ using Godot;
 namespace Demos.Game;
 
 /// <summary>
-/// Production → Statistiques, en lecture : pour toutes les communes ou une seule, la courbe mois par mois du produit
+/// Communes → Statistiques, en lecture : pour la commune du menu (au-dessus des onglets), la courbe mois par mois du produit
 /// choisi (production, utilisé, envoyé vers une autre commune, perdu, et le stock en fin de mois) ; dessous, un tableau
 /// de tous les produits pour le dernier mois fini (depuis le début de la partie tant qu'aucun mois n'est fini).
 /// </summary>
@@ -23,19 +23,19 @@ public partial class ProductionStatsPage : VBoxContainer, IMenuPage
 
     private readonly GameView _view = null!;
     private readonly ProductionHistory _history = null!;
-    private readonly CommuneChoice _commune = new();
+    private readonly CommuneFocus _focus = null!;
     private readonly OptionButton _product = null!;
     private readonly List<string> _productIds = [];
     private readonly LineChart _chart = new();
     private readonly RichTextLabel _text = null!;
     private string _chartKey = "";
 
-    public ProductionStatsPage(GameView view, ProductionHistory history)
+    public ProductionStatsPage(GameView view, ProductionHistory history, CommuneFocus focus)
     {
         _view = view;
         _history = history;
         AddThemeConstantOverride("separation", 8);
-        AddChild(_commune.Row());
+        _focus = focus;
 
         var row = new HBoxContainer();
         row.AddThemeConstantOverride("separation", 8);
@@ -61,11 +61,11 @@ public partial class ProductionStatsPage : VBoxContainer, IMenuPage
 
     public void Refresh()
     {
-        _commune.Fill(_view.Communes());
-        var flows = _view.ProductFlows();
+        // Les produits de la commune du menu Communes (au-dessus des onglets).
+        var flows = _view.ProductFlows().Where(f => f.CommuneId == _focus.Id).ToList();
         FillProducts(flows);
         RefreshChart();
-        var text = Describe(flows, _commune.SelectedId);
+        var text = Describe(flows, _focus.Id);
         // Le texte n'est remis que s'il a changé : sinon il remonterait en haut à chaque image.
         if (text != _text.Text)
             _text.Text = text;
@@ -98,7 +98,7 @@ public partial class ProductionStatsPage : VBoxContainer, IMenuPage
     {
         var snapshots = _history.Snapshots;
         var productId = SelectedProduct;
-        var key = $"{snapshots.Count}|{snapshots.LastOrDefault()?.Date}|{_commune.SelectedId}|{productId}";
+        var key = $"{snapshots.Count}|{snapshots.LastOrDefault()?.Date}|{_focus.Id}|{productId}";
         if (key == _chartKey)
             return;
         _chartKey = key;
@@ -108,8 +108,8 @@ public partial class ProductionStatsPage : VBoxContainer, IMenuPage
         for (var index = 1; index < snapshots.Count && productId is not null; index++)
         {
             months.Add(WorldText.MonthLabel(snapshots[index - 1].Date));
-            figures.Add(ProductFigures.Of(snapshots[index].Flows, productId, _commune.SelectedId)
-                .Since(ProductFigures.Of(snapshots[index - 1].Flows, productId, _commune.SelectedId)));
+            figures.Add(ProductFigures.Of(snapshots[index].Flows, productId, _focus.Id)
+                .Since(ProductFigures.Of(snapshots[index - 1].Flows, productId, _focus.Id)));
         }
 
         LineChart.Series Series(string name, int color, System.Func<ProductFigures, double> value) =>

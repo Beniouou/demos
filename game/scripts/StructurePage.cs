@@ -306,7 +306,7 @@ public partial class StructurePage : HBoxContainer, IMenuPage
                 text.AppendLine();
                 if (_view.BuildingFlows(node.Id) is { } flows)
                     text.Append(FlowText.Sections(_view, _history, flows)).AppendLine();
-                text.AppendLine(Muted("Les décisions sur ce bâtiment se prennent dans Production → Unités de production."));
+                text.AppendLine(Muted("Les décisions sur ce bâtiment se prennent dans Communes → Unités de production."));
                 break;
         }
 

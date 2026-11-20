@@ -1,7 +1,7 @@
 namespace Demos.Game;
 
 /// <summary>
-/// Les lignes d'approvisionnement du joueur (Production → Chaîne de production) : créer, retirer, changer la part
+/// Les lignes d'approvisionnement du joueur (Communes → Chaîne de production) : créer, retirer, changer la part
 /// envoyée. Chaque action passe par la simulation, qui vérifie la règle ; la réponse dit ce qui s'est passé.
 /// </summary>
 public sealed partial class PlayerDesk

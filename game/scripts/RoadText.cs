@@ -8,7 +8,7 @@ namespace Demos.Game;
 
 /// <summary>
 /// Les mots des routes : le nom d'un niveau, une liaison, et les messages du bilan (sentier ouvert, chemin, route,
-/// entretien payé ou impayé), pour la barre du bas et la page Production → Transport.
+/// entretien payé ou impayé), pour la barre du bas et la page Communes → Transport.
 /// </summary>
 public static class RoadText
 {

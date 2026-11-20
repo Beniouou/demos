@@ -6,7 +6,7 @@ using Godot;
 namespace Demos.Game;
 
 /// <summary>
-/// Le petit schéma d'un bâtiment dans Production → Unités de production, dessiné par Godot : à gauche d'où viennent
+/// Le petit schéma d'un bâtiment dans Communes → Unités de production, dessiné par Godot : à gauche d'où viennent
 /// ses matières, au milieu le bâtiment, à droite où part sa production ; une flèche porte le produit. Le cadre d'une
 /// boîte est bleu dans une autre commune, violet dans une autre préfecture ; une ligne d'approvisionnement est une
 /// flèche blanche épaisse ; un fournisseur que ses réglages d'achat écartent est voilé et barré, sans flèche. Les boîtes
