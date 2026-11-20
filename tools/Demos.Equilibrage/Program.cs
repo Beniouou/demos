@@ -149,6 +149,10 @@ internal sealed class Book(XLWorkbook workbook, World world, BalanceSettings bal
     // Feuille Recettes : ligne de chaque recette (type, numéro de la recette dans le type).
     private readonly Dictionary<(string TypeId, int Index), int> _recipeRows = [];
 
+    /// <summary>La possession visée par personne d'un besoin durable pour un rang (0 sans réglage).</summary>
+    private static double Possession(BalanceSettings balance, Rank rank, NeedCategory need) =>
+        balance.PossessionByRank.GetValueOrDefault(rank)?.GetValueOrDefault(need) ?? 0;
+
     /// <summary>Les réglages de la feuille Constantes que « appliquer » reporte dans equilibrage.json.</summary>
     public static readonly HashSet<string> AppliedConstants =
     [
@@ -157,6 +161,8 @@ internal sealed class Book(XLWorkbook workbook, World world, BalanceSettings bal
         "TransportDistance", "TransportMin", "TransportMax", "PollutionLoin", "PollutionDistance", "ExtractionDistance", "RessortCommune", "CommuneEcart", "RessortPrefecture", "RouteSeuilSentier", "RouteSeuilChemin", "RouteSeuilRoute", "RouteCoutSentier", "RouteCoutChemin",
         "RouteCoutRoute", "RouteEntretienSentier", "RouteEntretienChemin", "RouteEntretienRoute", "RouteMontee", "RouteBaisseChemin", "RouteBaisseRoute",
         "TransportVitesseSentier", "TransportVitesseChemin", "TransportVitesseRoute", "CapaciteEnvoiNiveau1", "CapaciteEnvoiNiveau2",
+        "CapaciteCharrette", "OutilsParEmploi", "OutilsPenalite", "PossessionRattrapage", "PossessionHabillerOuvriers", "PossessionHabillerPI",
+        "PossessionHabillerCadres", "PossessionMeublerOuvriers", "PossessionMeublerPI", "PossessionMeublerCadres",
         "TracePenteMax", "TracePoidsPente", "TraceReutilisation", "TraceCase", "SeuilPollution", "Dotation", "CampLegitimite", "StockFondation", "TvaEtat", "TvaCommune", "LicenciementInvendus", "EmbaucheInvendus", "VitessePublic", "VitesseScop",
         "VitessePrive", "BaisseSalaireScop", "BaisseSalaireScopMax", "LoiRemboursement", "LoiNonVises", "LoiVerrou", "LoiRegalien", "LoiMinimum",
         "ExtensionPopulation", "ExtensionBatiments", "ExtensionAutonomes", "ExtensionContenues", "ExtensionPartComptee", "ExtensionDistance", "BureaucratieEchelon",
@@ -406,6 +412,21 @@ internal sealed class Book(XLWorkbook workbook, World world, BalanceSettings bal
                 "Unités envoyées par jour vers les autres communes, par bâtiment logistique de niveau 1."),
             ("CapaciteEnvoiNiveau2", "Transport : capacité d'envoi par jour (dépôt logistique)", balance.ShippingCapacityLevel2,
                 "Par bâtiment logistique de niveau 2 ou plus."),
+            ("CapaciteCharrette", "Transport : capacité d'envoi par jour d'une charrette", balance.CartCapacity,
+                "S'ajoute à celle des bâtiments logistiques, pour chaque charrette gardée par la commune."),
+            ("OutilsParEmploi", "Outils visés par emploi productif", balance.ToolsPerJob,
+                "Pour chaque bâtiment qui a une recette ; durée d'usage des outils : feuille Produits."),
+            ("OutilsPenalite", "Production perdue sans aucun outil", balance.ToolShortagePenalty,
+                "En proportion de la part d'outils qui manque au bâtiment."),
+            ("PossessionRattrapage", "Objets durables : part du manque comblée par jour", balance.PossessionCatchUp,
+                "En plus de l'usure, rachetée chaque jour."),
+            ("PossessionHabillerOuvriers", "S'habiller : possession visée par ouvrier", Possession(balance, Rank.Workers, NeedCategory.Clothing),
+                "Objets durables : le besoin est couvert dans la mesure où le stock du groupe atteint cette possession."),
+            ("PossessionHabillerPI", "S'habiller : possession visée par profession intermédiaire", Possession(balance, Rank.Intermediate, NeedCategory.Clothing), ""),
+            ("PossessionHabillerCadres", "S'habiller : possession visée par cadre", Possession(balance, Rank.Executives, NeedCategory.Clothing), ""),
+            ("PossessionMeublerOuvriers", "Se meubler : possession visée par ouvrier", Possession(balance, Rank.Workers, NeedCategory.Furniture), ""),
+            ("PossessionMeublerPI", "Se meubler : possession visée par profession intermédiaire", Possession(balance, Rank.Intermediate, NeedCategory.Furniture), ""),
+            ("PossessionMeublerCadres", "Se meubler : possession visée par cadre", Possession(balance, Rank.Executives, NeedCategory.Furniture), ""),
             ("TracePenteMax", "Tracé : pente maximale (%)", balance.RoadMaxSlope, "Au-delà, le tracé contourne."),
             ("TracePoidsPente", "Tracé : poids de la pente", balance.RoadSlopeWeight, "Un pas coûte sa longueur × (1 + ce poids × la pente en %)."),
             ("TraceReutilisation", "Tracé : prix d'un pas sur une voie existante", balance.RoadReuseFactor,
@@ -478,7 +499,8 @@ internal sealed class Book(XLWorkbook workbook, World world, BalanceSettings bal
         var sheet = workbook.AddWorksheet("Produits");
         Header(sheet, 1, ["Id", "Nom", "Besoin", "Stockable", "Durée de vie (jours)", "Bâtiment de référence", "Liste",
             "Rang productif", "Salaires par emploi productif (feuille Bâtiments)", "Production par travailleur", .. MaterialTitles(),
-            "Coût salarial par emploi", "Énergie par emploi", "Coût des matières", "Prix recalculé", "Prix du jeu", "Écart"]);
+            "Coût salarial par emploi", "Énergie par emploi", "Coût des matières", "Prix recalculé", "Prix du jeu", "Écart",
+            Layout.ProductUsageHeader]);
 
         // Colonnes après les matières : coûts par emploi, coût des matières, prix recalculé, prix du jeu, écart.
         const int wages = Layout.ProductWages, energy = wages + 1, materials = wages + 2, price = Layout.ProductPrice, game = price + 1, gap = price + 2;
@@ -498,6 +520,11 @@ internal sealed class Book(XLWorkbook workbook, World world, BalanceSettings bal
             sheet.Cell(row, 4).Value = product.Stockable ? "oui" : "non";
             if (product.ShelfLifeDays is { } life)
                 Input(sheet.Cell(row, 5), life);
+            // Durée d'usage d'un objet durable (décidé le 20 novembre 2026) : case vide pour ce qui se consomme.
+            if (product.UsageDays is { } usage)
+                Input(sheet.Cell(row, Layout.ProductUsage), usage);
+            else
+                Input(sheet.Cell(row, Layout.ProductUsage), Blank.Value);
             sheet.Cell(row, game).Value = world.PriceOf(product.Id);
 
             if (Pricing.ReferenceFor(product.Id, world.BuildingTypes.Values) is not { } reference)

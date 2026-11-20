@@ -23,6 +23,11 @@ public static class Layout
     public const int ProductWages = 11 + 2 * MaxMaterials;
     public const int ProductPrice = ProductWages + 3;
 
+    /// <summary>Feuille Produits : la durée d'usage d'un objet durable, après l'écart (décidé le 20 novembre 2026).</summary>
+    public const int ProductUsage = ProductPrice + 3;
+
+    public const string ProductUsageHeader = "Durée d'usage (jours)";
+
     // Feuille Partie de départ : la matière m et sa quantité, à partir de la colonne J ; la production et les matières
     // par jour ; puis l'énergie, les emplois, les comptes, la clé et la classe propriétaire.
     public static int StartMaterial(int m) => 10 + 2 * m;

@@ -75,6 +75,12 @@ public static class PopulationText
 
     public const string HousingShortage = "La part des membres restés sans logement au dernier jour faute de places (et non faute d'argent).";
 
+    public static string Possessions =>
+        "Les objets durables (vêtements, meubles, poterie) ne se consomment pas : le groupe en garde un stock, qui s'use chaque "
+        + "jour selon la durée d'usage de chaque objet. Le besoin est couvert dans la mesure où ce stock atteint la possession "
+        + $"visée de son rang. Chaque jour, le groupe rachète l'usure et comble au plus {Demos.Domain.Economy.Balance.Current.PossessionCatchUp:P1} "
+        + "de son manque, dans la limite de son argent.";
+
     public const string Workplaces = "Les bâtiments et organismes où travaillent ses membres, d'après la dernière répartition des emplois.";
 
     public const string History =

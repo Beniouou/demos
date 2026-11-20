@@ -13,6 +13,26 @@ public static class Consumption
     public static IReadOnlyDictionary<NeedCategory, double> NeedsOf(Rank rank) =>
         Balance.Current.NeedsByRank.TryGetValue(rank, out var needs) ? needs : new Dictionary<NeedCategory, double>();
 
+    /// <summary>Possession visée par personne d'un besoin durable pour un rang (0 : besoin consommé chaque jour).</summary>
+    public static double PossessionOf(Rank rank, NeedCategory need) =>
+        Balance.Current.PossessionByRank.TryGetValue(rank, out var byNeed) ? byNeed.GetValueOrDefault(need) : 0;
+
+    /// <summary>
+    /// Donne à chaque groupe sa possession visée de chaque besoin durable, en objets du produit qui dure le plus
+    /// longtemps parmi ceux qui le couvrent (début de partie : chacun commence équipé).
+    /// </summary>
+    public static void EquipFully(IEnumerable<SocialClass> classes, IReadOnlyList<ProductDefinition> products)
+    {
+        foreach (var socialClass in classes)
+        {
+            foreach (var (need, perPerson) in Balance.Current.PossessionByRank.GetValueOrDefault(socialClass.Rank) ?? [])
+            {
+                if (products.Where(p => p.Need == need && p.IsDurable).OrderByDescending(p => p.UsageDays).FirstOrDefault() is { } product)
+                    socialClass.Possessions.Add(product.Id, socialClass.Population * perPerson);
+            }
+        }
+    }
+
     /// <summary>Tous les besoins consommés, quel que soit le rang.</summary>
     public static IEnumerable<NeedCategory> AllNeeds => Enum.GetValues<Rank>().SelectMany(r => NeedsOf(r).Keys).Distinct();
 
@@ -49,8 +69,35 @@ public static class Consumption
 
             var needed = new Dictionary<SocialClass, double>();
             var covered = new Dictionary<SocialClass, double>();
+            // Les besoins durables (décidé le 20 novembre 2026) : le groupe possède un stock qui s'use ; il achète de quoi
+            // remplacer l'usure et combler une part de son manque. Possession visée de chaque groupe concerné.
+            var targets = new Dictionary<SocialClass, double>();
+            var durableNeed = choices.Any(p => p.IsDurable);
             foreach (var socialClass in concerned.Where(c => c.Population > 0))
             {
+                if (durableNeed && PossessionOf(socialClass.Rank, category) is > 0 and var perPerson)
+                {
+                    var worn = 0.0;
+                    foreach (var product in choices)
+                    {
+                        var owned = socialClass.Possessions.QuantityOf(product.Id);
+                        var wear = owned * Math.Min(1, 1 / (product.UsageDays ?? 1));
+                        socialClass.Possessions.TryRemove(product.Id, wear);
+                        worn += wear;
+                        // Ce qui a été reçu en nature rejoint les objets possédés.
+                        var received = socialClass.Goods.QuantityOf(product.Id);
+                        socialClass.Goods.TryRemove(product.Id, received);
+                        socialClass.Possessions.Add(product.Id, received);
+                    }
+
+                    var target = socialClass.Population * perPerson;
+                    var missing = Math.Max(0, target - choices.Sum(p => socialClass.Possessions.QuantityOf(p.Id)));
+                    targets[socialClass] = target;
+                    needed[socialClass] = Math.Min(missing, worn + Math.Max(0, missing - worn) * Balance.Current.PossessionCatchUp);
+                    covered[socialClass] = 0;
+                    continue;
+                }
+
                 needed[socialClass] = socialClass.Population * NeedsOf(socialClass.Rank)[category];
                 covered[socialClass] = 0;
                 foreach (var product in choices)
@@ -82,6 +129,9 @@ public static class Consumption
 
                     socialClass.Wealth -= bought * price;
                     covered[socialClass] += bought;
+                    // Un objet durable acheté rejoint ce que le groupe possède.
+                    if (targets.ContainsKey(socialClass))
+                        socialClass.Possessions.Add(product.Id, bought);
                 }
             }
 
@@ -92,6 +142,19 @@ public static class Consumption
                 var missing = need - covered[socialClass];
                 var stillAffordable = cheapest > 0 ? Math.Max(0, socialClass.Wealth) / cheapest : missing;
                 var lackingMoney = Math.Max(0, missing - stillAffordable);
+
+                if (targets.TryGetValue(socialClass, out var target))
+                {
+                    // Un besoin durable est couvert à hauteur de ce que le groupe possède ; ce qui manque à sa possession
+                    // visée se partage entre manque d'argent et manque de produits comme ses achats du jour.
+                    var owned = choices.Sum(p => socialClass.Possessions.QuantityOf(p.Id));
+                    var short_ = Math.Max(0, 1 - owned / target);
+                    var moneyPart = missing > 0 ? lackingMoney / missing : 0;
+                    coverage[socialClass].Add(Math.Min(1, owned / target));
+                    moneyShortfall[socialClass].Add(short_ * moneyPart);
+                    supplyShortage[socialClass].Add(short_ * (1 - moneyPart));
+                    continue;
+                }
 
                 coverage[socialClass].Add(covered[socialClass] / need);
                 moneyShortfall[socialClass].Add(lackingMoney / need);

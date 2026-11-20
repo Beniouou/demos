@@ -10,6 +10,26 @@ namespace Demos.Domain.Economy;
 /// </summary>
 public sealed record BalanceSettings
 {
+    /// <summary>
+    /// Possession visée par personne des besoins durables (décidé le 20 novembre 2026), selon le rang : un besoin qui y
+    /// figure se couvre par un stock d'objets durables, qui s'use, au lieu d'achats consommés chaque jour.
+    /// </summary>
+    public Dictionary<Rank, Dictionary<NeedCategory, double>> PossessionByRank { get; init; } = new()
+    {
+        [Rank.Workers] = new() { [NeedCategory.Clothing] = 4, [NeedCategory.Furniture] = 4 },
+        [Rank.Intermediate] = new() { [NeedCategory.Clothing] = 7, [NeedCategory.Furniture] = 15 },
+        [Rank.Executives] = new() { [NeedCategory.Clothing] = 18, [NeedCategory.Furniture] = 75 },
+    };
+
+    /// <summary>Outils visés par emploi productif d'un bâtiment qui a une recette (décidé le 20 novembre 2026 : 0,1).</summary>
+    public double ToolsPerJob { get; init; } = 0.1;
+
+    /// <summary>Production perdue par un bâtiment qui n'a aucun outil (0,2) ; en proportion de ce qui lui manque.</summary>
+    public double ToolShortagePenalty { get; init; } = 0.2;
+
+    /// <summary>Part du manque d'objets durables qu'un groupe comble au plus chaque jour, en plus de l'usure (1/30).</summary>
+    public double PossessionCatchUp { get; init; } = 1.0 / 30;
+
     /// <summary>Besoins par personne et par jour, selon le rang : les mêmes pour tous, seules les quantités changent.</summary>
     public Dictionary<Rank, Dictionary<NeedCategory, double>> NeedsByRank { get; init; } = new()
     {
@@ -224,6 +244,9 @@ public sealed record BalanceSettings
 
     /// <summary>Capacité d'envoi par jour d'un bâtiment logistique de niveau 2 ou plus (dépôt logistique : 2 000 unités).</summary>
     public double ShippingCapacityLevel2 { get; init; } = 2000;
+
+    /// <summary>Capacité d'envoi par jour qu'ajoute une charrette gardée par une commune (décidé le 20 novembre 2026 : 50).</summary>
+    public double CartCapacity { get; init; } = 50;
 
     /// <summary>Tracé : pente la plus forte permise, en % (mètres de dénivelé pour 100 m).</summary>
     public double RoadMaxSlope { get; init; } = 12;

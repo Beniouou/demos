@@ -56,6 +56,12 @@ public static class PrototypeScenario
         foreach (var building in world.Structures.Values.Where(s => s.Kind == StructureKind.Building && world.TierOf(s) == 1))
             world.FuelStockOf(building).Add(building.HeatingProductId ?? Energy.DefaultHeating, Energy.FuelReserveOf(building));
 
+        // Chaque groupe commence avec sa possession visée d'objets durables (vêtements, meubles ; décidé le 20 novembre 2026).
+        Consumption.EquipFully(world.Classes, world.Products);
+        // Chaque bâtiment de départ qui a une recette reçoit son stock d'outils visé au complet.
+        foreach (var building in world.Structures.Values.Where(s => Tools.TargetOf(s) > 0))
+            Tools.Equip(building, world.ToolStockOf(building));
+
         // Chaque entreprise privée ou coopérative part avec sa réserve (30 jours de salaires et d'énergie), prise à ses
         // propriétaires.
         foreach (var building in world.Structures.Values.Where(Companies.HasCompanyFund))

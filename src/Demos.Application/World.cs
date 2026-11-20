@@ -485,6 +485,23 @@ public sealed class World
 
     private readonly Dictionary<string, Inventory> _fuelStocks = [];
 
+    /// <summary>Le stock d'outils d'un bâtiment (décidé le 20 novembre 2026, voir <see cref="Tools"/>), créé au besoin.</summary>
+    public Inventory ToolStockOf(Structure building)
+    {
+        if (!_toolStocks.TryGetValue(building.Id, out var stock))
+            _toolStocks[building.Id] = stock = new Inventory();
+        return stock;
+    }
+
+    private readonly Dictionary<string, Inventory> _toolStocks = [];
+
+    /// <summary>Les outils qu'un bâtiment possède, sans créer son stock.</summary>
+    public double ToolsOf(Structure building) =>
+        _toolStocks.TryGetValue(building.Id, out var stock) ? stock.QuantityOf(Tools.ProductId) : 0;
+
+    /// <summary>Effet de ses outils sur la production d'un bâtiment : 1 s'il a tous ceux qu'il vise.</summary>
+    public double ToolEffectOf(Structure building) => Tools.EffectOf(building, ToolsOf(building));
+
     /// <summary>Effet de son énergie sur un bâtiment : 1 s'il a tout, la moitié s'il n'a rien.</summary>
     public double EnergyEffectOf(Structure building) => Energy.EffectOf(EnergyShareOf(building));
 
@@ -541,7 +558,33 @@ public sealed class World
     public double ShippingCapacity(string communeId) => _structures.Values
         .Where(s => s.Kind == StructureKind.Building && s.TypeId is { } typeId && BuildingTypes.TryGetValue(typeId, out var type)
             && type.Category == Trade.LogisticsCategory && CommuneOf(s) == communeId)
-        .Sum(s => BuildingTypes[s.TypeId!].Level >= 2 ? Balance.Current.ShippingCapacityLevel2 : Balance.Current.ShippingCapacityLevel1);
+        .Sum(s => BuildingTypes[s.TypeId!].Level >= 2 ? Balance.Current.ShippingCapacityLevel2 : Balance.Current.ShippingCapacityLevel1)
+        + CartsOf(communeId) * Balance.Current.CartCapacity;
+
+    private readonly Dictionary<string, Inventory> _carts = [];
+    private readonly Dictionary<string, int> _wantedCarts = [];
+
+    /// <summary>Les charrettes d'une commune (décidé le 20 novembre 2026, voir <see cref="Carts"/>), créées au besoin.</summary>
+    public Inventory CartStockOf(string communeId)
+    {
+        if (!_carts.TryGetValue(communeId, out var stock))
+            _carts[communeId] = stock = new Inventory();
+        return stock;
+    }
+
+    /// <summary>Les charrettes en service dans une commune (une charrette usée en partie compte pour sa part).</summary>
+    public double CartsOf(string communeId) => _carts.TryGetValue(communeId, out var stock) ? stock.QuantityOf(Carts.ProductId) : 0;
+
+    /// <summary>Le nombre de charrettes que le joueur veut pour une commune.</summary>
+    public int WantedCartsOf(string communeId) => _wantedCarts.GetValueOrDefault(communeId);
+
+    public void SetWantedCarts(string communeId, int wanted)
+    {
+        if (wanted <= 0)
+            _wantedCarts.Remove(communeId);
+        else
+            _wantedCarts[communeId] = wanted;
+    }
 
     /// <summary>La capacité d'envoi que chaque commune a utilisée le dernier jour (échanges et lignes).</summary>
     public IReadOnlyDictionary<string, double> ShippingCapacityUsed { get; set; } = new Dictionary<string, double>();
@@ -560,6 +603,8 @@ public sealed class World
         foreach (var (buildingId, reserve) in _reserves)
             yield return (CommuneOfBuilding(buildingId), reserve);
         foreach (var (buildingId, stock) in _fuelStocks)
+            yield return (CommuneOfBuilding(buildingId), stock);
+        foreach (var (buildingId, stock) in _toolStocks)
             yield return (CommuneOfBuilding(buildingId), stock);
         foreach (var (communeId, reserve) in _constructionReserves)
             yield return (communeId, reserve);

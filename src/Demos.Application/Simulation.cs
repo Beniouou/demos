@@ -158,6 +158,18 @@ public sealed class Simulation(World world, GameClock clock)
             ? Roads.TravelDays(World.Roads.LevelBetween(from, to), MapScale.KmBetween(a, b), Balance.Current)
             : 1;
 
+    /// <summary>
+    /// Action du joueur : le nombre de charrettes voulu pour une commune (décidé le 20 novembre 2026). L'État de la
+    /// commune achète ce qui manque, chaque jour. Faux pour une commune inconnue.
+    /// </summary>
+    public bool SetWantedCarts(string communeId, int wanted)
+    {
+        if (!World.Communes.Any(c => c.Id == communeId))
+            return false;
+        World.SetWantedCarts(communeId, Math.Max(0, wanted));
+        return true;
+    }
+
     /// <summary>Outil d'administration : règle l'impôt d'État (part de la richesse versée chaque jour).</summary>
     public void SetStateTaxRate(double rate) => World.StateTaxRate = rate;
 
@@ -712,7 +724,8 @@ public sealed class Simulation(World world, GameClock clock)
             id => World.ReserveContentsOf(id).Count > 0 || localLines.Any(l => l.ClientId == id) ? World.ReserveOf(id) : null,
             // Les réglages d'achat des bâtiments publics (n'acheter que par ses lignes, vendeurs refusés).
             World.HasSupplySettings ? building => World.SupplySettingsOf(building.Id).PurchaseRulesFor(building, World.Structures) : null,
-            stageOutput => Deliver(localLines, stageOutput));
+            stageOutput => Deliver(localLines, stageOutput),
+            World.ToolEffectOf);
         World.SupplyShares = supplyShares;
         Deliver(distantLines, World.Produced);
         if (World.SupplyLines.Count > 0)
@@ -724,6 +737,11 @@ public sealed class Simulation(World world, GameClock clock)
         CountProduction();
         World.EnergyShares = Energy.RunDaily(World.Structures, World.TierOf, Clock.Season, World.MarketOf, World.Treasury, World.CommuneFundOf,
             World.CompanyFundOf, World.ClassesById, World.FuelStockOf, World.HeatsAllYear);
+        // Les outils s'usent ; chaque bâtiment rachète ce qui lui manque (décidé le 20 novembre 2026).
+        Tools.RunDaily(World.Structures, World.Products, World.MarketOf, World.Treasury, World.CommuneFundOf, World.CompanyFundOf,
+            World.ClassesById, World.ToolStockOf);
+        // Les charrettes s'usent ; l'État de chaque commune achète ce qui manque au nombre voulu.
+        Carts.RunDaily(World.Communes, World.Products, World.WantedCartsOf, World.CartStockOf, World.MarketOf, World.Treasury, World.CommuneFundOf);
         Housing.RunDaily(World.Structures, World.Classes, World.Treasury, World.CompanyFundOf, World.EnergyEffectOf, laws.HasHousingPriority);
         Education.RunDaily(World.Structures, World.Classes, World.Treasury, World.CompanyFundOf, World.EnergyEffectOf);
 
@@ -780,7 +798,12 @@ public sealed class Simulation(World world, GameClock clock)
         if (completed.Any(b => b.TypeId == PrefectureTypeId))
             RefreshPrefectureJobs();
         foreach (var building in completed)
+        {
+            // Un nouveau bâtiment reçoit son stock d'outils visé au complet (décidé le 20 novembre 2026).
+            if (World.Structures.TryGetValue(building.Id, out var placed))
+                Tools.Equip(placed, World.ToolStockOf(placed));
             BuildingCompleted?.Invoke(building);
+        }
     }
 
     private void PaySellers()

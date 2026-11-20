@@ -46,10 +46,11 @@ Jeu solo de construction de nation (Godot .NET 4.7, C#, .NET 10), en français. 
 | Petites images de la carte | `dotnet run --project tools/Demos.Carte -- --images` (dessine celles qui manquent dans `game/assets/carte/` ; `--forcer` les redessine toutes) |
 
 Le tableur (`equilibrage demos.xlsx`) et le rapport (`rapport simulation.html`) sont **à côté** du dossier `demos/`,
-hors du dépôt. Référence actuelle de la simulation : trésor **251 118** la 3e année (`simuler`, 3 ans, départ préréglé, depuis l'ordre
-de la journée par étapes de la chaîne du 20 novembre 2026 ; avant : 251 177 depuis les routes des bâtiments, 252 207 depuis
+hors du dépôt. Référence actuelle de la simulation : trésor **252 286** la 3e année (`simuler`, 3 ans, départ préréglé, depuis les
+objets durables et la chaîne du fer réduite du 20 novembre 2026 ; 252 563 avec la chaîne à 10, 3 et 3 emplois ; 255 632 avec les seuls biens durables ; 251 118 depuis l'ordre
+de la journée par étapes de la chaîne ; avant : 251 177 depuis les routes des bâtiments, 252 207 depuis
 l'atelier de matériaux d'État, 258 846 avant lui ; le chiffre sans loi, 410 815, date d'avant l'atelier). Avec une deuxième
-commune (`simuler 3 commune`) : **114 268** depuis la durée des trajets du 20 novembre 2026 (114 271 depuis les échanges de
+commune (`simuler 3 commune`) : **114 738** depuis les objets durables (114 268 depuis la durée des trajets du 20 novembre 2026, 114 271 depuis les échanges de
 matières, 114 954 avant eux,
 114 989 avant l'ordre par étapes, 116 018 avant les routes des bâtiments, 141 622 avant les routes).
 
@@ -76,6 +77,14 @@ matières, 114 954 avant eux,
 
 ## Économie : état actuel (résumé)
 
+Objets durables (20 novembre 2026) : `ProductDefinition.UsageDays` (vêtements, meubles, poterie, outils, charrette) ;
+habitants : `SocialClass.Possessions`, possession visée `possessionByRank`, rachat de l'usure + `possessionCatchUp` du manque
+(`Consumption`, seulement si le produit a une durée d'usage), équipés au départ (`Consumption.EquipFully`) ; bâtiments :
+`Tools` (stock `World.ToolStockOf`, `toolsPerJob`, pénalité `toolShortagePenalty` via `World.ToolEffectOf` dans `WorkDay`,
+stock offert au départ et en fin de chantier) ; chaîne du fer d'État au départ (mine de fer 3 emplois, forge 1, atelier d'outils 1) ;
+charrettes : `Carts`, `World.CartStockOf` / `SetWantedCarts` (`Simulation.SetWantedCarts`, `PlayerDesk.SetWantedCarts`),
+`cartCapacity` ajouté à `World.ShippingCapacity`. Tableur : colonne « Durée d'usage (jours) » de Produits
+(`Layout.ProductUsage`), constantes `Possession…`, `Outils…`, `CapaciteCharrette`.
 Ordre de la journée (20 novembre 2026, `WorkDay.Run`) : les bâtiments travaillent par étapes de la chaîne
 (`WorkDay.ChainStages`), la production d'une étape sert la suivante le jour même ; dans une étape, une matière qui manque
 est partagée au prorata du besoin (`ShortageRatios`, plafond `marketCap` de `Supply.Acquire`), puis ce qui reste est

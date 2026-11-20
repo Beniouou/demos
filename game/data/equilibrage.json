@@ -4,6 +4,14 @@
     "Intermediate": { "Food": 1, "Clothing": 0.02, "Furniture": 0.02, "Leisure": 0.1, "Administration": 0.02, "Security": 0.02 },
     "Executives": { "Food": 1, "Clothing": 0.05, "Furniture": 0.1, "Leisure": 0.2, "Administration": 0.05, "Security": 0.05 }
   },
+  "possessionByRank": {
+    "Workers": { "Clothing": 4, "Furniture": 4 },
+    "Intermediate": { "Clothing": 7, "Furniture": 15 },
+    "Executives": { "Clothing": 18, "Furniture": 75 }
+  },
+  "possessionCatchUp": 0.0333333333,
+  "toolsPerJob": 0.1,
+  "toolShortagePenalty": 0.2,
   "housingPlacesByRank": { "Workers": 1, "Intermediate": 2, "Executives": 4 },
   "supervisorsPerJob": 0.1,
   "directorsPerJob": 0.01,
@@ -48,6 +56,7 @@
   "transportSpeedRoad": 80,
   "shippingCapacityLevel1": 500,
   "shippingCapacityLevel2": 2000,
+  "cartCapacity": 50,
   "roadMaxSlope": 12,
   "roadSlopeWeight": 0.1,
   "roadReuseFactor": 0.5,

@@ -16,13 +16,36 @@ namespace Demos.Game;
 public partial class TransportPage : VBoxContainer, IMenuPage
 {
     private readonly GameView _view = null!;
+    private readonly PlayerDesk _desk = null!;
     private readonly CommuneFocus _focus = null!;
     private readonly RichTextLabel _text = null!;
+    private readonly Label _wanted = null!;
+    private readonly Label _answer = null!;
 
-    public TransportPage(GameView view, CommuneFocus focus)
+    public TransportPage(GameView view, PlayerDesk desk, CommuneFocus focus)
     {
         _view = view;
+        _desk = desk;
         _focus = focus;
+        AddThemeConstantOverride("separation", 6);
+
+        // Les charrettes voulues pour la commune (décidé le 20 novembre 2026) : − et + changent le nombre ; l'État de la
+        // commune achète ce qui manque.
+        var carts = new HBoxContainer();
+        carts.AddThemeConstantOverride("separation", 6);
+        carts.AddChild(new Label { Text = "Charrettes voulues", TooltipText = CartsHint, MouseFilter = MouseFilterEnum.Pass });
+        var less = new Button { Text = "−", FocusMode = FocusModeEnum.None, TooltipText = "Une charrette de moins" };
+        less.Pressed += () => ChangeCarts(-1);
+        carts.AddChild(less);
+        _wanted = new Label { CustomMinimumSize = new Vector2(32, 0), HorizontalAlignment = HorizontalAlignment.Center };
+        carts.AddChild(_wanted);
+        var more = new Button { Text = "+", FocusMode = FocusModeEnum.None, TooltipText = "Une charrette de plus" };
+        more.Pressed += () => ChangeCarts(1);
+        carts.AddChild(more);
+        _answer = UiTheme.Caption("");
+        carts.AddChild(_answer);
+        AddChild(carts);
+
         _text = new HintText
         {
             BbcodeEnabled = true,
@@ -37,8 +60,19 @@ public partial class TransportPage : VBoxContainer, IMenuPage
     // Godot recrée les nœuds C# par ce constructeur sans paramètre (rechargement des scripts).
     public TransportPage() { }
 
+    private const string CartsHint =
+        "Une charrette ajoute de la capacité d'envoi à la commune. Elle se fabrique à l'atelier (2 planches et 1 outil) et "
+        + "s'use. L'État de la commune garde le nombre voulu : il prend d'abord les charrettes qu'il a produites, puis achète "
+        + "ce qui manque au marché, avec la caisse de la commune puis le trésor.";
+
+    private void ChangeCarts(int step) =>
+        _answer.Text = _desk.SetWantedCarts(_focus.Id, _view.WantedCartsOf(_focus.Id) + step).Message;
+
     public void Refresh()
     {
+        var wanted = $"{_view.WantedCartsOf(_focus.Id)}";
+        if (_wanted.Text != wanted)
+            _wanted.Text = wanted;
         var text = Describe();
         // Le texte n'est remis que s'il a changé : sinon la fiche remonterait en haut à chaque image.
         if (text != _text.Text)
@@ -79,6 +113,7 @@ public partial class TransportPage : VBoxContainer, IMenuPage
         }
 
         AppendCapacity(text, settings);
+        AppendCarts(text, settings);
         AppendShipments(text);
 
         text.Append(SheetText.Section("Dernier bilan des routes"));
@@ -117,8 +152,21 @@ public partial class TransportPage : VBoxContainer, IMenuPage
         }
 
         var used = capacity.UsedLastDay;
-        text.AppendLine($"{SheetText.Escape(string.Join(", ", capacity.Buildings))} : {capacity.PerDay:N0} par jour · utilisée hier : "
-            + $"{used:N0} ({used / capacity.PerDay:P0})");
+        var carts = capacity.FromCarts > 0 ? $" · charrettes : {capacity.FromCarts:N0}" : "";
+        text.AppendLine($"{SheetText.Escape(string.Join(", ", capacity.Buildings))} : {capacity.PerDay - capacity.FromCarts:N0}{carts} par jour · "
+            + $"utilisée hier : {used:N0} ({used / capacity.PerDay:P0})");
+    }
+
+    /// <summary>Les charrettes de la commune : en service, voulues, ce qu'elles ajoutent, leur usure et leur prix.</summary>
+    private void AppendCarts(StringBuilder text, BalanceSettings settings)
+    {
+        text.Append(SheetText.Section("Charrettes", CartsHint));
+        var cartsView = _view.CartsOf(_focus.Id);
+        text.AppendLine(cartsView.Wanted == 0 && cartsView.InService < 0.05
+            ? SheetText.Muted("Aucune charrette voulue : réglez le nombre avec − et + en haut de la page.")
+            : $"{cartsView.Wanted} voulues · {cartsView.InService:N1} en service · +{cartsView.InService * settings.CartCapacity:N0} par jour de capacité d'envoi · "
+                + SheetText.Muted($"usure : 1 tous les {(cartsView.InService > 0 ? cartsView.UsageDays / cartsView.InService : cartsView.UsageDays):N0} jours environ · "
+                    + $"prix {cartsView.Price:N2}"));
     }
 
     /// <summary>Les chargements partis de la commune et encore en route, puis ce qui est en route vers elle.</summary>

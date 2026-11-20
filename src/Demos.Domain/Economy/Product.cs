@@ -46,8 +46,16 @@ public sealed record NeedDefinition(string Id, string Name, string? Description 
 /// Faux pour un produit qui se consomme le jour même ou se perd (l'eau, plus tard l'électricité), sauf dans un
 /// stockage fait pour lui (le château d'eau).
 /// </param>
+/// <param name="UsageDays">
+/// Durée d'usage d'un objet durable (vêtements, meubles, outils…), en jours (décidé le 20 novembre 2026) : il n'est pas
+/// consommé, celui qui le possède en garde un stock qui perd chaque jour 1 ÷ cette durée. Null pour une matière ou un
+/// produit qui se consomme.
+/// </param>
 public sealed record ProductDefinition(
-    string Id, string Name, NeedCategory? Need, double BasePrice, double? ShelfLifeDays = null, bool Stockable = true)
+    string Id, string Name, NeedCategory? Need, double BasePrice, double? ShelfLifeDays = null, bool Stockable = true,
+    double? UsageDays = null)
 {
     public bool IsPerishable => ShelfLifeDays is > 0;
+
+    public bool IsDurable => UsageDays is > 0;
 }

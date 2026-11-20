@@ -114,7 +114,7 @@ public partial class MainMenu : HBoxContainer
             [
                 new("Unités de production", () => new BuildingsPage(view, desk, ProductionHistory, Focus)),
                 new("Construire", () => new ConstructionPage(view, desk, map, Close, message => Message?.Invoke(message), Focus)),
-                new("Transport", () => new TransportPage(view, Focus)),
+                new("Transport", () => new TransportPage(view, desk, Focus)),
                 new("Chaîne de production", () => new ProductionChainPage(view, ShowBuilding, Focus)),
                 new("Statistiques", () => new ProductionStatsPage(view, ProductionHistory, Focus)),
             ], Wide: true),

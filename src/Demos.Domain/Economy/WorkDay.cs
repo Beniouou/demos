@@ -37,7 +37,8 @@ public static class WorkDay
         Dictionary<string, double>? supplyShares = null,
         Func<string, Inventory?>? reserveOf = null,
         Func<Structure, PurchaseRules?>? purchaseRulesOf = null,
-        Action<IReadOnlyDictionary<string, double>>? afterStage = null)
+        Action<IReadOnlyDictionary<string, double>>? afterStage = null,
+        Func<Structure, double>? toolEffectOf = null)
     {
         // Qui travaille où, rangé une fois par bâtiment, et les classes par identifiant : on ne parcourt pas toutes les
         // classes du pays pour chaque bâtiment.
@@ -76,6 +77,8 @@ public static class WorkDay
                 planned *= energyShareOf?.Invoke(workplace) ?? 1;
                 // Un bâtiment public produit moins quand l'entité qui le gère est débordée (extension).
                 planned *= publicEfficiencyOf?.Invoke(workplace) ?? 1;
+                // Un bâtiment qui manque d'outils produit moins (décidé le 20 novembre 2026).
+                planned *= toolEffectOf?.Invoke(workplace) ?? 1;
                 return (Workplace: workplace, CommuneId: communeId, Planned: planned, Reserve: reserveOf?.Invoke(workplace.Id));
             }).ToList();
 

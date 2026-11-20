@@ -23,6 +23,10 @@ public static class BalanceApplier
     private const string ProductsFile = "products.json";
     private const string ScenarioFile = "partie-depart.json";
 
+    /// <summary>La possession visée par personne d'un besoin durable pour un rang (0 sans réglage).</summary>
+    private static double Possession(BalanceSettings balance, Rank rank, NeedCategory need) =>
+        balance.PossessionByRank.GetValueOrDefault(rank)?.GetValueOrDefault(need) ?? 0;
+
     // Les constantes reportées : clé du tableur, chemin dans equilibrage.json, valeur actuelle.
     private static readonly (string Key, string[] Path, Func<BalanceSettings, double> Current)[] Constants =
     [
@@ -74,6 +78,16 @@ public static class BalanceApplier
         ("TransportVitesseRoute", ["transportSpeedRoad"], b => b.TransportSpeedRoad),
         ("CapaciteEnvoiNiveau1", ["shippingCapacityLevel1"], b => b.ShippingCapacityLevel1),
         ("CapaciteEnvoiNiveau2", ["shippingCapacityLevel2"], b => b.ShippingCapacityLevel2),
+        ("CapaciteCharrette", ["cartCapacity"], b => b.CartCapacity),
+        ("OutilsParEmploi", ["toolsPerJob"], b => b.ToolsPerJob),
+        ("OutilsPenalite", ["toolShortagePenalty"], b => b.ToolShortagePenalty),
+        ("PossessionRattrapage", ["possessionCatchUp"], b => b.PossessionCatchUp),
+        ("PossessionHabillerOuvriers", ["possessionByRank", "Workers", "Clothing"], b => Possession(b, Rank.Workers, NeedCategory.Clothing)),
+        ("PossessionHabillerPI", ["possessionByRank", "Intermediate", "Clothing"], b => Possession(b, Rank.Intermediate, NeedCategory.Clothing)),
+        ("PossessionHabillerCadres", ["possessionByRank", "Executives", "Clothing"], b => Possession(b, Rank.Executives, NeedCategory.Clothing)),
+        ("PossessionMeublerOuvriers", ["possessionByRank", "Workers", "Furniture"], b => Possession(b, Rank.Workers, NeedCategory.Furniture)),
+        ("PossessionMeublerPI", ["possessionByRank", "Intermediate", "Furniture"], b => Possession(b, Rank.Intermediate, NeedCategory.Furniture)),
+        ("PossessionMeublerCadres", ["possessionByRank", "Executives", "Furniture"], b => Possession(b, Rank.Executives, NeedCategory.Furniture)),
         ("TracePenteMax", ["roadMaxSlope"], b => b.RoadMaxSlope),
         ("TracePoidsPente", ["roadSlopeWeight"], b => b.RoadSlopeWeight),
         ("TraceReutilisation", ["roadReuseFactor"], b => b.RoadReuseFactor),
@@ -688,6 +702,8 @@ public static class BalanceApplier
         {
             if (Sheet("Produits") is not { } sheet)
                 return;
+            // Un tableur d'avant les objets durables n'a pas la colonne : on n'y touche pas.
+            var usageColumn = Text(sheet.Cell(1, Layout.ProductUsage)) == Layout.ProductUsageHeader;
 
             foreach (var row in Rows(sheet, 2, "A"))
             {
@@ -717,6 +733,28 @@ public static class BalanceApplier
                 {
                     json["shelfLifeDays"] = Json(days);
                     Changes.Add($"{id} : durée de vie {(product.ShelfLifeDays is { } c ? $"{Show(c)} jours" : "aucune")} → {Show(days)} jours");
+                }
+
+                // Durée d'usage d'un objet durable (décidé le 20 novembre 2026) : une case vide veut dire « se consomme ».
+                if (!usageColumn)
+                    continue;
+                var usageCell = row.Cell(Layout.ProductUsage);
+                var usage = Number(usageCell, integer: true, optional: true);
+                if (usage == 0)
+                {
+                    Errors.Add($"{Where(usageCell)} : une durée d'usage est d'au moins un jour (videz la case pour un produit qui se consomme).");
+                    continue;
+                }
+
+                if (usage is null && usageCell.Value.IsBlank && product.UsageDays is { } oldUsage)
+                {
+                    json.Remove("usageDays");
+                    Changes.Add($"{id} : durée d'usage {Show(oldUsage)} jours → se consomme");
+                }
+                else if (usage is { } usageDays && (product.UsageDays is not { } currentUsage || !Same(usageDays, currentUsage)))
+                {
+                    json["usageDays"] = Json(usageDays);
+                    Changes.Add($"{id} : durée d'usage {(product.UsageDays is { } u ? $"{Show(u)} jours" : "aucune")} → {Show(usageDays)} jours");
                 }
             }
         }

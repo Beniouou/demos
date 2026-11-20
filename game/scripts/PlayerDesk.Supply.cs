@@ -37,6 +37,12 @@ public sealed partial class PlayerDesk
             : new DeskAnswer($"Réglages enregistrés : {Name(buildingId)}.");
     }
 
+    /// <summary>Change le nombre de charrettes voulu pour une commune : l'État de la commune achète ce qui manque.</summary>
+    public DeskAnswer SetWantedCarts(string communeId, int wanted) =>
+        new(Simulation.SetWantedCarts(communeId, wanted)
+            ? $"Charrettes voulues : {System.Math.Max(0, wanted)} pour {Name(communeId)}."
+            : "Commune inconnue.");
+
     private string Name(string structureId) =>
         World.Structures.TryGetValue(structureId, out var structure) ? World.DisplayNameOf(structure) : structureId;
 }

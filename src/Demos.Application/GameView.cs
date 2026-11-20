@@ -48,11 +48,22 @@ public sealed class GameView(Simulation simulation)
     public ShippingCapacityView ShippingCapacityOf(string communeId) => new(
         World.ShippingCapacity(communeId),
         World.ShippingCapacityUsed.GetValueOrDefault(communeId),
+        World.CartsOf(communeId) * Balance.Current.CartCapacity,
         World.Structures.Values
             .Where(s => s.Kind == StructureKind.Building && s.TypeId is { } typeId && World.BuildingTypes.TryGetValue(typeId, out var type)
                 && type.Category == Demos.Domain.Economy.Trade.LogisticsCategory && World.CommuneOf(s) == communeId)
             .Select(World.DisplayNameOf)
             .ToList());
+
+    /// <summary>Le nombre de charrettes que le joueur veut pour une commune.</summary>
+    public int WantedCartsOf(string communeId) => World.WantedCartsOf(communeId);
+
+    /// <summary>Les charrettes d'une commune (décidé le 20 novembre 2026).</summary>
+    public CartsView CartsOf(string communeId) => new(
+        World.WantedCartsOf(communeId),
+        World.CartsOf(communeId),
+        World.Products.FirstOrDefault(p => p.Id == Demos.Domain.Economy.Carts.ProductId)?.UsageDays ?? 0,
+        World.PriceOf(Demos.Domain.Economy.Carts.ProductId));
 
     /// <summary>Les chargements en route qui partent de la commune (ou qui y arrivent), le plus proche de l'arrivée d'abord.</summary>
     public IReadOnlyList<ShipmentView> ShipmentsFrom(string communeId) => Shipments(s => s.Origin == communeId);
@@ -485,8 +496,23 @@ public sealed class GameView(Simulation simulation)
                 c.Ideology.Name, c.UnemployedMembers, c.SeasonIncome, c.SeasonMoneyShortfall, c.SeasonSupplyShortage,
                 c.HousingPlaceShortage, c.WealthPerMember,
                 c.Employment.Where(e => e.Value > 0).OrderByDescending(e => e.Value)
-                    .Select(e => new WorkplaceView(e.Key, NameOf(e.Key), c.Population * e.Value)).ToList())).ToList());
+                    .Select(e => new WorkplaceView(e.Key, NameOf(e.Key), c.Population * e.Value)).ToList(),
+                PossessionsOf(c))).ToList());
     }
+
+    /// <summary>Les objets durables d'un groupe, besoin par besoin : ce qu'il possède, ce qu'il vise, ce qui s'use par jour.</summary>
+    private List<PossessionView> PossessionsOf(Demos.Domain.Population.SocialClass socialClass) =>
+        (Balance.Current.PossessionByRank.GetValueOrDefault(socialClass.Rank) ?? [])
+        .Select(need =>
+        {
+            var products = World.Products.Where(p => p.Need == need.Key && p.IsDurable).ToList();
+            return new PossessionView(need.Key.Id,
+                products.Sum(p => socialClass.Possessions.QuantityOf(p.Id)),
+                socialClass.Population * need.Value,
+                products.Sum(p => socialClass.Possessions.QuantityOf(p.Id) / p.UsageDays!.Value));
+        })
+        .Where(p => p.Target > 0)
+        .ToList();
 
     /// <summary>
     /// Les structures emboîtées, de l'État (la racine) aux communes, puis à leurs organismes et bâtiments, chacune
@@ -690,7 +716,14 @@ public sealed record SocialClassView(
     double SupplyShortage = 0,
     double HousingPlaceShortage = 0,
     double WealthPerMember = 0,
-    IReadOnlyList<WorkplaceView>? Workplaces = null);
+    IReadOnlyList<WorkplaceView>? Workplaces = null,
+    IReadOnlyList<PossessionView>? Possessions = null);
+
+/// <summary>
+/// Les objets durables d'un groupe pour un besoin (décidé le 20 novembre 2026) : ce qu'il possède, sa possession visée
+/// (membres × possession par personne) et ce qui s'use par jour, en tout pour le groupe.
+/// </summary>
+public sealed record PossessionView(string NeedId, double Owned, double Target, double WearPerDay);
 
 /// <summary>Un lieu de travail d'un groupe local : la structure et le nombre de membres qui y travaillent.</summary>
 public sealed record WorkplaceView(string StructureId, string Name, double Members);
@@ -834,8 +867,14 @@ public sealed record SupplyLineView(
     bool IsActive,
     bool MissingLogistics = false);
 
-/// <summary>La capacité d'envoi d'une commune : par jour, utilisée le dernier jour, et les bâtiments qui la donnent.</summary>
-public sealed record ShippingCapacityView(double PerDay, double UsedLastDay, IReadOnlyList<string> Buildings);
+/// <summary>
+/// La capacité d'envoi d'une commune : par jour (bâtiments et charrettes), utilisée le dernier jour, la part des
+/// charrettes, et les bâtiments qui la donnent.
+/// </summary>
+public sealed record ShippingCapacityView(double PerDay, double UsedLastDay, double FromCarts, IReadOnlyList<string> Buildings);
+
+/// <summary>Les charrettes d'une commune : voulues, en service, leur durée d'usage et leur prix.</summary>
+public sealed record CartsView(int Wanted, double InService, double UsageDays, double Price);
 
 /// <summary>
 /// Un chargement en route entre deux communes : le produit, la quantité (après la perte en route), d'où et vers où, le

@@ -26,6 +26,23 @@ public sealed class SocialClass(string id, string name, Rank rank, Ideology ideo
     /// <summary>Produits reçus en paiement en nature, consommés avant d'acheter sur le marché.</summary>
     public Inventory Goods { get; } = new();
 
+    /// <summary>
+    /// Objets durables possédés par le groupe (vêtements, meubles… ; décidé le 20 novembre 2026) : ils s'usent chaque
+    /// jour et couvrent les besoins durables (voir <see cref="Consumption"/>).
+    /// </summary>
+    public Inventory Possessions { get; } = new();
+
+    /// <summary>Donne à un autre groupe une part des objets durables (des membres qui partent emportent les leurs).</summary>
+    private void GivePossessions(SocialClass target, double share)
+    {
+        foreach (var (productId, quantity) in Possessions.Contents.ToList())
+        {
+            var given = quantity * share;
+            Possessions.TryRemove(productId, given);
+            target.Possessions.Add(productId, given);
+        }
+    }
+
     /// <summary>Part des besoins de base couverte, de 0 à 1 : moyenne de se nourrir, s'habiller et se loger.</summary>
     public double NeedsSatisfaction { get; set; } = 0.5;
 
@@ -173,6 +190,7 @@ public sealed class SocialClass(string id, string name, Rank rank, Ideology ideo
         var wealth = Wealth * share;
         Wealth -= wealth;
         target.Wealth += wealth;
+        GivePossessions(target, share);
 
         var targetResidents = target._residence.ToDictionary(r => r.Key, r => r.Value * target.Population);
         foreach (var (communeId, residence) in _residence)
@@ -199,6 +217,7 @@ public sealed class SocialClass(string id, string name, Rank rank, Ideology ideo
         var wealth = Wealth * share;
         Wealth -= wealth;
         target.Wealth += wealth;
+        GivePossessions(target, share);
 
         if (toCommuneId is not null)
         {

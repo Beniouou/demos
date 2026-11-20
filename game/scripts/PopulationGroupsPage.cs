@@ -138,6 +138,15 @@ public partial class PopulationGroupsPage : HBoxContainer, IMenuPage
             + SheetText.Muted($"(sans place : {group.HousingPlaceShortage:P0})", PopulationText.HousingShortage));
         text.AppendLine($"{SheetText.Hint("Manque d'argent", PopulationText.MoneyShortfall)} {group.MoneyShortfall:P0} · "
             + $"{SheetText.Hint("manque de produits", PopulationText.SupplyShortage)} {group.SupplyShortage:P0}");
+        // Les objets durables, besoin par besoin, par personne.
+        if (group.Possessions is { Count: > 0 } possessions && group.Population > 0)
+        {
+            text.AppendLine(SheetText.Hint("Possessions", PopulationText.Possessions));
+            foreach (var possession in possessions)
+                text.AppendLine($"    {FlowText.NeedName(possession.NeedId)} : {possession.Owned / group.Population:N1} par personne sur "
+                    + $"{possession.Target / group.Population:N1} visés · "
+                    + SheetText.Muted($"usure {possession.WearPerDay / group.Population:N3} par jour"));
+        }
 
         text.Append(SheetText.Section("Politique et éducation"));
         text.AppendLine($"{SheetText.Hint("Adhésion", PopulationText.Adhesion)} {group.Adhesion:P0} · "

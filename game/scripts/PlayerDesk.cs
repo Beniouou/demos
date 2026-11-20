@@ -269,6 +269,15 @@ public sealed partial class PlayerDesk(Simulation simulation)
                 lines.Add("Matières par jour : " + string.Join(", ", production.Materials.Select(m => $"{m.ProductId} {perDay * m.Quantity:N1}")));
         }
 
+        // Les outils (décidé le 20 novembre 2026) : ceux qu'il a, ceux qu'il vise, et ce que leur manque lui coûte.
+        if (Tools.TargetOf(building) is > 0 and var toolTarget)
+        {
+            var tools = world.ToolsOf(building);
+            var loss = 1 - world.ToolEffectOf(building);
+            lines.Add($"Outils : {tools:N1} sur {toolTarget:N1} visés ({Balance.Current.ToolsPerJob:N1} par emploi productif) · "
+                + (loss > 0.0005 ? $"production −{loss:P0} par manque d'outils" : "rien ne manque"));
+        }
+
         var wages = world.Classes.Sum(c => c.MembersWorkingIn(building.Id) * Staffing.WageOf(building, c.Rank));
         if (wages > 0)
             lines.Add($"Salaires dus : {wages:N0} par jour");
