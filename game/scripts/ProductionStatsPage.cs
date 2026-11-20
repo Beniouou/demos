@@ -18,6 +18,7 @@ public partial class ProductionStatsPage : VBoxContainer, IMenuPage
     private const string SentHint = "Ce qui est parti vers une autre commune (échanges entre communes), avant la perte de transport.";
     private const string LostInTransitHint = "La part de l'envoyé qui s'est perdue en route vers une autre commune (échanges et lignes d'approvisionnement), selon la distance ; un chemin ou une route la réduit.";
     private const string LostHint = "Ce qui a été perdu dans la commune : faute de place pour stocker, ou parce que le produit s'est périmé.";
+    private const string InTransitHint = "Ce qui est parti de la commune vers une autre et n'est pas encore arrivé, à la fin de la période (après la perte en route).";
     private const string StockHint = "Ce qui est dans le stockage de la commune, en vente, à la fin de la période.";
     private const string PriceHint = "Le prix du produit ; pour l'instant, les prix restent les prix de départ.";
     private const string HistoryHint = "Un relevé le 1er de chaque mois, pris par l'interface pendant la partie : il repart de zéro à chaque lancement.";
@@ -143,18 +144,19 @@ public partial class ProductionStatsPage : VBoxContainer, IMenuPage
         if (products.Count == 0)
             return text + SheetText.Muted("Aucun produit encore.");
 
-        text.Append("[table=8]");
+        text.Append("[table=9]");
         foreach (var (header, hint) in new[]
                  {
                      ("Produit", ""), ("Production", ProducedHint), ("Utilisé", UsedHint), ("Envoyé", SentHint),
-                     ("Perdu en route", LostInTransitHint), ("Perdu au stockage", LostHint), ("Stock", StockHint), ("Prix", PriceHint),
+                     ("Perdu en route", LostInTransitHint), ("Perdu au stockage", LostHint), ("En route", InTransitHint), ("Stock", StockHint),
+                     ("Prix", PriceHint),
                  })
             text.Append(PopulationText.Cell(hint == "" ? header : SheetText.Hint(header, hint), header: true));
         foreach (var (productId, name) in products)
         {
             var figures = ProductFigures.Of(now, productId, communeId).Since(ProductFigures.Of(before, productId, communeId));
             if (figures.Produced <= 0 && figures.Used <= 0 && figures.Sent <= 0 && figures.Lost <= 0 && figures.LostInTransit <= 0
-                && figures.Stock <= 0)
+                && figures.InTransit <= 0 && figures.Stock <= 0)
                 continue;
             text.Append(PopulationText.Cell(SheetText.Escape(name)));
             text.Append(PopulationText.Cell($"{figures.Produced:N0}"));
@@ -162,6 +164,7 @@ public partial class ProductionStatsPage : VBoxContainer, IMenuPage
             text.Append(PopulationText.Cell($"{figures.Sent:N0}"));
             text.Append(PopulationText.Cell($"{figures.LostInTransit:N0}"));
             text.Append(PopulationText.Cell($"{figures.Lost:N0}"));
+            text.Append(PopulationText.Cell($"{figures.InTransit:N0}"));
             text.Append(PopulationText.Cell($"{figures.Stock:N0}"));
             text.Append(PopulationText.Cell($"{figures.Price:N2}"));
         }

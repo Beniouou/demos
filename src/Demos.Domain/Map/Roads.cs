@@ -91,6 +91,21 @@ public sealed record RoadChange(RoadLink Link, RoadLevel Before, double Cost, st
 /// </summary>
 public static class Roads
 {
+    /// <summary>
+    /// Durée d'un trajet entre deux communes, en jours (décidé le 20 novembre 2026) : la distance divisée par la vitesse
+    /// de la liaison (sans liaison ou sentier, chemin, route), arrondie au jour supérieur, au moins 1 jour.
+    /// </summary>
+    public static int TravelDays(RoadLevel level, double km, BalanceSettings settings)
+    {
+        var speed = level switch
+        {
+            RoadLevel.Path => settings.TransportSpeedPath,
+            RoadLevel.Road => settings.TransportSpeedRoad,
+            _ => settings.TransportSpeedTrail,
+        };
+        return speed <= 0 ? 1 : Math.Max(1, (int)Math.Ceiling(km / speed - 1e-9));
+    }
+
     public static double LossFactor(RoadLevel level, BalanceSettings settings) => level switch
     {
         RoadLevel.Path => 1 - settings.RoadPathLossCut,

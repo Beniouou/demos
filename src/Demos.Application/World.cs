@@ -534,6 +534,18 @@ public sealed class World
         && s.TypeId is { } typeId && BuildingTypes.TryGetValue(typeId, out var type) && type.Category == Trade.LogisticsCategory
         && CommuneOf(s) == communeId);
 
+    /// <summary>
+    /// Ce qu'une commune peut envoyer par jour vers les autres communes (décidé le 20 novembre 2026) : la somme de ses
+    /// bâtiments logistiques, selon leur niveau (réglages <c>shippingCapacityLevel1</c> et <c>shippingCapacityLevel2</c>).
+    /// </summary>
+    public double ShippingCapacity(string communeId) => _structures.Values
+        .Where(s => s.Kind == StructureKind.Building && s.TypeId is { } typeId && BuildingTypes.TryGetValue(typeId, out var type)
+            && type.Category == Trade.LogisticsCategory && CommuneOf(s) == communeId)
+        .Sum(s => BuildingTypes[s.TypeId!].Level >= 2 ? Balance.Current.ShippingCapacityLevel2 : Balance.Current.ShippingCapacityLevel1);
+
+    /// <summary>La capacité d'envoi que chaque commune a utilisée le dernier jour (échanges et lignes).</summary>
+    public IReadOnlyDictionary<string, double> ShippingCapacityUsed { get; set; } = new Dictionary<string, double>();
+
     /// <summary>Les chargements partis hier vers une autre commune, qui arrivent au début de la journée.</summary>
     public List<Shipment> ShipmentsInTransit { get; } = [];
 

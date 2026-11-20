@@ -207,6 +207,24 @@ public sealed record BalanceSettings
     /// <summary>Routes : part de la perte de transport retirée sur une route.</summary>
     public double RoadRoadLossCut { get; init; } = 0.5;
 
+    /// <summary>Transport entre communes : km parcourus par jour sans liaison ou sur un sentier (décidé le 20 novembre 2026 : 20).</summary>
+    public double TransportSpeedTrail { get; init; } = 20;
+
+    /// <summary>Transport entre communes : km parcourus par jour sur un chemin (40).</summary>
+    public double TransportSpeedPath { get; init; } = 40;
+
+    /// <summary>Transport entre communes : km parcourus par jour sur une route (80).</summary>
+    public double TransportSpeedRoad { get; init; } = 80;
+
+    /// <summary>
+    /// Capacité d'envoi par jour vers les autres communes d'un bâtiment logistique de niveau 1 (grenier, entrepôt, silo ;
+    /// décidé le 20 novembre 2026 : 500 unités).
+    /// </summary>
+    public double ShippingCapacityLevel1 { get; init; } = 500;
+
+    /// <summary>Capacité d'envoi par jour d'un bâtiment logistique de niveau 2 ou plus (dépôt logistique : 2 000 unités).</summary>
+    public double ShippingCapacityLevel2 { get; init; } = 2000;
+
     /// <summary>Tracé : pente la plus forte permise, en % (mètres de dénivelé pour 100 m).</summary>
     public double RoadMaxSlope { get; init; } = 12;
 

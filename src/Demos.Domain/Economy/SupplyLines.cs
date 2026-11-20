@@ -66,7 +66,12 @@ public static class SupplyLines
         Func<string, Treasury>? communeFundOf = null,
         Func<string, string, double>? transportLossOf = null,
         Action<string, string, double>? shipped = null,
-        Func<string, string, bool>? canTrade = null)
+        Func<string, string, bool>? canTrade = null,
+        Action<Shipment>? dispatch = null,
+        Func<string, string, int>? travelDaysOf = null,
+        Func<string, string, double>? inTransitOf = null,
+        Func<string, string, string>? capacityHolderOf = null,
+        Dictionary<string, double>? capacityLeft = null)
     {
         var delivered = new Dictionary<string, double>();
         var noClasses = new Dictionary<string, SocialClass>();
@@ -95,9 +100,17 @@ public static class SupplyLines
             // qu'il faut au client pour une journée à plein régime, moins sa réserve ; il faut en envoyer plus pour
             // couvrir la perte en route.
             var offered = Math.Min(produced.GetValueOrDefault(supplier.Id) * line.Share, originMarket.QuantityOf(productId, seller));
+            // Entre communes, ce qui part arrive dans quelques jours (décidé le 20 novembre 2026) : le client compare sa
+            // réserve et ce qui est déjà en route vers lui à ce qu'il lui faut jusqu'à l'arrivée.
+            var days = sameCommune || dispatch is null ? 1 : travelDaysOf?.Invoke(origin, destination) ?? 1;
+            var coming = sameCommune ? 0 : inTransitOf?.Invoke(client.Id, productId) ?? 0;
             var need = recipe.QuantityPerWorker * productionWorkers.GetValueOrDefault(client.Id) * material.Quantity;
-            var wanted = Math.Max(0, need - reserve.QuantityOf(productId)) / Math.Max(0.01, 1 - loss);
+            var wanted = Math.Max(0, need * days - reserve.QuantityOf(productId) - coming) / Math.Max(0.01, 1 - loss);
             var sent = Math.Min(offered, wanted);
+            // Entre communes, la capacité d'envoi de la commune qui sert l'envoi borne ce qui part (décidé le 20 novembre 2026).
+            var holder = sameCommune ? null : capacityHolderOf?.Invoke(origin, destination);
+            if (holder is not null && capacityLeft is not null)
+                sent = Math.Min(sent, Math.Max(0, capacityLeft.GetValueOrDefault(holder)));
 
             // Le client paie au prix du marché ce qui part, sauf dans sa commune : c'est déjà la production de son État.
             var payer = Supply.PayerOf(client, destination, treasury, communeFundOf?.Invoke(destination), null, noClasses);
@@ -113,10 +126,17 @@ public static class SupplyLines
                 payer.Spend(sent * price);
             if (!sameCommune)
                 shipped?.Invoke(origin, destination, sent);
+            if (holder is not null && capacityLeft is not null)
+                capacityLeft[holder] = capacityLeft.GetValueOrDefault(holder) - sent;
 
             var arrived = sent * (1 - loss);
             originMarket.CountLostInTransit(productId, sent - arrived);
-            reserve.Add(productId, arrived);
+            // Vers une autre commune, le chargement part sur la route et arrive dans la réserve du client après le trajet ;
+            // dans la même commune (ou sans file d'attente), il y entre tout de suite.
+            if (!sameCommune && dispatch is not null)
+                dispatch(new Shipment(origin, destination, productId, seller, arrived, days, client.Id, days));
+            else
+                reserve.Add(productId, arrived);
             delivered[line.Id] = arrived;
         }
 

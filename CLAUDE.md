@@ -49,7 +49,8 @@ Le tableur (`equilibrage demos.xlsx`) et le rapport (`rapport simulation.html`) 
 hors du dépôt. Référence actuelle de la simulation : trésor **251 118** la 3e année (`simuler`, 3 ans, départ préréglé, depuis l'ordre
 de la journée par étapes de la chaîne du 20 novembre 2026 ; avant : 251 177 depuis les routes des bâtiments, 252 207 depuis
 l'atelier de matériaux d'État, 258 846 avant lui ; le chiffre sans loi, 410 815, date d'avant l'atelier). Avec une deuxième
-commune (`simuler 3 commune`) : **114 271** depuis les échanges de matières du 20 novembre 2026 (114 954 avant eux,
+commune (`simuler 3 commune`) : **114 268** depuis la durée des trajets du 20 novembre 2026 (114 271 depuis les échanges de
+matières, 114 954 avant eux,
 114 989 avant l'ordre par étapes, 116 018 avant les routes des bâtiments, 141 622 avant les routes).
 
 ## Architecture et données
@@ -81,8 +82,16 @@ est partagée au prorata du besoin (`ShortageRatios`, plafond `marketCap` de `Su
 offert aux autres. Échanges entre communes (`Trade.RunDaily`, le soir après les habitants) : tous les produits qui se
 stockent, au-delà de la demande de demain (habitants + `Trade.BuildingDemand`) moins la production du jour ; seulement si
 l'une des deux communes a un bâtiment de catégorie Logistique (`Trade.CanTrade`, `World.HasLogisticsBuilding`, aussi pour
-les lignes) ; les chargements (`Shipment`, `World.ShipmentsInTransit`) arrivent le lendemain matin (`Trade.Arrive`, péremption
-d'une nuit comptée en perdu en route). Prix de départ = coût de revient du bâtiment de référence + 30 % ; entreprises privées et SCOP avec caisse propre
+les lignes) ; les chargements (`Shipment`, `World.ShipmentsInTransit`, aussi ceux des lignes entre communes, vers la réserve
+du client) prennent `Roads.TravelDays` jours (distance ÷ vitesse de la liaison : réglages `transportSpeedTrail/Path/Road`,
+`Simulation.TravelDaysBetween`) et avancent chaque matin (`Trade.Advance`, péremption de chaque nuit comptée en perdu en
+route) ; une commune commande sa demande nette × la durée du trajet, moins son stock et ce qui est déjà en route.
+Capacité d'envoi (`World.ShippingCapacity` : réglages `shippingCapacityLevel1/2` selon le niveau des bâtiments logistiques ;
+`Trade.CapacityHolder` : celle de la commune qui envoie, sinon de celle qui reçoit), prise d'abord par les lignes entre
+communes puis partagée au prorata entre les échanges du soir ; utilisée le dernier jour : `World.ShippingCapacityUsed`.
+Interface (20 novembre 2026) : Communes → Transport (`TransportPage`) — colonne « Durée » des liaisons, sections « Capacité
+d'envoi » et « Chargements en route » (`GameView.TravelDays`, `ShippingCapacityOf`, `ShipmentsFrom` / `ShipmentsTo`) ;
+Statistiques — colonne « En route » (`ProductFlowView.InTransit`, relevé comme le stock). Prix de départ = coût de revient du bâtiment de référence + 30 % ; entreprises privées et SCOP avec caisse propre
 (réserve de 30 jours, le reste aux propriétaires) ; licenciements et embauches au changement de mois (public 2 %,
 SCOP 5 % après une baisse de salaire jusqu'à −20 %, privé 15 %), faillite sans argent ; énergie (chauffage, eau) payée
 par chaque bâtiment ; impôt sur la richesse des habitants (État 0,3 %, commune 0,2 % par jour). Écrits mais

@@ -38,6 +38,41 @@ public sealed class GameView(Simulation simulation)
     /// <summary>Les sentiers, chemins et routes : les deux communes, le niveau, le tracé (en unités de carte), la longueur (km) et la structure qui paie.</summary>
     public IReadOnlyList<RoadLink> Roads() => World.Roads.Links.ToList();
 
+    /// <summary>La durée d'un trajet entre deux communes, en jours (décidé le 20 novembre 2026).</summary>
+    public int TravelDays(string fromCommuneId, string toCommuneId) => simulation.TravelDaysBetween(fromCommuneId, toCommuneId);
+
+    /// <summary>
+    /// La capacité d'envoi d'une commune vers les autres : par jour, utilisée le dernier jour, et les bâtiments
+    /// logistiques qui la donnent.
+    /// </summary>
+    public ShippingCapacityView ShippingCapacityOf(string communeId) => new(
+        World.ShippingCapacity(communeId),
+        World.ShippingCapacityUsed.GetValueOrDefault(communeId),
+        World.Structures.Values
+            .Where(s => s.Kind == StructureKind.Building && s.TypeId is { } typeId && World.BuildingTypes.TryGetValue(typeId, out var type)
+                && type.Category == Demos.Domain.Economy.Trade.LogisticsCategory && World.CommuneOf(s) == communeId)
+            .Select(World.DisplayNameOf)
+            .ToList());
+
+    /// <summary>Les chargements en route qui partent de la commune (ou qui y arrivent), le plus proche de l'arrivée d'abord.</summary>
+    public IReadOnlyList<ShipmentView> ShipmentsFrom(string communeId) => Shipments(s => s.Origin == communeId);
+
+    public IReadOnlyList<ShipmentView> ShipmentsTo(string communeId) => Shipments(s => s.Destination == communeId);
+
+    private List<ShipmentView> Shipments(Func<Demos.Domain.Economy.Shipment, bool> keep) => World.ShipmentsInTransit
+        .Where(keep)
+        .Select(s => new ShipmentView(
+            World.Products.FirstOrDefault(p => p.Id == s.ProductId)?.Name ?? s.ProductId,
+            s.Quantity,
+            NameOf(s.Origin),
+            NameOf(s.Destination),
+            // Parti le soir d'un jour passé ; arrive le matin, dans autant de jours qu'il en reste.
+            Today.AddDays(-(s.Days - s.DaysLeft)),
+            Today.AddDays(s.DaysLeft),
+            s.ClientId is { } client ? NameOf(client) : null))
+        .OrderBy(s => s.ArrivesOn).ThenBy(s => s.ProductName)
+        .ToList();
+
     /// <summary>
     /// Ce que les routes ont changé au dernier bilan (1er du mois : construction ; 1er janvier : aussi l'entretien). La liste
     /// est remplacée à chaque bilan : une nouvelle liste veut dire un nouveau bilan.
@@ -96,10 +131,11 @@ public sealed class GameView(Simulation simulation)
                 var tally = market?.TallyOf(product.Id) ?? default;
                 var stock = market?.QuantityOf(product.Id) ?? 0;
                 var made = produced.GetValueOrDefault(product.Id);
-                if (made <= 0 && stock <= 0 && tally.Used <= 0 && tally.Sent <= 0 && tally.Lost <= 0 && tally.LostInTransit <= 0)
+                var onTheWay = World.ShipmentsInTransit.Where(s => s.Origin == commune.Id && s.ProductId == product.Id).Sum(s => s.Quantity);
+                if (made <= 0 && stock <= 0 && onTheWay <= 0 && tally.Used <= 0 && tally.Sent <= 0 && tally.Lost <= 0 && tally.LostInTransit <= 0)
                     continue;
-                flows.Add(new ProductFlowView(commune.Id, product.Id, product.Name, made, tally.Used, tally.Sent, tally.Lost, tally.LostInTransit, stock,
-                    market?.PriceOf(product.Id) ?? product.BasePrice));
+                flows.Add(new ProductFlowView(commune.Id, product.Id, product.Name, made, tally.Used, tally.Sent, tally.Lost, tally.LostInTransit,
+                    onTheWay, stock, market?.PriceOf(product.Id) ?? product.BasePrice));
             }
         }
         return flows;
@@ -798,6 +834,16 @@ public sealed record SupplyLineView(
     bool IsActive,
     bool MissingLogistics = false);
 
+/// <summary>La capacité d'envoi d'une commune : par jour, utilisée le dernier jour, et les bâtiments qui la donnent.</summary>
+public sealed record ShippingCapacityView(double PerDay, double UsedLastDay, IReadOnlyList<string> Buildings);
+
+/// <summary>
+/// Un chargement en route entre deux communes : le produit, la quantité (après la perte en route), d'où et vers où, le
+/// jour du départ et celui de l'arrivée, et le bâtiment client s'il vient d'une ligne d'approvisionnement.
+/// </summary>
+public sealed record ShipmentView(string ProductName, double Quantity, string OriginName, string DestinationName,
+    DateOnly DepartedOn, DateOnly ArrivesOn, string? ClientName);
+
 /// <summary>
 /// Un fournisseur possible pour un client : un bâtiment public qui produit une de ses matières, et la perte en route ;
 /// <see cref="MissingLogistics"/> si aucune des deux communes n'a de bâtiment logistique (la ligne ne livrerait pas encore).
@@ -807,7 +853,8 @@ public sealed record SupplierCandidateView(string Id, string Name, string Commun
 /// <summary>
 /// Un produit dans une commune, en totaux depuis le début de la partie : produit, utilisé, envoyé vers une autre commune,
 /// perdu au stockage (<see cref="Lost"/>), perdu en route depuis cette commune (<see cref="LostInTransit"/>, une part de
-/// l'envoyé) ; et son stock et son prix du moment.
+/// l'envoyé) ; ce qui est parti de la commune et encore en route (<see cref="InTransit"/>, au moment du relevé) ; et son
+/// stock et son prix du moment.
 /// </summary>
 public sealed record ProductFlowView(
     string CommuneId,
@@ -818,5 +865,6 @@ public sealed record ProductFlowView(
     double Sent,
     double Lost,
     double LostInTransit,
+    double InTransit,
     double Stock,
     double Price);

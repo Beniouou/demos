@@ -4,8 +4,13 @@ using Demos.Domain.Shared;
 
 namespace Demos.Domain.Economy;
 
-/// <summary>Un chargement parti d'une commune vers une autre, qui arrive le lendemain (décidé le 20 novembre 2026).</summary>
-public sealed record Shipment(string Origin, string Destination, string ProductId, string SellerId, double Quantity);
+/// <summary>
+/// Un chargement parti d'une commune vers une autre (décidé le 20 novembre 2026) : il arrive après <see cref="DaysLeft"/>
+/// matins, au marché de sa commune d'arrivée au nom de son vendeur, ou dans la réserve de <see cref="ClientId"/> s'il
+/// vient d'une ligne d'approvisionnement.
+/// </summary>
+public sealed record Shipment(string Origin, string Destination, string ProductId, string SellerId, double Quantity,
+    int DaysLeft = 1, string? ClientId = null, int Days = 1);
 
 /// <summary>
 /// Échanges entre communes, en attendant la logistique : chaque jour, pour chaque produit qui se stocke, les surplus
@@ -30,6 +35,13 @@ public static class Trade
     /// </summary>
     public static bool CanTrade(string origin, string destination, Func<string, bool> hasLogistics) =>
         origin == destination || hasLogistics(origin) || hasLogistics(destination);
+
+    /// <summary>
+    /// La commune dont la capacité d'envoi sert à un envoi (décidé le 20 novembre 2026) : celle qui envoie si elle a un
+    /// bâtiment logistique, sinon celle qui reçoit.
+    /// </summary>
+    public static string CapacityHolder(string origin, string destination, Func<string, bool> hasLogistics) =>
+        hasLogistics(origin) ? origin : destination;
 
     /// <summary>
     /// Ce qu'il faut aux bâtiments de chaque commune pour une journée : leurs matières à plein régime avec leurs emplois
@@ -76,12 +88,15 @@ public static class Trade
     }
 
     /// <summary>
-    /// Les chargements de la veille arrivent : ils entrent au marché de leur commune d'arrivée, au nom de leur vendeur,
-    /// moins ce qui s'est périmé pendant la nuit (comme dans un stockage général), compté comme perdu en route dans la
-    /// commune de départ.
+    /// Chaque matin, les chargements avancent d'un jour : ils perdent ce qui s'est périmé pendant la nuit (comme dans un
+    /// stockage général, compté comme perdu en route dans la commune de départ), et ceux qui arrivent entrent au marché
+    /// de leur commune d'arrivée, au nom de leur vendeur, ou dans la réserve du client d'une ligne. Renvoie ceux qui
+    /// sont encore en route.
     /// </summary>
-    public static void Arrive(IEnumerable<Shipment> shipments, IReadOnlyList<ProductDefinition> products, Func<string, Market> marketOf)
+    public static List<Shipment> Advance(IEnumerable<Shipment> shipments, IReadOnlyList<ProductDefinition> products, Func<string, Market> marketOf,
+        Func<string, Inventory>? reserveOf = null)
     {
+        var stillOnTheWay = new List<Shipment>();
         foreach (var shipment in shipments)
         {
             var spoiled = products.FirstOrDefault(p => p.Id == shipment.ProductId) is { IsPerishable: true } product
@@ -89,8 +104,16 @@ public static class Trade
                 : 0;
             if (spoiled > 0)
                 marketOf(shipment.Origin).CountLostInTransit(shipment.ProductId, spoiled);
-            marketOf(shipment.Destination).Offer(shipment.ProductId, shipment.Quantity - spoiled, shipment.SellerId);
+            var left = shipment with { Quantity = shipment.Quantity - spoiled, DaysLeft = shipment.DaysLeft - 1 };
+            if (left.DaysLeft > 0)
+                stillOnTheWay.Add(left);
+            else if (left.ClientId is { } clientId && reserveOf is not null)
+                reserveOf(clientId).Add(left.ProductId, left.Quantity);
+            else
+                marketOf(left.Destination).Offer(left.ProductId, left.Quantity, left.SellerId);
         }
+
+        return stillOnTheWay;
     }
 
     public static void RunDaily(
@@ -104,8 +127,15 @@ public static class Trade
         Func<string, string, double>? buildingDemandOf = null,
         Func<string, string, bool>? canTrade = null,
         Action<Shipment>? dispatch = null,
-        Func<string, string, double>? expectedProductionOf = null)
+        Func<string, string, double>? expectedProductionOf = null,
+        Func<string, string, int>? travelDaysOf = null,
+        Func<string, string, double>? inTransitTo = null,
+        Func<string, string, string>? capacityHolderOf = null,
+        Dictionary<string, double>? capacityLeft = null)
     {
+        // D'abord ce que chaque produit enverrait, puis la capacité d'envoi de chaque commune, partagée au prorata entre
+        // tous les produits et toutes les destinations quand elle ne suffit pas (décidé le 20 novembre 2026).
+        var plans = new List<(ProductDefinition Product, string Origin, string Destination, double Quantity)>();
         foreach (var product in products)
         {
             // Ce qui ne se stocke pas (l'eau, les services) ne voyage pas entre communes. Sans la demande des bâtiments
@@ -121,7 +151,10 @@ public static class Trade
             // autres produits du même besoin (le pain et la viande nourrissent tous les deux), plus ce qu'il faut à ses
             // bâtiments pour une journée (matières et combustible).
             var substitutes = need is null ? [] : products.Where(p => p.Need == need && p.Id != product.Id).Select(p => p.Id).ToList();
-            var balance = communeIds.ToDictionary(
+            // Pour chaque commune, le soir : ce qu'elle a à vendre, et sa demande nette de demain (ce que consomment ses
+            // habitants, moins ce que couvrent déjà les autres produits du même besoin, plus ce qu'il faut à ses bâtiments,
+            // moins ce qu'elle produira demain, estimé par sa production du jour).
+            var state = communeIds.ToDictionary(
                 communeId => communeId,
                 communeId =>
                 {
@@ -131,11 +164,10 @@ public static class Trade
                         : 0;
                     var buildings = buildingDemandOf?.Invoke(communeId, product.Id) ?? 0;
                     var demand = Math.Max(0, residents - substitutes.Sum(s => market.QuantityForSale(s))) + buildings;
-                    // Le soir, ce que la commune produira demain (estimé par sa production du jour) couvrira une part de sa
-                    // demande de demain.
                     var expected = expectedProductionOf?.Invoke(communeId, product.Id) ?? 0;
-                    return market.QuantityForSale(product.Id) - Math.Max(0, demand - expected);
+                    return (ForSale: market.QuantityForSale(product.Id), Net: Math.Max(0, demand - expected));
                 });
+            var balance = state.ToDictionary(s => s.Key, s => s.Value.ForSale - s.Value.Net);
 
             var surplus = balance.Where(b => b.Value > 0).ToDictionary(b => b.Key, b => b.Value);
             var totalSurplus = surplus.Values.Sum();
@@ -146,7 +178,9 @@ public static class Trade
             List<string> OriginsFor(string destination) =>
                 surplus.Keys.Where(o => canTrade?.Invoke(o, destination) ?? true).ToList();
 
-            // Ce qu'il faut envoyer pour couvrir chaque manque, une fois la perte en route comptée.
+            // Ce qu'il faut envoyer pour couvrir chaque manque, une fois la perte en route comptée. Ce qui part arrive
+            // dans quelques jours : la commune compare ce qu'elle a et ce qui est déjà en route vers elle à ce qu'il lui
+            // faut jusqu'à l'arrivée (sa demande nette × la durée du trajet) ; elle ne commande pas deux fois.
             var toSend = balance
                 .Where(b => b.Value < 0 && OriginsFor(b.Key).Count > 0)
                 .ToDictionary(b => b.Key, b =>
@@ -155,7 +189,11 @@ public static class Trade
                     var lossEstimate = transportLossOf is not null
                         ? origins.Average(o => transportLossOf(o, b.Key))
                         : TransportLoss;
-                    return Math.Min(-b.Value, freeStorage[b.Key]) / Math.Max(0.01, 1 - lossEstimate);
+                    var days = travelDaysOf is not null ? origins.Average(o => travelDaysOf(o, b.Key)) : 1;
+                    var (forSale, net) = state[b.Key];
+                    var coming = inTransitTo?.Invoke(b.Key, product.Id) ?? 0;
+                    var missing = Math.Max(0, net * days - forSale - coming);
+                    return Math.Min(missing, freeStorage[b.Key]) / Math.Max(0.01, 1 - lossEstimate);
                 });
             var totalToSend = toSend.Values.Sum();
             if (totalToSend <= 0)
@@ -169,21 +207,48 @@ public static class Trade
                 var reachable = origins.Sum(o => surplus[o]);
                 foreach (var origin in origins)
                 {
+                    var planned = sent * surplus[origin] / reachable;
                     var loss = transportLossOf?.Invoke(origin, destination) ?? TransportLoss;
-                    var originMarket = marketOf(origin);
-                    foreach (var (sellerId, quantity) in originMarket.Take(product.Id, sent * surplus[origin] / reachable))
-                    {
-                        shipped?.Invoke(origin, destination, quantity);
-                        var arrived = quantity * (1 - loss);
-                        originMarket.CountLostInTransit(product.Id, quantity - arrived);
-                        freeStorage[destination] -= arrived;
-                        // Le chargement arrive le lendemain, ou tout de suite sans file d'attente (ancien appel).
-                        if (dispatch is not null)
-                            dispatch(new Shipment(origin, destination, product.Id, sellerId, arrived));
-                        else
-                            marketOf(destination).Offer(product.Id, arrived, sellerId);
-                    }
+                    freeStorage[destination] -= planned * (1 - loss);
+                    plans.Add((product, origin, destination, planned));
                 }
+            }
+        }
+
+        // La part de ce qui est prévu que la capacité de chaque commune permet d'envoyer.
+        var factorOf = new Dictionary<string, double>();
+        if (capacityHolderOf is not null && capacityLeft is not null)
+        {
+            foreach (var group in plans.GroupBy(p => capacityHolderOf(p.Origin, p.Destination)))
+            {
+                var total = group.Sum(p => p.Quantity);
+                factorOf[group.Key] = total > 0 ? Math.Clamp(capacityLeft.GetValueOrDefault(group.Key) / total, 0, 1) : 1;
+            }
+        }
+
+        foreach (var (product, origin, destination, planned) in plans)
+        {
+            var holder = capacityHolderOf?.Invoke(origin, destination);
+            var quantityToSend = planned * (holder is not null ? factorOf.GetValueOrDefault(holder, 1) : 1);
+            var loss = transportLossOf?.Invoke(origin, destination) ?? TransportLoss;
+            var originMarket = marketOf(origin);
+            foreach (var (sellerId, quantity) in originMarket.Take(product.Id, quantityToSend))
+            {
+                if (quantity <= 0)
+                    continue;
+                if (holder is not null && capacityLeft is not null)
+                    capacityLeft[holder] = capacityLeft.GetValueOrDefault(holder) - quantity;
+                shipped?.Invoke(origin, destination, quantity);
+                var arrived = quantity * (1 - loss);
+                originMarket.CountLostInTransit(product.Id, quantity - arrived);
+                // Le chargement part sur la route, ou arrive tout de suite sans file d'attente (ancien appel).
+                if (dispatch is not null)
+                {
+                    var days = travelDaysOf?.Invoke(origin, destination) ?? 1;
+                    dispatch(new Shipment(origin, destination, product.Id, sellerId, arrived, days, Days: days));
+                }
+                else
+                    marketOf(destination).Offer(product.Id, arrived, sellerId);
             }
         }
     }

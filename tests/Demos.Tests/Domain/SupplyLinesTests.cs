@@ -61,6 +61,24 @@ public class SupplyLinesTests
     }
 
     [Fact]
+    public void La_ligne_entre_communes_ne_depasse_pas_la_capacite_d_envoi()
+    {
+        var game = new Game();
+        game.Markets["a"].Offer("bois", 100, Market.StateSellerId("a"));
+        game.Funds["b"].Deposit(1_000);
+        var capacityLeft = new Dictionary<string, double> { ["a"] = 10 };
+
+        var delivered = SupplyLines.RunDaily([new SupplyLine("l1", "camp", "scierie", 0.5)], Towns(sawmillCommune: "b"),
+            new Dictionary<string, double> { ["camp"] = 100 }, new Dictionary<string, double> { ["scierie"] = 10 }, id => game.Markets[id],
+            game.Reserve, game.Treasury, id => game.Funds[id], (_, _) => 0.2,
+            capacityHolderOf: (from, to) => from, capacityLeft: capacityLeft);
+
+        // 25 voudraient partir ; la capacité n'en laisse partir que 10, dont 8 arrivent.
+        Assert.Equal(8, delivered["l1"], 6);
+        Assert.Equal(0, capacityLeft["a"], 6);
+    }
+
+    [Fact]
     public void Sans_batiment_logistique_la_ligne_dans_la_commune_livre_quand_meme()
     {
         var game = new Game();

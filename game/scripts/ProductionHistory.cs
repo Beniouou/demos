@@ -31,11 +31,11 @@ public sealed class ProductionHistory
 
 /// <summary>
 /// Les chiffres d'un produit pour une période (ou cumulés) : produit, utilisé, envoyé, perdu au stockage, perdu en route,
-/// et le stock à la fin.
+/// et, à la fin, ce qui est encore en route et le stock.
 /// </summary>
-public sealed record ProductFigures(double Produced, double Used, double Sent, double Lost, double LostInTransit, double Stock, double Price)
+public sealed record ProductFigures(double Produced, double Used, double Sent, double Lost, double LostInTransit, double InTransit, double Stock, double Price)
 {
-    public static readonly ProductFigures None = new(0, 0, 0, 0, 0, 0, 0);
+    public static readonly ProductFigures None = new(0, 0, 0, 0, 0, 0, 0, 0);
 
     /// <summary>Les totaux d'un produit dans les communes gardées (toutes si <paramref name="communeId"/> est null).</summary>
     public static ProductFigures Of(IEnumerable<ProductFlowView> flows, string productId, string? communeId)
@@ -44,11 +44,14 @@ public sealed record ProductFigures(double Produced, double Used, double Sent, d
         return chosen.Count == 0
             ? None
             : new ProductFigures(chosen.Sum(f => f.Produced), chosen.Sum(f => f.Used), chosen.Sum(f => f.Sent), chosen.Sum(f => f.Lost),
-                chosen.Sum(f => f.LostInTransit), chosen.Sum(f => f.Stock), chosen.Max(f => f.Price));
+                chosen.Sum(f => f.LostInTransit), chosen.Sum(f => f.InTransit), chosen.Sum(f => f.Stock), chosen.Max(f => f.Price));
     }
 
-    /// <summary>Ce qui s'est passé entre deux relevés de totaux : les différences, et le stock (et le prix) du second.</summary>
+    /// <summary>
+    /// Ce qui s'est passé entre deux relevés de totaux : les différences, et ce qui est en route, le stock (et le prix)
+    /// du second.
+    /// </summary>
     public ProductFigures Since(ProductFigures before) =>
         new(Produced - before.Produced, Used - before.Used, Sent - before.Sent, Lost - before.Lost,
-            LostInTransit - before.LostInTransit, Stock, Price);
+            LostInTransit - before.LostInTransit, InTransit, Stock, Price);
 }

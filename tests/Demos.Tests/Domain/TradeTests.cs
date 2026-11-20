@@ -237,9 +237,86 @@ public class TradeTests
 
         // Rien n'est encore arrivé ; le lendemain, 80 arrivent moins un dixième périmé dans la nuit (8, perdus en route à a).
         Assert.Equal(0, markets["b"].QuantityOf("pain"));
-        Trade.Arrive(inTransit, products, c => markets[c]);
+        Assert.Empty(Trade.Advance(inTransit, products, c => markets[c]));
         Assert.Equal(72, markets["b"].QuantityOf("pain"), precision: 6);
         Assert.Equal(20 + 8, markets["a"].TallyOf("pain").LostInTransit, precision: 6);
+    }
+
+    [Fact]
+    public void La_capacite_d_envoi_est_partagee_au_prorata_entre_les_produits_et_les_destinations()
+    {
+        var markets = new Dictionary<string, Market> { ["a"] = new(Products), ["b"] = new(Products), ["c"] = new(Products) };
+        markets["a"].Offer("pain", 1_000, "ferme");
+        markets["a"].Offer("bois", 1_000, "camp");
+        SocialClass[] classes = [Residents("a", 100), Residents("b", 300), Residents("c", 100)];
+        Dictionary<string, Dictionary<string, double>> demand = new() { ["a"] = [], ["b"] = [], ["c"] = new() { ["bois"] = 200 } };
+        var capacityLeft = new Dictionary<string, double> { ["a"] = 300 };
+
+        // Sans perte : b veut 300 pains, c 100 pains et 200 bois, soit 600 ; a ne peut envoyer que 300, la moitié de chacun.
+        Trade.RunDaily(["a", "b", "c"], classes, Products, c => markets[c], (_, _) => 10_000, (_, _) => 0,
+            buildingDemandOf: (c, p) => demand[c].GetValueOrDefault(p),
+            capacityHolderOf: (from, to) => Trade.CapacityHolder(from, to, commune => commune == "a"), capacityLeft: capacityLeft);
+
+        Assert.Equal(150, markets["b"].QuantityOf("pain"), precision: 6);
+        Assert.Equal(50, markets["c"].QuantityOf("pain"), precision: 6);
+        Assert.Equal(100, markets["c"].QuantityOf("bois"), precision: 6);
+        Assert.Equal(0, capacityLeft["a"], precision: 6);
+    }
+
+    [Fact]
+    public void Sans_batiment_logistique_une_commune_envoie_avec_la_capacite_de_celle_qui_recoit()
+    {
+        Assert.Equal("a", Trade.CapacityHolder("a", "b", c => c == "a"));
+        Assert.Equal("b", Trade.CapacityHolder("a", "b", c => c == "b"));
+    }
+
+    [Fact]
+    public void La_duree_du_trajet_suit_la_distance_et_la_liaison()
+    {
+        var settings = new BalanceSettings();
+
+        // 20, 40 et 80 km par jour ; arrondi au jour supérieur, au moins 1 jour.
+        Assert.Equal(3, Demos.Domain.Map.Roads.TravelDays(Demos.Domain.Map.RoadLevel.None, 50, settings));
+        Assert.Equal(3, Demos.Domain.Map.Roads.TravelDays(Demos.Domain.Map.RoadLevel.Trail, 50, settings));
+        Assert.Equal(2, Demos.Domain.Map.Roads.TravelDays(Demos.Domain.Map.RoadLevel.Path, 50, settings));
+        Assert.Equal(1, Demos.Domain.Map.Roads.TravelDays(Demos.Domain.Map.RoadLevel.Road, 50, settings));
+        Assert.Equal(2, Demos.Domain.Map.Roads.TravelDays(Demos.Domain.Map.RoadLevel.Road, 100, settings));
+        Assert.Equal(1, Demos.Domain.Map.Roads.TravelDays(Demos.Domain.Map.RoadLevel.None, 5, settings));
+    }
+
+    [Fact]
+    public void Un_chargement_de_trois_jours_se_perime_chaque_nuit_et_arrive_au_troisieme_matin()
+    {
+        ProductDefinition[] products = [new("pain", "Pain", NeedCategory.Food, 1, ShelfLifeDays: 10)];
+        var markets = new Dictionary<string, Market> { ["a"] = new(products), ["b"] = new(products) };
+        List<Shipment> onTheWay = [new Shipment("a", "b", "pain", "ferme", 100, DaysLeft: 3, Days: 3)];
+
+        onTheWay = Trade.Advance(onTheWay, products, c => markets[c]);
+        onTheWay = Trade.Advance(onTheWay, products, c => markets[c]);
+        Assert.Single(onTheWay);
+        Assert.Equal(0, markets["b"].QuantityOf("pain"));
+        onTheWay = Trade.Advance(onTheWay, products, c => markets[c]);
+
+        // 100 × 0,9 × 0,9 × 0,9 = 72,9 arrivent ; 27,1 perdus en route, comptés à a.
+        Assert.Empty(onTheWay);
+        Assert.Equal(72.9, markets["b"].QuantityOf("pain"), precision: 6);
+        Assert.Equal(27.1, markets["a"].TallyOf("pain").LostInTransit, precision: 6);
+    }
+
+    [Fact]
+    public void Une_commune_commande_ce_qu_il_lui_faut_jusqu_a_l_arrivee_moins_ce_qui_est_deja_en_route()
+    {
+        var markets = new Dictionary<string, Market> { ["a"] = new(Products), ["b"] = new(Products) };
+        markets["a"].Offer("pain", 1_000, "ferme");
+        SocialClass[] classes = [Residents("a", 200), Residents("b", 80)];
+        var inTransit = new List<Shipment>();
+
+        // Trois jours de trajet, sans perte : b a besoin de 3 × 80 = 240 jusqu'à l'arrivée, dont 160 déjà en route.
+        Trade.RunDaily(["a", "b"], classes, Products, c => markets[c], (_, _) => 10_000, (_, _) => 0, dispatch: inTransit.Add,
+            travelDaysOf: (_, _) => 3, inTransitTo: (c, p) => c == "b" && p == "pain" ? 160 : 0);
+
+        Assert.Equal(80, inTransit.Sum(s => s.Quantity), precision: 6);
+        Assert.All(inTransit, s => Assert.Equal(3, s.DaysLeft));
     }
 
     [Fact]

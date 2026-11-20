@@ -149,6 +149,15 @@ public sealed class Simulation(World world, GameClock clock)
             ? GeographicEconomics.TransportLoss(from, to, World.CommunePositions) * World.Roads.LossFactor(from, to)
             : Trade.TransportLoss;
 
+    /// <summary>
+    /// La durée d'un trajet entre deux communes, en jours, selon la distance et la liaison (décidé le 20 novembre 2026) ;
+    /// 1 jour sans carte.
+    /// </summary>
+    public int TravelDaysBetween(string from, string to) =>
+        World.CommunePositions.TryGetValue(from, out var a) && World.CommunePositions.TryGetValue(to, out var b)
+            ? Roads.TravelDays(World.Roads.LevelBetween(from, to), MapScale.KmBetween(a, b), Balance.Current)
+            : 1;
+
     /// <summary>Outil d'administration : règle l'impôt d'État (part de la richesse versée chaque jour).</summary>
     public void SetStateTaxRate(double rate) => World.StateTaxRate = rate;
 
@@ -654,17 +663,22 @@ public sealed class Simulation(World world, GameClock clock)
         var laws = World.LawBook;
         World.ApplyLaws(laws);
 
-        // Les chargements partis hier vers une autre commune arrivent (décidé le 20 novembre 2026).
+        // Les chargements en route avancent d'un jour ; ceux qui arrivent entrent au marché, ou dans la réserve du client
+        // d'une ligne (décidé le 20 novembre 2026).
         if (World.ShipmentsInTransit.Count > 0)
         {
-            var arriving = World.ShipmentsInTransit.ToList();
+            var onTheWay = Trade.Advance(World.ShipmentsInTransit.ToList(), World.Products, World.MarketOf, World.ReserveOf);
             World.ShipmentsInTransit.Clear();
-            Trade.Arrive(arriving, World.Products, World.MarketOf);
+            World.ShipmentsInTransit.AddRange(onTheWay);
         }
 
         // Deux communes n'échangent que si l'une a un bâtiment logistique ; lu une fois pour la journée.
         var hasLogistics = communeIds.ToDictionary(c => c, World.HasLogisticsBuilding);
         bool CanTrade(string from, string to) => Trade.CanTrade(from, to, c => hasLogistics.GetValueOrDefault(c));
+        // La capacité d'envoi de chaque commune pour la journée, partagée entre les lignes puis les échanges du soir.
+        var capacity = communeIds.ToDictionary(c => c, World.ShippingCapacity);
+        var capacityLeft = new Dictionary<string, double>(capacity);
+        string CapacityHolder(string from, string to) => Trade.CapacityHolder(from, to, c => hasLogistics.GetValueOrDefault(c));
 
         World.Workers = Employment.Assign(World.Structures, World.Classes);
         World.PollutionByCommune = Pollution.PerResidentByCommune(
@@ -685,7 +699,10 @@ public sealed class Simulation(World world, GameClock clock)
             if (lines.Count == 0)
                 return;
             foreach (var (lineId, quantity) in SupplyLines.RunDaily(lines, World.Structures, produced, World.Workers,
-                         World.MarketOf, World.ReserveOf, World.Treasury, World.CommuneFundOf, TransportLossBetween, World.RoadTraffic.Add, CanTrade))
+                         World.MarketOf, World.ReserveOf, World.Treasury, World.CommuneFundOf, TransportLossBetween, World.RoadTraffic.Add, CanTrade,
+                         World.ShipmentsInTransit.Add, TravelDaysBetween,
+                         (clientId, productId) => World.ShipmentsInTransit.Where(s => s.ClientId == clientId && s.ProductId == productId).Sum(s => s.Quantity),
+                         CapacityHolder, capacityLeft))
                 deliveries[lineId] = deliveries.GetValueOrDefault(lineId) + quantity;
         }
 
@@ -717,6 +734,10 @@ public sealed class Simulation(World world, GameClock clock)
         // stockent, au-delà de ce qu'il faudra demain aux habitants et aux bâtiments de la commune. Ils arrivent le
         // lendemain matin : partis avant les repas, ils compteraient deux fois (le jour même et pour le lendemain).
         var buildingDemand = Trade.BuildingDemand(World.Structures, World.Workers, World.TierOf, Clock.Season, World.HeatsAllYear);
+        // Ce qui est déjà en route vers chaque commune (hors lignes), lu avant les départs du soir.
+        var comingTo = new Dictionary<(string, string), double>();
+        foreach (var shipment in World.ShipmentsInTransit.Where(s => s.ClientId is null))
+            comingTo[(shipment.Destination, shipment.ProductId)] = comingTo.GetValueOrDefault((shipment.Destination, shipment.ProductId)) + shipment.Quantity;
         var producedToday = new Dictionary<(string, string), double>();
         foreach (var (buildingId, quantity) in World.Produced)
         {
@@ -739,7 +760,11 @@ public sealed class Simulation(World world, GameClock clock)
                 if (shipment.Quantity > 0)
                     World.ShipmentsInTransit.Add(shipment);
             },
-            (communeId, productId) => producedToday.TryGetValue((communeId, productId), out var quantity) ? quantity : 0);
+            (communeId, productId) => producedToday.TryGetValue((communeId, productId), out var quantity) ? quantity : 0,
+            TravelDaysBetween,
+            (communeId, productId) => comingTo.GetValueOrDefault((communeId, productId)),
+            CapacityHolder, capacityLeft);
+        World.ShippingCapacityUsed = capacity.ToDictionary(c => c.Key, c => c.Value - capacityLeft.GetValueOrDefault(c.Key));
 
         PaySellers();
         Companies.PayDividends(World.Structures, World.ClassesById, World.CompanyFundOf, World.PriceOf, b => fundsAtDayStart.GetValueOrDefault(b.Id));

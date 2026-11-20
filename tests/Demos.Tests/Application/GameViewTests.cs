@@ -37,6 +37,23 @@ public class GameViewTests
     }
 
     [Fact]
+    public void La_vue_montre_la_capacite_d_envoi_et_les_chargements_en_route()
+    {
+        var simulation = PrototypeScenario.Create(GameData.Content());
+        var view = new GameView(simulation);
+        var first = PrototypeScenario.FirstCommuneId;
+        simulation.World.ShipmentsInTransit.Add(new Demos.Domain.Economy.Shipment(first, "ailleurs", "pain", "etat", 90, DaysLeft: 2, Days: 3));
+
+        // Un grenier et un entrepôt : 2 × 500 par jour.
+        Assert.Equal(1_000, view.ShippingCapacityOf(first).PerDay);
+        var shipment = Assert.Single(view.ShipmentsFrom(first));
+        Assert.Equal(90, shipment.Quantity);
+        Assert.Equal(view.Today.AddDays(-1), shipment.DepartedOn);
+        Assert.Equal(view.Today.AddDays(2), shipment.ArrivesOn);
+        Assert.Equal(90, view.ProductFlows().Single(f => f.CommuneId == first && f.ProductId == "pain").InTransit);
+    }
+
+    [Fact]
     public void Les_totaux_des_produits_suivent_la_production_et_ce_qui_sort_du_stockage()
     {
         var simulation = PrototypeScenario.Create(GameData.Content());
