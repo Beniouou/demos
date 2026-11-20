@@ -67,7 +67,16 @@ public sealed class Simulation(World world, GameClock clock)
     /// zone de la carte qui correspond, à portée de sa commune (voir <see cref="World.ExtractionSiteProblem"/>) : sans
     /// position permise, il n'est pas construit. Sans carte, la position n'est pas demandée.
     /// </remarks>
-    public bool TryBuild(Structure structure, PaymentMode mode, Point2D? position = null)
+    public bool TryBuild(Structure structure, PaymentMode mode, Point2D? position = null) => Build(structure, mode, position).Started;
+
+    /// <summary>
+    /// Action du joueur : lancer le chantier d'un bâtiment à une taille choisie (de 10 % à 100 % du type ; décidé le 20
+    /// novembre 2026). Les matériaux viennent de la réserve de chantier et du stock de l'État de sa commune, d'un achat à
+    /// son marché, puis, s'il en manque, de la commune la plus proche qui en a et avec laquelle elle peut échanger (voir
+    /// <see cref="PlanConstruction"/>) : le chantier commence à leur arrivée. Un bâtiment d'extraction se pose sur une
+    /// zone qui convient et qui a encore la place pour ses emplois (<see cref="World.ZoneProblem"/>).
+    /// </summary>
+    public ConstructionOutcome Build(Structure structure, PaymentMode mode, Point2D? position = null, double size = 1)
     {
         if (World.IsIdTaken(structure.Id)
             || structure.TypeId is not { } typeId
@@ -78,21 +87,103 @@ public sealed class Simulation(World world, GameClock clock)
             || structure.ParentId is not { } parentId
             || !World.Structures.TryGetValue(parentId, out var parent)
             || World.CommuneOf(parent) is not { } communeId)
-            return false;
+            return new ConstructionOutcome(false, null, "ce bâtiment ne se construit pas ici");
 
+        structure = type.Sized(structure, size);
         var productId = structure.Production?.ProductId;
-        if (World.NeedsExtractionSite(typeId, productId)
-            && (position is not { } site || World.ExtractionSiteProblem(typeId, productId, communeId, site) is not null))
-            return false;
+        if (World.NeedsExtractionSite(typeId, productId))
+        {
+            if (position is not { } site)
+                return new ConstructionOutcome(false, null, "choisissez son emplacement sur la carte");
+            if ((World.ExtractionSiteProblem(typeId, productId, communeId, site) ?? World.ZoneProblem(typeId, productId, site, structure.JobCapacity)) is { } problem)
+                return new ConstructionOutcome(false, null, problem);
+        }
 
-        if (!Construction.TryPay(type.Construction!.Materials, mode, Market.StateSellerId(communeId), World.Treasury, World.MarketOf(communeId),
-                World.ConstructionReserveOf(communeId)))
-            return false;
+        var plan = PlanConstruction(type, communeId, size, mode);
+        if (!plan.Feasible)
+            return new ConstructionOutcome(false, plan, plan.Missing > 1e-6
+                ? $"il manque {plan.Missing:N0} matériaux, ici comme dans les communes avec lesquelles elle échange"
+                : $"il faut {plan.Money:N0} au trésor pour acheter les matériaux");
 
+        PayConstruction(plan, communeId);
         if (position is { } placed)
             World.SetBuildingPosition(structure.Id, placed);
-        World.AddConstructionSite(new ConstructionSite(structure, type.Construction.Days));
-        return true;
+        // Le chantier commence quand les matériaux venus d'ailleurs arrivent.
+        World.AddConstructionSite(new ConstructionSite(structure, type.Construction!.Days + plan.TravelDays));
+        return new ConstructionOutcome(true, plan, null);
+    }
+
+    /// <summary>
+    /// D'où viendraient les matériaux d'un chantier, sans rien dépenser (décidé le 20 novembre 2026) : la réserve de
+    /// chantier, le stock de l'État de la commune (sauf achat seul), un achat à son marché ; puis, s'il en manque, la commune
+    /// la plus proche avec laquelle elle peut échanger et qui en a : son stock de l'État, puis un achat à son marché, avec la
+    /// perte en route (il en part donc un peu plus), dans la limite de sa capacité d'envoi d'une journée.
+    /// </summary>
+    public ConstructionPlan PlanConstruction(BuildingType type, string communeId, double size = 1, PaymentMode mode = PaymentMode.StockFirst)
+    {
+        var productId = type.Construction?.ProductId ?? "";
+        var quantity = type.ConstructionQuantity(size);
+        var market = World.MarketOf(communeId);
+        var state = Market.StateSellerId(communeId);
+        var reserve = Math.Min(World.ConstructionReserveOf(communeId).QuantityOf(productId), quantity);
+        var missing = quantity - reserve;
+        var fromState = mode == PaymentMode.StockFirst ? Math.Min(market.QuantityOf(productId, state), missing) : 0;
+        missing -= fromState;
+        var boughtHere = Math.Min(market.QuantityForSale(productId, state), missing);
+        missing -= boughtHere;
+
+        string? other = null;
+        double fromOtherState = 0, boughtThere = 0, lost = 0;
+        var days = 0;
+        if (missing > 1e-6)
+        {
+            var hasLogistics = World.Communes.ToDictionary(c => c.Id, c => World.HasLogisticsBuilding(c.Id));
+            var here = World.CommunePositions.GetValueOrDefault(communeId);
+            var candidates = World.Communes
+                .Where(c => c.Id != communeId && Trade.CanTrade(c.Id, communeId, id => hasLogistics.GetValueOrDefault(id)))
+                .Where(c => World.Markets.TryGetValue(c.Id, out var m) && m.QuantityOf(productId) > 0)
+                .OrderBy(c => World.CommunePositions.TryGetValue(c.Id, out var p) ? MapScale.KmBetween(p, here) : double.MaxValue);
+            if (candidates.FirstOrDefault() is { } source)
+            {
+                other = source.Id;
+                var otherMarket = World.MarketOf(source.Id);
+                var otherState = Market.StateSellerId(source.Id);
+                var loss = TransportLossBetween(source.Id, communeId);
+                var holder = Trade.CapacityHolder(source.Id, communeId, id => hasLogistics.GetValueOrDefault(id));
+                var sendable = Math.Min(missing / Math.Max(0.01, 1 - loss), World.ShippingCapacity(holder));
+                fromOtherState = mode == PaymentMode.StockFirst ? Math.Min(otherMarket.QuantityOf(productId, otherState), sendable) : 0;
+                boughtThere = Math.Min(otherMarket.QuantityForSale(productId, otherState), sendable - fromOtherState);
+                lost = (fromOtherState + boughtThere) * loss;
+                missing = Math.Max(0, missing - (fromOtherState + boughtThere - lost));
+                days = TravelDaysBetween(source.Id, communeId);
+            }
+        }
+
+        var money = (boughtHere + boughtThere) * market.PriceOf(productId);
+        return new ConstructionPlan(productId, quantity, reserve, fromState, boughtHere, other, fromOtherState, boughtThere, lost, days,
+            money, missing, World.Treasury.Balance >= money - 1e-6);
+    }
+
+    /// <summary>Paie un chantier selon son plan : prend les matériaux, achète le reste avec le trésor, envoie ce qui vient d'ailleurs.</summary>
+    private void PayConstruction(ConstructionPlan plan, string communeId)
+    {
+        var productId = plan.ProductId;
+        World.Treasury.TrySpend(plan.Money);
+        World.ConstructionReserveOf(communeId).TryRemove(productId, plan.FromReserve);
+        var market = World.MarketOf(communeId);
+        var state = Market.StateSellerId(communeId);
+        market.TryWithdraw(productId, plan.FromState, state);
+        market.TryBuy(productId, plan.BoughtHere, exceptSellerId: state);
+        if (plan.OtherCommuneId is not { } other || plan.SentFromOther <= 0)
+            return;
+
+        // Les matériaux venus d'ailleurs voyagent comme un chargement : ils comptent pour les routes et la perte en route.
+        var otherMarket = World.MarketOf(other);
+        var otherState = Market.StateSellerId(other);
+        otherMarket.TryWithdraw(productId, plan.FromOtherState, otherState);
+        otherMarket.TryBuy(productId, plan.BoughtThere, exceptSellerId: otherState);
+        otherMarket.CountLostInTransit(productId, plan.LostOnTheWay);
+        World.RoadTraffic.Add(other, communeId, plan.SentFromOther);
     }
 
     /// <summary>Ancienne signature, gardée pour l'interface : le coût passé n'est plus utilisé, c'est celui du type.</summary>
@@ -751,7 +842,8 @@ public sealed class Simulation(World world, GameClock clock)
         // Les échanges entre communes, le soir, sur ce qui reste (décidé le 20 novembre 2026) : tous les produits qui se
         // stockent, au-delà de ce qu'il faudra demain aux habitants et aux bâtiments de la commune. Ils arrivent le
         // lendemain matin : partis avant les repas, ils compteraient deux fois (le jour même et pour le lendemain).
-        var buildingDemand = Trade.BuildingDemand(World.Structures, World.Workers, World.TierOf, Clock.Season, World.HeatsAllYear);
+        var buildingDemand = Trade.BuildingDemand(World.Structures, World.Workers, World.TierOf, Clock.Season, World.HeatsAllYear,
+            World.ToolsOf, World.Products.FirstOrDefault(p => p.Id == Tools.ProductId)?.UsageDays);
         // Ce qui est déjà en route vers chaque commune (hors lignes), lu avant les départs du soir.
         var comingTo = new Dictionary<(string, string), double>();
         foreach (var shipment in World.ShipmentsInTransit.Where(s => s.ClientId is null))

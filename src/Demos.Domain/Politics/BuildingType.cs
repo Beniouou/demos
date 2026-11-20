@@ -60,6 +60,31 @@ public sealed record BuildingType(
             StorageKind: StorageKind, StorageProductId: StorageProductId, MainRank: MainRank,
             StaffRatios: StaffRatios, Wages: Wages);
 
+    /// <summary>
+    /// Un bâtiment de ce type à une taille choisie (décidé le 20 novembre 2026) : de 10 % à 100 % du type ; ses emplois,
+    /// ses places et sa capacité de stockage suivent cette part, au moins <see cref="Economy.BalanceSettings.BuildingMinUnits"/>.
+    /// </summary>
+    public Structure Sized(Structure building, double size)
+    {
+        size = Math.Clamp(size, 0.1, 1);
+        if (size >= 1)
+            return building;
+        var minimum = Economy.Balance.Current.BuildingMinUnits;
+        int Scale(int value) => value <= 0 ? 0 : Math.Min(value, Math.Max(minimum, (int)Math.Round(value * size)));
+        return building with
+        {
+            Jobs = Scale(building.Jobs),
+            HousingPlaces = Scale(building.HousingPlaces),
+            SchoolPlaces = Scale(building.SchoolPlaces),
+            StorageCapacity = Scale(building.StorageCapacity),
+        };
+    }
+
+    /// <summary>Le coût en matériaux du chantier à une taille choisie : en proportion, au moins le minimum des réglages.</summary>
+    public double ConstructionQuantity(double size) => Construction is { } cost
+        ? Math.Min(cost.Quantity, Math.Max(Economy.Balance.Current.BuildingMinMaterials, Math.Round(cost.Quantity * Math.Clamp(size, 0.1, 1))))
+        : 0;
+
     /// <summary>Crée un bâtiment de ce type qui fabrique un produit précis, avec la première recette qui le fait.</summary>
     public Structure BuildFor(string productId, string id, string parentId, Ownership ownership = Ownership.Public, string? ownerClassId = null, string? name = null) =>
         Build(id, parentId, ownership, ownerClassId, name) with { Production = AvailableRecipes.First(r => r.ProductId == productId) };

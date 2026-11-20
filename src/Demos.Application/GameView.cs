@@ -370,10 +370,60 @@ public sealed class GameView(Simulation simulation)
             : [];
 
     /// <summary>Ce qui empêche de poser un bâtiment neuf de ce type à cette position pour cette commune, ou null si c'est permis.</summary>
-    public string? ExtractionSiteProblem(string typeId, string communeId, Point2D position) =>
+    public string? ExtractionSiteProblem(string typeId, string communeId, Point2D position, double size = 1) =>
         World.BuildingTypes.TryGetValue(typeId, out var type)
             ? World.ExtractionSiteProblem(typeId, type.DefaultProduction?.ProductId, communeId, position)
+                ?? World.ZoneProblem(typeId, type.DefaultProduction?.ProductId, position, SizedOf(typeId, size).Jobs)
             : "type de bâtiment inconnu";
+
+    /// <summary>
+    /// Ce qu'apporte et coûte un bâtiment neuf de ce type à une taille choisie (décidé le 20 novembre 2026) : emplois,
+    /// places de logement et d'élèves, stockage, matériaux.
+    /// </summary>
+    public SizedBuildingView SizedOf(string typeId, double size)
+    {
+        if (!World.BuildingTypes.TryGetValue(typeId, out var type))
+            return new SizedBuildingView(0, 0, 0, 0, 0);
+        var building = type.Sized(type.Build("aperçu", ""), size);
+        return new SizedBuildingView(building.JobCapacity, building.HousingPlaces, building.SchoolPlaces, building.StorageCapacity,
+            type.ConstructionQuantity(size));
+    }
+
+    /// <summary>Le rayon autour d'un bâtiment d'extraction où l'on compte la surface de sa zone, en km.</summary>
+    public double ZoneRadius => Balance.Current.ZoneRadius;
+
+    /// <summary>Ce que la zone d'un type supporte, en mots : « 20 emplois par km² ».</summary>
+    public string ZoneDensityText(string typeId)
+    {
+        var kinds = ExtractionZonesFor(typeId);
+        return kinds.Count == 0 ? "" : $"{kinds.Min(ZoneCapacity.DensityOf):N0} emplois par km²";
+    }
+
+    /// <summary>D'où viendraient les matériaux d'un chantier de ce type dans cette commune, à cette taille, sans rien dépenser.</summary>
+    public ConstructionPlan? PlanConstruction(string typeId, string communeId, double size) =>
+        World.BuildingTypes.TryGetValue(typeId, out var type) && type.CanBeBuilt ? simulation.PlanConstruction(type, communeId, size) : null;
+
+    /// <summary>
+    /// D'où viennent les matériaux d'un chantier, en une ligne : « 220 matériaux : 40 en réserve, 180 pris à Première
+    /// commune (2 jours de trajet, 6 perdus en route) ».
+    /// </summary>
+    public string DescribePlan(ConstructionPlan plan)
+    {
+        var parts = new List<string>();
+        if (plan.FromReserve > 0.5)
+            parts.Add($"{plan.FromReserve:N0} en réserve de chantier");
+        if (plan.FromState > 0.5)
+            parts.Add($"{plan.FromState:N0} du stock de l'État");
+        if (plan.BoughtHere > 0.5)
+            parts.Add($"{plan.BoughtHere:N0} achetés ici");
+        if (plan.OtherCommuneId is { } other && plan.SentFromOther > 0.5)
+            parts.Add($"{plan.SentFromOther - plan.LostOnTheWay:N0} pris à {NameOf(other)} ({plan.TravelDays} jour{(plan.TravelDays > 1 ? "s" : "")} de trajet, "
+                + $"{plan.LostOnTheWay:N0} perdus en route)");
+        var product = World.Products.FirstOrDefault(p => p.Id == plan.ProductId)?.Name.ToLowerInvariant() ?? plan.ProductId;
+        return $"{plan.Quantity:N0} {product} : {(parts.Count == 0 ? "rien de disponible" : string.Join(", ", parts))}"
+            + (plan.Money > 0.5 ? $" ; achats {plan.Money:N0} au trésor" : "")
+            + (plan.Missing > 0.5 ? $" ; il en manque {plan.Missing:N0}" : "");
+    }
 
     /// <summary>Les chantiers en cours : le bâtiment, son type, sa commune et les jours qu'il reste.</summary>
     public IReadOnlyList<ConstructionSiteView> ConstructionSites() => World.ConstructionSites
@@ -872,6 +922,9 @@ public sealed record SupplyLineView(
 /// charrettes, et les bâtiments qui la donnent.
 /// </summary>
 public sealed record ShippingCapacityView(double PerDay, double UsedLastDay, double FromCarts, IReadOnlyList<string> Buildings);
+
+/// <summary>Un bâtiment neuf à une taille choisie : ses emplois, ses places, son stockage et son coût en matériaux.</summary>
+public sealed record SizedBuildingView(int Jobs, int HousingPlaces, int SchoolPlaces, int StorageCapacity, double Materials);
 
 /// <summary>Les charrettes d'une commune : voulues, en service, leur durée d'usage et leur prix.</summary>
 public sealed record CartsView(int Wanted, double InService, double UsageDays, double Price);

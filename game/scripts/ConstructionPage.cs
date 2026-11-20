@@ -30,6 +30,14 @@ public partial class ConstructionPage : HBoxContainer, IMenuPage
     private Button _build = null!;
     private Label _message = null!;
     private Label _sites = null!;
+    private Label _sizeLabel = null!;
+    private int _size = 100;
+
+    private const string SizeHint =
+        "La taille du bâtiment, de 10 % à 100 % de son type : ses emplois, ses places, son stockage et son coût en matériaux "
+        + "suivent cette part (au moins 10 emplois ou places et 20 matériaux). La durée du chantier ne change pas.";
+
+    private double Size => _size / 100.0;
 
     public ConstructionPage(GameView view, PlayerDesk desk, MapCanvas map, System.Action closeMenu, System.Action<string> report, CommuneFocus focus)
     {
@@ -52,6 +60,19 @@ public partial class ConstructionPage : HBoxContainer, IMenuPage
         var right = new VBoxContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill, SizeFlagsVertical = SizeFlags.ExpandFill };
         right.AddThemeConstantOverride("separation", 8);
         right.AddChild(_schema.Sheet);
+        // La taille du bâtiment (décidé le 20 novembre 2026) : de 10 % à 100 % du type, par pas de 10 %.
+        var sizeRow = new HBoxContainer();
+        sizeRow.AddThemeConstantOverride("separation", 6);
+        sizeRow.AddChild(new Label { Text = "Taille", TooltipText = SizeHint, MouseFilter = MouseFilterEnum.Pass });
+        var smaller = new Button { Text = "−", FocusMode = FocusModeEnum.None, TooltipText = "10 % de moins" };
+        smaller.Pressed += () => _size = System.Math.Max(10, _size - 10);
+        sizeRow.AddChild(smaller);
+        _sizeLabel = new Label { CustomMinimumSize = new Vector2(48, 0), HorizontalAlignment = HorizontalAlignment.Center };
+        sizeRow.AddChild(_sizeLabel);
+        var larger = new Button { Text = "+", FocusMode = FocusModeEnum.None, TooltipText = "10 % de plus" };
+        larger.Pressed += () => _size = System.Math.Min(100, _size + 10);
+        sizeRow.AddChild(larger);
+        right.AddChild(sizeRow);
         _build = new Button { Text = "Lancer le chantier dans cette commune", FocusMode = FocusModeEnum.None };
         _build.Pressed += BuildSelected;
         right.AddChild(_build);
@@ -78,7 +99,10 @@ public partial class ConstructionPage : HBoxContainer, IMenuPage
             _schema.Selected = "aide";
         }
 
-        _schema.Refresh($"{SelectedCommune()}|{string.Join(";", types.Select(t => t.Id))}");
+        var sizeText = $"{_size} %";
+        if (_sizeLabel.Text != sizeText)
+            _sizeLabel.Text = sizeText;
+        _schema.Refresh($"{SelectedCommune()}|{_size}|{_view.Today}|{string.Join(";", types.Select(t => t.Id))}");
         _build.Disabled = SelectedCommune() is null || !_schema.Selected!.StartsWith("type:");
         _build.Text = SelectedType() is { } typeId && _view.ExtractionZonesFor(typeId).Count > 0
             ? "Choisir l'emplacement sur la carte"
@@ -116,9 +140,10 @@ public partial class ConstructionPage : HBoxContainer, IMenuPage
             return;
 
         var zones = _view.ExtractionZonesFor(typeId);
+        var size = Size;
         if (zones.Count == 0)
         {
-            _message.Text = _desk.Build(typeId, communeId);
+            _message.Text = _desk.Build(typeId, communeId, size: size);
             _message.Visible = true;
             return;
         }
@@ -131,8 +156,9 @@ public partial class ConstructionPage : HBoxContainer, IMenuPage
             zones,
             communeId,
             _view.ExtractionMaxDistance,
-            position => _view.ExtractionSiteProblem(typeId, communeId, position),
-            position => _report(_desk.Build(typeId, communeId, position))));
+            // La zone doit aussi avoir la place pour ses emplois, à cette taille.
+            position => _view.ExtractionSiteProblem(typeId, communeId, position, size),
+            position => _report(_desk.Build(typeId, communeId, position, size))));
     }
 
     // ---- Le catalogue ----------------------------------------------------------------------------------------------
@@ -156,8 +182,9 @@ public partial class ConstructionPage : HBoxContainer, IMenuPage
                 + SheetText.Muted("Choisissez un bâtiment de cette catégorie pour voir ce qu'il coûte et ce qu'il apporte.");
         return SheetText.Heading("CONSTRUIRE")
             + "Choisissez un bâtiment dans le catalogue : il sera bâti dans la commune affichée au-dessus des onglets (◀ ▶ pour en changer). Le chantier est payé tout de suite : d'abord la "
-            + "réserve de chantier de la commune, puis le stock de l'État, puis des achats avec le trésor. Le bâtiment arrive "
-            + "à la fin du chantier.\n\n"
+            + "réserve de chantier de la commune, puis le stock de l'État, puis des achats avec le trésor ; s'il en manque, la commune "
+            + "la plus proche avec laquelle elle échange envoie le reste, et le chantier commence à leur arrivée. Réglez la taille "
+            + "du bâtiment (de 10 % à 100 %) sous la fiche. Le bâtiment arrive à la fin du chantier.\n\n"
             + SheetText.Muted("En gris : les bâtiments qui n'ont pas encore d'effet dans le jeu (ni emplois, ni places, ni stockage).");
     }
 
@@ -171,41 +198,42 @@ public partial class ConstructionPage : HBoxContainer, IMenuPage
             text.AppendLine($"[color=#{UiTheme.Danger.ToHtml(false)}]Ce bâtiment n'a pas encore d'effet dans le jeu.[/color]");
 
         var zones = _view.ExtractionZonesFor(type.Id);
+        var sized = _view.SizedOf(type.Id, Size);
         if (zones.Count > 0)
         {
             text.Append(SheetText.Section("Emplacement"));
             text.AppendLine($"Sur la carte, sur {string.Join(" ou ", zones.Select(Demos.Domain.Map.ExtractionSites.ZoneName))}, "
                 + $"à {Demos.Domain.Map.MapScale.Format(_view.ExtractionMaxDistance)} de la commune au plus. Le bouton ouvre la carte pour le choisir.");
+            text.AppendLine(SheetText.Muted($"La zone doit avoir la place pour ses {sized.Jobs:N0} emplois : elle en supporte {_view.ZoneDensityText(type.Id)} "
+                + $"dans la partie à moins de {_view.ZoneRadius:N0} km, partagés avec les bâtiments déjà posés."));
         }
 
         text.Append(SheetText.Section("Coût"));
-        text.AppendLine($"{type.MaterialQuantity:N0} {SheetText.Escape(type.MaterialName)}, {type.Days} jours de chantier");
+        text.AppendLine($"{sized.Materials:N0} {SheetText.Escape(type.MaterialName)} à {_size} % de la taille, {type.Days} jours de chantier");
 
-        if (SelectedCommune() is { } communeId)
+        if (SelectedCommune() is { } communeId && _view.PlanConstruction(type.Id, communeId, Size) is { } plan)
         {
-            var available = _desk.AvailabilityOf(communeId, type.MaterialId);
-            var toBuy = System.Math.Max(0, type.MaterialQuantity - available.Reserve - available.StateStock);
-            var price = toBuy * available.Price;
-            var possible = available.OnSale >= toBuy && available.Treasury >= price;
-            text.Append(SheetText.Section("De quoi payer dans la commune"));
-            text.AppendLine($"Réserve de chantier {available.Reserve:N0} · stock de l'État {available.StateStock:N0} · en vente {available.OnSale:N0}");
-            text.AppendLine(toBuy <= 0
-                ? "Tout est déjà là : rien à acheter."
-                : $"À acheter : {toBuy:N0}, pour {price:N0} (trésor : {available.Treasury:N0}).");
-            var verdict = possible ? "Le chantier peut être lancé." : "Pas assez de matériaux en vente, ou pas assez d'argent au trésor.";
-            text.AppendLine($"[color=#{(possible ? UiTheme.Accent : UiTheme.Danger).ToHtml(false)}]{verdict}[/color]");
+            // D'où viennent les matériaux : ici, puis la commune la plus proche qui en a (décidé le 20 novembre 2026).
+            text.Append(SheetText.Section("D'où viennent les matériaux"));
+            text.AppendLine(SheetText.Escape(_view.DescribePlan(plan)) + ".");
+            if (plan.TravelDays > 0)
+                text.AppendLine(SheetText.Muted($"Le chantier commence à leur arrivée : {type.Days + plan.TravelDays} jours en tout."));
+            var verdict = plan.Feasible ? "Le chantier peut être lancé."
+                : plan.Missing > 0.5 ? "Pas assez de matériaux, ici comme dans les communes avec lesquelles elle échange."
+                : "Pas assez d'argent au trésor pour acheter les matériaux.";
+            text.AppendLine($"[color=#{(plan.Feasible ? UiTheme.Accent : UiTheme.Danger).ToHtml(false)}]{verdict}[/color]");
         }
 
         text.Append(SheetText.Section("Ce qu'il apporte"));
         var gains = new List<string>();
-        if (type.Jobs > 0)
-            gains.Add($"{type.Jobs:N0} emplois");
-        if (type.HousingPlaces > 0)
-            gains.Add($"{type.HousingPlaces:N0} places de logement");
-        if (type.SchoolPlaces > 0)
-            gains.Add($"{type.SchoolPlaces:N0} places d'élèves");
-        if (type.StorageCapacity > 0)
-            gains.Add($"stockage de {type.StorageCapacity:N0}");
+        if (sized.Jobs > 0)
+            gains.Add($"{sized.Jobs:N0} emplois");
+        if (sized.HousingPlaces > 0)
+            gains.Add($"{sized.HousingPlaces:N0} places de logement");
+        if (sized.SchoolPlaces > 0)
+            gains.Add($"{sized.SchoolPlaces:N0} places d'élèves");
+        if (sized.StorageCapacity > 0)
+            gains.Add($"stockage de {sized.StorageCapacity:N0}");
         text.AppendLine(gains.Count == 0 ? SheetText.Muted("Rien pour l'instant.") : string.Join(" · ", gains));
         if (type.Recipes.Count > 0)
             text.AppendLine($"Recettes : {SheetText.Escape(string.Join(" ; ", type.Recipes))}");

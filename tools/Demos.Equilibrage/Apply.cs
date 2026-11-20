@@ -79,6 +79,12 @@ public static class BalanceApplier
         ("CapaciteEnvoiNiveau1", ["shippingCapacityLevel1"], b => b.ShippingCapacityLevel1),
         ("CapaciteEnvoiNiveau2", ["shippingCapacityLevel2"], b => b.ShippingCapacityLevel2),
         ("CapaciteCharrette", ["cartCapacity"], b => b.CartCapacity),
+        ("TailleMinimum", ["buildingMinUnits"], b => b.BuildingMinUnits),
+        ("TailleMateriauxMinimum", ["buildingMinMaterials"], b => b.BuildingMinMaterials),
+        ("ZoneRayon", ["zoneRadius"], b => b.ZoneRadius),
+        ("ZoneDensiteFertile", ["zoneDensityFertile"], b => b.ZoneDensityFertile),
+        ("ZoneDensiteForet", ["zoneDensityForest"], b => b.ZoneDensityForest),
+        ("ZoneDensiteGisement", ["zoneDensityDeposit"], b => b.ZoneDensityDeposit),
         ("OutilsParEmploi", ["toolsPerJob"], b => b.ToolsPerJob),
         ("OutilsPenalite", ["toolShortagePenalty"], b => b.ToolShortagePenalty),
         ("PossessionRattrapage", ["possessionCatchUp"], b => b.PossessionCatchUp),
@@ -382,7 +388,7 @@ public static class BalanceApplier
                     continue;
                 }
 
-                var integer = key is "ReserveCombustible" or "ReserveEntreprise" or "ReserveDepart" or "Dotation";
+                var integer = key is "ReserveCombustible" or "ReserveEntreprise" or "ReserveDepart" or "Dotation" or "TailleMinimum";
                 var value = Number(row.Cell("B"), integer);
 
                 // Une part (vitesse de licenciement, baisse des salaires) ne dépasse pas 100 %.

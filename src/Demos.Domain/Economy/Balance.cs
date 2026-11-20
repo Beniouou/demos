@@ -245,6 +245,24 @@ public sealed record BalanceSettings
     /// <summary>Capacité d'envoi par jour d'un bâtiment logistique de niveau 2 ou plus (dépôt logistique : 2 000 unités).</summary>
     public double ShippingCapacityLevel2 { get; init; } = 2000;
 
+    /// <summary>Taille d'un bâtiment (décidé le 20 novembre 2026) : emplois ou places au moins, quelle que soit la taille (10).</summary>
+    public int BuildingMinUnits { get; init; } = 10;
+
+    /// <summary>Matériaux au moins pour un chantier, quelle que soit la taille du bâtiment (20).</summary>
+    public double BuildingMinMaterials { get; init; } = 20;
+
+    /// <summary>Rayon autour d'un bâtiment d'extraction dans lequel on compte la surface de sa zone, en km (5).</summary>
+    public double ZoneRadius { get; init; } = 5;
+
+    /// <summary>Emplois par km² qu'une terre fertile supporte dans ce rayon (20).</summary>
+    public double ZoneDensityFertile { get; init; } = 20;
+
+    /// <summary>Emplois par km² qu'une forêt supporte (20).</summary>
+    public double ZoneDensityForest { get; init; } = 20;
+
+    /// <summary>Emplois par km² qu'un gisement de pierre, de charbon ou de fer supporte (25).</summary>
+    public double ZoneDensityDeposit { get; init; } = 25;
+
     /// <summary>Capacité d'envoi par jour qu'ajoute une charrette gardée par une commune (décidé le 20 novembre 2026 : 50).</summary>
     public double CartCapacity { get; init; } = 50;
 

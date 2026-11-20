@@ -174,7 +174,7 @@ public sealed partial class PlayerDesk(Simulation simulation)
     /// Lance le chantier d'un bâtiment public dans une commune. Son coût est payé tout de suite (réserve de chantier,
     /// stock de l'État, puis achat avec le trésor) ; le bâtiment arrive à la fin du chantier.
     /// </summary>
-    public string Build(string typeId, string communeId, Demos.Domain.Map.Point2D? position = null)
+    public string Build(string typeId, string communeId, Demos.Domain.Map.Point2D? position = null, double size = 1)
     {
         if (!World.BuildingTypes.TryGetValue(typeId, out var type) || type.Construction is not { } cost
             || BuildableTypes().All(t => t.Id != typeId))
@@ -184,20 +184,19 @@ public sealed partial class PlayerDesk(Simulation simulation)
         while (World.IsIdTaken($"{typeId}-{number}"))
             number++;
         var building = type.Build($"{typeId}-{number}", communeId);
-        // Un bâtiment d'extraction se pose sur une zone de la carte qui correspond, à portée de la commune.
-        if (World.NeedsExtractionSite(typeId, building.Production?.ProductId))
+        // La taille choisie, l'emplacement sur la carte, la place sur la zone et l'origine des matériaux : la simulation
+        // vérifie tout et dit ce qui manque (décidé le 20 novembre 2026).
+        var outcome = simulation.Build(building, PaymentMode.StockFirst, position, size);
+        if (outcome is { Started: true, Plan: { } plan })
         {
-            if (position is not { } site)
-                return "Choisissez son emplacement sur la carte.";
-            if (World.ExtractionSiteProblem(typeId, building.Production?.ProductId, communeId, site) is { } problem)
-                return $"Emplacement impossible : {problem}.";
+            var sized = type.Sized(building, size);
+            var what = sized.JobCapacity > 0 ? $", {sized.JobCapacity:N0} emplois" : sized.HousingPlaces > 0 ? $", {sized.HousingPlaces:N0} places" : "";
+            return $"Chantier lancé : {World.DisplayNameOf(building)}{what}, {cost.Days + plan.TravelDays} jours. Matériaux : {new GameView(simulation).DescribePlan(plan)}.";
         }
-        if (simulation.TryBuild(building, PaymentMode.StockFirst, position))
-            return $"Chantier lancé : {World.DisplayNameOf(building)}, {cost.Days} jours. Les matériaux sont payés.";
 
-        var available = AvailabilityOf(communeId, cost.ProductId);
-        return $"Construction impossible : il faut {cost.Quantity:N0} {ProductName(cost.ProductId)}. Il y a {available.Reserve:N0} en réserve "
-            + $"de chantier, {available.StateStock:N0} dans le stock de l'État et {available.OnSale:N0} en vente, à acheter avec le trésor.";
+        return outcome.Plan is { } refused
+            ? $"Construction impossible : {outcome.Problem}. Matériaux : {new GameView(simulation).DescribePlan(refused)}."
+            : $"Construction impossible : {outcome.Problem}.";
     }
 
     /// <summary>Le nom lisible d'un produit (« matériaux de construction »), ou son identifiant s'il est inconnu.</summary>

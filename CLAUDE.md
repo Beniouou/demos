@@ -77,6 +77,12 @@ matières, 114 954 avant eux,
 
 ## Économie : état actuel (résumé)
 
+Nouvelles communes (20 novembre 2026) : `Simulation.Build(structure, mode, position, size)` → `ConstructionOutcome` ; matériaux
+selon `Simulation.PlanConstruction` (`ConstructionPlan` : réserve, stock de l'État, achat ici, puis la commune la plus proche qui
+échange, avec perte, trajet ajouté au chantier, une journée de capacité au plus ; texte `GameView.DescribePlan`) ; taille 10 % à
+100 % (`BuildingType.Sized`, `ConstructionQuantity`, réglages `buildingMinUnits/Materials`) ; zones limitées (`Map/ZoneCapacity`,
+`World.ZoneUsage` / `ZoneProblem`, rayon `zoneRadius`, densités `zoneDensityFertile/Forest/Deposit`) ; les outils comptent dans
+`Trade.BuildingDemand`. Interface : `ConstructionPage` (taille − +, origine des matériaux, zone vérifiée à la pose).
 Objets durables (20 novembre 2026) : `ProductDefinition.UsageDays` (vêtements, meubles, poterie, outils, charrette) ;
 habitants : `SocialClass.Possessions`, possession visée `possessionByRank`, rachat de l'usure + `possessionCatchUp` du manque
 (`Consumption`, seulement si le produit a une durée d'usage), équipés au départ (`Consumption.EquipFully`) ; bâtiments :

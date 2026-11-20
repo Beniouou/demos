@@ -52,7 +52,9 @@ public static class Trade
         IReadOnlyDictionary<string, double> productionWorkers,
         Func<Structure, int> tierOf,
         Season season,
-        Func<Structure, bool>? constantHeatingOf = null)
+        Func<Structure, bool>? constantHeatingOf = null,
+        Func<Structure, double>? toolsOf = null,
+        double? toolUsageDays = null)
     {
         var demand = new Dictionary<string, Dictionary<string, double>>();
         void Add(string communeId, string productId, double quantity)
@@ -73,6 +75,13 @@ public static class Trade
                 var planned = recipe.QuantityPerWorker * productionWorkers.GetValueOrDefault(building.Id);
                 foreach (var material in recipe.Materials)
                     Add(communeId, material.ProductId, planned * material.Quantity);
+            }
+
+            // Les outils (décidé le 20 novembre 2026) : l'usure du jour, plus une part de ce qui manque au stock visé.
+            if (toolsOf is not null && toolUsageDays is > 0 && Tools.TargetOf(building) is > 0 and var toolTarget)
+            {
+                var owned = toolsOf(building);
+                Add(communeId, Tools.ProductId, owned / toolUsageDays.Value + Math.Max(0, toolTarget - owned) * Balance.Current.PossessionCatchUp);
             }
 
             var units = Energy.UnitsOf(building);

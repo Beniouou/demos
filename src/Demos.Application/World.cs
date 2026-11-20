@@ -130,6 +130,32 @@ public sealed class World
             _communePositions.Where(p => _structures.ContainsKey(p.Key)).Select(p => (_structures[p.Key].Name, p.Value)),
             Balance.Current.CommuneMinDistance);
 
+    /// <summary>
+    /// Les emplois déjà posés autour de cette position sur sa sorte de zone, et ceux que la zone y supporte (décidé le 20
+    /// novembre 2026, voir <see cref="ZoneCapacity"/>) ; null si le type ne se pose pas sur une zone, ou sans carte. Les
+    /// bâtiments en chantier comptent.
+    /// </summary>
+    public (double Used, double Capacity)? ZoneUsage(string? typeId, string? productId, Point2D position)
+    {
+        var kinds = ExtractionSites.ZonesFor(typeId, productId);
+        if (kinds.Count == 0 || MapZones.Count == 0)
+            return null;
+
+        var placed = _structures.Values.Concat(_constructionSites.Select(s => s.Building))
+            .Where(b => b.Kind == StructureKind.Building && _buildingPositions.ContainsKey(b.Id))
+            .Select(b => (_buildingPositions[b.Id], b.JobCapacity, ExtractionSites.ZonesFor(b.TypeId, b.Production?.ProductId)));
+        return (ZoneCapacity.UsedAt(kinds, position, placed), ZoneCapacity.CapacityAt(kinds, position, MapZones));
+    }
+
+    /// <summary>Ce qui empêche de poser autant d'emplois à cette position (la zone est pleine), ou null si c'est permis.</summary>
+    public string? ZoneProblem(string? typeId, string? productId, Point2D position, int jobs)
+    {
+        if (ZoneUsage(typeId, productId, position) is not { } usage || usage.Used + jobs <= usage.Capacity + 1e-6)
+            return null;
+        return $"zone pleine : {usage.Used:N0} emplois sur {usage.Capacity:N0} possibles à moins de {Balance.Current.ZoneRadius:N0} km "
+            + $"(ce bâtiment en demande {jobs:N0}) ; choisissez une taille plus petite ou un autre emplacement";
+    }
+
     /// <summary>Vrai si ce type de bâtiment, avec cette recette, doit être posé sur une zone de la carte (une carte chargée).</summary>
     public bool NeedsExtractionSite(string? typeId, string? productId) =>
         MapZones.Count > 0 && ExtractionSites.ZonesFor(typeId, productId).Count > 0;

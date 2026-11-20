@@ -204,8 +204,16 @@ public class GameViewTests
         Assert.False(simulation.TryBuild(type.Build("bucheron-2", PrototypeScenario.FirstCommuneId), Demos.Domain.Economy.PaymentMode.StockFirst));
         Assert.False(simulation.TryBuild(type.Build("bucheron-2", PrototypeScenario.FirstCommuneId), Demos.Domain.Economy.PaymentMode.StockFirst,
             new Demos.Domain.Map.Point2D(capital.X + 1000, capital.Y)));
-        Assert.True(simulation.TryBuild(type.Build("bucheron-2", PrototypeScenario.FirstCommuneId), Demos.Domain.Economy.PaymentMode.StockFirst, forest));
-        Assert.Equal(forest, world.BuildingPositions["bucheron-2"]);
+        // Sur la forêt, mais le Bois des Chênes est plein (décidé le 20 novembre 2026) : 300 emplois sur 310 possibles.
+        var full = simulation.Build(type.Build("bucheron-2", PrototypeScenario.FirstCommuneId), Demos.Domain.Economy.PaymentMode.StockFirst, forest);
+        Assert.False(full.Started);
+        Assert.Contains("zone pleine", full.Problem);
+
+        // Une ferme à 10 % (220 emplois) tient sur la plaine fertile, où la ferme de départ en a 730 sur environ 1 300.
+        var farm = world.BuildingTypes["ferme"];
+        var plain = world.BuildingPositions["ferme"];
+        Assert.True(simulation.Build(farm.Build("ferme-2", PrototypeScenario.FirstCommuneId), Demos.Domain.Economy.PaymentMode.StockFirst, plain, 0.1).Started);
+        Assert.Equal(plain, world.BuildingPositions["ferme-2"]);
     }
 
     [Fact]
