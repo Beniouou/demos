@@ -1,0 +1,50 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#262b34"/>
+      <stop offset="100%" stop-color="#14171c"/>
+    </linearGradient>
+    <linearGradient id="gold" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#f5d77f"/>
+      <stop offset="50%" stop-color="#d9a441"/>
+      <stop offset="100%" stop-color="#a6731e"/>
+    </linearGradient>
+    <linearGradient id="slate" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#627187"/>
+      <stop offset="100%" stop-color="#343d4a"/>
+    </linearGradient>
+    <linearGradient id="stone" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#f0ebe1"/>
+      <stop offset="100%" stop-color="#b8ae9c"/>
+    </linearGradient>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="1.5" stdDeviation="1.5" flood-color="#000000" flood-opacity="0.5"/>
+    </filter>
+  </defs>
+  <circle cx="32" cy="32" r="29" fill="url(#bg)" stroke="#363d4a" stroke-width="1.5"/>
+  <circle cx="32" cy="32" r="26" fill="none" stroke="#d9a441" stroke-width="0.7" stroke-dasharray="2 2" opacity="0.55"/>
+  <g filter="url(#shadow)">
+    <!-- Toit à la Mansart en ardoise -->
+    <polygon points="18,24 24,14 40,14 46,24" fill="url(#slate)" stroke="#262d38" stroke-width="1"/>
+    <!-- Lucarne de toit -->
+    <rect x="29" y="16" width="6" height="6" rx="1" fill="url(#gold)"/>
+    <line x1="32" y1="16" x2="32" y2="22" stroke="#14171c" stroke-width="0.7"/>
+    <!-- Souches de cheminées -->
+    <rect x="21" y="12" width="3" height="5" fill="#a8432a"/>
+    <rect x="40" y="12" width="3" height="5" fill="#a8432a"/>
+    <!-- Façade en pierre de taille haussmannienne -->
+    <rect x="18" y="24" width="28" height="25" fill="url(#stone)" stroke="#8f8574" stroke-width="1"/>
+    <!-- Balcon filant en fer forgé au 2e étage -->
+    <rect x="16" y="32" width="32" height="2" fill="url(#gold)"/>
+    <!-- Fenêtres ordonnées régulières -->
+    <rect x="21" y="26" width="4" height="5" rx="0.5" fill="#20252e" stroke="#8f8574" stroke-width="0.6"/>
+    <rect x="30" y="26" width="4" height="5" rx="0.5" fill="#20252e" stroke="#8f8574" stroke-width="0.6"/>
+    <rect x="39" y="26" width="4" height="5" rx="0.5" fill="#20252e" stroke="#8f8574" stroke-width="0.6"/>
+    <rect x="21" y="36" width="4" height="5" rx="0.5" fill="#20252e" stroke="#8f8574" stroke-width="0.6"/>
+    <rect x="39" y="36" width="4" height="5" rx="0.5" fill="#20252e" stroke="#8f8574" stroke-width="0.6"/>
+    <!-- Porte d'entrée cochère en bois ouvragé -->
+    <path d="M 29 49 L 29 42 C 29 40, 35 40, 35 42 L 35 49 Z" fill="#4d3119" stroke="#363d4a" stroke-width="0.8"/>
+    <!-- Trottoir pavé -->
+    <line x1="14" y1="49" x2="50" y2="49" stroke="#7a8290" stroke-width="2"/>
+  </g>
+</svg>

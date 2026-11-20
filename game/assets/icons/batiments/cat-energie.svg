@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#262b34"/>
+      <stop offset="100%" stop-color="#14171c"/>
+    </linearGradient>
+    <linearGradient id="gold" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#f5d77f"/>
+      <stop offset="50%" stop-color="#d9a441"/>
+      <stop offset="100%" stop-color="#a6731e"/>
+    </linearGradient>
+    <linearGradient id="lightning" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#fff8b3"/>
+      <stop offset="50%" stop-color="#ffd033"/>
+      <stop offset="100%" stop-color="#e68a00"/>
+    </linearGradient>
+    <linearGradient id="steel" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ffffff"/>
+      <stop offset="50%" stop-color="#c4c9d2"/>
+      <stop offset="100%" stop-color="#7a8290"/>
+    </linearGradient>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="1.5" stdDeviation="1.5" flood-color="#000000" flood-opacity="0.5"/>
+    </filter>
+  </defs>
+  <circle cx="32" cy="32" r="29" fill="url(#bg)" stroke="#363d4a" stroke-width="1.5"/>
+  <circle cx="32" cy="32" r="26" fill="none" stroke="#d9a441" stroke-width="0.7" stroke-dasharray="2 2" opacity="0.55"/>
+  <g filter="url(#shadow)">
+    <!-- Anneau de dynamo / turbine rotative -->
+    <circle cx="32" cy="32" r="17" fill="#1b2029" stroke="url(#steel)" stroke-width="2"/>
+    <!-- Pales de rotor de générateur -->
+    <path d="M 32 15 C 34 22, 38 27, 47 27 C 40 29, 35 33, 35 42 C 33 35, 29 30, 20 30 C 27 28, 32 24, 32 15 Z" fill="#2d3542" stroke="#525d6e" stroke-width="0.8"/>
+    <!-- Cercles concentriques de force électromotrice -->
+    <circle cx="32" cy="32" r="10" fill="none" stroke="#d9a441" stroke-width="1" stroke-dasharray="2 2" opacity="0.8"/>
+    <!-- Éclair fulgurant au centre -->
+    <polygon points="36,13 22,31 32,31 26,49 42,28 32,28" fill="url(#lightning)" stroke="#a66300" stroke-width="1"/>
+    <!-- Noyau énergétique central -->
+    <circle cx="32" cy="32" r="3.5" fill="#ffffff" opacity="0.7"/>
+    <!-- Étincelles dynamiques -->
+    <circle cx="16" cy="20" r="1.5" fill="#ffd033"/>
+    <circle cx="48" cy="42" r="1.5" fill="#ffd033"/>
+  </g>
+</svg>

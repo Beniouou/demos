@@ -1,0 +1,61 @@
+﻿<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#262b34"/>
+      <stop offset="100%" stop-color="#14171c"/>
+    </linearGradient>
+    <linearGradient id="gold" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#f5d77f"/>
+      <stop offset="50%" stop-color="#d9a441"/>
+      <stop offset="100%" stop-color="#a6731e"/>
+    </linearGradient>
+    <linearGradient id="steel" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ffffff"/>
+      <stop offset="50%" stop-color="#c4c9d2"/>
+      <stop offset="100%" stop-color="#7a8290"/>
+    </linearGradient>
+    <linearGradient id="copper" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#f09b68"/>
+      <stop offset="100%" stop-color="#b8582b"/>
+    </linearGradient>
+    <linearGradient id="wood" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ba8252"/>
+      <stop offset="100%" stop-color="#694121"/>
+    </linearGradient>
+    <linearGradient id="bread" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#f7d488"/>
+      <stop offset="50%" stop-color="#d99938"/>
+      <stop offset="100%" stop-color="#8a5311"/>
+    </linearGradient>
+    <linearGradient id="ruby" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#f26c71"/>
+      <stop offset="100%" stop-color="#a82329"/>
+    </linearGradient>
+    <linearGradient id="brick" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#e07253"/>
+      <stop offset="100%" stop-color="#993821"/>
+    </linearGradient>
+    <linearGradient id="pottery" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#e68055"/>
+      <stop offset="100%" stop-color="#99421c"/>
+    </linearGradient>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="1.5" stdDeviation="1.5" flood-color="#000000" flood-opacity="0.5"/>
+    </filter>
+  </defs>
+  <circle cx="32" cy="32" r="29" fill="url(#bg)" stroke="#363d4a" stroke-width="1.5"/>
+  <circle cx="32" cy="32" r="26" fill="none" stroke="#d9a441" stroke-width="0.7" stroke-dasharray="2 2" opacity="0.55"/>
+  <g filter="url(#shadow)">
+    <!-- Poutrelle métallique en I d'acier rivetée et équerre technique -->
+    <!-- Poutrelle en I profilée (acier industriel) -->
+    <path d="M 16 18 L 48 18 L 48 24 L 35 24 L 35 40 L 48 40 L 48 46 L 16 46 L 16 40 L 29 40 L 29 24 L 16 24 Z" 
+          fill="url(#steel)" stroke="#363d4a" stroke-width="1.2"/>
+    <!-- Rivets réguliers sur la poutrelle -->
+    <circle cx="20" cy="21" r="1.2" fill="#20252e"/>
+    <circle cx="44" cy="21" r="1.2" fill="#20252e"/>
+    <circle cx="20" cy="43" r="1.2" fill="#20252e"/>
+    <circle cx="44" cy="43" r="1.2" fill="#20252e"/>
+    <!-- Équerre de précision dorée posée en avant-plan -->
+    <polygon points="32,48 48,48 48,32 44,32 44,44 32,44" fill="url(#gold)" stroke="#8f6418" stroke-width="0.8"/>
+  </g>
+</svg>

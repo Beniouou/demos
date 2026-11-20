@@ -1,0 +1,52 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#262b34"/>
+      <stop offset="100%" stop-color="#14171c"/>
+    </linearGradient>
+    <linearGradient id="gold" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#f5d77f"/>
+      <stop offset="50%" stop-color="#d9a441"/>
+      <stop offset="100%" stop-color="#a6731e"/>
+    </linearGradient>
+    <linearGradient id="barn" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#d9593d"/>
+      <stop offset="100%" stop-color="#8a2814"/>
+    </linearGradient>
+    <linearGradient id="straw" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#fff085"/>
+      <stop offset="100%" stop-color="#d9a441"/>
+    </linearGradient>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="1.5" stdDeviation="1.5" flood-color="#000000" flood-opacity="0.5"/>
+    </filter>
+  </defs>
+  <circle cx="32" cy="32" r="29" fill="url(#bg)" stroke="#363d4a" stroke-width="1.5"/>
+  <circle cx="32" cy="32" r="26" fill="none" stroke="#d9a441" stroke-width="0.7" stroke-dasharray="2 2" opacity="0.55"/>
+  <g filter="url(#shadow)">
+    <!-- Silo à grains à gauche -->
+    <path d="M 14 26 C 14 20, 22 20, 22 26 L 22 46 L 14 46 Z" fill="#4d5b6e" stroke="#262d38" stroke-width="0.8"/>
+    <ellipse cx="18" cy="23" rx="4" ry="2" fill="url(#gold)"/>
+    <!-- Grange agricole avec toit à pans coupés -->
+    <polygon points="34,14 50,24 18,24" fill="url(#gold)" stroke="#8f6418" stroke-width="0.8"/>
+    <!-- Girouette coq au sommet de la grange -->
+    <line x1="34" y1="10" x2="34" y2="14" stroke="#8f6418" stroke-width="1"/>
+    <polygon points="34,10 37,12 34,13" fill="url(#gold)"/>
+    <!-- Murs de la grange en bois rouge traditionnel -->
+    <rect x="20" y="24" width="28" height="22" fill="url(#barn)" stroke="#5c190a" stroke-width="1"/>
+    <!-- Colombages en croix blanche / crème -->
+    <line x1="20" y1="24" x2="48" y2="46" stroke="#f4efe6" stroke-width="1.2" opacity="0.8"/>
+    <line x1="48" y1="24" x2="20" y2="46" stroke="#f4efe6" stroke-width="1.2" opacity="0.8"/>
+    <!-- Grande porte double de grange -->
+    <rect x="29" y="34" width="10" height="12" fill="#1b120c" stroke="#f4efe6" stroke-width="0.8"/>
+    <!-- Épis de blé dorés croisés au premier plan -->
+    <g transform="translate(42, 40)">
+      <path d="M 0 10 Q 5 2 10 0" fill="none" stroke="url(#gold)" stroke-width="1.5" stroke-linecap="round"/>
+      <ellipse cx="2" cy="7" rx="1.5" ry="3" fill="url(#straw)" transform="rotate(-30 2 7)"/>
+      <ellipse cx="6" cy="4" rx="1.5" ry="3" fill="url(#straw)" transform="rotate(-30 6 4)"/>
+      <ellipse cx="9" cy="1" rx="1.5" ry="3" fill="url(#straw)" transform="rotate(-30 9 1)"/>
+    </g>
+    <!-- Sol fertile -->
+    <line x1="10" y1="48" x2="54" y2="48" stroke="#30a46c" stroke-width="2" stroke-linecap="round"/>
+  </g>
+</svg>

@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#262b34"/>
+      <stop offset="100%" stop-color="#14171c"/>
+    </linearGradient>
+    <linearGradient id="ecGreen" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#55db94"/>
+      <stop offset="50%" stop-color="#30a46c"/>
+      <stop offset="100%" stop-color="#1c6b44"/>
+    </linearGradient>
+    <linearGradient id="gold" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#f5d77f"/>
+      <stop offset="100%" stop-color="#c6922e"/>
+    </linearGradient>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="1.5" stdDeviation="1.5" flood-color="#000000" flood-opacity="0.5"/>
+    </filter>
+  </defs>
+  <circle cx="32" cy="32" r="29" fill="url(#bg)" stroke="#30a46c" stroke-width="1.8"/>
+  <circle cx="32" cy="32" r="26" fill="none" stroke="#30a46c" stroke-width="0.7" stroke-dasharray="2 2" opacity="0.6"/>
+  <g filter="url(#shadow)">
+    <!-- Feuille de chêne vigoureuse -->
+    <path d="M 32 14 C 36 17, 43 17, 41 23 C 45 27, 46 34, 40 37 C 42 42, 38 46, 32 46 C 26 46, 22 42, 24 37 C 18 34, 19 27, 23 23 C 21 17, 28 17, 32 14 Z" 
+          fill="url(#ecGreen)" stroke="#1c6b44" stroke-width="1.5"/>
+    <!-- Nervure centrale et nervures secondaires -->
+    <line x1="32" y1="18" x2="32" y2="48" stroke="#ffffff" stroke-width="1.8" stroke-linecap="round" opacity="0.8"/>
+    <path d="M 32 24 Q 38 22 40 25" fill="none" stroke="#ffffff" stroke-width="1.2" opacity="0.7"/>
+    <path d="M 32 28 Q 26 26 24 29" fill="none" stroke="#ffffff" stroke-width="1.2" opacity="0.7"/>
+    <path d="M 32 34 Q 38 32 40 35" fill="none" stroke="#ffffff" stroke-width="1.2" opacity="0.7"/>
+    <path d="M 32 38 Q 26 36 24 39" fill="none" stroke="#ffffff" stroke-width="1.2" opacity="0.7"/>
+    <!-- Gland de chêne / semence germée -->
+    <ellipse cx="23" cy="42" rx="3.5" ry="4" fill="url(#gold)" stroke="#8f6418" stroke-width="0.8"/>
+    <path d="M 19 40 C 19 38, 27 38, 27 40 Z" fill="#6e5020"/>
+    <!-- Texte Nature -->
+    <text x="32" y="53" fill="#55db94" font-size="7" font-weight="bold" font-family="sans-serif" text-anchor="middle" letter-spacing="1">ÉCOLOGIE</text>
+  </g>
+</svg>

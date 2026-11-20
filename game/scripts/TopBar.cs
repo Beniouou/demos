@@ -56,6 +56,17 @@ public partial class TopBar : PanelContainer
 
         row.AddChild(new Control { SizeFlagsHorizontal = SizeFlags.ExpandFill });
 
+        var treasuryIcon = IconRegistry.GetResourceIcon("tresor", 18);
+        if (treasuryIcon != null)
+        {
+            row.AddChild(new TextureRect
+            {
+                Texture = treasuryIcon,
+                CustomMinimumSize = new Vector2(treasuryIcon.GetWidth(), treasuryIcon.GetHeight()),
+                SizeFlagsVertical = SizeFlags.ShrinkCenter,
+                MouseFilter = MouseFilterEnum.Ignore,
+            });
+        }
         row.AddChild(UiTheme.Caption("Trésor"));
         _treasury = UiTheme.Title("");
         row.AddChild(_treasury);
@@ -81,18 +92,32 @@ public partial class TopBar : PanelContainer
             label.Text = $"{pole.Code} {view.LegitimacyOf(pole):F0}";
     }
 
-    /// <summary>Une pastille de la couleur du pôle et sa légitimité ; le nom complet s'affiche au survol.</summary>
+    /// <summary>Une pastille avec l'insigne du pôle et sa légitimité ; le nom complet s'affiche au survol.</summary>
     private Control LegitimacyChip(Orientation pole)
     {
         var chip = new HBoxContainer { TooltipText = $"Légitimité {WorldText.PoleName(pole)}", MouseFilter = MouseFilterEnum.Pass };
         chip.AddThemeConstantOverride("separation", 4);
-        chip.AddChild(new ColorRect
+        var poleIcon = IconRegistry.GetPoleIcon(pole, 16);
+        if (poleIcon != null)
         {
-            Color = UiTheme.PoleColor(pole),
-            CustomMinimumSize = new Vector2(10, 10),
-            SizeFlagsVertical = SizeFlags.ShrinkCenter,
-            MouseFilter = MouseFilterEnum.Ignore,
-        });
+            chip.AddChild(new TextureRect
+            {
+                Texture = poleIcon,
+                CustomMinimumSize = new Vector2(poleIcon.GetWidth(), poleIcon.GetHeight()),
+                SizeFlagsVertical = SizeFlags.ShrinkCenter,
+                MouseFilter = MouseFilterEnum.Ignore,
+            });
+        }
+        else
+        {
+            chip.AddChild(new ColorRect
+            {
+                Color = UiTheme.PoleColor(pole),
+                CustomMinimumSize = new Vector2(10, 10),
+                SizeFlagsVertical = SizeFlags.ShrinkCenter,
+                MouseFilter = MouseFilterEnum.Ignore,
+            });
+        }
         var label = new Label { CustomMinimumSize = new Vector2(52, 0), MouseFilter = MouseFilterEnum.Ignore };
         chip.AddChild(label);
         _legitimacy[pole] = label;

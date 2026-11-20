@@ -120,9 +120,19 @@ public partial class ProductionChainPage : VBoxContainer, IMenuPage
         _followIds.Clear();
         _followIds.AddRange(products.Select(p => p.ProductId));
         _follow.Clear();
-        _follow.AddItem("Tous les produits");
-        foreach (var (_, name) in products)
-            _follow.AddItem(name);
+        var allIcon = IconRegistry.GetMenuIcon("Ressources", 16);
+        if (allIcon is not null)
+            _follow.AddIconItem(allIcon, "Tous les produits");
+        else
+            _follow.AddItem("Tous les produits");
+        foreach (var (id, name) in products)
+        {
+            var icon = IconRegistry.GetProductIcon(id, 16) ?? IconRegistry.GetProductIcon(name, 16);
+            if (icon is not null)
+                _follow.AddIconItem(icon, name);
+            else
+                _follow.AddItem(name);
+        }
         _follow.Select(selected is null ? 0 : System.Math.Max(0, _followIds.IndexOf(selected) + 1));
     }
 }

@@ -1,0 +1,59 @@
+﻿<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#262b34"/>
+      <stop offset="100%" stop-color="#14171c"/>
+    </linearGradient>
+    <linearGradient id="gold" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#f5d77f"/>
+      <stop offset="50%" stop-color="#d9a441"/>
+      <stop offset="100%" stop-color="#a6731e"/>
+    </linearGradient>
+    <linearGradient id="steel" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ffffff"/>
+      <stop offset="50%" stop-color="#c4c9d2"/>
+      <stop offset="100%" stop-color="#7a8290"/>
+    </linearGradient>
+    <linearGradient id="copper" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#f09b68"/>
+      <stop offset="100%" stop-color="#b8582b"/>
+    </linearGradient>
+    <linearGradient id="wood" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ba8252"/>
+      <stop offset="100%" stop-color="#694121"/>
+    </linearGradient>
+    <linearGradient id="bread" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#f7d488"/>
+      <stop offset="50%" stop-color="#d99938"/>
+      <stop offset="100%" stop-color="#8a5311"/>
+    </linearGradient>
+    <linearGradient id="ruby" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#f26c71"/>
+      <stop offset="100%" stop-color="#a82329"/>
+    </linearGradient>
+    <linearGradient id="brick" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#e07253"/>
+      <stop offset="100%" stop-color="#993821"/>
+    </linearGradient>
+    <linearGradient id="pottery" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#e68055"/>
+      <stop offset="100%" stop-color="#99421c"/>
+    </linearGradient>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="1.5" stdDeviation="1.5" flood-color="#000000" flood-opacity="0.5"/>
+    </filter>
+  </defs>
+  <circle cx="32" cy="32" r="29" fill="url(#bg)" stroke="#363d4a" stroke-width="1.5"/>
+  <circle cx="32" cy="32" r="26" fill="none" stroke="#d9a441" stroke-width="0.7" stroke-dasharray="2 2" opacity="0.55"/>
+  <g filter="url(#shadow)">
+    <!-- Côtelette de boucherie ficelée / rôti préparé -->
+    <path d="M 22 24 C 18 20, 36 16, 44 22 C 50 28, 48 38, 42 42 C 34 46, 20 44, 18 36 C 16 30, 24 26, 22 24 Z" 
+          fill="url(#ruby)" stroke="#73141a" stroke-width="1.5"/>
+    <!-- Os de côtelette blanc au centre -->
+    <ellipse cx="26" cy="28" rx="4" ry="4" fill="#ffffff" stroke="#c4c9d2" stroke-width="0.8"/>
+    <circle cx="26" cy="28" r="1.8" fill="#e8dac1"/>
+    <!-- Ficelage de boucher -->
+    <path d="M 30 20 Q 36 30 38 42" fill="none" stroke="#ffffff" stroke-width="1.2" stroke-dasharray="2 2" opacity="0.8"/>
+    <path d="M 38 21 Q 42 30 42 40" fill="none" stroke="#ffffff" stroke-width="1.2" stroke-dasharray="2 2" opacity="0.8"/>
+  </g>
+</svg>

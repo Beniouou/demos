@@ -1,0 +1,52 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#262b34"/>
+      <stop offset="100%" stop-color="#14171c"/>
+    </linearGradient>
+    <linearGradient id="gold" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#f5d77f"/>
+      <stop offset="50%" stop-color="#d9a441"/>
+      <stop offset="100%" stop-color="#a6731e"/>
+    </linearGradient>
+    <linearGradient id="velvet" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#c92a34"/>
+      <stop offset="50%" stop-color="#8a141b"/>
+      <stop offset="100%" stop-color="#4d080c"/>
+    </linearGradient>
+    <linearGradient id="stage" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#d9995b"/>
+      <stop offset="100%" stop-color="#804d22"/>
+    </linearGradient>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="1.5" stdDeviation="1.5" flood-color="#000000" flood-opacity="0.5"/>
+    </filter>
+  </defs>
+  <circle cx="32" cy="32" r="29" fill="url(#bg)" stroke="#363d4a" stroke-width="1.5"/>
+  <circle cx="32" cy="32" r="26" fill="none" stroke="#d9a441" stroke-width="0.7" stroke-dasharray="2 2" opacity="0.55"/>
+  <g filter="url(#shadow)">
+    <!-- Cadre de scène à l'italienne / Arche de proscénium -->
+    <path d="M 14 47 L 14 16 C 14 14, 50 14, 50 16 L 50 47 Z" fill="#14171c" stroke="url(#gold)" stroke-width="1.8"/>
+    <!-- Lambrequin / cantonnière drapée en velours rouge carmin -->
+    <path d="M 14 16 Q 23 23 32 18 Q 41 23 50 16 L 50 22 Q 41 28 32 23 Q 23 28 14 22 Z" fill="url(#velvet)" stroke="#d9a441" stroke-width="0.8"/>
+    <!-- Rideaux de scène drapés sur les côtés avec embrasses dorées -->
+    <!-- Rideau gauche -->
+    <path d="M 14 22 Q 22 28 18 36 Q 22 43 14 46 Z" fill="url(#velvet)"/>
+    <circle cx="20" cy="36" r="1.5" fill="url(#gold)"/>
+    <!-- Rideau droit -->
+    <path d="M 50 22 Q 42 28 46 36 Q 42 43 50 46 Z" fill="url(#velvet)"/>
+    <circle cx="44" cy="36" r="1.5" fill="url(#gold)"/>
+    <!-- Éclairage de scène / Feux de rampe -->
+    <ellipse cx="32" cy="40" rx="10" ry="4" fill="#fdf2bb" opacity="0.6"/>
+    <!-- Plancher de scène en bois ciré -->
+    <polygon points="12,46 52,46 48,42 16,42" fill="url(#stage)"/>
+    <!-- Feux de rampe dorés au bas de la scène -->
+    <circle cx="20" cy="46" r="1.5" fill="#f5d77f"/>
+    <circle cx="26" cy="46" r="1.5" fill="#f5d77f"/>
+    <circle cx="32" cy="46" r="1.5" fill="#f5d77f"/>
+    <circle cx="38" cy="46" r="1.5" fill="#f5d77f"/>
+    <circle cx="44" cy="46" r="1.5" fill="#f5d77f"/>
+    <!-- Balustrade d'orchestre -->
+    <rect x="10" y="47" width="44" height="3" fill="#20252e" stroke="url(#gold)" stroke-width="0.8"/>
+  </g>
+</svg>

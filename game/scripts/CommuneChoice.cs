@@ -47,9 +47,21 @@ public sealed class CommuneChoice(bool allowAll = true)
         _ids.AddRange(communes.Select(c => c.Id));
         Button.Clear();
         if (allowAll)
-            Button.AddItem("Toutes les communes");
+        {
+            var allIcon = IconRegistry.GetCategoryIcon("Administration", 16);
+            if (allIcon is not null)
+                Button.AddIconItem(allIcon, "Toutes les communes");
+            else
+                Button.AddItem("Toutes les communes");
+        }
+        var icon = IconRegistry.GetBuildingIcon("mairie", null, 16) ?? IconRegistry.GetCategoryIcon("Administration", 16);
         foreach (var commune in communes)
-            Button.AddItem(commune.Name);
+        {
+            if (icon is not null)
+                Button.AddIconItem(icon, commune.Name);
+            else
+                Button.AddItem(commune.Name);
+        }
         Button.Select(selected is null ? 0 : System.Math.Max(0, _ids.IndexOf(selected) + Offset));
     }
 }

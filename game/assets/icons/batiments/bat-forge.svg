@@ -1,0 +1,52 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#262b34"/>
+      <stop offset="100%" stop-color="#14171c"/>
+    </linearGradient>
+    <linearGradient id="gold" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#f5d77f"/>
+      <stop offset="50%" stop-color="#d9a441"/>
+      <stop offset="100%" stop-color="#a6731e"/>
+    </linearGradient>
+    <linearGradient id="fire" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#fff275"/>
+      <stop offset="40%" stop-color="#ff7b2b"/>
+      <stop offset="100%" stop-color="#d92414"/>
+    </linearGradient>
+    <linearGradient id="steel" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ffffff"/>
+      <stop offset="50%" stop-color="#c4c9d2"/>
+      <stop offset="100%" stop-color="#7a8290"/>
+    </linearGradient>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="1.5" stdDeviation="1.5" flood-color="#000000" flood-opacity="0.5"/>
+    </filter>
+  </defs>
+  <circle cx="32" cy="32" r="29" fill="url(#bg)" stroke="#363d4a" stroke-width="1.5"/>
+  <circle cx="32" cy="32" r="26" fill="none" stroke="#d9a441" stroke-width="0.7" stroke-dasharray="2 2" opacity="0.55"/>
+  <g filter="url(#shadow)">
+    <!-- Flammes du foyer de forge en arrière-plan -->
+    <path d="M 32 10 C 37 15, 42 22, 38 28 C 45 22, 44 16, 42 12 C 48 20, 48 30, 41 36 C 36 34, 34 30, 36 26 C 31 29, 29 35, 24 35 C 18 30, 20 18, 26 14 C 25 18, 28 22, 32 20 C 31 16, 29 13, 32 10 Z" 
+          fill="url(#fire)" opacity="0.85"/>
+    <!-- Enclume de forgeron massive -->
+    <path d="M 16 32 C 18 30, 26 30, 30 30 L 46 30 C 50 30, 52 33, 48 36 L 40 37 L 42 43 L 48 48 L 16 48 L 22 43 L 24 37 L 16 34 Z" 
+          fill="#252c38" stroke="url(#steel)" stroke-width="1.2"/>
+    <!-- Bigorne ronde de l'enclume -->
+    <path d="M 16 32 Q 10 32 12 34 L 16 35 Z" fill="url(#steel)"/>
+    <!-- Lingot incandescent chauffé au rouge sur l'enclume -->
+    <rect x="27" y="28" width="12" height="4" rx="1" fill="url(#fire)" stroke="#ff7b2b" stroke-width="0.8"/>
+    <!-- Marteau de frappe s'abattant -->
+    <g transform="rotate(30 33 22)">
+      <rect x="31" y="8" width="3.5" height="22" rx="1" fill="#ba8252" stroke="#694121" stroke-width="0.6"/>
+      <rect x="26" y="7" width="13" height="7" rx="1" fill="url(#steel)" stroke="#363d4a" stroke-width="0.8"/>
+    </g>
+    <!-- Étincelles incandescentes projetées -->
+    <circle cx="24" cy="24" r="1.5" fill="#fff275"/>
+    <circle cx="44" cy="24" r="1.2" fill="#fff275"/>
+    <circle cx="41" cy="18" r="1" fill="#ff7b2b"/>
+    <circle cx="21" cy="28" r="1" fill="#ff7b2b"/>
+    <!-- Billot de chêne supportant l'enclume -->
+    <rect x="14" y="48" width="36" height="3" fill="#694121"/>
+  </g>
+</svg>

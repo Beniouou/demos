@@ -1,0 +1,83 @@
+﻿<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#262b34"/>
+      <stop offset="100%" stop-color="#14171c"/>
+    </linearGradient>
+    <linearGradient id="gold" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#f5d77f"/>
+      <stop offset="50%" stop-color="#d9a441"/>
+      <stop offset="100%" stop-color="#a6731e"/>
+    </linearGradient>
+    <linearGradient id="steel" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ffffff"/>
+      <stop offset="50%" stop-color="#c4c9d2"/>
+      <stop offset="100%" stop-color="#7a8290"/>
+    </linearGradient>
+    <linearGradient id="copper" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#f09b68"/>
+      <stop offset="100%" stop-color="#b8582b"/>
+    </linearGradient>
+    <linearGradient id="wood" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ba8252"/>
+      <stop offset="100%" stop-color="#694121"/>
+    </linearGradient>
+    <linearGradient id="coal" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#4d535e"/>
+      <stop offset="100%" stop-color="#14171c"/>
+    </linearGradient>
+    <linearGradient id="stone" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#e8e2d5"/>
+      <stop offset="100%" stop-color="#998e7d"/>
+    </linearGradient>
+    <linearGradient id="water" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#70c6ff"/>
+      <stop offset="50%" stop-color="#3399ff"/>
+      <stop offset="100%" stop-color="#1460b8"/>
+    </linearGradient>
+    <linearGradient id="ruby" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#f26c71"/>
+      <stop offset="100%" stop-color="#a82329"/>
+    </linearGradient>
+    <linearGradient id="wheat" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#fff275"/>
+      <stop offset="50%" stop-color="#e0a92b"/>
+      <stop offset="100%" stop-color="#996a12"/>
+    </linearGradient>
+    <linearGradient id="clay" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#e67e5a"/>
+      <stop offset="100%" stop-color="#993d1f"/>
+    </linearGradient>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="1.5" stdDeviation="1.5" flood-color="#000000" flood-opacity="0.5"/>
+    </filter>
+  </defs>
+  <circle cx="32" cy="32" r="29" fill="url(#bg)" stroke="#363d4a" stroke-width="1.5"/>
+  <circle cx="32" cy="32" r="26" fill="none" stroke="#d9a441" stroke-width="0.7" stroke-dasharray="2 2" opacity="0.55"/>
+  <g filter="url(#shadow)">
+    <!-- 3 Rondins de bois empilés avec écorce et cernes -->
+    <!-- Rondin bas gauche -->
+    <g transform="translate(14, 28)">
+      <rect x="6" y="0" width="22" height="15" rx="2" fill="url(#wood)" stroke="#3d210b" stroke-width="0.8"/>
+      <ellipse cx="6" cy="7.5" rx="5" ry="7.5" fill="#d9ab75" stroke="#3d210b" stroke-width="1"/>
+      <ellipse cx="6" cy="7.5" rx="3" ry="4.5" fill="none" stroke="#8a5322" stroke-width="0.8"/>
+      <circle cx="6" cy="7.5" r="1.2" fill="#3d210b"/>
+    </g>
+    <!-- Rondin bas droite -->
+    <g transform="translate(28, 28)">
+      <rect x="6" y="0" width="20" height="15" rx="2" fill="url(#wood)" stroke="#3d210b" stroke-width="0.8"/>
+      <ellipse cx="6" cy="7.5" rx="5" ry="7.5" fill="#d9ab75" stroke="#3d210b" stroke-width="1"/>
+      <ellipse cx="6" cy="7.5" rx="3" ry="4.5" fill="none" stroke="#8a5322" stroke-width="0.8"/>
+      <circle cx="6" cy="7.5" r="1.2" fill="#3d210b"/>
+    </g>
+    <!-- Rondin sommet -->
+    <g transform="translate(21, 15)">
+      <rect x="6" y="0" width="22" height="15" rx="2" fill="url(#wood)" stroke="#3d210b" stroke-width="0.8"/>
+      <ellipse cx="6" cy="7.5" rx="5" ry="7.5" fill="#e8c28b" stroke="#3d210b" stroke-width="1"/>
+      <ellipse cx="6" cy="7.5" rx="3" ry="4.5" fill="none" stroke="#8a5322" stroke-width="0.8"/>
+      <circle cx="6" cy="7.5" r="1.2" fill="#3d210b"/>
+    </g>
+    <!-- Feuilles de chêne vertes à la base -->
+    <path d="M 44 44 Q 50 40 52 46 Q 46 48 44 44 Z" fill="#30a46c"/>
+  </g>
+</svg>

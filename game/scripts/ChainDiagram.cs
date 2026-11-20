@@ -21,13 +21,13 @@ namespace Demos.Game;
 /// </summary>
 public partial class ChainDiagram : Control
 {
-    private const float BoxWidth = 190;
+    private const float BoxWidth = 215;
     private const float BoxHeight = 46;
     private const float ColumnGap = 74;
     private const float RowGap = 10;
     private const float BandPadding = 10;
     private const float LabelWidth = 150;
-    private const float SmallBoxWidth = 170;
+    private const float SmallBoxWidth = 195;
     private const float SmallBoxHeight = 40;
     private const float Margin = 12;
     private const float HeaderHeight = 26;
@@ -39,6 +39,7 @@ public partial class ChainDiagram : Control
     private sealed record Node(string Key, string Title, string Detail, Color Strip, bool Short, Rect2 Box)
     {
         public string? FullName { get; init; }
+        public Texture2D? Icon { get; init; }
     }
 
     /// <summary>« Atelier (Farine) 2 » → (« Atelier 2 », « Farine ») ; un nom sans produit reste entier.</summary>
@@ -135,8 +136,16 @@ public partial class ChainDiagram : Control
                 {
                     var box = new Rect2(ColumnX(column.Key), bandTop + BandPadding + row++ * (BoxHeight + RowGap), BoxWidth, BoxHeight);
                     var (type, product) = Split(building.Name);
+                    var icon = IconRegistry.GetBuildingIcon(building.TypeId, building.Category, 18)
+                        ?? IconRegistry.GetBuildingIcon(type, null, 18)
+                        ?? IconRegistry.GetProductIcon(building.ProductId, 18)
+                        ?? IconRegistry.GetCategoryIcon("Production", 18);
                     _nodes.Add(new Node(building.Id, type, $"{product ?? building.ProductName} · {building.ProducedToday:N0} par jour",
-                        UiTheme.OwnershipColor(building.Ownership), building.SupplyShare < 0.995, box) { FullName = building.Name });
+                        UiTheme.OwnershipColor(building.Ownership), building.SupplyShare < 0.995, box)
+                    {
+                        FullName = building.Name,
+                        Icon = icon,
+                    });
                 }
             }
             var bottom = bandTop + 2 * BandPadding + rows * (BoxHeight + RowGap) - RowGap;
@@ -153,7 +162,13 @@ public partial class ChainDiagram : Control
             var building = plain[index];
             var box = new Rect2(Margin + index % perRow * (SmallBoxWidth + RowGap),
                 top + 22 + BandPadding + index / perRow * (SmallBoxHeight + RowGap), SmallBoxWidth, SmallBoxHeight);
-            _nodes.Add(new Node(building.Id, building.Name, Offer(building), UiTheme.OwnershipColor(building.Ownership), false, box));
+            var icon = IconRegistry.GetBuildingIcon(building.TypeId, building.Category, 16)
+                ?? IconRegistry.GetBuildingIcon(building.Name, null, 16)
+                ?? IconRegistry.GetCategoryIcon(building.Category ?? "Logistique", 16);
+            _nodes.Add(new Node(building.Id, building.Name, Offer(building), UiTheme.OwnershipColor(building.Ownership), false, box)
+            {
+                Icon = icon,
+            });
         }
         var plainRows = (plain.Count + perRow - 1) / perRow;
         var height = top + 22 + 2 * BandPadding + plainRows * (SmallBoxHeight + RowGap) + Margin;
@@ -347,9 +362,20 @@ public partial class ChainDiagram : Control
                 DrawRect(box.Grow(3), frame with { A = alpha }, filled: false, width: 2);
             if (node.Key == _selected)
                 DrawRect(box.Grow(2), UiTheme.Text, filled: false, width: 2);
-            DrawString(font, box.Position + new Vector2(12, small ? 17 : 19), node.Title, HorizontalAlignment.Left, box.Size.X - 18,
+
+            var textOffsetX = 12f;
+            if (node.Icon is not null)
+            {
+                var iconSize = node.Icon.GetSize();
+                var iconPos = new Vector2(box.Position.X + 9, box.Position.Y + (box.Size.Y - iconSize.Y) / 2f);
+                DrawTextureRect(node.Icon, new Rect2(iconPos, iconSize), false, new Color(1, 1, 1, alpha));
+                textOffsetX = 9 + iconSize.X + 6;
+            }
+
+            var textWidth = box.Size.X - textOffsetX - 6;
+            DrawString(font, box.Position + new Vector2(textOffsetX, small ? 17 : 19), node.Title, HorizontalAlignment.Left, textWidth,
                 small ? size - 1 : size, UiTheme.Text with { A = alpha });
-            DrawString(font, box.Position + new Vector2(12, small ? 33 : 37), node.Detail, HorizontalAlignment.Left, box.Size.X - 18, size - 2,
+            DrawString(font, box.Position + new Vector2(textOffsetX, small ? 33 : 37), node.Detail, HorizontalAlignment.Left, textWidth, size - 2,
                 UiTheme.Muted with { A = alpha });
         }
     }

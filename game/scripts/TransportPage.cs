@@ -65,12 +65,18 @@ public partial class TransportPage : VBoxContainer, IMenuPage
         + "s'use. L'État de la commune garde le nombre voulu : il prend d'abord les charrettes qu'il a produites, puis achète "
         + "ce qui manque au marché, avec la caisse de la commune puis le trésor.";
 
-    private void ChangeCarts(int step) =>
-        _answer.Text = _desk.SetWantedCarts(_focus.Id, _view.WantedCartsOf(_focus.Id) + step).Message;
+    private void ChangeCarts(int step)
+    {
+        if (_focus.Id is not { } communeId)
+            return;
+        _answer.Text = _desk.SetWantedCarts(communeId, _view.WantedCartsOf(communeId) + step).Message;
+    }
 
     public void Refresh()
     {
-        var wanted = $"{_view.WantedCartsOf(_focus.Id)}";
+        if (_focus.Id is not { } communeId)
+            return;
+        var wanted = $"{_view.WantedCartsOf(communeId)}";
         if (_wanted.Text != wanted)
             _wanted.Text = wanted;
         var text = Describe();
@@ -81,9 +87,11 @@ public partial class TransportPage : VBoxContainer, IMenuPage
 
     private string Describe()
     {
+        if (_focus.Id is not { } communeId)
+            return SheetText.Muted("Aucune commune sélectionnée.");
         var settings = Balance.Current;
         // Les liaisons de la commune du menu : vers une autre commune, ou vers un de ses bâtiments posés sur la carte.
-        bool Touches(string place) => place == _focus.Id || _view.CommuneOf(place) == _focus.Id;
+        bool Touches(string place) => place == communeId || _view.CommuneOf(place) == communeId;
         var links = _view.Roads().Where(l => Touches(l.A) || Touches(l.B)).OrderByDescending(l => l.Level).ThenBy(l => RoadText.Link(_view, l)).ToList();
         var text = new StringBuilder(SheetText.Heading($"LIAISONS ({links.Count})"));
         if (links.Count == 0)
@@ -112,9 +120,9 @@ public partial class TransportPage : VBoxContainer, IMenuPage
             text.AppendLine("[/table]");
         }
 
-        AppendCapacity(text, settings);
-        AppendCarts(text, settings);
-        AppendShipments(text);
+        AppendCapacity(text, settings, communeId);
+        AppendCarts(text, settings, communeId);
+        AppendShipments(text, communeId);
 
         text.Append(SheetText.Section("Dernier bilan des routes"));
         var lines = RoadText.Lines(_view, _view.RoadChanges);
@@ -137,14 +145,14 @@ public partial class TransportPage : VBoxContainer, IMenuPage
     private static string Days(int days) => days == 1 ? "1 jour" : $"{days} jours";
 
     /// <summary>La capacité d'envoi de la commune vers les autres, et ce qui en a servi le dernier jour.</summary>
-    private void AppendCapacity(StringBuilder text, BalanceSettings settings)
+    private void AppendCapacity(StringBuilder text, BalanceSettings settings, string communeId)
     {
         var hint = "Ce que la commune peut envoyer par jour vers les autres communes (échanges et lignes d'approvisionnement), "
             + $"tous produits confondus : {settings.ShippingCapacityLevel1:N0} par grenier, entrepôt ou silo, "
             + $"{settings.ShippingCapacityLevel2:N0} par dépôt logistique. Quand elle ne suffit pas, chaque envoi est réduit au prorata. "
             + "Une commune sans bâtiment logistique peut recevoir d'une commune qui en a un, et lui envoyer avec la capacité de celle-ci.";
         text.Append(SheetText.Section("Capacité d'envoi", hint));
-        var capacity = _view.ShippingCapacityOf(_focus.Id);
+        var capacity = _view.ShippingCapacityOf(communeId);
         if (capacity.PerDay <= 0)
         {
             text.AppendLine(SheetText.Muted("Aucun bâtiment logistique : la commune n'échange qu'avec une commune qui en a un."));
@@ -158,10 +166,10 @@ public partial class TransportPage : VBoxContainer, IMenuPage
     }
 
     /// <summary>Les charrettes de la commune : en service, voulues, ce qu'elles ajoutent, leur usure et leur prix.</summary>
-    private void AppendCarts(StringBuilder text, BalanceSettings settings)
+    private void AppendCarts(StringBuilder text, BalanceSettings settings, string communeId)
     {
         text.Append(SheetText.Section("Charrettes", CartsHint));
-        var cartsView = _view.CartsOf(_focus.Id);
+        var cartsView = _view.CartsOf(communeId);
         text.AppendLine(cartsView.Wanted == 0 && cartsView.InService < 0.05
             ? SheetText.Muted("Aucune charrette voulue : réglez le nombre avec − et + en haut de la page.")
             : $"{cartsView.Wanted} voulues · {cartsView.InService:N1} en service · +{cartsView.InService * settings.CartCapacity:N0} par jour de capacité d'envoi · "
@@ -170,12 +178,12 @@ public partial class TransportPage : VBoxContainer, IMenuPage
     }
 
     /// <summary>Les chargements partis de la commune et encore en route, puis ce qui est en route vers elle.</summary>
-    private void AppendShipments(StringBuilder text)
+    private void AppendShipments(StringBuilder text, string communeId)
     {
         var hint = "Ce qui est parti vers une autre commune et n'est pas encore arrivé, après la perte en route. Un chargement "
             + "met la distance divisée par la vitesse de la liaison (moins sur un chemin, encore moins sur une route), et se "
             + "périme chaque nuit comme dans un stockage général. Il arrive le matin.";
-        var leaving = _view.ShipmentsFrom(_focus.Id);
+        var leaving = _view.ShipmentsFrom(communeId);
         text.Append(SheetText.Section($"Chargements en route ({leaving.Count})", hint));
         if (leaving.Count == 0)
             text.AppendLine(SheetText.Muted("Aucun chargement ne part d'ici."));
@@ -197,7 +205,7 @@ public partial class TransportPage : VBoxContainer, IMenuPage
             text.AppendLine("[/table]");
         }
 
-        var coming = _view.ShipmentsTo(_focus.Id);
+        var coming = _view.ShipmentsTo(communeId);
         text.AppendLine(coming.Count == 0
             ? SheetText.Muted("Arrivent ici : rien.")
             : $"Arrivent ici : {string.Join(" · ", coming.GroupBy(s => s.ProductName).Select(g => $"{SheetText.Escape(g.Key)} {g.Sum(s => s.Quantity):N0}"))}");

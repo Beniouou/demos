@@ -41,6 +41,7 @@ Jeu solo de construction de nation (Godot .NET 4.7, C#, .NET 10), en français. 
 | Simulation et rapport | `simuler.bat [années] [commune]` (`-- simuler`) |
 | Éditeur de contenu | `editeur.bat` (fenêtre Windows, `tools/Demos.Editeur`) |
 | Éditeur de carte | `carte.bat` (fenêtre Windows, `tools/Demos.Carte`) |
+| Gestionnaire d'icônes | `icones.bat` (fenêtre application 74 logos, `galerie-icones.html` ; `remplacer.bat` pour remplacement direct) |
 | Test auto de la carte | `dotnet run --project tools/Demos.Carte -- --test-sliders` |
 | Relief de la carte (images) | `dotnet run --project tools/Demos.Carte -- --relief` (après chaque changement de `carte.json`) |
 | Petites images de la carte | `dotnet run --project tools/Demos.Carte -- --images` (dessine celles qui manquent dans `game/assets/carte/` ; `--forcer` les redessine toutes) |

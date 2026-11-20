@@ -1,0 +1,49 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#262b34"/>
+      <stop offset="100%" stop-color="#14171c"/>
+    </linearGradient>
+    <linearGradient id="gold" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#f5d77f"/>
+      <stop offset="50%" stop-color="#d9a441"/>
+      <stop offset="100%" stop-color="#a6731e"/>
+    </linearGradient>
+    <linearGradient id="steel" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ffffff"/>
+      <stop offset="50%" stop-color="#c4c9d2"/>
+      <stop offset="100%" stop-color="#7a8290"/>
+    </linearGradient>
+    <linearGradient id="ruby" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#f26c71"/>
+      <stop offset="100%" stop-color="#a82329"/>
+    </linearGradient>
+    <linearGradient id="purple" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#b488f5"/>
+      <stop offset="100%" stop-color="#7645b8"/>
+    </linearGradient>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="1.5" stdDeviation="1.5" flood-color="#000000" flood-opacity="0.5"/>
+    </filter>
+  </defs>
+  <circle cx="32" cy="32" r="29" fill="url(#bg)" stroke="#363d4a" stroke-width="1.5"/>
+  <circle cx="32" cy="32" r="26" fill="none" stroke="#d9a441" stroke-width="0.7" stroke-dasharray="2 2" opacity="0.55"/>
+  <g filter="url(#shadow)">
+    <!-- Fiole de laboratoire / Alambic -->
+    <path d="M 29 13 L 35 13 L 35 24 C 35 24, 46 36, 46 43 C 46 49, 39 52, 32 52 C 25 52, 18 49, 18 43 C 18 36, 29 24, 29 24 Z" 
+          fill="#1d222b" stroke="url(#gold)" stroke-width="2" stroke-linejoin="round"/>
+    <rect x="28" y="12" width="8" height="3" rx="1" fill="url(#gold)"/>
+    <!-- Liquide violet / réactif républicain -->
+    <path d="M 21 44 C 23 40, 41 40, 43 44 C 43 48, 38 50, 32 50 C 26 50, 21 48, 21 44 Z" fill="url(#purple)" opacity="0.85"/>
+    <!-- Bulles d'effervescence -->
+    <circle cx="32" cy="45" r="1.8" fill="#ffffff" opacity="0.8"/>
+    <circle cx="28" cy="42" r="1.2" fill="#ffffff" opacity="0.8"/>
+    <circle cx="35" cy="38" r="1.5" fill="#f26c71" opacity="0.9"/>
+    <circle cx="31" cy="32" r="1.2" fill="url(#gold)"/>
+    <!-- Anneaux orbitaux d'innovation -->
+    <ellipse cx="32" cy="22" rx="15" ry="4.5" fill="none" stroke="url(#steel)" stroke-width="1" transform="rotate(-25 32 22)" stroke-dasharray="3 2"/>
+    <ellipse cx="32" cy="22" rx="15" ry="4.5" fill="none" stroke="url(#steel)" stroke-width="1" transform="rotate(25 32 22)" stroke-dasharray="3 2"/>
+    <!-- Étoile étincelante au-dessus du col -->
+    <polygon points="32,7 33.5,10.5 37,12 33.5,13.5 32,17 30.5,13.5 27,12 30.5,10.5" fill="url(#gold)"/>
+  </g>
+</svg>

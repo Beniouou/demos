@@ -1,6 +1,5 @@
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
 using Demos.Application;
 using Godot;
 
@@ -9,7 +8,7 @@ namespace Demos.Game;
 /// <summary>
 /// Communes → Statistiques, en lecture : pour la commune du menu (au-dessus des onglets), la courbe mois par mois du produit
 /// choisi (production, utilisé, envoyé vers une autre commune, perdu en route, perdu au stockage, et le stock en fin de mois) ; dessous, un tableau
-/// de tous les produits pour le dernier mois fini (depuis le début de la partie tant qu'aucun mois n'est fini).
+/// de tous les produits avec leurs logos officiels pour le dernier mois fini.
 /// </summary>
 public partial class ProductionStatsPage : VBoxContainer, IMenuPage
 {
@@ -29,33 +28,89 @@ public partial class ProductionStatsPage : VBoxContainer, IMenuPage
     private readonly OptionButton _product = null!;
     private readonly List<string> _productIds = [];
     private readonly LineChart _chart = new();
-    private readonly RichTextLabel _text = null!;
+    private readonly Label _title = null!;
+    private readonly Label _hint = null!;
+    private readonly Tree _table = null!;
     private string _chartKey = "";
+    private string _tableKey = "";
 
     public ProductionStatsPage(GameView view, ProductionHistory history, CommuneFocus focus)
     {
         _view = view;
         _history = history;
-        AddThemeConstantOverride("separation", 8);
         _focus = focus;
+        AddThemeConstantOverride("separation", 8);
 
         var row = new HBoxContainer();
         row.AddThemeConstantOverride("separation", 8);
         row.AddChild(new Label { Text = "Produit", CustomMinimumSize = new Vector2(90, 0) });
         _product = new OptionButton { SizeFlagsHorizontal = SizeFlags.ExpandFill, FocusMode = FocusModeEnum.None, FitToLongestItem = false };
+        _product.ItemSelected += _ =>
+        {
+            UpdateProductIcon();
+            RefreshChart();
+        };
         row.AddChild(_product);
         AddChild(row);
 
         AddChild(_chart);
-        _text = new HintText
+
+        var titleRow = new HBoxContainer();
+        titleRow.AddThemeConstantOverride("separation", 8);
+        _title = UiTheme.Title("");
+        _title.SizeFlagsHorizontal = SizeFlags.ExpandFill;
+        titleRow.AddChild(_title);
+        _hint = UiTheme.Caption("");
+        titleRow.AddChild(_hint);
+        AddChild(titleRow);
+
+        _table = new Tree
         {
-            BbcodeEnabled = true,
+            HideRoot = true,
             SizeFlagsHorizontal = SizeFlags.ExpandFill,
             SizeFlagsVertical = SizeFlags.ExpandFill,
-            SelectionEnabled = false,
+            FocusMode = FocusModeEnum.None,
+            Columns = 9,
         };
-        _text.AddThemeColorOverride("default_color", UiTheme.Text);
-        AddChild(_text);
+        _table.AddThemeColorOverride("font_color", UiTheme.Text);
+        _table.AddThemeStyleboxOverride("panel", new StyleBoxEmpty());
+        _table.SetColumnTitlesVisible(true);
+
+        var headers = new[]
+        {
+            ("Produit", "", 180),
+            ("Production", ProducedHint, 80),
+            ("Utilisé", UsedHint, 70),
+            ("Envoyé", SentHint, 70),
+            ("Perdu route", LostInTransitHint, 85),
+            ("Perdu stock", LostHint, 85),
+            ("En route", InTransitHint, 70),
+            ("Stock", StockHint, 70),
+            ("Prix", PriceHint, 60),
+        };
+
+        for (var i = 0; i < headers.Length; i++)
+        {
+            _table.SetColumnTitle(i, headers[i].Item1);
+            _table.SetColumnCustomMinimumWidth(i, headers[i].Item3);
+            _table.SetColumnExpand(i, i == 0);
+        }
+
+        _table.ItemSelected += () =>
+        {
+            if (_table.GetSelected()?.GetMetadata(0).AsString() is { Length: > 0 } id)
+            {
+                var idx = _productIds.IndexOf(id);
+                if (idx >= 0 && idx != _product.Selected)
+                {
+                    _product.Select(idx);
+                    UpdateProductIcon();
+                    RefreshChart();
+                }
+            }
+        };
+
+        AddChild(_table);
     }
 
     // Godot recrée les nœuds C# par ce constructeur sans paramètre (rechargement des scripts).
@@ -67,13 +122,18 @@ public partial class ProductionStatsPage : VBoxContainer, IMenuPage
         var flows = _view.ProductFlows().Where(f => f.CommuneId == _focus.Id).ToList();
         FillProducts(flows);
         RefreshChart();
-        var text = Describe(flows, _focus.Id);
-        // Le texte n'est remis que s'il a changé : sinon il remonterait en haut à chaque image.
-        if (text != _text.Text)
-            _text.Text = text;
+        RefreshTable(flows, _focus.Id);
     }
 
     private string? SelectedProduct => _product.Selected >= 0 && _product.Selected < _productIds.Count ? _productIds[_product.Selected] : null;
+
+    private void UpdateProductIcon()
+    {
+        if (_product.Selected >= 0 && _product.Selected < _product.ItemCount)
+            _product.Icon = _product.GetItemIcon(_product.Selected);
+        else
+            _product.Icon = null;
+    }
 
     /// <summary>Les produits qui ont servi ou sont en stock, par nom ; refait quand il en apparaît un, le choix gardé.</summary>
     private void FillProducts(IReadOnlyList<ProductFlowView> flows)
@@ -86,10 +146,19 @@ public partial class ProductionStatsPage : VBoxContainer, IMenuPage
         _productIds.Clear();
         _productIds.AddRange(products.Select(p => p.ProductId));
         _product.Clear();
-        foreach (var (_, name) in products)
-            _product.AddItem(name);
+        foreach (var (productId, name) in products)
+        {
+            var icon = IconRegistry.GetProductIcon(productId, 20) ?? IconRegistry.GetProductIcon(name, 20);
+            if (icon != null)
+                _product.AddIconItem(icon, name);
+            else
+                _product.AddItem(name);
+        }
         if (_productIds.Count > 0)
+        {
             _product.Select(System.Math.Max(0, selected is null ? 0 : _productIds.IndexOf(selected)));
+            UpdateProductIcon();
+        }
     }
 
     /// <summary>
@@ -128,47 +197,59 @@ public partial class ProductionStatsPage : VBoxContainer, IMenuPage
             value => value.ToString("N0"));
     }
 
-    private string Describe(IReadOnlyList<ProductFlowView> flows, string? communeId)
+    private void RefreshTable(IReadOnlyList<ProductFlowView> flows, string? communeId)
     {
         var snapshots = _history.Snapshots;
-        // Le dernier mois fini : entre les deux derniers relevés. Sans mois fini, depuis le début de la partie.
         var (title, now, before) = snapshots.Count >= 2
             ? ($"Mois de {WorldText.MonthLabel(snapshots[^2].Date)}", snapshots[^1].Flows, snapshots[^2].Flows)
             : ("Depuis le début de la partie", flows, (IReadOnlyList<ProductFlowView>)[]);
 
-        var text = new StringBuilder(SheetText.Section(title, HistoryHint));
-        if (snapshots.Count < 2)
-            text.AppendLine(SheetText.Muted("La courbe commence quand le premier mois est fini (le 1er du mois prochain)."));
+        _title.Text = title;
+        _hint.Text = snapshots.Count < 2 ? "(la courbe commence le 1er du mois prochain)" : "";
 
         var products = flows.Select(f => (f.ProductId, f.ProductName)).Distinct().OrderBy(p => p.ProductName).ToList();
-        if (products.Count == 0)
-            return text + SheetText.Muted("Aucun produit encore.");
+        var key = $"{title}|{communeId}|{string.Join(",", products.Select(p => p.ProductId))}|{now.Count}";
+        if (key == _tableKey)
+            return;
+        _tableKey = key;
 
-        text.Append("[table=9]");
-        foreach (var (header, hint) in new[]
-                 {
-                     ("Produit", ""), ("Production", ProducedHint), ("Utilisé", UsedHint), ("Envoyé", SentHint),
-                     ("Perdu en route", LostInTransitHint), ("Perdu au stockage", LostHint), ("En route", InTransitHint), ("Stock", StockHint),
-                     ("Prix", PriceHint),
-                 })
-            text.Append(PopulationText.Cell(hint == "" ? header : SheetText.Hint(header, hint), header: true));
+        _table.Clear();
+        var root = _table.CreateItem();
+
+        if (products.Count == 0)
+        {
+            var empty = _table.CreateItem(root);
+            empty.SetText(0, "Aucun produit encore.");
+            empty.SetCustomColor(0, UiTheme.Muted);
+            return;
+        }
+
         foreach (var (productId, name) in products)
         {
             var figures = ProductFigures.Of(now, productId, communeId).Since(ProductFigures.Of(before, productId, communeId));
             if (figures.Produced <= 0 && figures.Used <= 0 && figures.Sent <= 0 && figures.Lost <= 0 && figures.LostInTransit <= 0
                 && figures.InTransit <= 0 && figures.Stock <= 0)
                 continue;
-            text.Append(PopulationText.Cell(SheetText.Escape(name)));
-            text.Append(PopulationText.Cell($"{figures.Produced:N0}"));
-            text.Append(PopulationText.Cell($"{figures.Used:N0}"));
-            text.Append(PopulationText.Cell($"{figures.Sent:N0}"));
-            text.Append(PopulationText.Cell($"{figures.LostInTransit:N0}"));
-            text.Append(PopulationText.Cell($"{figures.Lost:N0}"));
-            text.Append(PopulationText.Cell($"{figures.InTransit:N0}"));
-            text.Append(PopulationText.Cell($"{figures.Stock:N0}"));
-            text.Append(PopulationText.Cell($"{figures.Price:N2}"));
+
+            var row = _table.CreateItem(root);
+            row.SetMetadata(0, productId);
+
+            var icon = IconRegistry.GetProductIcon(productId, 20) ?? IconRegistry.GetProductIcon(name, 20);
+            row.SetIcon(0, icon);
+            row.SetIconMaxWidth(0, 36);
+            row.SetText(0, name);
+
+            row.SetText(1, $"{figures.Produced:N0}");
+            row.SetText(2, $"{figures.Used:N0}");
+            row.SetText(3, $"{figures.Sent:N0}");
+            row.SetText(4, $"{figures.LostInTransit:N0}");
+            row.SetText(5, $"{figures.Lost:N0}");
+            row.SetText(6, $"{figures.InTransit:N0}");
+            row.SetText(7, $"{figures.Stock:N0}");
+            row.SetText(8, $"{figures.Price:N2}");
+
+            for (var c = 1; c <= 8; c++)
+                row.SetTextAlignment(c, HorizontalAlignment.Right);
         }
-        text.AppendLine("[/table]");
-        return text.ToString();
     }
 }

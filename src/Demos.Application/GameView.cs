@@ -170,6 +170,7 @@ public sealed class GameView(Simulation simulation)
                 var recipe = building.Production!.Value;
                 var workers = World.Workers.GetValueOrDefault(building.Id);
                 var fullOutput = recipe.QuantityPerWorker * workers;
+                var category = building.TypeId is { } typeId && World.BuildingTypes.TryGetValue(typeId, out var type) ? type.Category : null;
                 return new ChainBuildingView(
                     building.Id,
                     World.DisplayNameOf(building),
@@ -184,7 +185,9 @@ public sealed class GameView(Simulation simulation)
                     World.Produced.GetValueOrDefault(building.Id),
                     World.SupplyShares.GetValueOrDefault(building.Id, 1),
                     World.EnergyShareOf(building),
-                    Energy.HeatingFuels.Contains(recipe.ProductId) || recipe.ProductId == Energy.Water);
+                    Energy.HeatingFuels.Contains(recipe.ProductId) || recipe.ProductId == Energy.Water,
+                    building.TypeId,
+                    category);
             })
             .OrderBy(b => b.Name)
             .ToList();
@@ -196,7 +199,11 @@ public sealed class GameView(Simulation simulation)
     /// </summary>
     public IReadOnlyList<PlainBuildingView> BuildingsWithoutRecipe(string communeId) => World.Structures.Values
         .Where(s => s.Kind == StructureKind.Building && s.Production is null && World.CommuneOf(s) == communeId)
-        .Select(s => new PlainBuildingView(s.Id, World.DisplayNameOf(s), s.Ownership, s.HousingPlaces, s.SchoolPlaces, s.StorageCapacity))
+        .Select(s =>
+        {
+            var category = s.TypeId is { } typeId && World.BuildingTypes.TryGetValue(typeId, out var type) ? type.Category : null;
+            return new PlainBuildingView(s.Id, World.DisplayNameOf(s), s.Ownership, s.HousingPlaces, s.SchoolPlaces, s.StorageCapacity, s.TypeId, category);
+        })
         .OrderBy(b => b.Name)
         .ToList();
 
@@ -847,7 +854,9 @@ public sealed record ChainBuildingView(
     double ProducedToday,
     double SupplyShare,
     double EnergyShare,
-    bool FuelsBuildings = false);
+    bool FuelsBuildings = false,
+    string? TypeId = null,
+    string? Category = null);
 
 /// <summary>Où se trouve un autre bâtiment ou une autre commune : la même commune, une autre de la même préfecture, une autre préfecture.</summary>
 public enum PlaceRelation
@@ -888,7 +897,7 @@ public sealed record BuildingFlowView(string BuildingId, string CommuneId, strin
     IReadOnlyList<FlowEndView> Destinations, bool HasMaterials);
 
 /// <summary>Un bâtiment sans recette et ce qu'il offre : places de logement, places d'école, capacité de stockage.</summary>
-public sealed record PlainBuildingView(string Id, string Name, Ownership Ownership, int HousingPlaces, int SchoolPlaces, int StorageCapacity);
+public sealed record PlainBuildingView(string Id, string Name, Ownership Ownership, int HousingPlaces, int SchoolPlaces, int StorageCapacity, string? TypeId = null, string? Category = null);
 
 /// <summary>
 /// Une matière d'une recette : par unité produite, ce qu'il en faudrait à plein régime par jour, le stock de la commune,

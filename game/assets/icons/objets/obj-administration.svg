@@ -1,0 +1,60 @@
+﻿<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#262b34"/>
+      <stop offset="100%" stop-color="#14171c"/>
+    </linearGradient>
+    <linearGradient id="gold" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#f5d77f"/>
+      <stop offset="50%" stop-color="#d9a441"/>
+      <stop offset="100%" stop-color="#a6731e"/>
+    </linearGradient>
+    <linearGradient id="steel" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ffffff"/>
+      <stop offset="50%" stop-color="#c4c9d2"/>
+      <stop offset="100%" stop-color="#7a8290"/>
+    </linearGradient>
+    <linearGradient id="copper" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#f09b68"/>
+      <stop offset="100%" stop-color="#b8582b"/>
+    </linearGradient>
+    <linearGradient id="wood" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ba8252"/>
+      <stop offset="100%" stop-color="#694121"/>
+    </linearGradient>
+    <linearGradient id="bread" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#f7d488"/>
+      <stop offset="50%" stop-color="#d99938"/>
+      <stop offset="100%" stop-color="#8a5311"/>
+    </linearGradient>
+    <linearGradient id="ruby" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#f26c71"/>
+      <stop offset="100%" stop-color="#a82329"/>
+    </linearGradient>
+    <linearGradient id="brick" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#e07253"/>
+      <stop offset="100%" stop-color="#993821"/>
+    </linearGradient>
+    <linearGradient id="pottery" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#e68055"/>
+      <stop offset="100%" stop-color="#99421c"/>
+    </linearGradient>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="1.5" stdDeviation="1.5" flood-color="#000000" flood-opacity="0.5"/>
+    </filter>
+  </defs>
+  <circle cx="32" cy="32" r="29" fill="url(#bg)" stroke="#363d4a" stroke-width="1.5"/>
+  <circle cx="32" cy="32" r="26" fill="none" stroke="#d9a441" stroke-width="0.7" stroke-dasharray="2 2" opacity="0.55"/>
+  <g filter="url(#shadow)">
+    <!-- Tampon officiel en bois/bronze et parapheur d'actes d'État -->
+    <!-- Registre officiel ouvert à la base -->
+    <polygon points="16,34 32,38 48,34 46,47 32,49 18,47" fill="#20252e" stroke="url(#steel)" stroke-width="1"/>
+    <line x1="32" y1="38" x2="32" y2="49" stroke="url(#steel)" stroke-width="1.5"/>
+    <!-- Sceau de cire rouge officiel sur l'acte -->
+    <circle cx="40" cy="42" r="3.5" fill="url(#ruby)" stroke="#ff7378" stroke-width="0.6"/>
+    <!-- Grand tampon de l'administration républicaine au-dessus -->
+    <rect x="24" y="30" width="16" height="4" rx="1" fill="url(#gold)" stroke="#8f6418" stroke-width="0.8"/>
+    <path d="M 28 30 C 28 24, 30 22, 30 18 C 30 15, 34 15, 34 18 C 34 22, 36 24, 36 30 Z" fill="url(#wood)" stroke="#523214" stroke-width="0.8"/>
+    <circle cx="32" cy="15" r="3" fill="url(#gold)"/>
+  </g>
+</svg>

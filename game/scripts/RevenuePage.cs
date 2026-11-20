@@ -49,7 +49,7 @@ public partial class RevenuePage : HBoxContainer, IMenuPage
         _entity.ItemSelected += _ => _message.Visible = false;
         _summary = Sheet();
         left.AddChild(_summary);
-        _taxLaw = new Button { FocusMode = FocusModeEnum.None, TooltipText = "Crée un brouillon de loi d'impôt à ce niveau, à régler et voter dans Lois → Éditeur de lois." };
+        _taxLaw = new Button { FocusMode = FocusModeEnum.None, Icon = IconRegistry.GetMenuIcon("Lois", 18), TooltipText = "Crée un brouillon de loi d'impôt à ce niveau, à régler et voter dans Lois → Éditeur de lois." };
         _taxLaw.Pressed += () =>
         {
             if (SelectedEntity() is not { } entityId)
@@ -103,8 +103,16 @@ public partial class RevenuePage : HBoxContainer, IMenuPage
         _entityIds.Clear();
         _entityIds.AddRange(entities.Select(e => e.Id));
         _entity.Clear();
-        foreach (var (_, name) in entities)
-            _entity.AddItem(name);
+        foreach (var (id, name) in entities)
+        {
+            var icon = id == state?.Id
+                ? IconRegistry.GetMenuIcon("Structure", 16)
+                : IconRegistry.GetBuildingIcon("mairie", null, 16);
+            if (icon is not null)
+                _entity.AddIconItem(icon, name);
+            else
+                _entity.AddItem(name);
+        }
         _entity.Select(System.Math.Max(0, selected is null ? 0 : _entityIds.IndexOf(selected)));
     }
 

@@ -48,9 +48,10 @@ public partial class MapPage : ScrollContainer, IMenuPage
 
         var recenterButton = new Button
         {
-            Text = "Recadrer la carte sur la capitale",
+            Text = "  Recadrer la carte sur la capitale",
+            Icon = IconRegistry.GetMenuIcon("Carte", 18),
             FocusMode = FocusModeEnum.None,
-            CustomMinimumSize = new Vector2(220, 32),
+            CustomMinimumSize = new Vector2(250, 34),
             SizeFlagsHorizontal = SizeFlags.ShrinkBegin,
         };
         recenterButton.Pressed += () => _map.CenterOnCapital();
@@ -60,9 +61,19 @@ public partial class MapPage : ScrollContainer, IMenuPage
         content.AddChild(UiTheme.Caption("Filtres d'information :"));
         foreach (var (filter, name, description) in MapFilterCatalog.All)
         {
+            var filterIcon = filter switch
+            {
+                MapFilters.Physical => IconRegistry.GetCategoryIcon("Eau", 16) ?? IconRegistry.GetMenuIcon("Carte", 16),
+                MapFilters.Biomes => IconRegistry.GetProductIcon("Bois", 16),
+                MapFilters.Deposits => IconRegistry.GetCategoryIcon("Extraction", 16),
+                MapFilters.Politics => IconRegistry.GetMenuIcon("Structure", 16),
+                MapFilters.ProductionTransport => IconRegistry.GetCategoryIcon("Logistique", 16),
+                _ => null,
+            };
             var box = new CheckBox
             {
-                Text = name,
+                Text = $"  {name}",
+                Icon = filterIcon,
                 TooltipText = description,
                 ButtonPressed = _map.HasFilter(filter),
                 FocusMode = FocusModeEnum.None,

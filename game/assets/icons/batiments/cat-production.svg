@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#262b34"/>
+      <stop offset="100%" stop-color="#14171c"/>
+    </linearGradient>
+    <linearGradient id="gold" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#f5d77f"/>
+      <stop offset="50%" stop-color="#d9a441"/>
+      <stop offset="100%" stop-color="#a6731e"/>
+    </linearGradient>
+    <linearGradient id="brick" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#e07253"/>
+      <stop offset="100%" stop-color="#993821"/>
+    </linearGradient>
+    <linearGradient id="steel" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ffffff"/>
+      <stop offset="50%" stop-color="#c4c9d2"/>
+      <stop offset="100%" stop-color="#7a8290"/>
+    </linearGradient>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="1.5" stdDeviation="1.5" flood-color="#000000" flood-opacity="0.5"/>
+    </filter>
+  </defs>
+  <circle cx="32" cy="32" r="29" fill="url(#bg)" stroke="#363d4a" stroke-width="1.5"/>
+  <circle cx="32" cy="32" r="26" fill="none" stroke="#d9a441" stroke-width="0.7" stroke-dasharray="2 2" opacity="0.55"/>
+  <g filter="url(#shadow)">
+    <!-- Cheminée d'usine en brique haute à droite -->
+    <polygon points="43,16 47,16 49,46 41,46" fill="url(#brick)" stroke="#363d4a" stroke-width="0.8"/>
+    <rect x="42" y="15" width="6" height="2" fill="url(#gold)"/>
+    <!-- Volutes de fumée industrielle -->
+    <circle cx="47" cy="11" r="3" fill="#697587" opacity="0.7"/>
+    <circle cx="51" cy="7" r="4" fill="#8a97ab" opacity="0.5"/>
+    <!-- Toits d'usine en redent / sheds en dents de scie -->
+    <polygon points="12,46 12,32 20,24 20,32 28,24 28,32 36,24 36,46" fill="#20252e" stroke="url(#steel)" stroke-width="1.2"/>
+    <!-- Verrières d'atelier orientées au nord -->
+    <polygon points="13,31 19,25 19,31" fill="url(#gold)" opacity="0.85"/>
+    <polygon points="21,31 27,25 27,31" fill="url(#gold)" opacity="0.85"/>
+    <polygon points="29,31 35,25 35,31" fill="url(#gold)" opacity="0.85"/>
+    <!-- Grande porte coulissante d'atelier -->
+    <rect x="18" y="38" width="10" height="8" fill="#14171c" stroke="#525d6e" stroke-width="0.8"/>
+    <line x1="23" y1="38" x2="23" y2="46" stroke="#525d6e" stroke-width="0.8"/>
+    <!-- Sol pavé d'usine -->
+    <line x1="10" y1="48" x2="54" y2="48" stroke="url(#steel)" stroke-width="1.8" stroke-linecap="round"/>
+  </g>
+</svg>

@@ -129,19 +129,26 @@ public sealed class StructurePicker
             selected = entities.FirstOrDefault(e => e.Node.Children.Any(c => c.Kind is StructureNodeKind.Building or StructureNodeKind.Organization)).Node?.Id;
         // Le retrait montre la hiérarchie : une commune sous sa préfecture, une préfecture sous l'État.
         Fill(_entity, _entityIds, selected,
-            _allowAll ? new (string?, string)[] { (null, "Toutes les entités") } : [],
+            _allowAll ? [ ((string?)null, "Toutes les entités", IconRegistry.GetMenuIcon("Structure", 16)) ] : [],
             entities.Select(e => ((string?)e.Node.Id, new string(' ', 4 * e.Depth) + e.Node.Name
-                + (e.Node.Kind == StructureNodeKind.Prefecture ? " (préfecture)" : ""))));
+                + (e.Node.Kind == StructureNodeKind.Prefecture ? " (préfecture)" : ""),
+                e.Node.Kind switch
+                {
+                    StructureNodeKind.Prefecture => IconRegistry.GetBuildingIcon("prefecture", null, 16),
+                    StructureNodeKind.Commune => IconRegistry.GetBuildingIcon("mairie", null, 16),
+                    _ => IconRegistry.GetMenuIcon("Structure", 16),
+                })));
     }
 
     private void FillOrganizations(string? selected)
     {
         var organizations = SelectedEntity()?.Children.Where(c => c.Kind == StructureNodeKind.Organization).ToList() ?? [];
+        var allOrgIcon = IconRegistry.GetMenuIcon("Structure", 16);
         Fill(_organization, _organizationIds, selected,
             organizations.Count == 0
-                ? new (string?, string)[] { (null, "Tous les organismes") }
-                : [(null, "Tous les organismes"), (WithoutOrganization, "Sans organisme")],
-            organizations.Select(o => ((string?)o.Id, o.Name)));
+                ? [ ((string?)null, "Tous les organismes", allOrgIcon) ]
+                : [((string?)null, "Tous les organismes", allOrgIcon), ((string?)WithoutOrganization, "Sans organisme", (Texture2D?)null)],
+            organizations.Select(o => ((string?)o.Id, o.Name, allOrgIcon)));
         // En attendant les organismes, le menu reste grisé.
         _organization.Disabled = organizations.Count == 0;
     }
@@ -155,7 +162,9 @@ public sealed class StructurePicker
         foreach (var category in buildings.GroupBy(b => b.Category ?? "Autres"))
         {
             items.Add((Separator, category.Key, null));
-            items.AddRange(category.Select(b => ((string?)b.Id, b.Name, (Texture2D?)UiTheme.Square(UiTheme.OwnershipColor(b.Ownership), 12, 12))));
+            // Le carré du propriétaire, puis le logo du bâtiment.
+            items.AddRange(category.Select(b => ((string?)b.Id, b.Name,
+                (Texture2D?)IconRegistry.WithSquare(IconRegistry.GetBuildingIcon(b.TypeId, b.Category, 18), UiTheme.OwnershipColor(b.Ownership), 12))));
         }
 
         _buildingIds.Clear();
@@ -224,14 +233,17 @@ public sealed class StructurePicker
     }
 
     private static void Fill(OptionButton menu, List<string?> ids, string? selected,
-        IEnumerable<(string? Id, string Name)> first, IEnumerable<(string? Id, string Name)> items)
+        IEnumerable<(string? Id, string Name, Texture2D? Icon)> first, IEnumerable<(string? Id, string Name, Texture2D? Icon)> items)
     {
         ids.Clear();
         menu.Clear();
-        foreach (var (id, name) in first.Concat(items))
+        foreach (var (id, name, icon) in first.Concat(items))
         {
             ids.Add(id);
-            menu.AddItem(name);
+            if (icon is not null)
+                menu.AddIconItem(icon, name);
+            else
+                menu.AddItem(name);
         }
         if (ids.Count > 0)
             menu.Select(System.Math.Max(0, ids.IndexOf(selected)));

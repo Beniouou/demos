@@ -1,0 +1,70 @@
+﻿<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#262b34"/>
+      <stop offset="100%" stop-color="#14171c"/>
+    </linearGradient>
+    <linearGradient id="gold" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#f5d77f"/>
+      <stop offset="50%" stop-color="#d9a441"/>
+      <stop offset="100%" stop-color="#a6731e"/>
+    </linearGradient>
+    <linearGradient id="steel" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ffffff"/>
+      <stop offset="50%" stop-color="#c4c9d2"/>
+      <stop offset="100%" stop-color="#7a8290"/>
+    </linearGradient>
+    <linearGradient id="copper" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#f09b68"/>
+      <stop offset="100%" stop-color="#b8582b"/>
+    </linearGradient>
+    <linearGradient id="wood" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ba8252"/>
+      <stop offset="100%" stop-color="#694121"/>
+    </linearGradient>
+    <linearGradient id="coal" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#4d535e"/>
+      <stop offset="100%" stop-color="#14171c"/>
+    </linearGradient>
+    <linearGradient id="stone" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#e8e2d5"/>
+      <stop offset="100%" stop-color="#998e7d"/>
+    </linearGradient>
+    <linearGradient id="water" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#70c6ff"/>
+      <stop offset="50%" stop-color="#3399ff"/>
+      <stop offset="100%" stop-color="#1460b8"/>
+    </linearGradient>
+    <linearGradient id="ruby" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#f26c71"/>
+      <stop offset="100%" stop-color="#a82329"/>
+    </linearGradient>
+    <linearGradient id="wheat" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#fff275"/>
+      <stop offset="50%" stop-color="#e0a92b"/>
+      <stop offset="100%" stop-color="#996a12"/>
+    </linearGradient>
+    <linearGradient id="clay" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#e67e5a"/>
+      <stop offset="100%" stop-color="#993d1f"/>
+    </linearGradient>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="1.5" stdDeviation="1.5" flood-color="#000000" flood-opacity="0.5"/>
+    </filter>
+  </defs>
+  <circle cx="32" cy="32" r="29" fill="url(#bg)" stroke="#363d4a" stroke-width="1.5"/>
+  <circle cx="32" cy="32" r="26" fill="none" stroke="#d9a441" stroke-width="0.7" stroke-dasharray="2 2" opacity="0.55"/>
+  <g filter="url(#shadow)">
+    <!-- Pépites et filons d'or natif sur quartz rocheux -->
+    <polygon points="17,45 14,30 26,17 44,18 51,32 45,46 30,48" fill="#2d333b" stroke="#525d6e" stroke-width="1.2"/>
+    <!-- Veine d'or pur étincelante -->
+    <path d="M 20 34 Q 30 24 42 26 Q 47 34 42 42" fill="none" stroke="url(#gold)" stroke-width="3.5" stroke-linecap="round"/>
+    <!-- Grosses pépites d'or incrustées -->
+    <ellipse cx="28" cy="24" rx="4" ry="3" fill="url(#gold)" transform="rotate(-20 28 24)"/>
+    <ellipse cx="38" cy="32" rx="4.5" ry="3.5" fill="url(#gold)" transform="rotate(15 38 32)"/>
+    <ellipse cx="25" cy="38" rx="3.5" ry="2.5" fill="url(#gold)"/>
+    <!-- Étoiles de brillance -->
+    <polygon points="28,21 29,23 31,24 29,25 28,27 27,25 25,24 27,23" fill="#ffffff"/>
+    <polygon points="40,30 41,31.5 43,32 41,32.5 40,34 39,32.5 37,32 39,31.5" fill="#ffffff"/>
+  </g>
+</svg>

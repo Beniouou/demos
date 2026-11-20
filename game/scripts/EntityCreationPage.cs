@@ -72,8 +72,8 @@ public partial class EntityCreationPage : VBoxContainer, IMenuPage
         // Quoi créer : deux cases qui s'excluent.
         var kind = Row(column, "Que créer ?");
         var group = new ButtonGroup();
-        _communeChoice = new CheckBox { Text = "Commune", ButtonGroup = group, ButtonPressed = true, FocusMode = FocusModeEnum.None };
-        _prefectureChoice = new CheckBox { Text = "Préfecture", ButtonGroup = group, FocusMode = FocusModeEnum.None };
+        _communeChoice = new CheckBox { Text = "Commune", ButtonGroup = group, ButtonPressed = true, FocusMode = FocusModeEnum.None, Icon = IconRegistry.GetBuildingIcon("camp-de-base", "Administration", 16) };
+        _prefectureChoice = new CheckBox { Text = "Préfecture", ButtonGroup = group, FocusMode = FocusModeEnum.None, Icon = IconRegistry.GetBuildingIcon("prefecture", null, 16) };
         _communeChoice.Toggled += _ => ShowForm();
         _prefectureChoice.Toggled += _ => ShowForm();
         kind.AddChild(_communeChoice);
@@ -154,7 +154,7 @@ public partial class EntityCreationPage : VBoxContainer, IMenuPage
         _communeCost.AddThemeColorOverride("default_color", UiTheme.Text);
         column.AddChild(_communeCost);
 
-        _chooseSite = new Button { Text = "Choisir l'emplacement sur la carte", FocusMode = FocusModeEnum.None, SizeFlagsHorizontal = SizeFlags.ShrinkBegin };
+        _chooseSite = new Button { Text = "Choisir l'emplacement sur la carte", Icon = IconRegistry.GetMenuIcon("Carte", 16), FocusMode = FocusModeEnum.None, SizeFlagsHorizontal = SizeFlags.ShrinkBegin };
         _chooseSite.Pressed += () =>
         {
             if (Pick(_payer, _payerIds) is { } payerId && _communePole.Selected >= 0)
@@ -166,7 +166,8 @@ public partial class EntityCreationPage : VBoxContainer, IMenuPage
     private void FillPayers()
     {
         var selected = Pick(_payer, _payerIds);
-        Fill(_payer, _payerIds, _view.Communes().Select(c => (c.Id, c.Name)), selected);
+        var communeIcon = IconRegistry.GetBuildingIcon("mairie", null, 16);
+        Fill(_payer, _payerIds, _view.Communes().Select(c => (c.Id, c.Name, communeIcon)), selected);
         // Un nom proposé pour la prochaine commune, tant que le joueur ne l'a pas changé.
         if (_communeName.Text.StartsWith("Commune ") || _communeName.Text.Length == 0)
             _communeName.Text = _desk.NextCommuneName();
@@ -224,7 +225,7 @@ public partial class EntityCreationPage : VBoxContainer, IMenuPage
         _seat.TooltipText = "Une commune regroupée : elle accueille le bâtiment et paie son chantier";
         _foundPole = Choice(column, "Pôle payé");
         _foundCost = Note(column);
-        var found = new Button { Text = "Fonder la préfecture", FocusMode = FocusModeEnum.None, SizeFlagsHorizontal = SizeFlags.ShrinkBegin };
+        var found = new Button { Text = "Fonder la préfecture", Icon = IconRegistry.GetBuildingIcon("prefecture", null, 16), FocusMode = FocusModeEnum.None, SizeFlagsHorizontal = SizeFlags.ShrinkBegin };
         found.Pressed += Found;
         column.AddChild(found);
         _foundMessage = Message(column);
@@ -283,10 +284,14 @@ public partial class EntityCreationPage : VBoxContainer, IMenuPage
             .ToList();
         _seatIds.Clear();
         _seat.Clear();
+        var icon = IconRegistry.GetBuildingIcon("mairie", null, 16);
         foreach (var commune in communes)
         {
             _seatIds.Add(commune.Id);
-            _seat.AddItem(commune.Name);
+            if (icon is not null)
+                _seat.AddIconItem(icon, commune.Name);
+            else
+                _seat.AddItem(commune.Name);
         }
         if (communes.Count == 0)
             _seat.AddItem("Cochez d'abord des entités");
@@ -300,7 +305,8 @@ public partial class EntityCreationPage : VBoxContainer, IMenuPage
     {
         var parent = Pick(_parent, _parentIds);
         var parents = entities.Where(e => e.Node.Kind is StructureNodeKind.State or StructureNodeKind.Prefecture).ToList();
-        Fill(_parent, _parentIds, parents.Select(p => (p.Node.Id, new string(' ', 4 * p.Depth) + p.Node.Name)), parent);
+        Fill(_parent, _parentIds, parents.Select(p => (p.Node.Id, new string(' ', 4 * p.Depth) + p.Node.Name,
+            p.Node.Kind == StructureNodeKind.Prefecture ? IconRegistry.GetBuildingIcon("prefecture", null, 16) : IconRegistry.GetMenuIcon("Structure", 16))), parent);
         FillMembers(entities);
     }
 
@@ -312,7 +318,10 @@ public partial class EntityCreationPage : VBoxContainer, IMenuPage
         {
             menu.Clear();
             foreach (var pole in poles)
-                menu.AddIconItem(UiTheme.Square(UiTheme.PoleColor(pole), 12, 12), "");
+            {
+                var icon = IconRegistry.GetPoleIcon(pole, 16) ?? UiTheme.Square(UiTheme.PoleColor(pole), 12, 12);
+                menu.AddIconItem(icon, "");
+            }
         }
         for (var i = 0; i < poles.Count; i++)
         {
@@ -412,14 +421,17 @@ public partial class EntityCreationPage : VBoxContainer, IMenuPage
         message.Visible = true;
     }
 
-    private static void Fill(OptionButton menu, List<string> ids, IEnumerable<(string Id, string Name)> items, string? selected)
+    private static void Fill(OptionButton menu, List<string> ids, IEnumerable<(string Id, string Name, Texture2D? Icon)> items, string? selected)
     {
         ids.Clear();
         menu.Clear();
-        foreach (var (id, name) in items)
+        foreach (var (id, name, icon) in items)
         {
             ids.Add(id);
-            menu.AddItem(name);
+            if (icon is not null)
+                menu.AddIconItem(icon, name);
+            else
+                menu.AddItem(name);
         }
         if (ids.Count > 0)
             menu.Select(System.Math.Max(0, selected is null ? 0 : ids.IndexOf(selected)));

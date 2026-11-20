@@ -29,6 +29,9 @@ public partial class LawCommissionPage : HBoxContainer, IMenuPage
     // La clé dont les décisions sont affichées : elles ne sont refaites que quand le choix change (sinon un curseur
     // perdrait la souris pendant qu'on le tire).
     private string? _actionsKey;
+    // Les logos des pôles que le brouillon affiché modifie, tenus à jour quand on bouge un curseur.
+    private HBoxContainer? _draftPoles;
+    private string _draftPolesKey = "";
 
     public LawCommissionPage(GameView view, PlayerDesk desk)
     {
@@ -76,6 +79,57 @@ public partial class LawCommissionPage : HBoxContainer, IMenuPage
             _message.Visible = false;
             BuildActions();
         }
+        else if (_draftPoles is not null && (_actionsKey ?? "").StartsWith("brouillon:")
+            && drafts.FirstOrDefault(d => d.Id == _actionsKey![10..]) is { } draft)
+        {
+            FillPoles(_draftPoles, draft.Law.Orientations, ref _draftPolesKey);
+        }
+    }
+
+    /// <summary>Les logos des pôles, chacun suivi de son code ; son nom au survol. « aucun » sans pôle.</summary>
+    private static void FillPoles(HBoxContainer box, IReadOnlyList<Orientation> poles, ref string shownKey)
+    {
+        var key = string.Join(",", poles.Distinct().Select(p => p.Code));
+        if (key == shownKey && box.GetChildCount() > 0)
+            return;
+        shownKey = key;
+        foreach (var child in box.GetChildren())
+        {
+            box.RemoveChild(child);
+            child.QueueFree();
+        }
+        if (key.Length == 0)
+        {
+            var none = UiTheme.Caption("aucun");
+            box.AddChild(none);
+            return;
+        }
+        foreach (var pole in poles.Distinct())
+        {
+            var tooltip = $"{pole.Code} : pôle {WorldText.PoleName(pole)}";
+            if (IconRegistry.GetPoleIcon(pole, 16) is { } icon)
+                box.AddChild(new TextureRect
+                {
+                    Texture = icon,
+                    CustomMinimumSize = icon.GetSize(),
+                    StretchMode = TextureRect.StretchModeEnum.KeepCentered,
+                    SizeFlagsVertical = SizeFlags.ShrinkCenter,
+                    TooltipText = tooltip,
+                    MouseFilter = MouseFilterEnum.Pass,
+                });
+            box.AddChild(new Label { Text = pole.Code, TooltipText = tooltip, MouseFilter = MouseFilterEnum.Pass });
+        }
+    }
+
+    /// <summary>Les pôles qu'une brique touche avec cette valeur : selon le sens de l'écart à la valeur héritée.</summary>
+    private static IReadOnlyList<Orientation> BrickPoles(BrickDefinition definition, LawSubject subject, double value, double reference) =>
+        value == reference ? [] : definition.PolesOf(subject, raise: value > reference);
+
+    private static HBoxContainer PolesBox()
+    {
+        var box = new HBoxContainer();
+        box.AddThemeConstantOverride("separation", 4);
+        return box;
     }
 
     // ---- Les décisions -----------------------------------------------------------------------------------------------
@@ -83,6 +137,8 @@ public partial class LawCommissionPage : HBoxContainer, IMenuPage
     private void BuildActions()
     {
         _actionsKey = _schema.Selected;
+        _draftPoles = null;
+        _draftPolesKey = "";
         foreach (var child in _actions.GetChildren())
         {
             _actions.RemoveChild(child);
@@ -136,6 +192,22 @@ public partial class LawCommissionPage : HBoxContainer, IMenuPage
     private void DraftActions(LawDraftView draft)
     {
         _actions.AddChild(new HSeparator());
+
+        // Les pôles que la loi modifie, selon ses curseurs : ils changent quand on en bouge un.
+        var polesRow = new HBoxContainer();
+        polesRow.AddThemeConstantOverride("separation", 8);
+        polesRow.AddChild(new Label
+        {
+            Text = "Pôles modifiés",
+            CustomMinimumSize = new Vector2(90, 0),
+            TooltipText = "Les pôles que cette loi favorise : ceux de chaque brique dans le sens où son curseur s'écarte de la valeur héritée.",
+            MouseFilter = MouseFilterEnum.Pass,
+        });
+        _draftPoles = PolesBox();
+        FillPoles(_draftPoles, draft.Law.Orientations, ref _draftPolesKey);
+        polesRow.AddChild(_draftPoles);
+        _actions.AddChild(polesRow);
+
         if (draft.Kind != LawChangeKind.Repeal)
             NameField(draft.Law.Name, text => _desk.RenameDraft(draft.Id, text));
         if (draft.Kind == LawChangeKind.Enact)
@@ -171,11 +243,51 @@ public partial class LawCommissionPage : HBoxContainer, IMenuPage
         var inDomain = bricks.Where(b => b.Domain == draft.Law.Domain).ToList();
         var full = (draft.Law.Bricks?.Count ?? 0) >= LawCatalogue.MaxBricksPerLaw;
         var menu = new OptionButton { SizeFlagsHorizontal = SizeFlags.ExpandFill, FocusMode = FocusModeEnum.None, FitToLongestItem = false, Disabled = full };
+        // Chaque brique avec les logos de tous les pôles qu'elle peut toucher, en hausse ou en baisse.
         foreach (var brick in inDomain)
-            menu.AddItem(brick.Name);
+        {
+            var poles = brick.Poles.SelectMany(p => p.Raise.Concat(p.Lower)).Distinct().ToList();
+            if (poles.Count > 0 && IconRegistry.GetPolesIcon(poles, 14) is { } icon)
+                menu.AddIconItem(icon, brick.Name);
+            else
+                menu.AddItem(brick.Name);
+        }
         var row = new HBoxContainer();
         row.AddThemeConstantOverride("separation", 8);
         row.AddChild(menu);
+
+        // Sous le menu : les pôles que la brique choisie favorise selon le sens du curseur.
+        var sides = new HBoxContainer();
+        sides.AddThemeConstantOverride("separation", 8);
+        var raiseLabel = new Label { MouseFilter = MouseFilterEnum.Pass };
+        var raisePoles = PolesBox();
+        var lowerLabel = new Label { MouseFilter = MouseFilterEnum.Pass };
+        var lowerPoles = PolesBox();
+        sides.AddChild(raiseLabel);
+        sides.AddChild(raisePoles);
+        sides.AddChild(new Control { CustomMinimumSize = new Vector2(16, 0) });
+        sides.AddChild(lowerLabel);
+        sides.AddChild(lowerPoles);
+        var raiseKey = "";
+        var lowerKey = "";
+        void ShowSides(int index)
+        {
+            sides.Visible = index >= 0 && index < inDomain.Count;
+            if (!sides.Visible)
+                return;
+            var brick = inDomain[index];
+            var permission = brick.Family == BrickFamily.Permission;
+            raiseLabel.Text = permission ? "Autoriser :" : "En hausse :";
+            lowerLabel.Text = permission ? "Interdire :" : "En baisse :";
+            raiseLabel.TooltipText = lowerLabel.TooltipText =
+                "Les pôles que la brique favorise quand son curseur s'écarte de la valeur héritée dans ce sens "
+                + "(pour la règle générale ; un sujet peut avoir ses propres pôles).";
+            var general = brick.Poles.FirstOrDefault(p => p.Subject is null) ?? brick.Poles.FirstOrDefault();
+            FillPoles(raisePoles, general?.Raise ?? [], ref raiseKey);
+            FillPoles(lowerPoles, general?.Lower ?? [], ref lowerKey);
+        }
+        menu.ItemSelected += i => ShowSides((int)i);
+        ShowSides(menu.Selected);
         var add = ActionButton(full ? $"{LawCatalogue.MaxBricksPerLaw} briques au plus" : "Ajouter la brique", () =>
         {
             if (menu.Selected >= 0)
@@ -184,6 +296,9 @@ public partial class LawCommissionPage : HBoxContainer, IMenuPage
         add.Disabled = full || inDomain.Count == 0;
         row.AddChild(add);
         _actions.AddChild(row);
+        _actions.AddChild(sides);
+        if (full)
+            sides.Visible = false;
     }
 
     /// <summary>
@@ -195,6 +310,11 @@ public partial class LawCommissionPage : HBoxContainer, IMenuPage
         var header = new HBoxContainer();
         header.AddThemeConstantOverride("separation", 8);
         header.AddChild(new Label { Text = definition.Name, CustomMinimumSize = new Vector2(180, 0), TooltipText = definition.Description ?? "", MouseFilter = MouseFilterEnum.Pass });
+        // Les pôles que cette brique touche avec son curseur actuel.
+        var brickPoles = PolesBox();
+        var brickPolesKey = "";
+        FillPoles(brickPoles, BrickPoles(definition, brick.Subject, brick.Value, brick.Reference), ref brickPolesKey);
+        header.AddChild(brickPoles);
         var choices = _desk.SubjectChoices(definition.Id);
         var subject = new OptionButton { SizeFlagsHorizontal = SizeFlags.ExpandFill, FocusMode = FocusModeEnum.None, FitToLongestItem = false };
         foreach (var choice in choices)
@@ -221,7 +341,11 @@ public partial class LawCommissionPage : HBoxContainer, IMenuPage
         if (definition.Family == BrickFamily.Permission)
         {
             var allowed = new CheckBox { Text = "autorisé", ButtonPressed = brick.Value >= 0.5, FocusMode = FocusModeEnum.None };
-            allowed.Toggled += on => Show(_desk.SetDraftBrick(draftId, index, on ? 1 : 0));
+            allowed.Toggled += on =>
+            {
+                Show(_desk.SetDraftBrick(draftId, index, on ? 1 : 0));
+                FillPoles(brickPoles, BrickPoles(definition, brick.Subject, on ? 1 : 0, brick.Reference), ref brickPolesKey);
+            };
             row.AddChild(allowed);
         }
         else
@@ -242,6 +366,7 @@ public partial class LawCommissionPage : HBoxContainer, IMenuPage
             {
                 value.Text = SheetText.Value(definition.Family, v);
                 Show(_desk.SetDraftBrick(draftId, index, v));
+                FillPoles(brickPoles, BrickPoles(definition, brick.Subject, v, brick.Reference), ref brickPolesKey);
             };
             row.AddChild(slider);
             row.AddChild(value);
@@ -348,31 +473,33 @@ public partial class LawCommissionPage : HBoxContainer, IMenuPage
 
     private void Build(TreeItem root)
     {
-        _schema.Item(root, "vierge", "+ Nouvelle loi vierge", UiTheme.Accent);
+        var lawIcon = IconRegistry.GetMenuIcon("Lois", 18);
+        _schema.Item(root, "vierge", "+ Nouvelle loi vierge", UiTheme.Accent, icon: lawIcon);
 
         var voted = _view.VotedLawChanges();
-        var votedItem = _schema.Item(root, "votes", $"Votées, en vigueur le 1er du mois ({voted.Count})", GroupColor);
+        var votedItem = _schema.Item(root, "votes", $"Votées, en vigueur le 1er du mois ({voted.Count})", GroupColor, icon: lawIcon);
         foreach (var change in voted)
             AddChange(votedItem, change);
 
         var drafts = _view.LawDrafts();
-        var draftsItem = _schema.Item(root, "brouillons", $"Brouillons ({drafts.Count})", GroupColor);
+        var draftsItem = _schema.Item(root, "brouillons", $"Brouillons ({drafts.Count})", GroupColor, icon: lawIcon);
         foreach (var draft in drafts)
             AddChange(draftsItem, draft);
 
         var templates = _view.LawTemplates();
-        var templatesItem = _schema.Item(root, "modeles", $"Modèles ({templates.Count})", GroupColor);
+        var templatesItem = _schema.Item(root, "modeles", $"Modèles ({templates.Count})", GroupColor, icon: lawIcon);
         var bricks = _view.LawBricks();
         foreach (var domain in _view.LawDomains())
         {
             var inDomain = templates.Where(t => t.Domain == domain.Id).ToList();
             if (inDomain.Count == 0)
                 continue;
-            var domainItem = _schema.Item(templatesItem, $"domaine:{domain.Id}", $"{domain.Name} ({inDomain.Count})", muted: true);
+            var domainItem = _schema.Item(templatesItem, $"domaine:{domain.Id}", $"{domain.Name} ({inDomain.Count})", muted: true, icon: lawIcon);
             foreach (var template in inDomain)
             {
-                var item = _schema.Item(domainItem, $"modele:{template.Id}", template.Name);
-                TreeSheet.AddPoleChips(item, PolesOf(template, bricks), template.Name);
+                var poles = PolesOf(template, bricks);
+                var item = _schema.Item(domainItem, $"modele:{template.Id}", template.Name, icon: IconRegistry.GetPolesIcon(poles, 18));
+                TreeSheet.PoleTooltip(item, poles);
             }
         }
     }
@@ -380,8 +507,8 @@ public partial class LawCommissionPage : HBoxContainer, IMenuPage
     private void AddChange(TreeItem parent, LawDraftView change)
     {
         var item = _schema.Item(parent, $"{(change.Voted ? "vote" : "brouillon")}:{change.Id}",
-            $"{SheetText.ChangeKind(change.Kind)} : {change.Law.Name}");
-        TreeSheet.AddPoleChips(item, change.Law.Orientations, change.Law.Name);
+            $"{SheetText.ChangeKind(change.Kind)} : {change.Law.Name}", icon: IconRegistry.GetPolesIcon(change.Law.Orientations, 18));
+        TreeSheet.PoleTooltip(item, change.Law.Orientations);
     }
 
     private string Describe(string key)

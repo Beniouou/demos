@@ -48,13 +48,15 @@ public static class SheetText
             ? $"{OwnerSquare(ownership)} {Escape(view.NameOf(structureId))}"
             : Escape(view.NameOf(structureId));
 
+    /// <summary>Le logo du pôle (sinon un carré de sa couleur), son nom au survol.</summary>
     public static string Chip(Orientation pole) =>
-        Hint($"[color=#{UiTheme.PoleColor(pole).ToHtml(false)}]■[/color]", $"{pole.Code} : pôle {WorldText.PoleName(pole)}");
+        Hint(IconRegistry.PoleInline(pole) ?? $"[color=#{UiTheme.PoleColor(pole).ToHtml(false)}]■[/color]",
+            $"{pole.Code} : pôle {WorldText.PoleName(pole)}");
 
-    /// <summary>Les pastilles de plusieurs pôles, suivies de leurs codes : « ■■ EG PR » ; le nom de chaque pôle au survol.</summary>
+    /// <summary>Les logos de plusieurs pôles, suivis de leurs codes : « ■■ EG PR » ; le nom de chaque pôle au survol.</summary>
     public static string Chips(IEnumerable<Orientation> poles)
     {
-        var list = poles.ToList();
+        var list = poles.Distinct().ToList();
         return list.Count == 0
             ? ""
             : $"{string.Concat(list.Select(Chip))} {string.Join(" ", list.Select(p => Hint(p.Code, $"{p.Code} : pôle {WorldText.PoleName(p)}")))}";

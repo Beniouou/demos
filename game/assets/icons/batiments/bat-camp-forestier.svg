@@ -1,0 +1,60 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#262b34"/>
+      <stop offset="100%" stop-color="#14171c"/>
+    </linearGradient>
+    <linearGradient id="gold" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#f5d77f"/>
+      <stop offset="50%" stop-color="#d9a441"/>
+      <stop offset="100%" stop-color="#a6731e"/>
+    </linearGradient>
+    <linearGradient id="wood" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ba8252"/>
+      <stop offset="100%" stop-color="#694121"/>
+    </linearGradient>
+    <linearGradient id="pine" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#408a56"/>
+      <stop offset="100%" stop-color="#1b4728"/>
+    </linearGradient>
+    <linearGradient id="steel" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ffffff"/>
+      <stop offset="50%" stop-color="#c4c9d2"/>
+      <stop offset="100%" stop-color="#7a8290"/>
+    </linearGradient>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="1.5" stdDeviation="1.5" flood-color="#000000" flood-opacity="0.5"/>
+    </filter>
+  </defs>
+  <circle cx="32" cy="32" r="29" fill="url(#bg)" stroke="#363d4a" stroke-width="1.5"/>
+  <circle cx="32" cy="32" r="26" fill="none" stroke="#d9a441" stroke-width="0.7" stroke-dasharray="2 2" opacity="0.55"/>
+  <g filter="url(#shadow)">
+    <!-- Sapin en arrière-plan à gauche -->
+    <polygon points="17,14 21,21 13,21" fill="url(#pine)"/>
+    <polygon points="17,19 23,28 11,28" fill="url(#pine)"/>
+    <polygon points="17,25 25,36 9,36" fill="url(#pine)"/>
+    <rect x="15.5" y="36" width="3" height="8" fill="#4d3119"/>
+    <!-- Cabane de bûcherons en rondins de bois -->
+    <!-- Toit en bardeaux de mélèze -->
+    <polygon points="36,18 52,29 20,29" fill="url(#gold)" stroke="#8f6418" stroke-width="0.8"/>
+    <polygon points="36,18 20,29 20,44 36,44" fill="url(#wood)" stroke="#523214" stroke-width="1"/>
+    <!-- Façade en rondins horizontaux -->
+    <rect x="23" y="29" width="26" height="15" fill="url(#wood)" stroke="#523214" stroke-width="0.8"/>
+    <line x1="23" y1="33" x2="49" y2="33" stroke="#523214" stroke-width="1"/>
+    <line x1="23" y1="37" x2="49" y2="37" stroke="#523214" stroke-width="1"/>
+    <line x1="23" y1="41" x2="49" y2="41" stroke="#523214" stroke-width="1"/>
+    <!-- Porte de la cabane -->
+    <rect x="33" y="34" width="7" height="10" fill="#2d1c0f"/>
+    <!-- Rondins coupés empilés au premier plan -->
+    <ellipse cx="44" cy="45" rx="3" ry="3" fill="url(#gold)" stroke="#523214" stroke-width="0.8"/>
+    <circle cx="44" cy="45" r="1.2" fill="#694121"/>
+    <ellipse cx="50" cy="45" rx="3" ry="3" fill="url(#gold)" stroke="#523214" stroke-width="0.8"/>
+    <circle cx="50" cy="45" r="1.2" fill="#694121"/>
+    <ellipse cx="47" cy="40" rx="3" ry="3" fill="url(#gold)" stroke="#523214" stroke-width="0.8"/>
+    <circle cx="47" cy="40" r="1.2" fill="#694121"/>
+    <!-- Scie de bûcheron / passe-partout -->
+    <path d="M 22 47 Q 34 44 46 47" fill="none" stroke="url(#steel)" stroke-width="1.5"/>
+    <rect x="20" y="45" width="2" height="4" fill="url(#wood)"/>
+    <rect x="46" y="45" width="2" height="4" fill="url(#wood)"/>
+  </g>
+</svg>

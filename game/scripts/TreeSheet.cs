@@ -85,14 +85,21 @@ public sealed class TreeSheet
     /// <summary>Force le schéma à se refaire au prochain rafraîchissement (un filtre a changé).</summary>
     public void Invalidate() => _shape = "\0";
 
-    /// <summary>Une boîte du schéma : son titre, un repère de couleur à gauche (ou rien), et sa clé.</summary>
-    public TreeItem Item(TreeItem parent, string key, string text, Color? marker = null, bool muted = false)
+    /// <summary>Une boîte du schéma : son titre, un repère de couleur ou une icône à gauche (ou rien), et sa clé.</summary>
+    public TreeItem Item(TreeItem parent, string key, string text, Color? marker = null, bool muted = false, Texture2D? icon = null)
     {
         var item = _tree.CreateItem(parent);
         item.SetText(0, text);
         item.SetMetadata(0, key);
-        if (marker is { } color)
+        if (icon is not null)
+        {
+            item.SetIcon(0, icon);
+            item.SetIconMaxWidth(0, 48);
+        }
+        else if (marker is { } color)
+        {
             item.SetIcon(0, UiTheme.Square(color, 6, 18));
+        }
         if (muted)
             item.SetCustomColor(0, UiTheme.Muted);
         item.Collapsed = !_expanded.Contains(key);
@@ -101,14 +108,24 @@ public sealed class TreeSheet
         return item;
     }
 
+    /// <summary>La bulle d'une ligne dont l'icône montre les logos des pôles : leurs noms, puisque l'image n'en dit rien.</summary>
+    public static void PoleTooltip(TreeItem item, IEnumerable<Orientation> poles)
+    {
+        var names = poles.Distinct().Select(p => $"{WorldText.PoleName(p)} ({p.Code})").ToList();
+        item.SetTooltipText(0, names.Count == 0 ? "Aucun pôle" : $"Pôles : {string.Join(", ", names)}");
+    }
+
     /// <summary>Les pastilles des pôles, à droite du titre ; le texte de la bulle s'affiche au survol.</summary>
     public static void AddPoleChips(TreeItem item, IEnumerable<Orientation> poles, string tooltip)
     {
         var id = item.GetButtonCount(0);
         foreach (var pole in poles.Distinct())
+        {
+            var icon = IconRegistry.GetPoleIcon(pole, 16) ?? UiTheme.Square(UiTheme.PoleColor(pole), 12, 12);
             // Un bouton actif garde sa vraie couleur (désactivé, il serait terni) ; un clic dessus ne fait rien.
-            item.AddButton(0, UiTheme.Square(UiTheme.PoleColor(pole), 12, 12), id++, disabled: false,
+            item.AddButton(0, icon, id++, disabled: false,
                 tooltipText: $"{tooltip} : {WorldText.PoleName(pole)} ({pole.Code})");
+        }
     }
 
     private void Choose(TreeItem? item)

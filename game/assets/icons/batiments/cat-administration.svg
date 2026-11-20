@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#262b34"/>
+      <stop offset="100%" stop-color="#14171c"/>
+    </linearGradient>
+    <linearGradient id="gold" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#f5d77f"/>
+      <stop offset="50%" stop-color="#d9a441"/>
+      <stop offset="100%" stop-color="#a6731e"/>
+    </linearGradient>
+    <linearGradient id="steel" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ffffff"/>
+      <stop offset="50%" stop-color="#c4c9d2"/>
+      <stop offset="100%" stop-color="#7a8290"/>
+    </linearGradient>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="1.5" stdDeviation="1.5" flood-color="#000000" flood-opacity="0.5"/>
+    </filter>
+  </defs>
+  <circle cx="32" cy="32" r="29" fill="url(#bg)" stroke="#363d4a" stroke-width="1.5"/>
+  <circle cx="32" cy="32" r="26" fill="none" stroke="#d9a441" stroke-width="0.7" stroke-dasharray="2 2" opacity="0.55"/>
+  <g filter="url(#shadow)">
+    <!-- Fronton néoclassique triangulaire -->
+    <polygon points="32,13 50,22 14,22" fill="url(#gold)" stroke="#8f6418" stroke-width="0.8"/>
+    <!-- Médaillon du fronton -->
+    <circle cx="32" cy="18" r="2" fill="#14171c" stroke="#d9a441" stroke-width="0.6"/>
+    <!-- Entablement sous le fronton -->
+    <rect x="16" y="22" width="32" height="3" fill="url(#gold)"/>
+    <!-- 4 Colonnes ioniques -->
+    <line x1="19" y1="25" x2="19" y2="42" stroke="url(#steel)" stroke-width="2.5" stroke-linecap="round"/>
+    <line x1="27" y1="25" x2="27" y2="42" stroke="url(#steel)" stroke-width="2.5" stroke-linecap="round"/>
+    <line x1="37" y1="25" x2="37" y2="42" stroke="url(#steel)" stroke-width="2.5" stroke-linecap="round"/>
+    <line x1="45" y1="25" x2="45" y2="42" stroke="url(#steel)" stroke-width="2.5" stroke-linecap="round"/>
+    <!-- Porte d'honneur en arche centrale -->
+    <path d="M 30 42 L 30 33 C 30 31, 34 31, 34 33 L 34 42 Z" fill="#14171c" stroke="url(#gold)" stroke-width="0.8"/>
+    <!-- Stylobate / marches de l'édifice -->
+    <rect x="14" y="42" width="36" height="3" fill="url(#gold)"/>
+    <rect x="12" y="45" width="40" height="3" fill="url(#steel)"/>
+    <rect x="10" y="48" width="44" height="3" fill="#20252e" stroke="#363d4a" stroke-width="0.8"/>
+  </g>
+</svg>

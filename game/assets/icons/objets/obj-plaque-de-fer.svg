@@ -1,0 +1,62 @@
+﻿<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#262b34"/>
+      <stop offset="100%" stop-color="#14171c"/>
+    </linearGradient>
+    <linearGradient id="gold" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#f5d77f"/>
+      <stop offset="50%" stop-color="#d9a441"/>
+      <stop offset="100%" stop-color="#a6731e"/>
+    </linearGradient>
+    <linearGradient id="steel" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ffffff"/>
+      <stop offset="50%" stop-color="#c4c9d2"/>
+      <stop offset="100%" stop-color="#7a8290"/>
+    </linearGradient>
+    <linearGradient id="copper" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#f09b68"/>
+      <stop offset="100%" stop-color="#b8582b"/>
+    </linearGradient>
+    <linearGradient id="wood" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ba8252"/>
+      <stop offset="100%" stop-color="#694121"/>
+    </linearGradient>
+    <linearGradient id="bread" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#f7d488"/>
+      <stop offset="50%" stop-color="#d99938"/>
+      <stop offset="100%" stop-color="#8a5311"/>
+    </linearGradient>
+    <linearGradient id="ruby" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#f26c71"/>
+      <stop offset="100%" stop-color="#a82329"/>
+    </linearGradient>
+    <linearGradient id="brick" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#e07253"/>
+      <stop offset="100%" stop-color="#993821"/>
+    </linearGradient>
+    <linearGradient id="pottery" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#e68055"/>
+      <stop offset="100%" stop-color="#99421c"/>
+    </linearGradient>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="1.5" stdDeviation="1.5" flood-color="#000000" flood-opacity="0.5"/>
+    </filter>
+  </defs>
+  <circle cx="32" cy="32" r="29" fill="url(#bg)" stroke="#363d4a" stroke-width="1.5"/>
+  <circle cx="32" cy="32" r="26" fill="none" stroke="#d9a441" stroke-width="0.7" stroke-dasharray="2 2" opacity="0.55"/>
+  <g filter="url(#shadow)">
+    <!-- Tôle de fer laminée industrielle avec rivets aux quatre coins -->
+    <rect x="15" y="18" width="34" height="28" rx="2" fill="url(#steel)" stroke="#363d4a" stroke-width="1.5"/>
+    <rect x="18" y="21" width="28" height="22" fill="none" stroke="#525d6e" stroke-width="0.8" stroke-dasharray="2 2"/>
+    <!-- 4 Rivets d'acier aux coins -->
+    <circle cx="19" cy="22" r="1.8" fill="#20252e" stroke="url(#steel)" stroke-width="0.8"/>
+    <circle cx="45" cy="22" r="1.8" fill="#20252e" stroke="url(#steel)" stroke-width="0.8"/>
+    <circle cx="19" cy="42" r="1.8" fill="#20252e" stroke="url(#steel)" stroke-width="0.8"/>
+    <circle cx="45" cy="42" r="1.8" fill="#20252e" stroke="url(#steel)" stroke-width="0.8"/>
+    <!-- Rayures de laminage industriel -->
+    <line x1="22" y1="26" x2="42" y2="26" stroke="#9aa1ad" stroke-width="1"/>
+    <line x1="22" y1="32" x2="42" y2="32" stroke="#9aa1ad" stroke-width="1"/>
+    <line x1="22" y1="38" x2="42" y2="38" stroke="#9aa1ad" stroke-width="1"/>
+  </g>
+</svg>

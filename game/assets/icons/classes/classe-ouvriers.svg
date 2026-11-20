@@ -1,0 +1,49 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#262b34"/>
+      <stop offset="100%" stop-color="#14171c"/>
+    </linearGradient>
+    <linearGradient id="gold" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#f5d77f"/>
+      <stop offset="50%" stop-color="#d9a441"/>
+      <stop offset="100%" stop-color="#a6731e"/>
+    </linearGradient>
+    <linearGradient id="steel" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ffffff"/>
+      <stop offset="50%" stop-color="#c4c9d2"/>
+      <stop offset="100%" stop-color="#7a8290"/>
+    </linearGradient>
+    <linearGradient id="copper" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#f09b68"/>
+      <stop offset="100%" stop-color="#b8582b"/>
+    </linearGradient>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="1.5" stdDeviation="1.5" flood-color="#000000" flood-opacity="0.5"/>
+    </filter>
+  </defs>
+  <circle cx="32" cy="32" r="29" fill="url(#bg)" stroke="#363d4a" stroke-width="1.5"/>
+  <circle cx="32" cy="32" r="26" fill="none" stroke="#d9a441" stroke-width="0.7" stroke-dasharray="2 2" opacity="0.55"/>
+  <g filter="url(#shadow)">
+    <!-- Engrenage ouvrier en fond -->
+    <circle cx="32" cy="32" r="14" fill="#20252e" stroke="#4a5568" stroke-width="1.5"/>
+    <circle cx="32" cy="32" r="6" fill="#14171c" stroke="#d9a441" stroke-width="1"/>
+    <!-- Clé plate inclinée -->
+    <g transform="rotate(45 32 32)">
+      <rect x="30" y="11" width="4" height="42" rx="1.5" fill="url(#steel)" stroke="#525d6e" stroke-width="0.8"/>
+      <!-- Mâchoire supérieure de la clé -->
+      <path d="M 26 12 C 26 8, 38 8, 38 12 L 35 15 L 29 15 Z" fill="url(#steel)" stroke="#525d6e" stroke-width="0.8"/>
+      <!-- Œil inférieur de la clé -->
+      <circle cx="32" cy="50" r="4.5" fill="none" stroke="url(#steel)" stroke-width="2.5"/>
+    </g>
+    <!-- Marteau ouvrier croisé -->
+    <g transform="rotate(-45 32 32)">
+      <rect x="30" y="12" width="4" height="40" rx="1.5" fill="url(#copper)" stroke="#8f6418" stroke-width="0.8"/>
+      <path d="M 23 15 L 41 15 L 43 23 L 21 23 Z" fill="url(#steel)" stroke="#363d4a" stroke-width="1"/>
+      <rect x="29" y="14" width="6" height="10" fill="url(#gold)"/>
+    </g>
+    <!-- Casquette d'ouvrier emblématique au sommet -->
+    <path d="M 24 16 C 26 13, 38 13, 40 16 L 43 18 L 21 18 Z" fill="url(#copper)" stroke="#8f6418" stroke-width="0.8"/>
+    <ellipse cx="32" cy="18" rx="11" ry="1.5" fill="#525d6e"/>
+  </g>
+</svg>

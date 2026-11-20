@@ -185,18 +185,33 @@ public partial class StructurePage : HBoxContainer, IMenuPage
 
     private void AddNode(TreeItem parent, StructureNode node)
     {
+        var icon = node.Kind switch
+        {
+            StructureNodeKind.State => IconRegistry.GetMenuIcon("Structure", 20),
+            StructureNodeKind.Prefecture => IconRegistry.GetBuildingIcon("prefecture", "Administration", 20),
+            StructureNodeKind.Commune => IconRegistry.GetBuildingIcon("mairie", "Administration", 20),
+            StructureNodeKind.Building => IconRegistry.GetBuildingIcon(node.TypeId, node.Category, 18),
+            _ => null,
+        };
+
         var item = Item(parent, node.Id, node.Kind == StructureNodeKind.State ? node.Name.ToUpperInvariant() : node.Name,
-            node.Kind is StructureNodeKind.State or StructureNodeKind.Prefecture or StructureNodeKind.Commune ? EntityColor : UnitColor);
+            node.Kind is StructureNodeKind.State or StructureNodeKind.Prefecture or StructureNodeKind.Commune ? EntityColor : UnitColor,
+            icon: icon);
+
+        // Un bâtiment garde le carré de son propriétaire, devant son logo.
         if (node.Kind == StructureNodeKind.Building)
-            item.SetIcon(0, UiTheme.Square(UiTheme.OwnershipColor(node.Ownership), 12, 12));
+        {
+            item.SetIcon(0, IconRegistry.WithSquare(icon, UiTheme.OwnershipColor(node.Ownership), 12));
+            item.SetIconMaxWidth(0, 64);
+        }
         AddLawChips(item, node.Laws);
 
         // Déroulée, une boîte montre d'abord ses lois en toutes lettres, puis ce qu'elle contient.
         foreach (var law in node.Laws)
         {
-            var lawItem = Item(item, $"loi:{law.Id}", $"Loi : {law.Name}", null);
+            var lawItem = Item(item, $"loi:{law.Id}", $"Loi : {law.Name}", null, icon: IconRegistry.GetPolesIcon(law.Orientations, 18));
             lawItem.SetCustomColor(0, UiTheme.Muted);
-            AddLawChips(lawItem, [law]);
+            TreeSheet.PoleTooltip(lawItem, law.Orientations);
         }
 
         if (node.Kind == StructureNodeKind.Commune)
@@ -213,7 +228,8 @@ public partial class StructurePage : HBoxContainer, IMenuPage
             // Les bâtiments sont rangés par catégorie (Extraction, Production…), chacune repliable.
             foreach (var category in buildings.GroupBy(b => b.Category ?? "Autres"))
             {
-                var categoryItem = Item(buildingsItem, $"categorie:{node.Id}:{category.Key}", $"{category.Key} ({category.Count()})", GroupColor);
+                var catIcon = IconRegistry.GetCategoryIcon(category.Key, 18);
+                var categoryItem = Item(buildingsItem, $"categorie:{node.Id}:{category.Key}", $"{category.Key} ({category.Count()})", GroupColor, icon: catIcon);
                 foreach (var child in category)
                     AddNode(categoryItem, child);
             }
@@ -228,13 +244,20 @@ public partial class StructurePage : HBoxContainer, IMenuPage
         }
     }
 
-    private TreeItem Item(TreeItem parent, string key, string text, Color? color)
+    private TreeItem Item(TreeItem parent, string key, string text, Color? color, Texture2D? icon = null)
     {
         var item = _tree.CreateItem(parent);
         item.SetText(0, text);
         item.SetMetadata(0, key);
-        if (color is { } marker)
+        if (icon is not null)
+        {
+            item.SetIcon(0, icon);
+            item.SetIconMaxWidth(0, 48);
+        }
+        else if (color is { } marker)
+        {
             item.SetIcon(0, UiTheme.Square(marker, 6, 18));
+        }
         item.Collapsed = !_expanded.Contains(key);
         if (key == _selected)
             item.Select(0);
@@ -247,9 +270,11 @@ public partial class StructurePage : HBoxContainer, IMenuPage
         var id = 0;
         foreach (var law in laws)
             foreach (var pole in law.Orientations)
-                // Un bouton actif garde sa vraie couleur (désactivé, il serait terni) ; un clic dessus ne fait rien.
-                item.AddButton(0, UiTheme.Square(UiTheme.PoleColor(pole), 12, 12), id++, disabled: false,
+            {
+                var poleIcon = IconRegistry.GetPoleIcon(pole, 16) ?? UiTheme.Square(UiTheme.PoleColor(pole), 12, 12);
+                item.AddButton(0, poleIcon, id++, disabled: false,
                     tooltipText: $"{law.Name} : {WorldText.PoleName(pole)} ({pole.Code})");
+            }
     }
 
     // ---- La fiche --------------------------------------------------------------------------------------------------

@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#262b34"/>
+      <stop offset="100%" stop-color="#14171c"/>
+    </linearGradient>
+    <linearGradient id="prTeal" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#69edd2"/>
+      <stop offset="50%" stop-color="#3dd6b5"/>
+      <stop offset="100%" stop-color="#198a71"/>
+    </linearGradient>
+    <linearGradient id="gold" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#f5d77f"/>
+      <stop offset="100%" stop-color="#c6922e"/>
+    </linearGradient>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="1.5" stdDeviation="1.5" flood-color="#000000" flood-opacity="0.5"/>
+    </filter>
+  </defs>
+  <circle cx="32" cy="32" r="29" fill="url(#bg)" stroke="#3dd6b5" stroke-width="1.8"/>
+  <circle cx="32" cy="32" r="26" fill="none" stroke="#3dd6b5" stroke-width="0.7" stroke-dasharray="2 2" opacity="0.6"/>
+  <g filter="url(#shadow)">
+    <!-- Bouclier de rempart communal / protectionnisme -->
+    <path d="M 32 12 L 47 16 C 47 30, 42 42, 32 47 C 22 42, 17 30, 17 16 Z" 
+          fill="#1d2627" stroke="url(#prTeal)" stroke-width="2.2" stroke-linejoin="round"/>
+    <!-- Bordure et rivets de fortification -->
+    <path d="M 32 17 L 43 20 C 43 30, 39 39, 32 43 C 25 39, 21 30, 21 20 Z" 
+          fill="none" stroke="#3dd6b5" stroke-width="1" stroke-dasharray="3 2" opacity="0.7"/>
+    <!-- Grenier / réserve commune au centre du bouclier -->
+    <polygon points="32,22 39,26 25,26" fill="url(#gold)"/>
+    <rect x="27" y="26" width="10" height="9" fill="url(#prTeal)"/>
+    <!-- Clé de sécurité / verrou de douane -->
+    <circle cx="32" cy="30" r="1.5" fill="#14171c"/>
+    <line x1="32" y1="31" x2="32" y2="33" stroke="#14171c" stroke-width="1"/>
+    <!-- Texte Protection -->
+    <text x="32" y="53" fill="#69edd2" font-size="6.5" font-weight="bold" font-family="sans-serif" text-anchor="middle" letter-spacing="0.8">PROTECTION</text>
+  </g>
+</svg>

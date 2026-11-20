@@ -37,7 +37,7 @@ public partial class ConstructionPage : HBoxContainer, IMenuPage
         "La taille du bâtiment, de 10 % à 100 % de son type : ses emplois, ses places, son stockage et son coût en matériaux "
         + "suivent cette part (au moins 10 emplois ou places et 20 matériaux). La durée du chantier ne change pas.";
 
-    private double Size => _size / 100.0;
+    private double BuildingSize => _size / 100.0;
 
     public ConstructionPage(GameView view, PlayerDesk desk, MapCanvas map, System.Action closeMenu, System.Action<string> report, CommuneFocus focus)
     {
@@ -140,7 +140,7 @@ public partial class ConstructionPage : HBoxContainer, IMenuPage
             return;
 
         var zones = _view.ExtractionZonesFor(typeId);
-        var size = Size;
+        var size = BuildingSize;
         if (zones.Count == 0)
         {
             _message.Text = _desk.Build(typeId, communeId, size: size);
@@ -167,9 +167,13 @@ public partial class ConstructionPage : HBoxContainer, IMenuPage
     {
         foreach (var category in _desk.BuildableTypes().GroupBy(t => t.Category))
         {
-            var categoryItem = _schema.Item(root, $"categorie:{category.Key}", $"{category.Key} ({category.Count()})", GroupColor);
+            var catIcon = IconRegistry.GetCategoryIcon(category.Key, 20);
+            var categoryItem = _schema.Item(root, $"categorie:{category.Key}", $"{category.Key} ({category.Count()})", GroupColor, icon: catIcon);
             foreach (var type in category.OrderBy(t => t.Level).ThenBy(t => t.Name))
-                _schema.Item(categoryItem, $"type:{type.Id}", $"{type.Name}   (niveau {type.Level})", muted: !type.IsFunctional);
+            {
+                var buildingIcon = IconRegistry.GetBuildingIcon(type.Id, category.Key, 20);
+                _schema.Item(categoryItem, $"type:{type.Id}", $"{type.Name}   (niveau {type.Level})", muted: !type.IsFunctional, icon: buildingIcon);
+            }
         }
     }
 
@@ -198,7 +202,7 @@ public partial class ConstructionPage : HBoxContainer, IMenuPage
             text.AppendLine($"[color=#{UiTheme.Danger.ToHtml(false)}]Ce bâtiment n'a pas encore d'effet dans le jeu.[/color]");
 
         var zones = _view.ExtractionZonesFor(type.Id);
-        var sized = _view.SizedOf(type.Id, Size);
+        var sized = _view.SizedOf(type.Id, BuildingSize);
         if (zones.Count > 0)
         {
             text.Append(SheetText.Section("Emplacement"));
@@ -211,7 +215,7 @@ public partial class ConstructionPage : HBoxContainer, IMenuPage
         text.Append(SheetText.Section("Coût"));
         text.AppendLine($"{sized.Materials:N0} {SheetText.Escape(type.MaterialName)} à {_size} % de la taille, {type.Days} jours de chantier");
 
-        if (SelectedCommune() is { } communeId && _view.PlanConstruction(type.Id, communeId, Size) is { } plan)
+        if (SelectedCommune() is { } communeId && _view.PlanConstruction(type.Id, communeId, BuildingSize) is { } plan)
         {
             // D'où viennent les matériaux : ici, puis la commune la plus proche qui en a (décidé le 20 novembre 2026).
             text.Append(SheetText.Section("D'où viennent les matériaux"));

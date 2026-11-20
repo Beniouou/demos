@@ -59,16 +59,21 @@ public partial class PopulationGroupsPage : HBoxContainer, IMenuPage
     {
         foreach (var commune in _communes)
         {
-            var item = _sheet.Item(root, CommuneKey + commune.Id, $"{commune.Name} ({commune.Classes.Count})");
+            var communeIcon = IconRegistry.GetCategoryIcon("Administration", 20);
+            var item = _sheet.Item(root, CommuneKey + commune.Id, $"{commune.Name} ({commune.Classes.Count})", icon: communeIcon);
             // Un rang par branche repliable, seulement s'il a des groupes dans la commune.
             foreach (var rank in commune.Classes.Select(g => g.Rank).Distinct().Order())
             {
                 var groups = commune.Classes.Where(g => g.Rank == rank).ToList();
+                var rankIcon = IconRegistry.GetRankIcon(rank, 20);
                 var rankItem = _sheet.Item(item, KeyOf(commune, rank),
-                    $"{ClassTransitions.RankName(rank)} ({groups.Count}) · {groups.Sum(g => g.Population):N0}");
+                    $"{ClassTransitions.RankName(rank)} ({groups.Count}) · {groups.Sum(g => g.Population):N0}", icon: rankIcon);
                 foreach (var group in Ordered(groups))
                 {
-                    var groupItem = _sheet.Item(rankItem, GroupKey + group.Id, $"{group.IdeologyName} ({group.Population:N0})");
+                    var poleIcon = group.Poles?.FirstOrDefault() is { } primaryPole
+                        ? IconRegistry.GetPoleIcon(primaryPole, 18)
+                        : rankIcon;
+                    var groupItem = _sheet.Item(rankItem, GroupKey + group.Id, $"{group.IdeologyName} ({group.Population:N0})", icon: poleIcon);
                     TreeSheet.AddPoleChips(groupItem, group.Poles ?? [], "Pôle du groupe");
                 }
             }

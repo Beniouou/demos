@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#262b34"/>
+      <stop offset="100%" stop-color="#14171c"/>
+    </linearGradient>
+    <linearGradient id="liYellow" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#fff085"/>
+      <stop offset="50%" stop-color="#f5c542"/>
+      <stop offset="100%" stop-color="#ba8611"/>
+    </linearGradient>
+    <linearGradient id="gold" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#f5d77f"/>
+      <stop offset="100%" stop-color="#c6922e"/>
+    </linearGradient>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="1.5" stdDeviation="1.5" flood-color="#000000" flood-opacity="0.5"/>
+    </filter>
+  </defs>
+  <circle cx="32" cy="32" r="29" fill="url(#bg)" stroke="#f5c542" stroke-width="1.8"/>
+  <circle cx="32" cy="32" r="26" fill="none" stroke="#f5c542" stroke-width="0.7" stroke-dasharray="2 2" opacity="0.6"/>
+  <g filter="url(#shadow)">
+    <!-- Ailes de Mercure déployées (Commerce & Libre échange) -->
+    <!-- Aile gauche -->
+    <path d="M 32 28 C 24 20, 16 22, 12 28 C 16 30, 24 33, 32 30" fill="url(#liYellow)" stroke="#ba8611" stroke-width="0.8"/>
+    <!-- Aile droite -->
+    <path d="M 32 28 C 40 20, 48 22, 52 28 C 48 30, 40 33, 32 30" fill="url(#liYellow)" stroke="#ba8611" stroke-width="0.8"/>
+    <!-- Pièce d'or ailée centrale -->
+    <circle cx="32" cy="27" r="8" fill="url(#liYellow)" stroke="#ba8611" stroke-width="1.5"/>
+    <circle cx="32" cy="27" r="5.5" fill="none" stroke="#ffffff" stroke-width="1" opacity="0.7"/>
+    <!-- Bourse de monnaie au bas -->
+    <path d="M 27 36 C 27 34, 37 34, 37 36 L 41 45 C 41 48, 23 48, 23 45 Z" fill="#2d291e" stroke="url(#liYellow)" stroke-width="1.2"/>
+    <line x1="26" y1="37" x2="38" y2="37" stroke="url(#liYellow)" stroke-width="1.5"/>
+    <circle cx="32" cy="42" r="2" fill="url(#liYellow)"/>
+    <!-- Texte Libéralisme -->
+    <text x="32" y="53" fill="#fff085" font-size="7" font-weight="bold" font-family="sans-serif" text-anchor="middle" letter-spacing="1">LIBERTÉ</text>
+  </g>
+</svg>

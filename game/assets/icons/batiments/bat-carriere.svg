@@ -1,0 +1,50 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#262b34"/>
+      <stop offset="100%" stop-color="#14171c"/>
+    </linearGradient>
+    <linearGradient id="gold" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#f5d77f"/>
+      <stop offset="50%" stop-color="#d9a441"/>
+      <stop offset="100%" stop-color="#a6731e"/>
+    </linearGradient>
+    <linearGradient id="stone" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#e8e2d5"/>
+      <stop offset="100%" stop-color="#998e7d"/>
+    </linearGradient>
+    <linearGradient id="rock" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#737d8c"/>
+      <stop offset="100%" stop-color="#3b424d"/>
+    </linearGradient>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="1.5" stdDeviation="1.5" flood-color="#000000" flood-opacity="0.5"/>
+    </filter>
+  </defs>
+  <circle cx="32" cy="32" r="29" fill="url(#bg)" stroke="#363d4a" stroke-width="1.5"/>
+  <circle cx="32" cy="32" r="26" fill="none" stroke="#d9a441" stroke-width="0.7" stroke-dasharray="2 2" opacity="0.55"/>
+  <g filter="url(#shadow)">
+    <!-- Front de taille rocheux en gradins (Carrière à ciel ouvert) -->
+    <polygon points="12,48 12,20 24,20 24,30 36,30 36,40 52,40 52,48" fill="url(#rock)" stroke="#262b34" stroke-width="1"/>
+    <!-- Stries de coupe dans la roche -->
+    <line x1="16" y1="22" x2="16" y2="46" stroke="#262b34" stroke-width="0.8" opacity="0.6"/>
+    <line x1="28" y1="32" x2="28" y2="46" stroke="#262b34" stroke-width="0.8" opacity="0.6"/>
+    <line x1="40" y1="42" x2="40" y2="46" stroke="#262b34" stroke-width="0.8" opacity="0.6"/>
+    <!-- Blocs de pierre de taille / marbre équarris -->
+    <!-- Bloc 1 -->
+    <rect x="22" y="38" width="12" height="8" rx="0.5" fill="url(#stone)" stroke="#696052" stroke-width="1"/>
+    <line x1="22" y1="38" x2="25" y2="35" stroke="#696052" stroke-width="1"/>
+    <line x1="34" y1="38" x2="37" y2="35" stroke="#696052" stroke-width="1"/>
+    <line x1="25" y1="35" x2="37" y2="35" stroke="#696052" stroke-width="1"/>
+    <!-- Bloc 2 levé par la grue -->
+    <rect x="38" y="24" width="9" height="7" rx="0.5" fill="url(#stone)" stroke="url(#gold)" stroke-width="1"/>
+    <!-- Câble de levage et poulie de carrière -->
+    <line x1="42.5" y1="12" x2="42.5" y2="24" stroke="url(#gold)" stroke-width="1.2"/>
+    <circle cx="42.5" cy="12" r="2" fill="url(#gold)"/>
+    <!-- Flèche de chèvre / mât de levage -->
+    <line x1="52" y1="44" x2="42.5" y2="12" stroke="#8f6418" stroke-width="2"/>
+    <line x1="46" y1="44" x2="42.5" y2="12" stroke="#8f6418" stroke-width="1.5"/>
+    <!-- Sol de gravier et sable -->
+    <line x1="10" y1="49" x2="54" y2="49" stroke="#998e7d" stroke-width="2"/>
+  </g>
+</svg>

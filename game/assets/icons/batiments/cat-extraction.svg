@@ -1,0 +1,49 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#262b34"/>
+      <stop offset="100%" stop-color="#14171c"/>
+    </linearGradient>
+    <linearGradient id="gold" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#f5d77f"/>
+      <stop offset="50%" stop-color="#d9a441"/>
+      <stop offset="100%" stop-color="#a6731e"/>
+    </linearGradient>
+    <linearGradient id="steel" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ffffff"/>
+      <stop offset="50%" stop-color="#c4c9d2"/>
+      <stop offset="100%" stop-color="#7a8290"/>
+    </linearGradient>
+    <linearGradient id="copper" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#f09b68"/>
+      <stop offset="100%" stop-color="#b8582b"/>
+    </linearGradient>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="1.5" stdDeviation="1.5" flood-color="#000000" flood-opacity="0.5"/>
+    </filter>
+  </defs>
+  <circle cx="32" cy="32" r="29" fill="url(#bg)" stroke="#363d4a" stroke-width="1.5"/>
+  <circle cx="32" cy="32" r="26" fill="none" stroke="#d9a441" stroke-width="0.7" stroke-dasharray="2 2" opacity="0.55"/>
+  <g filter="url(#shadow)">
+    <!-- Monticule rocheux en arrière-plan -->
+    <polygon points="12,48 24,32 36,44 44,28 52,48" fill="#20252e" stroke="#525d6e" stroke-width="1"/>
+    <!-- Filon de minerai d'or étincelant -->
+    <polygon points="32,48 35,42 38,48" fill="url(#gold)"/>
+    <polygon points="21,48 24,44 26,48" fill="url(#gold)"/>
+    <!-- Pioche de mineur croisée -->
+    <g transform="rotate(35 32 30)">
+      <rect x="30" y="10" width="3.5" height="38" rx="1.5" fill="url(#copper)" stroke="#8f6418" stroke-width="0.8"/>
+      <!-- Fer courbe de la pioche -->
+      <path d="M 16 16 Q 32 10 48 16 L 46 19 Q 32 14 18 19 Z" fill="url(#steel)" stroke="#363d4a" stroke-width="0.8"/>
+    </g>
+    <!-- Hache de bûcheron croisée -->
+    <g transform="rotate(-35 32 30)">
+      <rect x="30" y="10" width="3.5" height="38" rx="1.5" fill="url(#copper)" stroke="#8f6418" stroke-width="0.8"/>
+      <!-- Fer de la hache -->
+      <path d="M 32 13 L 44 10 C 46 16, 46 20, 44 24 L 32 20 Z" fill="url(#steel)" stroke="#363d4a" stroke-width="0.8"/>
+    </g>
+    <!-- Éclats de roche taillée -->
+    <circle cx="20" cy="22" r="1.5" fill="url(#steel)"/>
+    <circle cx="44" cy="20" r="1.2" fill="url(#gold)"/>
+  </g>
+</svg>

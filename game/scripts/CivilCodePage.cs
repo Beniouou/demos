@@ -106,15 +106,17 @@ public partial class CivilCodePage : HBoxContainer, IMenuPage
     private void Build(TreeItem root)
     {
         var laws = ShownLaws();
+        var lawIcon = IconRegistry.GetMenuIcon("Lois", 18);
         foreach (var domain in _view.LawDomains())
         {
             var inDomain = laws.Where(l => l.Domain == domain.Id).ToList();
             var item = _schema.Item(root, $"domaine:{domain.Id}",
-                $"{domain.Name} ({inDomain.Count}){(domain.Regalian ? "   régalien" : "")}", GroupColor, muted: inDomain.Count == 0);
+                $"{domain.Name} ({inDomain.Count}){(domain.Regalian ? "   régalien" : "")}", GroupColor, muted: inDomain.Count == 0, icon: lawIcon);
             foreach (var law in inDomain)
             {
-                var lawItem = _schema.Item(item, $"loi:{law.Id}", $"{law.Name}   ({law.StructureName})");
-                TreeSheet.AddPoleChips(lawItem, law.Orientations, law.Name);
+                // Devant la loi, les logos des pôles qu'elle touche ; leurs noms au survol.
+                var lawItem = _schema.Item(item, $"loi:{law.Id}", $"{law.Name}   ({law.StructureName})", icon: IconRegistry.GetPolesIcon(law.Orientations, 18));
+                TreeSheet.PoleTooltip(lawItem, law.Orientations);
             }
         }
     }

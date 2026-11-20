@@ -1,0 +1,63 @@
+﻿<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#262b34"/>
+      <stop offset="100%" stop-color="#14171c"/>
+    </linearGradient>
+    <linearGradient id="gold" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#f5d77f"/>
+      <stop offset="50%" stop-color="#d9a441"/>
+      <stop offset="100%" stop-color="#a6731e"/>
+    </linearGradient>
+    <linearGradient id="steel" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ffffff"/>
+      <stop offset="50%" stop-color="#c4c9d2"/>
+      <stop offset="100%" stop-color="#7a8290"/>
+    </linearGradient>
+    <linearGradient id="copper" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#f09b68"/>
+      <stop offset="100%" stop-color="#b8582b"/>
+    </linearGradient>
+    <linearGradient id="wood" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ba8252"/>
+      <stop offset="100%" stop-color="#694121"/>
+    </linearGradient>
+    <linearGradient id="bread" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#f7d488"/>
+      <stop offset="50%" stop-color="#d99938"/>
+      <stop offset="100%" stop-color="#8a5311"/>
+    </linearGradient>
+    <linearGradient id="ruby" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#f26c71"/>
+      <stop offset="100%" stop-color="#a82329"/>
+    </linearGradient>
+    <linearGradient id="brick" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#e07253"/>
+      <stop offset="100%" stop-color="#993821"/>
+    </linearGradient>
+    <linearGradient id="pottery" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#e68055"/>
+      <stop offset="100%" stop-color="#99421c"/>
+    </linearGradient>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="1.5" stdDeviation="1.5" flood-color="#000000" flood-opacity="0.5"/>
+    </filter>
+  </defs>
+  <circle cx="32" cy="32" r="29" fill="url(#bg)" stroke="#363d4a" stroke-width="1.5"/>
+  <circle cx="32" cy="32" r="26" fill="none" stroke="#d9a441" stroke-width="0.7" stroke-dasharray="2 2" opacity="0.55"/>
+  <g filter="url(#shadow)">
+    <!-- Bouteille de vin / spiritueux et verre à pied de bistrot -->
+    <!-- Bouteille foncée avec col étiré -->
+    <path d="M 22 22 L 22 15 L 26 15 L 26 22 C 26 24, 29 26, 29 29 L 29 47 L 19 47 L 19 29 C 19 26, 22 24, 22 22 Z" 
+          fill="#1b2e1e" stroke="#486e4e" stroke-width="1"/>
+    <!-- Bouchon de liège et bague -->
+    <rect x="22" y="13" width="4" height="2.5" fill="url(#gold)"/>
+    <!-- Étiquette de cru sur la bouteille -->
+    <rect x="20.5" y="32" width="7" height="9" fill="#f4efe6" stroke="#8a7a63" stroke-width="0.6"/>
+    <line x1="22" y1="35" x2="26" y2="35" stroke="#73141a" stroke-width="0.8"/>
+    <!-- Verre à pied avec vin rouge républicain -->
+    <path d="M 35 28 C 35 36, 45 36, 45 28 Z" fill="url(#ruby)" stroke="url(#steel)" stroke-width="1"/>
+    <line x1="40" y1="36" x2="40" y2="45" stroke="url(#steel)" stroke-width="1.5"/>
+    <ellipse cx="40" cy="46" rx="4.5" ry="1.5" fill="url(#steel)"/>
+  </g>
+</svg>

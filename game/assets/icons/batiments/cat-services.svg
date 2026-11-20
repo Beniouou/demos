@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#262b34"/>
+      <stop offset="100%" stop-color="#14171c"/>
+    </linearGradient>
+    <linearGradient id="gold" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#f5d77f"/>
+      <stop offset="50%" stop-color="#d9a441"/>
+      <stop offset="100%" stop-color="#a6731e"/>
+    </linearGradient>
+    <linearGradient id="ruby" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#f26c71"/>
+      <stop offset="100%" stop-color="#a82329"/>
+    </linearGradient>
+    <linearGradient id="steel" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ffffff"/>
+      <stop offset="50%" stop-color="#c4c9d2"/>
+      <stop offset="100%" stop-color="#7a8290"/>
+    </linearGradient>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="1.5" stdDeviation="1.5" flood-color="#000000" flood-opacity="0.5"/>
+    </filter>
+  </defs>
+  <circle cx="32" cy="32" r="29" fill="url(#bg)" stroke="#363d4a" stroke-width="1.5"/>
+  <circle cx="32" cy="32" r="26" fill="none" stroke="#d9a441" stroke-width="0.7" stroke-dasharray="2 2" opacity="0.55"/>
+  <g filter="url(#shadow)">
+    <!-- Bouclier civique de protection sociale -->
+    <path d="M 32 13 L 47 18 C 47 32, 42 42, 32 47 C 22 42, 17 32, 17 18 Z" 
+          fill="#20252e" stroke="url(#gold)" stroke-width="1.8" stroke-linejoin="round"/>
+    <!-- Croix civique de service public (Santé, École, Sécurité) -->
+    <path d="M 28 20 L 36 20 L 36 26 L 42 26 L 42 34 L 36 34 L 36 40 L 28 40 L 28 34 L 22 34 L 22 26 L 28 26 Z" 
+          fill="url(#ruby)" stroke="#ffffff" stroke-width="0.8"/>
+    <!-- Rayons civiques de bienveillance -->
+    <circle cx="32" cy="30" r="1.5" fill="#ffffff"/>
+    <!-- Couronne de laurier civique entourant la pointe basse -->
+    <path d="M 16 38 C 19 46, 26 50, 32 52 C 38 50, 45 46, 48 38" fill="none" stroke="url(#steel)" stroke-width="1.5" stroke-linecap="round"/>
+  </g>
+</svg>

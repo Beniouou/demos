@@ -1,0 +1,50 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#262b34"/>
+      <stop offset="100%" stop-color="#14171c"/>
+    </linearGradient>
+    <linearGradient id="gold" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#f5d77f"/>
+      <stop offset="50%" stop-color="#d9a441"/>
+      <stop offset="100%" stop-color="#a6731e"/>
+    </linearGradient>
+    <linearGradient id="stone" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#f4efe6"/>
+      <stop offset="100%" stop-color="#baa990"/>
+    </linearGradient>
+    <linearGradient id="slate" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#65768f"/>
+      <stop offset="100%" stop-color="#303b4a"/>
+    </linearGradient>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="1.5" stdDeviation="1.5" flood-color="#000000" flood-opacity="0.5"/>
+    </filter>
+  </defs>
+  <circle cx="32" cy="32" r="29" fill="url(#bg)" stroke="#363d4a" stroke-width="1.5"/>
+  <circle cx="32" cy="32" r="26" fill="none" stroke="#d9a441" stroke-width="0.7" stroke-dasharray="2 2" opacity="0.55"/>
+  <g filter="url(#shadow)">
+    <!-- Beffroi républicain central avec horloge -->
+    <polygon points="32,9 36,15 28,15" fill="url(#gold)"/>
+    <rect x="29" y="15" width="6" height="12" fill="url(#stone)" stroke="#7a6e5b" stroke-width="0.8"/>
+    <!-- Cadran de l'horloge communale -->
+    <circle cx="32" cy="20" r="2.8" fill="#ffffff" stroke="#14171c" stroke-width="0.8"/>
+    <line x1="32" y1="20" x2="32" y2="18.5" stroke="#14171c" stroke-width="0.6"/>
+    <line x1="32" y1="20" x2="33.5" y2="20" stroke="#14171c" stroke-width="0.6"/>
+    <!-- Toiture principale en ardoise -->
+    <polygon points="16,27 28,21 36,21 48,27" fill="url(#slate)" stroke="#303b4a" stroke-width="1"/>
+    <!-- Corps principal de la Mairie -->
+    <rect x="18" y="27" width="28" height="20" fill="url(#stone)" stroke="#7a6e5b" stroke-width="1"/>
+    <!-- Balcon officiel -->
+    <rect x="26" y="33" width="12" height="2" fill="url(#gold)"/>
+    <!-- Fenêtres du 1er étage -->
+    <rect x="21" y="29" width="3.5" height="5" rx="0.5" fill="#20252e" stroke="#7a6e5b" stroke-width="0.6"/>
+    <rect x="30.2" y="29" width="3.5" height="5" rx="0.5" fill="#20252e" stroke="#7a6e5b" stroke-width="0.6"/>
+    <rect x="39.5" y="29" width="3.5" height="5" rx="0.5" fill="#20252e" stroke="#7a6e5b" stroke-width="0.6"/>
+    <!-- Porte d'honneur avec perron -->
+    <path d="M 29 47 L 29 39 C 29 37.5, 35 37.5, 35 39 L 35 47 Z" fill="#3a2717" stroke="url(#gold)" stroke-width="0.8"/>
+    <!-- Marches du perron -->
+    <rect x="16" y="47" width="32" height="2" fill="url(#gold)"/>
+    <rect x="14" y="49" width="36" height="2" fill="#7a6e5b"/>
+  </g>
+</svg>

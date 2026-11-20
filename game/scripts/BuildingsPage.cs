@@ -345,7 +345,13 @@ public partial class BuildingsPage : HBoxContainer, IMenuPage
     {
         option.Clear();
         foreach (var item in items)
-            option.AddItem(item);
+        {
+            var icon = IconRegistry.GetProductIcon(item, 18);
+            if (icon != null)
+                option.AddIconItem(icon, item);
+            else
+                option.AddItem(item);
+        }
         if (items.Count > 0)
             option.Select(System.Math.Clamp(selected, 0, items.Count - 1));
     }

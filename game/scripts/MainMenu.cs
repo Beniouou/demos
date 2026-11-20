@@ -125,7 +125,7 @@ public partial class MainMenu : HBoxContainer
             ]),
             new("Ressources",
             [
-                Text("Stocks", () => WorldText.Stocks(view)),
+                new("Stocks", () => new StocksPage(view)),
                 new("Revenus", () => new RevenuePage(view, desk)),
             ], Wide: true),
             new("Aide", [Text("Commandes", () => HelpText)]),
@@ -144,14 +144,18 @@ public partial class MainMenu : HBoxContainer
         for (var index = 0; index < _menus.Length; index++)
         {
             var menu = index;
+            var title = _menus[index].Title;
+            var icon = IconRegistry.GetMenuIcon(title, 24);
             var button = new Button
             {
-                Text = _menus[index].Title,
+                Text = $"  {title}",
+                Icon = icon,
+                ExpandIcon = false,
                 ToggleMode = true,
                 ButtonGroup = group,
                 FocusMode = FocusModeEnum.None,
                 Alignment = HorizontalAlignment.Left,
-                CustomMinimumSize = new Vector2(140, 40),
+                CustomMinimumSize = new Vector2(175, 48),
             };
             button.Pressed += () => Toggle(menu);
             _buttons.Add(button);
@@ -333,17 +337,40 @@ public partial class MainMenu : HBoxContainer
             child.QueueFree();
         }
 
-        foreach (var page in menu.Pages)
+        for (var i = 0; i < menu.Pages.Length; i++)
         {
+            var page = menu.Pages[i];
             _tabs.AddChild(page.Create());
             // Le titre est posé à part : un nom de nœud ne peut pas contenir de point.
-            _tabs.SetTabTitle(_tabs.GetTabCount() - 1, page.Title);
+            _tabs.SetTabTitle(i, page.Title);
+            var icon = GetTabIcon(page.Title);
+            if (icon is not null)
+                _tabs.SetTabIcon(i, icon);
         }
 
         // Un menu sans sous-menu n'affiche pas de barre d'onglets.
         _tabs.TabsVisible = menu.Pages.Length > 1;
         _tabs.CurrentTab = 0;
     }
+
+    private static Texture2D? GetTabIcon(string title) => title switch
+    {
+        "Filtres" => IconRegistry.GetMenuIcon("Carte", 16),
+        "Code civil" or "Éditeur de lois" => IconRegistry.GetMenuIcon("Lois", 16),
+        "Gestion des entités politiques" or "Organisme" => IconRegistry.GetMenuIcon("Structure", 16),
+        "Création d'entité politique" => IconRegistry.GetCategoryIcon("Administration", 16),
+        "Vue d'ensemble" or "Évolution" => IconRegistry.GetMenuIcon("Population", 16),
+        "Groupes sociaux" => IconRegistry.GetRankIcon(Demos.Domain.Population.Rank.Executives, 16),
+        "Unités de production" or "Chaîne de production" => IconRegistry.GetCategoryIcon("Production", 16),
+        "Construire" => IconRegistry.GetCategoryIcon("Extraction", 16),
+        "Transport" => IconRegistry.GetCategoryIcon("Logistique", 16),
+        "Statistiques" => IconRegistry.GetProductIcon("Blé", 16),
+        "Projets de recherche" or "Unités de recherche" => IconRegistry.GetMenuIcon("Recherche", 16),
+        "Stocks" => IconRegistry.GetMenuIcon("Ressources", 16),
+        "Revenus" => IconRegistry.GetTreasuryIcon(16),
+        "Commandes" => IconRegistry.GetMenuIcon("Aide", 16),
+        _ => null,
+    };
 
     private static Page Coming(string title, string description) =>
         new(title, () => new TextPage(null, $"À venir.\n\n{description}"));
