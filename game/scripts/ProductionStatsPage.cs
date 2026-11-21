@@ -26,7 +26,10 @@ public partial class ProductionStatsPage : VBoxContainer, IMenuPage
     private readonly ProductionHistory _history = null!;
     private readonly CommuneFocus _focus = null!;
     private readonly OptionButton _product = null!;
-    private readonly List<string> _productIds = [];
+    // Un produit par entrée du menu ; null pour un intertitre de famille.
+    private readonly List<string?> _productIds = [];
+    // Les familles repliées dans le tableau, gardées pour la partie (la page est refaite à chaque ouverture du menu).
+    private static readonly HashSet<string> CollapsedFamilies = [];
     private readonly LineChart _chart = new();
     private readonly Label _title = null!;
     private readonly Label _hint = null!;
@@ -96,6 +99,16 @@ public partial class ProductionStatsPage : VBoxContainer, IMenuPage
             _table.SetColumnExpand(i, i == 0);
         }
 
+        _table.ItemCollapsed += item =>
+        {
+            if (item.GetMetadata(1).AsString() is not { Length: > 0 } family)
+                return;
+            if (item.Collapsed)
+                CollapsedFamilies.Add(family);
+            else
+                CollapsedFamilies.Remove(family);
+        };
+
         _table.ItemSelected += () =>
         {
             if (_table.GetSelected()?.GetMetadata(0).AsString() is { Length: > 0 } id)
@@ -135,28 +148,41 @@ public partial class ProductionStatsPage : VBoxContainer, IMenuPage
             _product.Icon = null;
     }
 
-    /// <summary>Les produits qui ont servi ou sont en stock, par nom ; refait quand il en apparaît un, le choix gardé.</summary>
+    /// <summary>
+    /// Les produits qui ont servi ou sont en stock, rangés par famille (un intertitre par famille), par nom dans chacune ;
+    /// refait quand il en apparaît un, le choix gardé.
+    /// </summary>
     private void FillProducts(IReadOnlyList<ProductFlowView> flows)
     {
-        var products = flows.Select(f => (f.ProductId, f.ProductName)).Distinct().OrderBy(p => p.ProductName).ToList();
-        if (products.Select(p => p.ProductId).SequenceEqual(_productIds))
+        var products = flows.Select(f => (f.ProductId, f.ProductName)).Distinct().ToList();
+        var groups = ProductFamilies.Group(_view, products, p => p.ProductId, p => p.ProductName);
+        var ids = groups.SelectMany(g => g.Items.Select(p => (string?)p.ProductId).Prepend(null)).ToList();
+        if (ids.SequenceEqual(_productIds))
             return;
 
         var selected = SelectedProduct;
         _productIds.Clear();
-        _productIds.AddRange(products.Select(p => p.ProductId));
+        _productIds.AddRange(ids);
         _product.Clear();
-        foreach (var (productId, name) in products)
+        foreach (var (family, items) in groups)
         {
-            var icon = IconRegistry.GetProductIcon(productId, 20) ?? IconRegistry.GetProductIcon(name, 20);
-            if (icon != null)
-                _product.AddIconItem(icon, name);
-            else
-                _product.AddItem(name);
+            _product.AddSeparator(ProductFamilies.NameOf(family));
+            foreach (var (productId, name) in items)
+            {
+                var icon = IconRegistry.GetProductIcon(productId, 20) ?? IconRegistry.GetProductIcon(name, 20);
+                if (icon != null)
+                    _product.AddIconItem(icon, name);
+                else
+                    _product.AddItem(name);
+            }
         }
-        if (_productIds.Count > 0)
+        // Le produit gardé, sinon le premier qui n'est pas un intertitre.
+        var index = selected is null ? -1 : _productIds.IndexOf(selected);
+        if (index < 0)
+            index = _productIds.FindIndex(id => id is not null);
+        if (index >= 0)
         {
-            _product.Select(System.Math.Max(0, selected is null ? 0 : _productIds.IndexOf(selected)));
+            _product.Select(index);
             UpdateProductIcon();
         }
     }
@@ -224,32 +250,51 @@ public partial class ProductionStatsPage : VBoxContainer, IMenuPage
             return;
         }
 
-        foreach (var (productId, name) in products)
+        // Une ligne repliable par famille, sans totaux (des quantités de produits différents ne s'additionnent pas).
+        var shown = products
+            .Select(p => (p.ProductId, p.ProductName,
+                Figures: ProductFigures.Of(now, p.ProductId, communeId).Since(ProductFigures.Of(before, p.ProductId, communeId))))
+            .Where(p => p.Figures.Produced > 0 || p.Figures.Used > 0 || p.Figures.Sent > 0 || p.Figures.Lost > 0
+                || p.Figures.LostInTransit > 0 || p.Figures.InTransit > 0 || p.Figures.Stock > 0)
+            .ToList();
+        foreach (var (family, items) in ProductFamilies.Group(_view, shown, p => p.ProductId, p => p.ProductName))
         {
-            var figures = ProductFigures.Of(now, productId, communeId).Since(ProductFigures.Of(before, productId, communeId));
-            if (figures.Produced <= 0 && figures.Used <= 0 && figures.Sent <= 0 && figures.Lost <= 0 && figures.LostInTransit <= 0
-                && figures.InTransit <= 0 && figures.Stock <= 0)
-                continue;
+            var familyKey = ProductFamilies.KeyOf(family);
+            var familyRow = _table.CreateItem(root);
+            familyRow.SetText(0, $"{ProductFamilies.NameOf(family)} ({items.Count})");
+            familyRow.SetMetadata(0, "");
+            familyRow.SetMetadata(1, familyKey);
+            familyRow.SetSelectable(0, false);
+            familyRow.SetCustomColor(0, UiTheme.Accent);
+            familyRow.Collapsed = CollapsedFamilies.Contains(familyKey);
+            for (var c = 1; c < _table.Columns; c++)
+                familyRow.SetSelectable(c, false);
 
-            var row = _table.CreateItem(root);
-            row.SetMetadata(0, productId);
-
-            var icon = IconRegistry.GetProductIcon(productId, 20) ?? IconRegistry.GetProductIcon(name, 20);
-            row.SetIcon(0, icon);
-            row.SetIconMaxWidth(0, 36);
-            row.SetText(0, name);
-
-            row.SetText(1, $"{figures.Produced:N0}");
-            row.SetText(2, $"{figures.Used:N0}");
-            row.SetText(3, $"{figures.Sent:N0}");
-            row.SetText(4, $"{figures.LostInTransit:N0}");
-            row.SetText(5, $"{figures.Lost:N0}");
-            row.SetText(6, $"{figures.InTransit:N0}");
-            row.SetText(7, $"{figures.Stock:N0}");
-            row.SetText(8, $"{figures.Price:N2}");
-
-            for (var c = 1; c <= 8; c++)
-                row.SetTextAlignment(c, HorizontalAlignment.Right);
+            foreach (var (productId, name, figures) in items)
+                AddProductRow(familyRow, productId, name, figures);
         }
+    }
+
+    private void AddProductRow(TreeItem parent, string productId, string name, ProductFigures figures)
+    {
+        var row = _table.CreateItem(parent);
+        row.SetMetadata(0, productId);
+
+        var icon = IconRegistry.GetProductIcon(productId, 20) ?? IconRegistry.GetProductIcon(name, 20);
+        row.SetIcon(0, icon);
+        row.SetIconMaxWidth(0, 36);
+        row.SetText(0, name);
+
+        row.SetText(1, $"{figures.Produced:N0}");
+        row.SetText(2, $"{figures.Used:N0}");
+        row.SetText(3, $"{figures.Sent:N0}");
+        row.SetText(4, $"{figures.LostInTransit:N0}");
+        row.SetText(5, $"{figures.Lost:N0}");
+        row.SetText(6, $"{figures.InTransit:N0}");
+        row.SetText(7, $"{figures.Stock:N0}");
+        row.SetText(8, $"{figures.Price:N2}");
+
+        for (var c = 1; c <= 8; c++)
+            row.SetTextAlignment(c, HorizontalAlignment.Right);
     }
 }

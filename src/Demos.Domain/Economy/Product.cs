@@ -36,6 +36,31 @@ public sealed record NeedDefinition(string Id, string Name, string? Description 
     public NeedCategory Category => new(Id);
 }
 
+/// <summary>
+/// Les familles de produits, dans l'ordre où l'interface les montre (décidé le 21 novembre 2026). Écrites dans
+/// products.json (« family »), pas déduites des recettes.
+/// </summary>
+public enum ProductFamily
+{
+    /// <summary>Matières premières : ce qu'on extrait ou récolte (blé, bois, minerais, pierre…).</summary>
+    RawMaterial,
+
+    /// <summary>Produits transformés : matières pour d'autres bâtiments (farine, planche, lingots…).</summary>
+    Processed,
+
+    /// <summary>Biens de consommation : ce que les habitants achètent (pain, vêtements, meubles…).</summary>
+    ConsumerGoods,
+
+    /// <summary>Équipement : outils et charrettes des bâtiments et des communes.</summary>
+    Equipment,
+
+    /// <summary>Construction : les matériaux des chantiers.</summary>
+    Construction,
+
+    /// <summary>Énergie et services : énergie, eau, services administratifs et de sécurité, spectacles.</summary>
+    EnergyAndServices,
+}
+
 /// <summary>Bien, service ou matière. Une matière (pierre, bois…) ne couvre aucun besoin.</summary>
 /// <param name="BasePrice">Prix de départ sur le marché ; la formation des prix reste à définir.</param>
 /// <param name="ShelfLifeDays">
@@ -51,9 +76,13 @@ public sealed record NeedDefinition(string Id, string Name, string? Description 
 /// consommé, celui qui le possède en garde un stock qui perd chaque jour 1 ÷ cette durée. Null pour une matière ou un
 /// produit qui se consomme.
 /// </param>
+/// <param name="Family">
+/// La famille du produit, pour ranger les listes de l'interface (décidé le 21 novembre 2026) ; sans effet sur la partie.
+/// Null : rangé dans « Autres ».
+/// </param>
 public sealed record ProductDefinition(
     string Id, string Name, NeedCategory? Need, double BasePrice, double? ShelfLifeDays = null, bool Stockable = true,
-    double? UsageDays = null)
+    double? UsageDays = null, ProductFamily? Family = null)
 {
     public bool IsPerishable => ShelfLifeDays is > 0;
 

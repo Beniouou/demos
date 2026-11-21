@@ -63,9 +63,14 @@ public partial class StocksPage : VBoxContainer, IMenuPage
             SizeFlagsHorizontal = SizeFlags.ExpandFill,
             SizeFlagsVertical = SizeFlags.ExpandFill,
             FocusMode = FocusModeEnum.None,
+            Columns = 2,
         };
+        _tree.SetColumnExpand(0, true);
+        _tree.SetColumnExpand(1, false);
+        _tree.SetColumnCustomMinimumWidth(1, 220);
         _tree.AddThemeColorOverride("font_color", UiTheme.Text);
         _tree.AddThemeStyleboxOverride("panel", new StyleBoxEmpty());
+        _tree.ItemCollapsed += OnItemCollapsed;
         AddChild(_tree);
     }
 
@@ -78,55 +83,132 @@ public partial class StocksPage : VBoxContainer, IMenuPage
         _taxLabel.Text = $"Impôt d'État : {_view.StateTaxRate:P2} par jour";
 
         var communes = _view.Communes();
-        var shape = $"{_view.TreasuryBalance}|" + string.Join(";", communes.Select(c =>
-            $"{c.Id}:{c.Stored}:{c.StorageCapacity}:" + string.Join(",", c.Stock.Select(s => $"{s.Key}={s.Value}"))));
+        // La forme : les communes et leurs produits. Elle seule refait l'arbre ; sinon les chiffres sont mis à jour sur
+        // place, ce qui garde la position de la liste et ce qui est replié.
+        var shape = string.Join(";", communes.Select(c => $"{c.Id}:" + string.Join(",", c.Stock.Keys.Order())));
+        if (shape != _lastShape)
+        {
+            _lastShape = shape;
+            Build(communes);
+        }
+        UpdateFigures(communes);
+    }
 
-        if (shape == _lastShape)
-            return;
-        _lastShape = shape;
+    // Ce qui est déplié, gardé pour la partie (la page est refaite à chaque ouverture du menu). Au premier affichage :
+    // la première commune et ses familles.
+    private static readonly HashSet<string> Expanded = [];
+    private static bool _expandedSet;
+    private readonly Dictionary<string, TreeItem> _items = [];
 
+    private void Build(IReadOnlyList<CommuneView> communes)
+    {
+        if (!_expandedSet && communes.Count > 0)
+        {
+            _expandedSet = true;
+            Expanded.Add(CommuneKey(communes[0].Id));
+            foreach (var family in System.Enum.GetValues<Demos.Domain.Economy.ProductFamily>())
+                Expanded.Add(FamilyKey(communes[0].Id, family));
+            Expanded.Add(FamilyKey(communes[0].Id, null));
+        }
+
+        _items.Clear();
         _tree.Clear();
         var root = _tree.CreateItem();
+        var communeIcon = IconRegistry.GetBuildingIcon("mairie", "Administration", 20);
 
         foreach (var commune in communes)
         {
-            var communeItem = _tree.CreateItem(root);
-            var communeIcon = IconRegistry.GetBuildingIcon("mairie", "Administration", 20);
-            communeItem.SetIcon(0, communeIcon);
-            communeItem.SetIconMaxWidth(0, 36);
-            communeItem.SetText(0, $"{commune.Name.ToUpperInvariant()}   —   Stockage {commune.Stored:N0} / {commune.StorageCapacity:N0}");
+            var communeItem = Row(root, CommuneKey(commune.Id), communeIcon);
             communeItem.SetCustomColor(0, UiTheme.Accent);
+            communeItem.SetCustomColor(1, UiTheme.Muted);
 
             if (commune.Stock.Count == 0)
             {
                 var emptyItem = _tree.CreateItem(communeItem);
-                emptyItem.SetText(0, "  (Stockage vide)");
+                emptyItem.SetText(0, "Stockage vide");
                 emptyItem.SetCustomColor(0, UiTheme.Muted);
                 continue;
             }
 
-            foreach (var item in commune.Stock.OrderBy(i => i.Key))
+            var groups = ProductFamilies.Group(_view, commune.Stock.Keys, id => id, id => ProductFamilies.NameOfProduct(_view, id));
+            foreach (var (family, products) in groups)
             {
-                var productItem = _tree.CreateItem(communeItem);
-                var productIcon = IconRegistry.GetProductIcon(item.Key, 20);
-                productItem.SetIcon(0, productIcon);
-                productItem.SetIconMaxWidth(0, 36);
-
-                var stateQty = commune.StateStock.GetValueOrDefault(item.Key);
-                var stateDetail = stateQty > 0 ? $"   (dont État : {stateQty:N0})" : "";
-                var formattedName = FormatName(item.Key);
-
-                productItem.SetText(0, $"{formattedName} : {item.Value:N0}{stateDetail}");
+                var familyItem = Row(communeItem, FamilyKey(commune.Id, family), IconRegistry.GetProductIcon(products[0], 18));
+                familyItem.SetCustomColor(1, UiTheme.Muted);
+                foreach (var productId in products)
+                {
+                    var productItem = Row(familyItem, ProductKey(commune.Id, productId), IconRegistry.GetProductIcon(productId, 18));
+                    productItem.SetText(0, ProductFamilies.NameOfProduct(_view, productId));
+                }
             }
         }
     }
 
-    private static string FormatName(string raw)
+    /// <summary>Une ligne de l'arbre : repliée selon ce qui est retenu, chiffres à droite (mis par UpdateFigures).</summary>
+    private TreeItem Row(TreeItem parent, string key, Texture2D? icon)
     {
-        if (string.IsNullOrWhiteSpace(raw))
-            return raw;
-        // Met la première lettre en majuscule proprement
-        var clean = raw.Replace('-', ' ');
-        return char.ToUpperInvariant(clean[0]) + clean[1..];
+        var item = _tree.CreateItem(parent);
+        item.SetMetadata(0, key);
+        if (icon is not null)
+        {
+            item.SetIcon(0, icon);
+            item.SetIconMaxWidth(0, 36);
+        }
+        item.SetTextAlignment(1, HorizontalAlignment.Right);
+        // Les lignes de produits n'ont pas d'enfants : seules les communes et les familles se replient.
+        item.Collapsed = !Expanded.Contains(key);
+        _items[key] = item;
+        return item;
     }
+
+    private void UpdateFigures(IReadOnlyList<CommuneView> communes)
+    {
+        foreach (var commune in communes)
+        {
+            if (_items.TryGetValue(CommuneKey(commune.Id), out var communeItem))
+            {
+                Set(communeItem, 0, commune.Name.ToUpperInvariant());
+                Set(communeItem, 1, $"Stockage {commune.Stored:N0} / {commune.StorageCapacity:N0}");
+            }
+
+            foreach (var (family, products) in ProductFamilies.Group(_view, commune.Stock.Keys, id => id, id => id))
+            {
+                if (_items.TryGetValue(FamilyKey(commune.Id, family), out var familyItem))
+                {
+                    Set(familyItem, 0, $"{ProductFamilies.NameOf(family)} ({products.Count})");
+                    Set(familyItem, 1, $"{products.Sum(id => commune.Stock[id]):N0}");
+                }
+                foreach (var productId in products)
+                {
+                    if (!_items.TryGetValue(ProductKey(commune.Id, productId), out var productItem))
+                        continue;
+                    var stateQty = commune.StateStock.GetValueOrDefault(productId);
+                    Set(productItem, 1, stateQty > 0 ? $"{commune.Stock[productId]:N0}   (État {stateQty:N0})" : $"{commune.Stock[productId]:N0}");
+                }
+            }
+        }
+    }
+
+    private static void Set(TreeItem item, int column, string text)
+    {
+        if (item.GetText(column) != text)
+            item.SetText(column, text);
+    }
+
+    private void OnItemCollapsed(TreeItem item)
+    {
+        if (item.GetMetadata(0).AsString() is not { Length: > 0 } key)
+            return;
+        if (item.Collapsed)
+            Expanded.Remove(key);
+        else
+            Expanded.Add(key);
+    }
+
+    private static string CommuneKey(string communeId) => $"commune:{communeId}";
+
+    private static string FamilyKey(string communeId, Demos.Domain.Economy.ProductFamily? family) =>
+        $"famille:{communeId}:{ProductFamilies.KeyOf(family)}";
+
+    private static string ProductKey(string communeId, string productId) => $"produit:{communeId}:{productId}";
 }

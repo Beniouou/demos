@@ -124,6 +124,9 @@ public sealed class GameView(Simulation simulation)
             .ToList();
     }
 
+    /// <summary>Le catalogue des produits (nom, famille…), dans l'ordre du fichier.</summary>
+    public IReadOnlyList<ProductDefinition> Products() => World.Products;
+
     /// <summary>
     /// Les totaux de chaque produit dans chaque commune depuis le début de la partie : produit, utilisé (achats des
     /// habitants, matières et énergie des bâtiments, chantiers), envoyé vers une autre commune, perdu au stockage, perdu en

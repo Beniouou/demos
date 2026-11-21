@@ -84,6 +84,9 @@ selon `Simulation.PlanConstruction` (`ConstructionPlan` : réserve, stock de l'�
 100 % (`BuildingType.Sized`, `ConstructionQuantity`, réglages `buildingMinUnits/Materials`) ; zones limitées (`Map/ZoneCapacity`,
 `World.ZoneUsage` / `ZoneProblem`, rayon `zoneRadius`, densités `zoneDensityFertile/Forest/Deposit`) ; les outils comptent dans
 `Trade.BuildingDemand`. Interface : `ConstructionPage` (taille − +, origine des matériaux, zone vérifiée à la pose).
+Familles de produits (21 novembre 2026, sans effet sur la partie) : `ProductDefinition.Family` (`ProductFamily`, champ
+`family` de `products.json`, test `Chaque_produit_a_une_famille`) ; noms et rangement dans `game/scripts/ProductFamilies.cs` ;
+Ressources → Stocks (`StocksPage`) et Communes → Statistiques (`ProductionStatsPage`) rangés par famille, repliables.
 Objets durables (20 novembre 2026) : `ProductDefinition.UsageDays` (vêtements, meubles, poterie, outils, charrette) ;
 habitants : `SocialClass.Possessions`, possession visée `possessionByRank`, rachat de l'usure + `possessionCatchUp` du manque
 (`Consumption`, seulement si le produit a une durée d'usage), équipés au départ (`Consumption.EquipFully`) ; bâtiments :
