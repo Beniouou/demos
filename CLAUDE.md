@@ -210,7 +210,10 @@ désactivés : TVA sur la valeur ajoutée, épargne progressive des entreprises.
   bâtiment d'extraction au-delà du ressort de la commune, `World.ExtractionSiteProblem`) — 23 novembre 2026 ; voter une loi peut se
   faire à crédit (`LegitimacyPool.TrySpendOnCredit`, plafond `legitimacyMaxDebt` 100, constante DetteLegitimite) : un pôle en
   dette ne paie rien d'autre (`TrySpend` refuse) ; la légitimité produite par les lois acceptées est un réglage (`legitimacyPerMemberPerDay`
-  0,0001, constante LegitimiteParMembre), séparé du taux du coût des lois (`lawCostPerMemberPerDay` 0,001, LoiCoutParMembre) ;
+  0,0001, constante LegitimiteParMembre), séparé du taux du coût des lois (`lawCostPerMemberPerDay` 0,001, LoiCoutParMembre) ; la légitimité
+  s'use (`LegitimacyPool.Erode`, chaque mois, `legitimacyYearlyErosion` 10 %) ; les coûts fixes suivent la nation
+  (`Simulation.NationCostScale` : fonder, rattacher), les habitants regroupés (`PrefectureLegitimacyCostOf`) ou les emplois
+  (`BuildingLegitimacyCost` : vendre, nationaliser) ;
   la touche C et le bouton « Camp de base » y mènent (`MainMenu.ShowCommuneCreation`). Puis la carte passe en mode pose
   (`MapCanvas.PlacementRequest`, sans zones, avec `ExclusionRadius` : cercles rouges autour des communes) ;
   `PlayerDesk.FoundCommune` (`PlayerDesk.Communes.cs`) fonde et explique un refus.

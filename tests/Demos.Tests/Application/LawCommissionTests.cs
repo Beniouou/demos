@@ -135,9 +135,10 @@ public class LawCommissionTests
         Assert.Equal(LawVoteOutcome.Voted, simulation.TryVote(draftId));
 
         Assert.True(simulation.CancelVote(draftId));
-        AdvanceDays(simulation, 31);
-
         Assert.Equal(100, simulation.World.Legitimacy[EC], precision: 6);
+
+        // Le 1er du mois, rien n'entre en vigueur (la légitimité, elle, commence à s'user).
+        AdvanceDays(simulation, 31);
         Assert.Empty(simulation.World.Laws);
         Assert.Single(simulation.World.LawCommission.Drafts);
     }

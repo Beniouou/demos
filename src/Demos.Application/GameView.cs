@@ -516,7 +516,7 @@ public sealed partial class GameView(Simulation simulation)
             type?.Construction?.Quantity ?? 0,
             type?.Construction?.Days ?? 0,
             settings.PrefectureLegitimacyCost,
-            settings.AttachLegitimacyCost,
+            settings.AttachLegitimacyCost * Simulation.NationCostScaleOf(World),
             settings.PrefectureMinimumMembers,
             type?.Jobs ?? 0,
             settings.PrefectureJobsPerEntity,

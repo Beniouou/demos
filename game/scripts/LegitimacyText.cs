@@ -30,6 +30,7 @@ public static class LegitimacyText
             LegitimacySpendingKind.Prefecture => $"Création de la préfecture {subject}",
             LegitimacySpendingKind.Attach => $"Rattachement de {subject}",
             LegitimacySpendingKind.Sale => $"Vente de {subject}",
+            LegitimacySpendingKind.Erosion => "Usure : la légitimité s'use avec le temps",
             _ => $"Nationalisation de {subject}",
         };
     }

@@ -277,8 +277,31 @@ public sealed class Simulation(World world, GameClock clock)
     /// <summary>Outil d'administration : fixe le prix d'un produit dans toutes les communes.</summary>
     public void SetPrice(string productId, double price) => World.SetPrice(productId, price);
 
-    /// <summary>Proposition : vendre un bâtiment public coûte 10 de légitimité libérale (LI).</summary>
-    public const double SaleLegitimacyCost = 10;
+    /// <summary>Coût de base d'une vente au privé en légitimité LI, pour un bâtiment de référence (réglage).</summary>
+    public static double SaleLegitimacyCost => Balance.Current.SaleLegitimacyCost;
+
+    /// <summary>La population de la nation : tous les membres de toutes les classes.</summary>
+    public double NationPopulation => World.Classes.Sum(c => (double)c.Population);
+
+    /// <summary>
+    /// La taille de la nation par rapport à la population de référence, au moins 1 : les coûts fixes en légitimité
+    /// (fonder, rattacher) la suivent (décidé le 23 novembre 2026).
+    /// </summary>
+    public double NationCostScale => NationCostScaleOf(World);
+
+    /// <summary>La taille d'une nation par rapport à la population de référence, au moins 1.</summary>
+    public static double NationCostScaleOf(World world) =>
+        Math.Max(1, world.Classes.Sum(c => (double)c.Population) / Balance.Current.LegitimacyCostReferencePopulation);
+
+    /// <summary>
+    /// Le coût en légitimité d'une action sur un bâtiment (vendre, nationaliser) : son coût de base, au prorata de ses
+    /// emplois par rapport au bâtiment de référence, au moins le coût minimal d'une brique (décidé le 23 novembre 2026).
+    /// </summary>
+    public static double BuildingLegitimacyCost(double baseCost, Structure building) =>
+        Math.Max(Balance.Current.MinimumBrickCost, baseCost * building.JobCapacity / Balance.Current.LegitimacyCostReferenceJobs);
+
+    /// <summary>Ce que coûte la vente de ce bâtiment au privé, en légitimité LI.</summary>
+    public double SaleLegitimacyCostOf(Structure building) => BuildingLegitimacyCost(SaleLegitimacyCost, building);
 
     /// <summary>Pôle d'une vente au privé : libéral (LI).</summary>
     public static readonly Orientation SalePole = new(IdeologicalAxis.Property, Pole.B);
@@ -305,7 +328,7 @@ public sealed class Simulation(World world, GameClock clock)
         // Sans loi qui autorise le privé à cet endroit, on ne vend qu'à des ouvriers (en SCOP).
         if (Privatization.OwnershipFor(buyer) == Ownership.Private && !PrivateCompaniesAllowed(building))
             return SaleOutcome.PrivateForbidden;
-        if (!World.Legitimacy.TrySpend(SalePole, SaleLegitimacyCost, LegitimacySpendingKind.Sale, buildingId))
+        if (!World.Legitimacy.TrySpend(SalePole, SaleLegitimacyCostOf(building), LegitimacySpendingKind.Sale, buildingId))
             return SaleOutcome.NotEnoughLegitimacy;
 
         buyer.Wealth -= price;
@@ -361,7 +384,7 @@ public sealed class Simulation(World world, GameClock clock)
         Nationalization.PriceOf(mode, IsStruggling(building), DailyProfitOf(building));
 
     public double NationalizationLegitimacyCostOf(Structure building, NationalizationMode mode) =>
-        Nationalization.LegitimacyCostOf(mode, IsStruggling(building));
+        BuildingLegitimacyCost(Nationalization.LegitimacyCostOf(mode, IsStruggling(building)), building);
 
     /// <summary>
     /// Action du joueur : reprendre un bâtiment privé ou coopératif, par rachat (le trésor paie le propriétaire) ou
@@ -398,7 +421,7 @@ public sealed class Simulation(World world, GameClock clock)
     /// que votent les lois qui la couvrent.
     /// </summary>
     public double FoundingLegitimacyCostOf(string payingCommuneId) =>
-        Balance.Current.BaseCampLegitimacyCost * World.LawBook.FoundingCostFactor(payingCommuneId);
+        Balance.Current.BaseCampLegitimacyCost * NationCostScale * World.LawBook.FoundingCostFactor(payingCommuneId);
 
     /// <summary>Vrai si les lois qui couvrent cette commune autorisent l'expansion (brique « Extension »).</summary>
     public bool AllowsExtension(string communeId) => World.LawBook.AllowsExtension(communeId);
@@ -463,11 +486,28 @@ public sealed class Simulation(World world, GameClock clock)
     }
 
     /// <summary>
+    /// Ce que coûte une préfecture qui regroupe ces entités : son coût de base, au prorata des habitants qu'elle regroupe
+    /// par rapport à la population de référence, au moins le coût de base (décidé le 23 novembre 2026).
+    /// </summary>
+    public double PrefectureLegitimacyCostOf(IEnumerable<string> memberIds)
+    {
+        var members = memberIds.Distinct().ToList();
+        var inhabitants = World.Communes
+            .Where(c => members.Any(m => StructureTree.IsWithin(c, m, World.Structures)))
+            .Sum(c => World.Residents(c.Id));
+        var settings = Balance.Current;
+        return settings.PrefectureLegitimacyCost * Math.Max(1, inhabitants / settings.LegitimacyCostReferencePopulation);
+    }
+
+    /// <summary>Ce que coûte un rattachement : son coût de base, qui suit la taille de la nation.</summary>
+    public double AttachLegitimacyCost => Balance.Current.AttachLegitimacyCost * NationCostScale;
+
+    /// <summary>
     /// Action du joueur : fonder une préfecture dans <paramref name="parentId"/> (l'État ou une préfecture), qui regroupe
     /// les entités choisies (communes ou préfectures, au moins 2), gratuitement rattachées. Son bâtiment se construit dans
     /// le chef-lieu, une commune contenue dans ces entités, qui paie le chantier ; ses emplois sont ceux du type plus 5 par
-    /// entité contenue, payés par le trésor de l'État. Elle coûte de la légitimité dans le pôle choisi, sans charte.
-    /// Renvoie null, sans rien dépenser, si c'est impossible.
+    /// entité contenue, payés par le trésor de l'État. Elle coûte de la légitimité dans le pôle choisi (voir
+    /// <see cref="PrefectureLegitimacyCostOf"/>), sans charte. Renvoie null, sans rien dépenser, si c'est impossible.
     /// </summary>
     public Structure? TryFoundPrefecture(
         string name,
@@ -493,7 +533,7 @@ public sealed class Simulation(World world, GameClock clock)
             || !members.Any(m => StructureTree.IsWithin(seat, m!.Id, structures))
             || !World.BuildingTypes.TryGetValue(PrefectureTypeId, out var type)
             || !type.CanBeBuilt
-            || World.Legitimacy[legitimacyPole] < settings.PrefectureLegitimacyCost)
+            || World.Legitimacy[legitimacyPole] < PrefectureLegitimacyCostOf(memberIds))
             return null;
 
         var number = 1;
@@ -508,7 +548,7 @@ public sealed class Simulation(World world, GameClock clock)
                 World.MarketOf(seatCommuneId), World.ConstructionReserveOf(seatCommuneId)))
             return null;
 
-        World.Legitimacy.TrySpend(legitimacyPole, settings.PrefectureLegitimacyCost, LegitimacySpendingKind.Prefecture, prefecture.Id);
+        World.Legitimacy.TrySpend(legitimacyPole, PrefectureLegitimacyCostOf(memberIds), LegitimacySpendingKind.Prefecture, prefecture.Id);
         World.AddStructure(prefecture);
         foreach (var member in members)
             World.UpdateStructure(member! with { ParentId = prefecture.Id });
@@ -525,7 +565,7 @@ public sealed class Simulation(World world, GameClock clock)
     public bool TryAttach(string entityId, string newParentId, Orientation legitimacyPole)
     {
         if (!CanAttach(entityId, newParentId)
-            || !World.Legitimacy.TrySpend(legitimacyPole, Balance.Current.AttachLegitimacyCost, LegitimacySpendingKind.Attach, entityId))
+            || !World.Legitimacy.TrySpend(legitimacyPole, AttachLegitimacyCost, LegitimacySpendingKind.Attach, entityId))
             return false;
 
         World.UpdateStructure(World.Structures[entityId] with { ParentId = newParentId });
@@ -1053,6 +1093,9 @@ public sealed class Simulation(World world, GameClock clock)
     private void RunMonthlyCalculations()
     {
         EnactVotedLaws();
+
+        // La légitimité s'use (décidé le 23 novembre 2026) : un douzième de l'usure annuelle, chaque mois.
+        World.Legitimacy.Erode(1 - Math.Pow(1 - Balance.Current.LegitimacyYearlyErosion, 1.0 / 12));
 
         // Le trafic du mois fini (entre communes, et entre un bâtiment posé et sa commune) crée ou améliore les routes,
         // si la structure qui les paie en a les moyens.

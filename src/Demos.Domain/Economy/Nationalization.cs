@@ -36,9 +36,10 @@ public static class Nationalization
     /// <summary>Prix plancher d'un rachat.</summary>
     public const double MinimumPrice = 1_000;
 
-    public const double StrugglingLegitimacyCost = 5;
-    public const double ThrivingLegitimacyCost = 25;
-    public const double ExpropriationLegitimacyCost = 60;
+    // Coûts de base en légitimité CO, pour un bâtiment de référence (réglages ; la simulation les fait suivre les emplois).
+    public static double StrugglingLegitimacyCost => Balance.Current.NationalizationStrugglingLegitimacyCost;
+    public static double ThrivingLegitimacyCost => Balance.Current.NationalizationThrivingLegitimacyCost;
+    public static double ExpropriationLegitimacyCost => Balance.Current.ExpropriationLegitimacyCost;
 
     public static double PriceOf(NationalizationMode mode, bool struggling, double dailyProfit) => mode switch
     {

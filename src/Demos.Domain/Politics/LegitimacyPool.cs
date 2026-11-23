@@ -54,6 +54,20 @@ public sealed class LegitimacyPool
             Ledger.RecordSpending(new LegitimacySpending(Clock(), pole, amount, spending, subject));
     }
 
+    /// <summary>
+    /// L'usure de la légitimité (décidé le 23 novembre 2026) : chaque pôle perd cette part de son stock positif ; une dette
+    /// ne s'use pas. La perte est notée au relevé.
+    /// </summary>
+    public void Erode(double share)
+    {
+        foreach (var (pole, stock) in _stocks.Where(s => s.Value > 0).ToList())
+        {
+            var lost = stock * share;
+            _stocks[pole] = stock - lost;
+            Note(pole, lost, LegitimacySpendingKind.Erosion, "");
+        }
+    }
+
     /// <summary>Vrai si le pôle peut payer ce montant en s'endettant au plus de <paramref name="maxDebt"/> (voter à crédit).</summary>
     public bool CanSpendOnCredit(Orientation pole, double amount, double maxDebt) => this[pole] - amount >= -maxDebt - 1e-9;
 

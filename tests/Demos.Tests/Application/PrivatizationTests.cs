@@ -29,6 +29,7 @@ public class PrivatizationTests
         var treasuryBefore = world.Treasury.Balance;
         var cadresBefore = world.ClassesById["cadres"].Wealth;
         var legitimacyBefore = world.Legitimacy[Simulation.SalePole];
+        var saleCost = simulation.SaleLegitimacyCostOf(world.Structures["camp-forestier"]);
 
         var outcome = simulation.TrySellBuilding("camp-forestier", "cadres", 10_000);
 
@@ -37,7 +38,7 @@ public class PrivatizationTests
         Assert.Equal("cadres", world.Structures["camp-forestier"].OwnerClassId);
         Assert.Equal(treasuryBefore + 10_000, world.Treasury.Balance, precision: 6);
         Assert.Equal(cadresBefore - 10_000, world.ClassesById["cadres"].Wealth, precision: 6);
-        Assert.Equal(legitimacyBefore - Simulation.SaleLegitimacyCost, world.Legitimacy[Simulation.SalePole], precision: 6);
+        Assert.Equal(legitimacyBefore - saleCost, world.Legitimacy[Simulation.SalePole], precision: 6);
 
         // Vendre ne crée pas de loi.
         Assert.DoesNotContain(world.Laws, l => l.Id.Contains("camp-forestier"));

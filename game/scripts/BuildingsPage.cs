@@ -154,14 +154,14 @@ public partial class BuildingsPage : HBoxContainer, IMenuPage
         _jobsNote.Text = $"Capacité {sheet.JobCapacity:N0}. Aujourd'hui {sheet.Jobs:N0} postes ouverts"
             + (sheet.JobsSetByPlayer ? ", fixés à la main." : ", réglés automatiquement (licenciements et embauches chaque mois).");
         _saleNote.Text =
-            $"Au plus {sheet.MaximumSalePrice:N0} (un an de bénéfice attendu). Coûte {Simulation.SaleLegitimacyCost} de légitimité LI " +
+            $"Au plus {sheet.MaximumSalePrice:N0} (un an de bénéfice attendu). Coûte {sheet.SaleLegitimacyCost:0.#} de légitimité LI, selon ses emplois " +
             $"(disponible : {sheet.SaleLegitimacyAvailable:F1}).";
         _sell.Disabled = _buyerIds.Count == 0;
         if (sheet is { Buyout: { } buyout, Expropriation: { } expropriation })
             _nationalizationNote.Text =
                 $"Entreprise {(sheet.IsStruggling ? "en difficulté" : "qui paie ses salaires")}.\n" +
-                $"Rachat : {buyout.Price:N0} du trésor et {buyout.LegitimacyCost} de légitimité CO.\n" +
-                $"Expropriation : sans payer, {expropriation.LegitimacyCost} de légitimité CO.\n" +
+                $"Rachat : {buyout.Price:N0} du trésor et {buyout.LegitimacyCost:0.#} de légitimité CO.\n" +
+                $"Expropriation : sans payer, {expropriation.LegitimacyCost:0.#} de légitimité CO.\n" +
                 $"(Légitimité CO disponible : {sheet.NationalizationLegitimacyAvailable:F1})";
     }
 

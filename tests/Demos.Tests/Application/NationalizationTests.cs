@@ -12,7 +12,7 @@ public class NationalizationTests
         var simulation = PrototypeScenario.Create(GameData.Content());
         for (var day = 0; day < 5; day++)
             simulation.AdvanceDay();
-        simulation.World.Legitimacy.Add(Simulation.NationalizationPole, 100);
+        simulation.World.Legitimacy.Add(Simulation.NationalizationPole, 1_000);
         simulation.World.Treasury.Deposit(10_000_000);
         return simulation;
     }
@@ -45,6 +45,7 @@ public class NationalizationTests
         var simulation = Prototype();
         MakeStruggling(simulation, "atelier");
         var atelier = simulation.World.Structures["atelier"];
+        var legitimacyCost = simulation.NationalizationLegitimacyCostOf(atelier, NationalizationMode.Buyout);
         var expected = Math.Max(Nationalization.MinimumPrice, simulation.DailyProfitOf(atelier) * Nationalization.StrugglingProfitDays);
         var cadresBefore = simulation.World.ClassesById["cadres"].Wealth;
         var fundBefore = simulation.World.CompanyFundOf("atelier").Balance;
@@ -56,7 +57,7 @@ public class NationalizationTests
         Assert.Null(simulation.World.Structures["atelier"].OwnerClassId);
         // Les cadres touchent le prix, plus ce qui restait dans la caisse de l'atelier.
         Assert.Equal(cadresBefore + expected + fundBefore, simulation.World.ClassesById["cadres"].Wealth, precision: 6);
-        Assert.Equal(legitimacyBefore - Nationalization.StrugglingLegitimacyCost, simulation.World.Legitimacy[Simulation.NationalizationPole], precision: 6);
+        Assert.Equal(legitimacyBefore - legitimacyCost, simulation.World.Legitimacy[Simulation.NationalizationPole], precision: 6);
         // Nationaliser ne crée pas de loi.
         Assert.DoesNotContain(simulation.World.Laws, l => l.Id.Contains("atelier"));
     }
@@ -72,8 +73,9 @@ public class NationalizationTests
         MakeStruggling(simulation, "atelier");
 
         Assert.True(thrivingPrice >= simulation.NationalizationPriceOf(atelier, NationalizationMode.Buyout));
-        Assert.Equal(Nationalization.ThrivingLegitimacyCost, thrivingCost);
-        Assert.Equal(Nationalization.StrugglingLegitimacyCost, simulation.NationalizationLegitimacyCostOf(atelier, NationalizationMode.Buyout));
+        // Les coûts de base suivent les emplois du bâtiment (décidé le 23 novembre 2026).
+        Assert.Equal(Simulation.BuildingLegitimacyCost(Nationalization.ThrivingLegitimacyCost, atelier), thrivingCost, precision: 9);
+        Assert.Equal(Simulation.BuildingLegitimacyCost(Nationalization.StrugglingLegitimacyCost, atelier), simulation.NationalizationLegitimacyCostOf(atelier, NationalizationMode.Buyout), precision: 9);
     }
 
     [Fact]
@@ -84,13 +86,14 @@ public class NationalizationTests
         var fundBefore = simulation.World.CompanyFundOf("atelier").Balance;
         var communeFundBefore = simulation.World.CommuneFundOf("commune-1").Balance;
         var cadresBefore = simulation.World.ClassesById["cadres"].Wealth;
+        var expropriationCost = simulation.NationalizationLegitimacyCostOf(simulation.World.Structures["atelier"], NationalizationMode.Expropriation);
         var legitimacyBefore = simulation.World.Legitimacy[Simulation.NationalizationPole];
 
         Assert.Equal(NationalizationOutcome.Done, simulation.TryNationalize("atelier", NationalizationMode.Expropriation));
 
         Assert.Equal(treasuryBefore, simulation.World.Treasury.Balance, precision: 6);
         Assert.Equal(cadresBefore, simulation.World.ClassesById["cadres"].Wealth, precision: 6);
-        Assert.Equal(legitimacyBefore - Nationalization.ExpropriationLegitimacyCost, simulation.World.Legitimacy[Simulation.NationalizationPole], precision: 6);
+        Assert.Equal(legitimacyBefore - expropriationCost, simulation.World.Legitimacy[Simulation.NationalizationPole], precision: 6);
 
         // La caisse de l'atelier va à la commune, pas aux cadres.
         Assert.True(fundBefore > 0);

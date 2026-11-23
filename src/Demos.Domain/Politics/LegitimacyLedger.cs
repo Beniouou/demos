@@ -10,6 +10,9 @@ public enum LegitimacySpendingKind
     Attach,
     Sale,
     Nationalization,
+
+    /// <summary>L'usure mensuelle du stock (décidé le 23 novembre 2026).</summary>
+    Erosion,
 }
 
 /// <summary>Une part du gain d'un jour : ce qu'un groupe a produit dans un pôle en acceptant une loi.</summary>

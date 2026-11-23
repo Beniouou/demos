@@ -125,7 +125,7 @@ public partial class EntityCreationPage : VBoxContainer, IMenuPage
         var cost = _view.PrefectureCost();
         _foundCost.Text =
             $"Coût : {cost.MaterialQuantity:N0} {cost.MaterialProductId}, payés par le chef-lieu, et {cost.ConstructionDays} jours de chantier ; "
-            + $"{cost.FoundingLegitimacy:0.#} de légitimité dans le pôle choisi. Au moins {cost.MinimumMembers} entités. "
+            + $"{cost.FoundingLegitimacy:0.#} de légitimité dans le pôle choisi, plus si les entités regroupées dépassent {Balance.Current.LegitimacyCostReferencePopulation:N0} habitants (au prorata). Au moins {cost.MinimumMembers} entités. "
             + $"Emplois : {cost.BaseJobs} + {cost.JobsPerEntity} par entité regroupée, à {cost.WageBillPerJob:0.##} par emploi et par jour, "
             + "payés par le trésor.";
         FillPoles(_foundPole, cost.FoundingLegitimacy);

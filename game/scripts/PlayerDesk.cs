@@ -48,6 +48,7 @@ public sealed partial class PlayerDesk(Simulation simulation)
                 .Select(c => new BuyerEntry(c.Id, $"{c.Name} ({c.Wealth:N0})"))
                 .ToList(),
             Privatization.MaximumPriceOf(simulation.DailyProfitOf(building)),
+            simulation.SaleLegitimacyCostOf(building),
             World.Legitimacy[Simulation.SalePole],
             isPublic ? null : OfferOf(building, NationalizationMode.Buyout),
             isPublic ? null : OfferOf(building, NationalizationMode.Expropriation),
@@ -63,7 +64,7 @@ public sealed partial class PlayerDesk(Simulation simulation)
             SaleOutcome.BuyerNotInCommune => "L'acheteur ne vit pas dans la commune du bâtiment.",
             SaleOutcome.BuyerTooPoor => "L'acheteur n'a pas assez d'argent.",
             SaleOutcome.PriceAboveProfit => "Trop cher : le prix dépasse un an de bénéfice attendu.",
-            _ => $"Pas assez de légitimité LI (il en faut {Simulation.SaleLegitimacyCost}).",
+            _ => $"Pas assez de légitimité LI (il en faut {simulation.SaleLegitimacyCostOf(World.Structures[buildingId]):0.#}).",
         };
 
     /// <summary>Reprend une entreprise privée ou coopérative : rachat payé par le trésor, ou expropriation sans payer.</summary>
@@ -214,8 +215,9 @@ public sealed partial class PlayerDesk(Simulation simulation)
             return "Donnez un nom à la préfecture.";
         if (memberIds.Count < settings.PrefectureMinimumMembers)
             return $"Une préfecture regroupe au moins {settings.PrefectureMinimumMembers} entités.";
-        if (World.Legitimacy[pole] < settings.PrefectureLegitimacyCost)
-            return $"Pas assez de légitimité {pole.Code} (il en faut {settings.PrefectureLegitimacyCost:0.#}).";
+        var cost = simulation.PrefectureLegitimacyCostOf(memberIds);
+        if (World.Legitimacy[pole] < cost)
+            return $"Pas assez de légitimité {pole.Code} (il en faut {cost:0.#}, selon les habitants regroupés).";
 
         return simulation.TryFoundPrefecture(name.Trim(), parentId, memberIds, seatCommuneId, PaymentMode.StockFirst, pole) is { } prefecture
             ? $"{prefecture.Name} fondée : son bâtiment est en chantier dans le chef-lieu."
@@ -230,7 +232,7 @@ public sealed partial class PlayerDesk(Simulation simulation)
             return "Rattachement impossible : déjà là, boucle, ou chef-lieu qui quitterait sa préfecture.";
         return simulation.TryAttach(entityId, newParentId, pole)
             ? "Rattachement fait."
-            : $"Pas assez de légitimité {pole.Code} (il en faut {Balance.Current.AttachLegitimacyCost:0.#}).";
+            : $"Pas assez de légitimité {pole.Code} (il en faut {simulation.AttachLegitimacyCost:0.#}).";
     }
 
     private NationalizationOffer OfferOf(Structure building, NationalizationMode mode) =>
@@ -369,6 +371,7 @@ public sealed record BuildingSheet(
     int HeatingIndex,
     IReadOnlyList<BuyerEntry> Buyers,
     double MaximumSalePrice,
+    double SaleLegitimacyCost,
     double SaleLegitimacyAvailable,
     NationalizationOffer? Buyout,
     NationalizationOffer? Expropriation,

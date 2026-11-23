@@ -284,6 +284,37 @@ public sealed record BalanceSettings
     /// </summary>
     public double LegitimacyMaxDebt { get; init; } = 100;
 
+    /// <summary>
+    /// Usure de la légitimité (décidé le 23 novembre 2026, proposition) : part du stock positif de chaque pôle perdue en un
+    /// an, retirée un douzième chaque mois. Une dette ne s'use pas.
+    /// </summary>
+    public double LegitimacyYearlyErosion { get; init; } = 0.1;
+
+    /// <summary>
+    /// Population de la nation à laquelle les coûts fixes valent leur coût de base (fonder une commune, rattacher) :
+    /// au-delà, ils grandissent avec elle (décidé le 23 novembre 2026, proposition). Une préfecture se mesure aux
+    /// habitants qu'elle regroupe.
+    /// </summary>
+    public double LegitimacyCostReferencePopulation { get; init; } = 5000;
+
+    /// <summary>
+    /// Emplois d'un bâtiment pour lesquels vendre ou nationaliser vaut son coût de base : le coût suit les emplois du
+    /// bâtiment, au moins le coût minimal d'une brique (décidé le 23 novembre 2026, proposition).
+    /// </summary>
+    public double LegitimacyCostReferenceJobs { get; init; } = 200;
+
+    /// <summary>Vendre un bâtiment public au privé : légitimité LI, pour un bâtiment de référence.</summary>
+    public double SaleLegitimacyCost { get; init; } = 10;
+
+    /// <summary>Racheter une entreprise en difficulté : légitimité CO, pour un bâtiment de référence.</summary>
+    public double NationalizationStrugglingLegitimacyCost { get; init; } = 5;
+
+    /// <summary>Racheter une entreprise qui marche : légitimité CO, pour un bâtiment de référence.</summary>
+    public double NationalizationThrivingLegitimacyCost { get; init; } = 25;
+
+    /// <summary>Exproprier : légitimité CO, pour un bâtiment de référence.</summary>
+    public double ExpropriationLegitimacyCost { get; init; } = 60;
+
     /// <summary>Pollution par habitant et par jour au-delà de laquelle une commune est polluée.</summary>
     public double PollutedThreshold { get; init; } = 0.1;
 
