@@ -98,6 +98,8 @@ public partial class Main : Node
                 // joué, tassés à un par mois au-delà d'un an (décidé le 21 novembre 2026).
                 _hud.Menu.ProductionHistory.Record(_view);
                 _hud.Menu.History.Record(_view);
+                // Le stock de légitimité (Population → Légitimité) : chaque jour, tassé à un par mois au-delà de 30 jours.
+                _hud.Menu.LegitimacyHistory.Record(_view);
                 ShowRoadChanges();
             }
 

@@ -12,7 +12,7 @@ namespace Demos.Application;
 /// donc rien y changer. Lire ne crée rien non plus (ni caisse, ni marché). Les actions du joueur passent par
 /// <see cref="Simulation"/>.
 /// </summary>
-public sealed class GameView(Simulation simulation)
+public sealed partial class GameView(Simulation simulation)
 {
     private World World => simulation.World;
 

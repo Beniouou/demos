@@ -107,6 +107,7 @@ public partial class MainMenu : HBoxContainer
                 new("Besoins", () => new PopulationNeedsPage(view)),
                 new("Groupes et attentes", () => new PopulationGroupsPage(view)),
                 new("Évolution", () => new PopulationHistoryPage(view, History)),
+                new("Légitimité", () => new LegitimacyPage(view, LegitimacyHistory)),
             ], Wide: true),
             // Le menu d'une commune (décidé le 20 novembre 2026) : tous ses onglets montrent la commune choisie au-dessus d'eux
             // (Focus), la même quand on change d'onglet.
@@ -118,6 +119,7 @@ public partial class MainMenu : HBoxContainer
                 new("Chaîne de production", () => new ProductionChainPage(view, ShowBuilding, Focus)),
                 new("Statistiques", () => new ProductionStatsPage(view, ProductionHistory, Focus)),
                 new("Habitants", () => new PopulationOverviewPage(view, Focus)),
+                new("Légitimité", () => new CommuneLegitimacyPage(view, Focus)),
             ], Wide: true),
             new("Recherche",
             [
@@ -205,6 +207,9 @@ public partial class MainMenu : HBoxContainer
 
     /// <summary>Le relevé mensuel des produits, montré dans Communes → Statistiques (pris par <see cref="Main"/>).</summary>
     public ProductionHistory ProductionHistory { get; } = new();
+
+    /// <summary>Le relevé du stock de légitimité, montré dans Population → Légitimité (pris par <see cref="Main"/>).</summary>
+    public LegitimacyHistory LegitimacyHistory { get; } = new();
 
     public void Close()
     {

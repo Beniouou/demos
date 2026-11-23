@@ -225,6 +225,15 @@ désactivés : TVA sur la valeur ajoutée, épargne progressive des entreprises.
   Relevés sans effet sur la partie : `SocialClass.NeedDetails` (`NeedRecord`, par `Consumption`) et `LawStances`
   (`LawStance`, par `LawEffects`), lus par `SocialClassView.NeedDetails` / `LawStances` (`LawStanceView`).
   L'ancienne vue d'ensemble est devenue Communes → Habitants (`PopulationOverviewPage(view, Focus)`).
+- Légitimité (23 novembre 2026) : Population → « Légitimité » (`LegitimacyPage` : par pôle stock, gain/jour, gagné,
+  dépensé et solde sur 30 jours ; gain par loi et par pôle ; dépenses récentes ; courbe du stock, `LegitimacyHistory`
+  relevé par `Main` chaque jour, un point par jour sur 30 jours puis un par mois) et Communes → « Légitimité »
+  (`CommuneLegitimacyPage` : produit de la commune et sa part du pays, par pôle, par groupe, par loi avec
+  `GameView.LawEfficiencyIn`). Relevé sans effet sur la partie : `LegitimacyLedger` (dans `LegitimacyPool.Ledger`,
+  30 jours) note les gains (`LegitimacyPool.Earn`, appelé par `LawEffects`, jour ouvert par `Simulation` avec
+  `BeginDay`) et les dépenses avec leur motif (`LegitimacySpendingKind`, paramètre des `TrySpend`/`TrySpendOnCredit`,
+  et `Add` pour un vote annulé) ; lu par `GameView.LegitimacyLedger()` (`GameView.Legitimacy.cs`). Textes et bulles
+  dans `LegitimacyText.cs`. `LineChart` descend sous 0 quand une valeur est négative (pôle en dette).
   Chiffres agrégés dans `PopulationStats.cs` (`NeedCells`, `UnemployedByRank`, `AdhesionByPole`, `NeedsByRank`), bulles d'aide (règles et constantes du
   moteur) dans `PopulationText.cs`. Graphiques dessinés par Godot, réutilisables : `LineChart` (courbes, axe serré
   autour des relevés sauf pour une part, survol) et `StackedBar` (barre en parts) ; couleurs `UiTheme.SeriesColor`.
@@ -296,8 +305,8 @@ désactivés : TVA sur la valeur ajoutée, épargne progressive des entreprises.
   Priorité des lignes : `World.MoveSupplyLine`. Actions : `Simulation.SetSupplySettings`, `MoveSupplyLine`, par
   `PlayerDesk.Supply.cs`. Interface : `PurchaseSalePanel` et ↑ ↓ dans `SupplyLinesPanel` (Unités de production) ;
   fournisseur écarté barré dans `FlowDiagram` (`FlowEndView.Blocked`). Lecture : `GameView.SupplySettingsOf`.
-- Menu Communes (20 novembre 2026, ex-menu Production) : ses cinq onglets (Unités de production, Construire, Transport,
-  Chaîne de production, Statistiques) montrent tous la commune choisie, affichée au-dessus d'eux avec ◀ ▶ pour passer
+- Menu Communes (20 novembre 2026, ex-menu Production) : ses onglets (Unités de production, Construire, Transport,
+  Chaîne de production, Statistiques, Habitants, Légitimité) montrent tous la commune choisie, affichée au-dessus d'eux avec ◀ ▶ pour passer
   à une autre (`CommuneFocus`, `MainMenu.Focus`, gardée d'un onglet à l'autre et quand le menu se ferme). Plus de menu
   déroulant de commune dans ces pages : Unités de production cache le menu « Entité » (`StructurePicker.FixEntity`),
   Transport ne montre que les liaisons de la commune, Statistiques n'a plus « Toutes les communes ». Un clic sur une

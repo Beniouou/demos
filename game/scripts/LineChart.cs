@@ -98,7 +98,8 @@ public partial class LineChart : Control
         var high = System.Math.Max(low + step, System.Math.Ceiling(highest / step) * step);
         if (lowest == highest)
             (low, high) = (low - step, high + step);
-        return (System.Math.Max(0, low), high, step);
+        // L'axe part de 0 au plus bas, sauf pour des valeurs négatives (un pôle de légitimité en dette).
+        return (lowest >= 0 ? System.Math.Max(0, low) : low, high, step);
     }
 
     // Un haut d'axe rond (1, 2, 2,5 ou 5 × une puissance de 10) au-dessus du plus haut relevé.

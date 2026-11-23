@@ -26,8 +26,15 @@ public sealed class Simulation(World world, GameClock clock)
     /// </summary>
     public static int FoundingGrantDays => Balance.Current.FoundingGrantDays;
 
-    public World World { get; } = world;
+    public World World { get; } = WithLegitimacyClock(world, clock);
     public GameClock Clock { get; } = clock;
+
+    /// <summary>Les dépenses de légitimité notées au relevé portent la date du jeu.</summary>
+    private static World WithLegitimacyClock(World world, GameClock clock)
+    {
+        world.Legitimacy.Clock = () => clock.Today;
+        return world;
+    }
 
     public event Action? SeasonPassed;
     public event Action? YearPassed;
@@ -298,7 +305,7 @@ public sealed class Simulation(World world, GameClock clock)
         // Sans loi qui autorise le privé à cet endroit, on ne vend qu'à des ouvriers (en SCOP).
         if (Privatization.OwnershipFor(buyer) == Ownership.Private && !PrivateCompaniesAllowed(building))
             return SaleOutcome.PrivateForbidden;
-        if (!World.Legitimacy.TrySpend(SalePole, SaleLegitimacyCost))
+        if (!World.Legitimacy.TrySpend(SalePole, SaleLegitimacyCost, LegitimacySpendingKind.Sale, buildingId))
             return SaleOutcome.NotEnoughLegitimacy;
 
         buyer.Wealth -= price;
@@ -372,7 +379,7 @@ public sealed class Simulation(World world, GameClock clock)
         var legitimacyCost = NationalizationLegitimacyCostOf(building, mode);
         if (World.Treasury.Balance < price)
             return NationalizationOutcome.TreasuryTooPoor;
-        if (!World.Legitimacy.TrySpend(NationalizationPole, legitimacyCost))
+        if (!World.Legitimacy.TrySpend(NationalizationPole, legitimacyCost, LegitimacySpendingKind.Nationalization, buildingId))
             return NationalizationOutcome.NotEnoughLegitimacy;
 
         World.Treasury.TrySpend(price);
@@ -444,7 +451,7 @@ public sealed class Simulation(World world, GameClock clock)
             return null;
         }
 
-        World.Legitimacy.TrySpend(FoundingPole, legitimacyCost);
+        World.Legitimacy.TrySpend(FoundingPole, legitimacyCost, LegitimacySpendingKind.Founding, commune.Id);
         World.CommuneFundOf(commune.Id).Deposit(grant);
         World.AddStructure(commune);
         if (position.HasValue)
@@ -501,7 +508,7 @@ public sealed class Simulation(World world, GameClock clock)
                 World.MarketOf(seatCommuneId), World.ConstructionReserveOf(seatCommuneId)))
             return null;
 
-        World.Legitimacy.TrySpend(legitimacyPole, settings.PrefectureLegitimacyCost);
+        World.Legitimacy.TrySpend(legitimacyPole, settings.PrefectureLegitimacyCost, LegitimacySpendingKind.Prefecture, prefecture.Id);
         World.AddStructure(prefecture);
         foreach (var member in members)
             World.UpdateStructure(member! with { ParentId = prefecture.Id });
@@ -518,7 +525,7 @@ public sealed class Simulation(World world, GameClock clock)
     public bool TryAttach(string entityId, string newParentId, Orientation legitimacyPole)
     {
         if (!CanAttach(entityId, newParentId)
-            || !World.Legitimacy.TrySpend(legitimacyPole, Balance.Current.AttachLegitimacyCost))
+            || !World.Legitimacy.TrySpend(legitimacyPole, Balance.Current.AttachLegitimacyCost, LegitimacySpendingKind.Attach, entityId))
             return false;
 
         World.UpdateStructure(World.Structures[entityId] with { ParentId = newParentId });
@@ -703,7 +710,7 @@ public sealed class Simulation(World world, GameClock clock)
             return LawVoteOutcome.NotEnoughLegitimacy;
 
         foreach (var (pole, amount) in cost)
-            World.Legitimacy.TrySpendOnCredit(pole, amount, maxDebt);
+            World.Legitimacy.TrySpendOnCredit(pole, amount, maxDebt, LegitimacySpendingKind.LawVote, draft.Law.Name);
         World.LawCommission.MarkVoted(draft, cost);
         return LawVoteOutcome.Voted;
     }
@@ -715,7 +722,7 @@ public sealed class Simulation(World world, GameClock clock)
             return false;
 
         foreach (var (pole, amount) in voted.Paid)
-            World.Legitimacy.Add(pole, amount);
+            World.Legitimacy.Add(pole, amount, LegitimacySpendingKind.VoteCancelled, voted.Draft.Law.Name);
         return true;
     }
 
@@ -905,6 +912,7 @@ public sealed class Simulation(World world, GameClock clock)
         Companies.PayDividends(World.Structures, World.ClassesById, World.CompanyFundOf, World.PriceOf, b => fundsAtDayStart.GetValueOrDefault(b.Id));
         Taxation.CollectDaily(World.Classes, World.StateTaxRate, World.CommuneTaxRateOf, World.Treasury, World.CommuneFundOf, laws.TaxFactorOf,
             World.StateCollectionIn, World.CommuneCollectionIn);
+        World.Legitimacy.Ledger.BeginDay(Clock.Today);
         LawEffects.ApplyDaily(World.Classes, laws, World.Legitimacy);
         Storage.ApplyDaily(communeIds, World.Structures, World.Products, World.MarketOf);
         SpoilOutsideStorage();

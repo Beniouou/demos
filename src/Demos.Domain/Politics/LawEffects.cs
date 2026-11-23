@@ -56,7 +56,7 @@ public static class LawEffects
                             continue;
 
                         accepted += weight;
-                        legitimacy.Add(pole, LegitimacyPerMemberPerDay * socialClass.Population * weight);
+                        legitimacy.Earn(pole, LegitimacyPerMemberPerDay * socialClass.Population * weight, law.Id, socialClass.Id);
                     }
                 }
 
