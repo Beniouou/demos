@@ -19,7 +19,7 @@ public static class WorldText
         "SE" => "ségrégationniste",
         "PO" => "positiviste",
         "EC" => "écologiste",
-        "PR" => "protectionniste",
+        "CO" => "collectiviste",
         _ => "libéral",
     };
 
@@ -28,6 +28,10 @@ public static class WorldText
 
     /// <summary>« janv. 1900 », pour l'axe d'un graphique.</summary>
     public static string MonthLabel(System.DateOnly date) => $"{MonthNames[date.Month - 1]} {date.Year}";
+
+    /// <summary>« 14 mars 1901 » (« 1er mars 1901 » le premier du mois).</summary>
+    public static string DayLabel(System.DateOnly date) =>
+        $"{(date.Day == 1 ? "1er" : date.Day.ToString())} {MonthNames[date.Month - 1]} {date.Year}";
 
     public static string SeasonName(Season season) => season switch
     {

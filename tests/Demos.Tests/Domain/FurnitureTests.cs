@@ -56,6 +56,23 @@ public class FurnitureTests
     }
 
     [Fact]
+    public void Le_releve_garde_chaque_besoin_et_la_cause_du_manque()
+    {
+        var market = MarketWith(0);
+        var workers = Resident(Rank.Workers, 1_000);
+
+        Consumption.RunDaily([workers], Products, market);
+
+        // Le pain est couvert, les meubles manquent faute de produits ; la moyenne des parts fait la satisfaction.
+        Assert.Equal(1, workers.NeedDetails["Food"].Coverage, precision: 6);
+        Assert.Equal(0, workers.NeedDetails["Furniture"].Coverage, precision: 6);
+        Assert.Equal(1, workers.NeedDetails["Furniture"].SupplyShortage, precision: 6);
+        Assert.Equal(0, workers.NeedDetails["Furniture"].MoneyShortfall, precision: 6);
+        Assert.Equal(1, workers.NeedDetails["Housing"].Coverage, precision: 6);
+        Assert.Equal(workers.NeedDetails.Values.Average(r => r.Coverage), workers.NeedsSatisfaction, precision: 6);
+    }
+
+    [Fact]
     public void Sans_meubles_personne_ne_couvre_tous_ses_besoins()
     {
         var market = MarketWith(0);

@@ -6,7 +6,7 @@ using Godot;
 namespace Demos.Game;
 
 /// <summary>
-/// Communes → Statistiques, en lecture : pour la commune du menu (au-dessus des onglets), la courbe mois par mois du produit
+/// Communes → Statistiques, en lecture : pour la commune du menu (au-dessus des onglets), la courbe jour par jour du produit
 /// choisi (production, utilisé, envoyé vers une autre commune, perdu en route, perdu au stockage, et le stock en fin de mois) ; dessous, un tableau
 /// de tous les produits avec leurs logos officiels pour le dernier mois fini.
 /// </summary>
@@ -20,7 +20,7 @@ public partial class ProductionStatsPage : VBoxContainer, IMenuPage
     private const string InTransitHint = "Ce qui est parti de la commune vers une autre et n'est pas encore arrivé, à la fin de la période (après la perte en route).";
     private const string StockHint = "Ce qui est dans le stockage de la commune, en vente, à la fin de la période.";
     private const string PriceHint = "Le prix du produit ; pour l'instant, les prix restent les prix de départ.";
-    private const string HistoryHint = "Un relevé le 1er de chaque mois, pris par l'interface pendant la partie : il repart de zéro à chaque lancement.";
+    private const string HistoryHint = "Un relevé chaque jour joué, pris par l'interface pendant la partie (un par mois au-delà d'un an) : la courbe montre les flux en moyenne par jour entre deux relevés, et le stock au relevé ; le tableau, le dernier mois fini. Il repart de zéro à chaque lancement.";
 
     private readonly GameView _view = null!;
     private readonly ProductionHistory _history = null!;
@@ -200,38 +200,43 @@ public partial class ProductionStatsPage : VBoxContainer, IMenuPage
             return;
         _chartKey = key;
 
-        var months = new List<string>();
-        var figures = new List<ProductFigures>();
+        // Un point par relevé (chaque jour sur les douze derniers mois, chaque mois avant ; décidé le 21 novembre 2026) :
+        // les flux en moyenne par jour entre deux relevés, pour que jours et mois se lisent sur la même échelle ; le stock
+        // tel qu'il est au relevé.
+        var days = new List<string>();
+        var figures = new List<(ProductFigures Figures, double Days)>();
         for (var index = 1; index < snapshots.Count && productId is not null; index++)
         {
-            months.Add(WorldText.MonthLabel(snapshots[index - 1].Date));
-            figures.Add(ProductFigures.Of(snapshots[index].Flows, productId, _focus.Id)
-                .Since(ProductFigures.Of(snapshots[index - 1].Flows, productId, _focus.Id)));
+            days.Add(WorldText.DayLabel(snapshots[index - 1].Date));
+            figures.Add((ProductFigures.Of(snapshots[index].Flows, productId, _focus.Id)
+                .Since(ProductFigures.Of(snapshots[index - 1].Flows, productId, _focus.Id)),
+                System.Math.Max(1, snapshots[index].Date.DayNumber - snapshots[index - 1].Date.DayNumber)));
         }
 
-        LineChart.Series Series(string name, int color, System.Func<ProductFigures, double> value) =>
-            new(name, UiTheme.SeriesColor(color), figures.Select(value).ToList());
-        _chart.SetData(months,
+        LineChart.Series Series(string name, int color, System.Func<ProductFigures, double> value, bool perDay = true) =>
+            new(name, UiTheme.SeriesColor(color), figures.Select(f => perDay ? value(f.Figures) / f.Days : value(f.Figures)).ToList());
+        _chart.SetData(days,
             [
-                Series("Production", 2, f => f.Produced),
-                Series("Utilisé", 0, f => f.Used),
-                Series("Envoyé", 1, f => f.Sent),
-                Series("Perdu en route", 6, f => f.LostInTransit),
-                Series("Perdu au stockage", 3, f => f.Lost),
-                Series("Stock en fin de mois", 7, f => f.Stock),
+                Series("Production par jour", 2, f => f.Produced),
+                Series("Utilisé par jour", 0, f => f.Used),
+                Series("Envoyé par jour", 1, f => f.Sent),
+                Series("Perdu en route par jour", 6, f => f.LostInTransit),
+                Series("Perdu au stockage par jour", 3, f => f.Lost),
+                Series("Stock", 7, f => f.Stock, perDay: false),
             ],
             value => value.ToString("N0"));
     }
 
     private void RefreshTable(IReadOnlyList<ProductFlowView> flows, string? communeId)
     {
-        var snapshots = _history.Snapshots;
+        // Le tableau montre le dernier mois fini : les relevés du 1er du mois.
+        var snapshots = _history.MonthStarts;
         var (title, now, before) = snapshots.Count >= 2
             ? ($"Mois de {WorldText.MonthLabel(snapshots[^2].Date)}", snapshots[^1].Flows, snapshots[^2].Flows)
             : ("Depuis le début de la partie", flows, (IReadOnlyList<ProductFlowView>)[]);
 
         _title.Text = title;
-        _hint.Text = snapshots.Count < 2 ? "(la courbe commence le 1er du mois prochain)" : "";
+        _hint.Text = snapshots.Count < 2 ? "(le mois se montre à partir du 1er du mois prochain)" : "";
 
         var products = flows.Select(f => (f.ProductId, f.ProductName)).Distinct().OrderBy(p => p.ProductName).ToList();
         var key = $"{title}|{communeId}|{string.Join(",", products.Select(p => p.ProductId))}|{now.Count}";

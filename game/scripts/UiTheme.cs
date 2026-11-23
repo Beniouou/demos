@@ -26,9 +26,9 @@ public static class UiTheme
     {
         ["EG"] = new("#e5484d"),
         ["SE"] = new("#4c8df6"),
-        ["PO"] = new("#9a6ce0"),
+        ["PO"] = new("#f76808"),
         ["EC"] = new("#30a46c"),
-        ["PR"] = new("#3dd6b5"),
+        ["CO"] = new("#9a6ce0"),
         ["LI"] = new("#f5c542"),
     };
 

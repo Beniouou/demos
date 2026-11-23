@@ -94,14 +94,10 @@ public partial class Main : Node
             {
                 _pendingDays -= 1;
                 _simulation.AdvanceDay();
-                // Les relevés de la population (Population → Évolution) et des produits (Communes → Statistiques) : le
-                // 1er de chaque mois, et après le premier jour joué (avant, les emplois ne sont pas encore répartis :
-                // tout le monde serait chômeur).
-                if (_view.Today.Day == 1 || _hud.Menu.History.Snapshots.Count == 0)
-                {
-                    _hud.Menu.History.Record(_view);
-                    _hud.Menu.ProductionHistory.Record(_view);
-                }
+                // Les relevés des produits (Communes → Statistiques) et de la population (Population → Évolution) : chaque jour
+                // joué, tassés à un par mois au-delà d'un an (décidé le 21 novembre 2026).
+                _hud.Menu.ProductionHistory.Record(_view);
+                _hud.Menu.History.Record(_view);
                 ShowRoadChanges();
             }
 

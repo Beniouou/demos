@@ -67,7 +67,7 @@
   "roadSlopeWeight": 0.1,
   "roadReuseFactor": 0.5,
   "roadGridCell": 0.8,
-  "pollutedThreshold": 0.1,
+  "pollutedThreshold": 0.3,
   "foundingGrantDays": 60,
   "baseCampLegitimacyCost": 20,
   "foundingMaterials": 1000,

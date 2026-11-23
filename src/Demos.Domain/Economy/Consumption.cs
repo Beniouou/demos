@@ -53,6 +53,12 @@ public static class Consumption
         // Part de chaque besoin non couverte faute de produits sur le marché, ou de places de logement.
         var supplyShortage = classes.ToDictionary(c => c, c => new List<double> { c.HousingPlaceShortage });
 
+        // Le relevé besoin par besoin, pour l'interface (sans effet sur la partie) ; se loger d'abord.
+        var details = classes.ToDictionary(c => c, c => new Dictionary<string, NeedRecord>
+        {
+            [NeedCategory.Housing.Id] = new(c.HousingCoverage, Math.Max(0, 1 - c.HousingCoverage - c.HousingPlaceShortage), c.HousingPlaceShortage),
+        });
+
         foreach (var category in AllNeeds)
         {
             var concerned = classes.Where(c => NeedsOf(c.Rank).ContainsKey(category)).ToList();
@@ -63,7 +69,10 @@ public static class Consumption
             if (choices.Count == 0)
             {
                 foreach (var socialClass in concerned)
+                {
                     coverage[socialClass].Add(0);
+                    details[socialClass][category.Id] = new NeedRecord(0, 0, 1);
+                }
                 continue;
             }
 
@@ -153,12 +162,14 @@ public static class Consumption
                     coverage[socialClass].Add(Math.Min(1, owned / target));
                     moneyShortfall[socialClass].Add(short_ * moneyPart);
                     supplyShortage[socialClass].Add(short_ * (1 - moneyPart));
+                    details[socialClass][category.Id] = new NeedRecord(Math.Min(1, owned / target), short_ * moneyPart, short_ * (1 - moneyPart));
                     continue;
                 }
 
                 coverage[socialClass].Add(covered[socialClass] / need);
                 moneyShortfall[socialClass].Add(lackingMoney / need);
                 supplyShortage[socialClass].Add((missing - lackingMoney) / need);
+                details[socialClass][category.Id] = new NeedRecord(covered[socialClass] / need, lackingMoney / need, (missing - lackingMoney) / need);
             }
         }
 
@@ -168,6 +179,7 @@ public static class Consumption
                 continue;
 
             socialClass.NeedsSatisfaction = parts.Average();
+            socialClass.NeedDetails = details[socialClass];
             if (moneyShortfall[socialClass].Count > 0)
                 socialClass.RecordMoneyShortfall(moneyShortfall[socialClass].Average());
             socialClass.RecordSupplyShortage(supplyShortage[socialClass].Average());

@@ -13,7 +13,7 @@ public class LawEffectsTests
     private static readonly Dictionary<string, Structure> Structures = new[] { State, VillageA, FactoryB }.ToDictionary(s => s.Id);
 
     // Exemple du document : 200 membres, 50 vivent dans le village A, 10 d'entre eux travaillent dans l'usine B.
-    // Ouvriers communistes : EG, PO et PR.
+    // Ouvriers communistes : EG, PO et CO.
     private static SocialClass EgalitarianClass()
     {
         var socialClass = new SocialClass("c", "Classe", Rank.Workers, new Ideology(Pole.A, Pole.A, Pole.A), 200);
@@ -44,8 +44,21 @@ public class LawEffectsTests
 
         // Salaire minimum des ouvriers de 2 à 2,5 (borne 4) : intensité 0,25. 200 membres × 25 % × 0,25 × 0,001 par pôle.
         Assert.Equal(0.0125, pool[EG], precision: 9);
-        Assert.Equal(0.0125, pool[PR], precision: 9);
+        Assert.Equal(0.0125, pool[CO], precision: 9);
         Assert.Equal(0, pool[SE]);
+    }
+
+    [Fact]
+    public void Le_releve_garde_ce_que_chaque_groupe_accepte_de_chaque_loi()
+    {
+        var socialClass = EgalitarianClass();
+
+        LawEffects.ApplyDaily([socialClass], Book(Structures, VillageMinimumWage("Workers", 2.5)), new LegitimacyPool());
+
+        // Le groupe est EG et CO, les deux pôles de la hausse du salaire minimum : il l'accepte entièrement.
+        var stance = Assert.Single(socialClass.LawStances).Value;
+        Assert.Equal(1, stance.Share, precision: 9);
+        Assert.Equal(socialClass.Adhesion, stance.Share, precision: 9);
     }
 
     [Fact]
@@ -80,7 +93,7 @@ public class LawEffectsTests
 
         LawEffects.ApplyDaily([socialClass], Book(Structures, quota, VillageMinimumWage("Workers", 2.5)), pool);
 
-        // Quota d'État (EC, rejeté) : 100 % × 0,4. Salaire du village (EG et PR, acceptés) : 2 pôles × 25 % × 0,25.
+        // Quota d'État (EC, rejeté) : 100 % × 0,4. Salaire du village (EG et CO, acceptés) : 2 pôles × 25 % × 0,25.
         Assert.Equal(0.125 / 0.525, socialClass.Adhesion, precision: 9);
         Assert.Equal(0, pool[EC]);
     }

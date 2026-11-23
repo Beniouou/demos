@@ -7,14 +7,14 @@ internal static class TestLaws
 {
     public static readonly Orientation EG = Orientation.FromCode("EG");
     public static readonly Orientation SE = Orientation.FromCode("SE");
-    public static readonly Orientation PR = Orientation.FromCode("PR");
+    public static readonly Orientation CO = Orientation.FromCode("CO");
     public static readonly Orientation LI = Orientation.FromCode("LI");
     public static readonly Orientation PO = Orientation.FromCode("PO");
     public static readonly Orientation EC = Orientation.FromCode("EC");
 
-    /// <summary>Salaire minimum : 2 par défaut, de 1 à 4 ; EG et PR en hausse, SE et LI en baisse.</summary>
+    /// <summary>Salaire minimum : 2 par défaut, de 1 à 4 ; EG et CO en hausse, SE et LI en baisse.</summary>
     public static readonly BrickDefinition MinimumWage = new("salaire-minimum", "Salaire minimum", "travail", BrickFamily.Parameter,
-        [SubjectKind.Rank], 2, 1, 4, [new([EG, PR], [SE, LI])]);
+        [SubjectKind.Rank], 2, 1, 4, [new([EG, CO], [SE, LI])]);
 
     public static readonly BrickDefinition PaymentInKind = new(Bricks.PaymentInKind, "Paiement en nature", "travail", BrickFamily.Permission,
         [SubjectKind.Everyone, SubjectKind.Ownership], 0, 0, 1, [new([SE], [EG])], Weight: 0.5);
@@ -23,18 +23,18 @@ internal static class TestLaws
     public static readonly BrickDefinition ProductionBrick = new("production", "Production", "environnement", BrickFamily.Modifier,
         [SubjectKind.Everyone, SubjectKind.BuildingType], 0, -0.5, 0.5, [new([PO], [EC])]);
 
-    /// <summary>Entreprises privées : interdites par défaut ; LI quand on les autorise, PR quand on les interdit.</summary>
+    /// <summary>Entreprises privées : interdites par défaut ; LI quand on les autorise, CO quand on les interdit.</summary>
     public static readonly BrickDefinition PrivateCompanies = new(Bricks.PrivateCompanies, "Entreprises privées", "propriete",
-        BrickFamily.Permission, [SubjectKind.Everyone, SubjectKind.BuildingType], 0, 0, 1, [new([LI], [PR])], Weight: 0.5);
+        BrickFamily.Permission, [SubjectKind.Everyone, SubjectKind.BuildingType], 0, 0, 1, [new([LI], [CO])], Weight: 0.5);
 
-    /// <summary>Impôt : PR en hausse, LI en baisse ; sur les cadres, EG et PR en hausse.</summary>
+    /// <summary>Impôt : CO en hausse, LI en baisse ; sur les cadres, EG et CO en hausse.</summary>
     public static readonly BrickDefinition Tax = new("impot", "Impôt", "impots", BrickFamily.Modifier,
         [SubjectKind.Everyone, SubjectKind.Rank], 0, -1, 1,
-        [new([PR], [LI]), new([EG, PR], [SE, LI], new LawSubject(SubjectKind.Rank, "Executives"))]);
+        [new([CO], [LI]), new([EG, CO], [SE, LI], new LawSubject(SubjectKind.Rank, "Executives"))]);
 
-    /// <summary>Choix des fournisseurs publics : permis par défaut ; PR quand on le permet, LI quand on l'interdit.</summary>
+    /// <summary>Choix des fournisseurs publics : permis par défaut ; CO quand on le permet, LI quand on l'interdit.</summary>
     public static readonly BrickDefinition SupplierChoice = new(Bricks.SupplierChoice, "Choix des fournisseurs publics", "propriete",
-        BrickFamily.Permission, [SubjectKind.Everyone, SubjectKind.Ownership], 1, 0, 1, [new([PR], [LI])], Weight: 0.5);
+        BrickFamily.Permission, [SubjectKind.Everyone, SubjectKind.Ownership], 1, 0, 1, [new([CO], [LI])], Weight: 0.5);
 
     public static readonly LawCatalogue Catalogue = new(
         [new("travail", "Travail"), new("environnement", "Environnement"), new("propriete", "Propriété"), new("impots", "Impôts"),

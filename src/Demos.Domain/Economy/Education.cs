@@ -31,6 +31,7 @@ public static class Education
         Func<Structure, Treasury>? companyFundOf = null,
         Func<Structure, double>? energyShareOf = null)
     {
+        var today = classes.ToDictionary(c => c, _ => 0.0);
         foreach (var level in Enum.GetValues<EducationLevel>())
         {
             var pupils = PlaceAllocation.Allocate(
@@ -50,7 +51,12 @@ public static class Education
                     socialClass.EducationPoints += served.Value;
                 else
                     socialClass.AdvancedEducationPoints += served.Value;
+                today[socialClass] = today.GetValueOrDefault(socialClass) + served.Value;
             }
         }
+
+        // Le relevé de la saison, pour l'école qui enseigne La Promesse.
+        foreach (var (socialClass, points) in today)
+            socialClass.RecordSchoolDay(points);
     }
 }

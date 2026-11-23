@@ -30,6 +30,6 @@ public class LegitimacyPoolTests
     [Fact]
     public void Les_codes_des_poles_suivent_le_document()
     {
-        Assert.Equal(["EG", "SE", "PO", "EC", "PR", "LI"], Orientation.All.Select(o => o.Code));
+        Assert.Equal(["EG", "SE", "PO", "EC", "CO", "LI"], Orientation.All.Select(o => o.Code));
     }
 }

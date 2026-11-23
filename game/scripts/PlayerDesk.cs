@@ -76,7 +76,7 @@ public sealed partial class PlayerDesk(Simulation simulation)
             NationalizationOutcome.Done => mode == NationalizationMode.Buyout ? "Racheté par l'État." : "Exproprié par l'État.",
             NationalizationOutcome.NotPrivate => "Ce bâtiment est déjà public.",
             NationalizationOutcome.TreasuryTooPoor => "Le trésor n'a pas assez d'argent.",
-            _ => "Pas assez de légitimité PR.",
+            _ => "Pas assez de légitimité CO.",
         };
 
     /// <summary>Fixe à la main les postes ouverts d'un bâtiment public, entre 0 et sa capacité.</summary>

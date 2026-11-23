@@ -9,7 +9,7 @@ namespace Demos.Tests.Application;
 public class PrivateCompaniesLawTests
 {
     private static readonly Orientation LI = Orientation.FromCode("LI");
-    private static readonly Orientation PR = Orientation.FromCode("PR");
+    private static readonly Orientation CO = Orientation.FromCode("CO");
 
     private static Simulation With(params string[] templates) => PrototypeScenario.Create(GameData.Content(),
         new StartingLaws(StartingLawsMode.Chosen, templates.Select(t => new ScenarioLaw(t)).ToList()));
@@ -43,7 +43,7 @@ public class PrivateCompaniesLawTests
         var simulation = With("liberte-entreprendre");
         IReadOnlyList<Structure>? taken = null;
         simulation.CompaniesNationalizedByLaw += buildings => taken = buildings;
-        simulation.World.Legitimacy.Add(PR, 1_000);
+        simulation.World.Legitimacy.Add(CO, 1_000);
 
         var draftId = simulation.DraftRepeal(simulation.World.Laws.Single().Id)!;
         Assert.Equal(LawVoteOutcome.Voted, simulation.TryVote(draftId));

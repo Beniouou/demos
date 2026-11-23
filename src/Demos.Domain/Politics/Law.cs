@@ -5,7 +5,7 @@ namespace Demos.Domain.Politics;
 /// <summary>Pôle qu'une loi favorise sur un axe.</summary>
 public readonly record struct Orientation(IdeologicalAxis Axis, Pole Pole)
 {
-    /// <summary>Tous les pôles, axe par axe : EG, SE, PO, EC, PR, LI.</summary>
+    /// <summary>Tous les pôles, axe par axe : EG, SE, PO, EC, CO, LI.</summary>
     public static IEnumerable<Orientation> All =>
         Enum.GetValues<IdeologicalAxis>().SelectMany(axis => new[] { new Orientation(axis, Pole.A), new Orientation(axis, Pole.B) });
 
@@ -15,7 +15,7 @@ public readonly record struct Orientation(IdeologicalAxis Axis, Pole Pole)
         (IdeologicalAxis.Hierarchy, Pole.B) => "SE",
         (IdeologicalAxis.Production, Pole.A) => "PO",
         (IdeologicalAxis.Production, Pole.B) => "EC",
-        (IdeologicalAxis.Property, Pole.A) => "PR",
+        (IdeologicalAxis.Property, Pole.A) => "CO",
         (IdeologicalAxis.Property, Pole.B) => "LI",
         _ => $"{Axis}:{Pole}",
     };

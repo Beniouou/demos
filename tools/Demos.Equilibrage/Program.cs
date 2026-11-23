@@ -87,6 +87,8 @@ public static class WorkbookGenerator
         book.WriteProducts();
         book.WriteNeeds();
         book.WriteStartingGame();
+        book.WriteTransitions();
+        book.WritePromises(content.LoadPromises());
 
         // Les bâtiments et les recettes sont écrits avant les produits (les prix s'y réfèrent), mais rangés après.
         workbook.Worksheet("Produits").Position = 3;
@@ -325,6 +327,8 @@ internal sealed class Book(XLWorkbook workbook, World world, BalanceSettings bal
             "- Recettes : chaque recette à plein régime : production, valeur, coûts et bénéfice par jour.",
             "- Besoins : quantités par rang, coût de la vie par jour comparé au salaire de chaque rang.",
             "- Partie de départ : population, emplois des bâtiments de départ, production comparée à la demande.",
+            "- Passages : les réglages de la dérive des classes (chômage, crise, propriété, production, école de La Promesse).",
+            "- Promesses : les 26 Promesses des exilés (1 à 3 axes) ; leur nom se change dans la colonne jaune.",
             "",
             "Les prix recalculés suivent les mêmes règles que le jeu ; la colonne Écart doit rester à 0 tant que rien n'est changé.",
             "Le jeu recalcule ses prix à partir des réglages : après « appliquer », régénérez pour voir les nouveaux prix du jeu.",
@@ -751,6 +755,91 @@ internal sealed class Book(XLWorkbook workbook, World world, BalanceSettings bal
         sheet.Range(row + 2, 4, row + 2, 6).Style.NumberFormat.Format = "0%";
         Finish(sheet, 1);
     }
+
+    /// <summary>Les réglages des passages entre classes (la dérive) : clé, nom, valeur, explication.</summary>
+    public static (string Key, string Label, Func<BalanceSettings, double> Value, string Note)[] TransitionRows =>
+    [
+        ("PassageEducation", "Points d'éducation pour monter d'un rang", b => b.TransitionEducationPointsPerPromotion,
+            "Une année d'études : 365 points (un élève d'école en rapporte 1 par jour, de lycée 2)."),
+        ("PassagePromotionMax", "Part qui peut monter de rang par an", b => b.TransitionMaxYearlyPromotionShare, "Au plus cette part des membres d'une classe, chaque 1er janvier."),
+        ("PassageChomageSeuil", "Chômage : seuil", b => b.TransitionUnemploymentThreshold, "Au-delà de cette part de chômeurs (et si la richesse par membre ne monte plus), la classe est en crise."),
+        ("PassageChomagePart", "Chômage : part des chômeurs qui descendent d'un rang", b => b.TransitionUnemployedShare,
+            "Chaque saison ; ils basculent aussi sur l'axe hiérarchie selon la confiance et le déclassement."),
+        ("PassagePleinEmploiSeuil", "Plein emploi : seuil", b => b.TransitionFullEmploymentThreshold, "Sous cette part de chômeurs, la classe est en plein emploi."),
+        ("PassagePleinEmploiPart", "Plein emploi : part qui redevient égalitariste", b => b.TransitionFullEmploymentShare, "Chaque saison, pour une classe ségrégationniste."),
+        ("PassageManqueArgentSeuil", "Manque d'argent : seuil", b => b.TransitionMoneyShortfallThreshold,
+            "Part des besoins non couverte faute d'argent au-delà de laquelle une classe qui travaille est en crise."),
+        ("PassagePrelevementSeuil", "Prélèvements lourds : seuil", b => b.TransitionHeavyTaxThreshold, "Part des revenus de la saison prélevée par l'impôt."),
+        ("PassageCombleSeuil", "Classe comblée : seuil", b => b.TransitionFullySatisfiedThreshold,
+            "Besoins couverts au-delà de ce seuil : comblée et fortement prélevée, elle devient ségrégationniste."),
+        ("PassageHierarchiePart", "Axe hiérarchie : part qui bascule", b => b.TransitionHierarchyShare, "Chaque saison, par le manque d'argent ou les prélèvements lourds."),
+        ("PassageConfiance", "Crise : adhésion de la confiance", b => b.TransitionTrustThreshold,
+            "À partir de cette adhésion, une classe en crise fait confiance : sans déclassement, elle devient égalitariste (solidarité)."),
+        ("PassageCriseDivise", "Crise : part vers l'égalitarisme quand elle divise", b => b.TransitionCrisisSplit,
+            "Confiance et déclassement mêlés : cette part va vers l'égalitarisme, le reste vers le ségrégationnisme."),
+        ("PassageProprietePart", "Axe propriété : part qui bascule", b => b.TransitionPropertyShare,
+            "Chaque saison, parmi les membres que leur lieu de travail ou ce qu'ils possèdent pousse."),
+        ("PassagePenurieSeuil", "Manque de produits : seuil", b => b.TransitionSupplyShortageThreshold,
+            "Part des besoins non couverte faute de produits ou de places au-delà de laquelle la classe devient positiviste."),
+        ("PassageProductionPart", "Axe production : part qui bascule", b => b.TransitionProductionShare,
+            "Chaque saison, par la pollution (seuil : SeuilPollution, feuille Constantes) ou le manque de produits."),
+        ("PassageEcolePromesse", "École : part des élèves qui rejoignent La Promesse", b => b.TransitionPromiseSchoolShare,
+            "Chaque saison, en mode avec promesse, sur le premier axe où la classe s'écarte de La Promesse."),
+    ];
+
+    /// <summary>Les réglages des passages entre classes, en cases jaunes.</summary>
+    public void WriteTransitions()
+    {
+        var sheet = workbook.AddWorksheet("Passages");
+        Header(sheet, 1, "Réglage", "Valeur", "Explication", "Clé (ne pas modifier)");
+        var row = 2;
+        foreach (var (key, label, value, note) in TransitionRows)
+        {
+            sheet.Cell(row, 1).Value = label;
+            Input(sheet.Cell(row, 2), value(balance));
+            sheet.Cell(row, 3).Value = note;
+            sheet.Cell(row, 4).Value = key;
+            row++;
+        }
+
+        Finish(sheet, 1);
+        sheet.Column(3).Width = 90;
+    }
+
+    /// <summary>
+    /// Les Promesses des exilés : une ligne par combinaison de pôles, de la plus courte à la plus longue ; le nom est un
+    /// réglage (case jaune), les pôles et la clé ne se changent pas.
+    /// </summary>
+    public void WritePromises(IReadOnlyList<PromiseDefinition> promises)
+    {
+        var sheet = workbook.AddWorksheet("Promesses");
+        Header(sheet, 1, "Nom", "Axes", "Hiérarchie", "Production", "Propriété", "Clé (ne pas modifier)");
+        var axes = new[] { IdeologicalAxis.Hierarchy, IdeologicalAxis.Production, IdeologicalAxis.Property };
+        var row = 2;
+        foreach (var promise in promises.OrderBy(p => p.Poles.Count))
+        {
+            Input(sheet.Cell(row, 1), promise.Name);
+            sheet.Cell(row, 2).Value = promise.Poles.Count;
+            for (var a = 0; a < axes.Length; a++)
+                sheet.Cell(row, 3 + a).Value = promise.PoleOn(axes[a]) is { } pole ? PoleName(pole.Code) : "libre";
+            sheet.Cell(row, 6).Value = promise.Id;
+            row++;
+        }
+
+        Finish(sheet, 1);
+        sheet.Column(1).Width = 32;
+    }
+
+    private static string PoleName(string code) => code switch
+    {
+        "EG" => "égalitariste",
+        "SE" => "ségrégationniste",
+        "PO" => "positiviste",
+        "EC" => "écologiste",
+        "CO" => "collectiviste",
+        "LI" => "libéral",
+        _ => code,
+    };
 
     public void WriteStartingGame()
     {

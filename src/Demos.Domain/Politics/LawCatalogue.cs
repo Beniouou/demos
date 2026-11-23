@@ -5,7 +5,7 @@ public sealed record LawDomain(string Id, string Name, bool Regalian = false);
 
 /// <summary>
 /// Pôles d'une brique selon le sens du curseur. Sans sujet, la règle vaut pour tous ; avec un sujet, elle ne vaut que
-/// pour lui (un impôt en hausse sur les cadres est EG et PR, sur tout le monde seulement PR).
+/// pour lui (un impôt en hausse sur les cadres est EG et CO, sur tout le monde seulement CO).
 /// </summary>
 public sealed record BrickPoles(IReadOnlyList<Orientation> Raise, IReadOnlyList<Orientation> Lower, LawSubject? Subject = null);
 

@@ -25,4 +25,30 @@ public class GameDataTests
         Assert.Equal(Demos.Domain.Economy.ProductFamily.RawMaterial, products.Single(p => p.Id == "ble").Family);
         Assert.Equal(Demos.Domain.Economy.ProductFamily.Equipment, products.Single(p => p.Id == "charrette").Family);
     }
+
+    [Fact]
+    public void Chaque_brique_de_loi_ne_touche_qu_un_seul_axe()
+    {
+        // Révision des axes (23 novembre 2026) : la redistribution relève de la Hiérarchie, la Propriété de qui possède.
+        var bricks = GameData.Content().LoadLawCatalogue().Bricks;
+
+        Assert.NotEmpty(bricks);
+        Assert.All(bricks, brick => Assert.Single(
+            brick.Poles.SelectMany(p => p.Raise.Concat(p.Lower)).Select(o => o.Axis).Distinct()));
+    }
+
+    [Fact]
+    public void Chaque_combinaison_de_poles_a_une_promesse_nommee()
+    {
+        var promises = GameData.Content().LoadPromises();
+        var combinations = Demos.Domain.Politics.PromiseDefinition.AllCombinations()
+            .Select(Demos.Domain.Politics.PromiseDefinition.IdOf).ToList();
+
+        Assert.Equal(26, combinations.Count);
+        Assert.Equal(combinations.OrderBy(c => c), promises.Select(p => p.Id).OrderBy(i => i));
+        Assert.All(promises, p => Assert.Equal(p.Id, Demos.Domain.Politics.PromiseDefinition.IdOf(p.Orientations)));
+        Assert.All(promises, p => Assert.False(string.IsNullOrWhiteSpace(p.Name)));
+        Assert.Equal(promises.Count, promises.Select(p => p.Name).Distinct().Count());
+        Assert.Equal("La Commune Libre", promises.Single(p => p.Id == "eg-ec-co").Name);
+    }
 }

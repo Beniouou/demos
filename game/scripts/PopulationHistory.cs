@@ -6,40 +6,47 @@ using Demos.Domain.Shared;
 namespace Demos.Game;
 
 /// <summary>
-/// Le relevé de la population le 1er de chaque mois, pris par l'interface (la simulation ne garde pas d'historique) :
-/// les chiffres de toutes les communes et de chacune. La courbe de Population → Évolution montre chaque relevé, le
-/// tableau le premier de chaque saison. Il ne dure que le temps de la partie.
+/// Le relevé de la population, pris par l'interface chaque jour joué (la simulation ne garde pas d'historique ; décidé le
+/// 21 novembre 2026, avant : le 1er de chaque mois) : les chiffres de toute la nation et de chaque commune. Un relevé de
+/// plus d'un an n'est gardé que s'il est du 1er du mois (ou le tout premier) : les courbes de Population → Évolution ont
+/// un point par jour sur les douze derniers mois, un point par mois avant. Il ne dure que le temps de la partie.
 /// </summary>
 public sealed class PopulationHistory
 {
-    /// <summary>Un relevé : sa date, toutes les communes, et chaque commune.</summary>
+    /// <summary>Au-delà de ce nombre de jours, un relevé n'est gardé que s'il ouvre un mois.</summary>
+    private const int DailyDays = 365;
+
+    /// <summary>Un relevé : sa date, toute la nation, et chaque commune.</summary>
     public sealed record Snapshot(System.DateOnly Date, PopulationStats All, IReadOnlyDictionary<string, PopulationStats> ByCommune)
     {
-        /// <summary>« janv. 1900 », pour l'axe du graphique.</summary>
+        /// <summary>« janv. 1900 ».</summary>
         public string MonthLabel => WorldText.MonthLabel(Date);
 
-        public Season Season => GameClock.SeasonOf(Date);
+        /// <summary>« 14 mars 1901 », pour l'axe et le survol du graphique.</summary>
+        public string DayLabel => WorldText.DayLabel(Date);
 
-        /// <summary>« Hiver 1901 » : l'hiver commence en décembre, il prend le nom de l'année qui suit.</summary>
-        public string SeasonLabel => $"{WorldText.SeasonName(Season)} {(Date.Month == 12 ? Date.Year + 1 : Date.Year)}";
+        public Season Season => GameClock.SeasonOf(Date);
     }
 
     private readonly List<Snapshot> _snapshots = [];
 
     public IReadOnlyList<Snapshot> Snapshots => _snapshots;
 
-    /// <summary>Les relevés qui ouvrent une saison (le premier de la partie compris), pour le tableau.</summary>
-    public IEnumerable<Snapshot> SeasonStarts() =>
-        _snapshots.Where((snapshot, index) => index == 0 || snapshot.SeasonLabel != _snapshots[index - 1].SeasonLabel);
-
-    /// <summary>Relève la population ; un second relevé dans le même mois remplace le premier.</summary>
+    /// <summary>Relève la population ; un second relevé le même jour remplace le premier. Tasse ce qui a plus d'un an.</summary>
     public void Record(GameView view)
     {
         var communes = view.Communes();
         var snapshot = new Snapshot(view.Today, PopulationStats.Of(communes), communes.ToDictionary(c => c.Id, c => PopulationStats.Of([c])));
-        if (_snapshots.Count > 0 && _snapshots[^1].MonthLabel == snapshot.MonthLabel)
+        if (_snapshots.Count > 0 && _snapshots[^1].Date == snapshot.Date)
             _snapshots[^1] = snapshot;
         else
             _snapshots.Add(snapshot);
+
+        var limit = view.Today.AddDays(-DailyDays);
+        for (var index = _snapshots.Count - 1; index > 0; index--)
+        {
+            if (_snapshots[index].Date < limit && _snapshots[index].Date.Day != 1)
+                _snapshots.RemoveAt(index);
+        }
     }
 }

@@ -557,7 +557,12 @@ public sealed class GameView(Simulation simulation)
                 c.HousingPlaceShortage, c.WealthPerMember,
                 c.Employment.Where(e => e.Value > 0).OrderByDescending(e => e.Value)
                     .Select(e => new WorkplaceView(e.Key, NameOf(e.Key), c.Population * e.Value)).ToList(),
-                PossessionsOf(c))).ToList());
+                PossessionsOf(c),
+                c.NeedDetails,
+                c.LawStances.Select(s => new LawStanceView(s.Key, World.Laws.FirstOrDefault(l => l.Id == s.Key)?.Name ?? s.Key,
+                    s.Value.Share, s.Value.Applicable)).OrderBy(s => s.Share).ToList(),
+                c.SeasonTaxRate,
+                c.WealthPerMemberLastSeason)).ToList());
     }
 
     /// <summary>Les objets durables d'un groupe, besoin par besoin : ce qu'il possède, ce qu'il vise, ce qui s'use par jour.</summary>
@@ -777,7 +782,17 @@ public sealed record SocialClassView(
     double HousingPlaceShortage = 0,
     double WealthPerMember = 0,
     IReadOnlyList<WorkplaceView>? Workplaces = null,
-    IReadOnlyList<PossessionView>? Possessions = null);
+    IReadOnlyList<PossessionView>? Possessions = null,
+    IReadOnlyDictionary<string, NeedRecord>? NeedDetails = null,
+    IReadOnlyList<LawStanceView>? LawStances = null,
+    double SeasonTaxRate = 0,
+    double? WealthPerMemberLastSeason = null);
+
+/// <summary>
+/// Une loi en vigueur jugée par un groupe au dernier jour (décidé le 21 novembre 2026) : la part qu'il en accepte et le
+/// poids de son jugement (ce que la loi pèse pour lui) ; les plus rejetées d'abord.
+/// </summary>
+public sealed record LawStanceView(string LawId, string LawName, double Share, double Weight);
 
 /// <summary>
 /// Les objets durables d'un groupe pour un besoin (décidé le 20 novembre 2026) : ce qu'il possède, sa possession visée

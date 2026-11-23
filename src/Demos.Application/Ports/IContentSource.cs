@@ -31,4 +31,7 @@ public interface IContentSource
 
     /// <summary>La carte d'altitude (pour le tracé des routes) ; nulle si elle manque.</summary>
     ReliefGrid? LoadRelief() => null;
+
+    /// <summary>Les Promesses des exilés (une par combinaison de 1 à 3 pôles) et leurs noms ; vide si le fichier manque.</summary>
+    IReadOnlyList<PromiseDefinition> LoadPromises() => [];
 }

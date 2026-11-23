@@ -53,7 +53,7 @@ public static class SheetText
         Hint(IconRegistry.PoleInline(pole) ?? $"[color=#{UiTheme.PoleColor(pole).ToHtml(false)}]■[/color]",
             $"{pole.Code} : pôle {WorldText.PoleName(pole)}");
 
-    /// <summary>Les logos de plusieurs pôles, suivis de leurs codes : « ■■ EG PR » ; le nom de chaque pôle au survol.</summary>
+    /// <summary>Les logos de plusieurs pôles, suivis de leurs codes : « ■■ EG CO » ; le nom de chaque pôle au survol.</summary>
     public static string Chips(IEnumerable<Orientation> poles)
     {
         var list = poles.Distinct().ToList();

@@ -2,7 +2,7 @@ namespace Demos.Domain.Politics;
 
 /// <summary>
 /// Légitimité : la ressource du joueur. Elle est polaire, avec un stock par pôle idéologique
-/// (EG, SE, PO, EC, PR, LI).
+/// (EG, SE, PO, EC, CO, LI).
 /// </summary>
 public sealed class LegitimacyPool
 {

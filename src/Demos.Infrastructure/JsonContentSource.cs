@@ -114,6 +114,19 @@ public sealed class JsonContentSource(Func<string, string> readText, Func<string
         }
     }
 
+    /// <summary>Les Promesses des exilés (promesses.json) ; vide si le fichier manque.</summary>
+    public IReadOnlyList<PromiseDefinition> LoadPromises()
+    {
+        try
+        {
+            return Load<PromiseDefinition>("promesses.json");
+        }
+        catch (FileNotFoundException)
+        {
+            return [];
+        }
+    }
+
     private List<T> Load<T>(string fileName) =>
         JsonSerializer.Deserialize<List<T>>(readText(fileName), Options) ?? [];
 }

@@ -22,6 +22,7 @@ public static class BalanceApplier
     private const string BuildingsFile = "buildings.json";
     private const string ProductsFile = "products.json";
     private const string ScenarioFile = "partie-depart.json";
+    private const string PromisesFile = "promesses.json";
 
     /// <summary>La possession visée par personne d'un besoin durable pour un rang (0 sans réglage).</summary>
     private static double Possession(BalanceSettings balance, Rank rank, NeedCategory need) =>
@@ -150,11 +151,16 @@ public static class BalanceApplier
 
         var texts = new[] { BalanceFile, BuildingsFile, ProductsFile, ScenarioFile }
             .ToDictionary(f => f, f => File.ReadAllText(Path.Combine(dataDirectory, f)));
+        // Les Promesses : un fichier facultatif (une ancienne copie du jeu peut ne pas l'avoir).
+        var promisesPath = Path.Combine(dataDirectory, PromisesFile);
+        if (File.Exists(promisesPath))
+            texts[PromisesFile] = File.ReadAllText(promisesPath);
         var applier = new Applier(workbook, content,
             JsonNode.Parse(texts[BalanceFile])!.AsObject(),
             JsonNode.Parse(texts[BuildingsFile])!.AsArray(),
             JsonNode.Parse(texts[ProductsFile])!.AsArray(),
-            JsonNode.Parse(texts[ScenarioFile])!.AsObject());
+            JsonNode.Parse(texts[ScenarioFile])!.AsObject(),
+            texts.TryGetValue(PromisesFile, out var promisesText) ? JsonNode.Parse(promisesText)!.AsArray() : null);
 
         applier.Run();
         using (workbook) { }
@@ -180,6 +186,8 @@ public static class BalanceApplier
             [ProductsFile] = JsonFormat.Write(applier.ProductsJson, texts[ProductsFile]),
             [ScenarioFile] = JsonFormat.Write(applier.ScenarioJson, texts[ScenarioFile]),
         };
+        if (applier.PromisesJson is { } promisesJson)
+            written[PromisesFile] = JsonFormat.Write(promisesJson, texts[PromisesFile]);
 
         // Essai à blanc : le jeu doit pouvoir charger les nouveaux fichiers et créer la partie de départ.
         var saved = Balance.Current;
@@ -209,7 +217,7 @@ public static class BalanceApplier
     }
 
     private sealed class Applier(XLWorkbook workbook, IContentSource content, JsonObject balanceJson, JsonArray buildingsJson,
-        JsonArray productsJson, JsonObject scenarioJson)
+        JsonArray productsJson, JsonObject scenarioJson, JsonArray? promisesJson)
     {
         public List<string> Errors { get; } = [];
 
@@ -222,6 +230,8 @@ public static class BalanceApplier
         public JsonArray ProductsJson => productsJson;
 
         public JsonObject ScenarioJson => scenarioJson;
+
+        public JsonArray? PromisesJson => promisesJson;
 
         private readonly BalanceSettings _balance = content.LoadBalance();
         private readonly Dictionary<string, BuildingType> _types = content.LoadBuildingTypes().ToDictionary(t => t.Id);
@@ -237,6 +247,8 @@ public static class BalanceApplier
             ApplyRecipes();
             ApplyProducts();
             ApplyStartingGame();
+            ApplyTransitions();
+            ApplyPromises();
         }
 
         private IXLWorksheet? Sheet(string name)
@@ -374,6 +386,53 @@ public static class BalanceApplier
 
         // Feuilles ------------------------------------------------------------------------------------------------------
 
+        // Feuille Passages : clé du tableur → réglage d'equilibrage.json.
+        private static readonly Dictionary<string, string> TransitionPaths = new()
+        {
+            ["PassageEducation"] = "transitionEducationPointsPerPromotion",
+            ["PassagePromotionMax"] = "transitionMaxYearlyPromotionShare",
+            ["PassageChomageSeuil"] = "transitionUnemploymentThreshold",
+            ["PassageChomagePart"] = "transitionUnemployedShare",
+            ["PassagePleinEmploiSeuil"] = "transitionFullEmploymentThreshold",
+            ["PassagePleinEmploiPart"] = "transitionFullEmploymentShare",
+            ["PassageManqueArgentSeuil"] = "transitionMoneyShortfallThreshold",
+            ["PassagePrelevementSeuil"] = "transitionHeavyTaxThreshold",
+            ["PassageCombleSeuil"] = "transitionFullySatisfiedThreshold",
+            ["PassageHierarchiePart"] = "transitionHierarchyShare",
+            ["PassageConfiance"] = "transitionTrustThreshold",
+            ["PassageCriseDivise"] = "transitionCrisisSplit",
+            ["PassageProprietePart"] = "transitionPropertyShare",
+            ["PassagePenurieSeuil"] = "transitionSupplyShortageThreshold",
+            ["PassageProductionPart"] = "transitionProductionShare",
+            ["PassageEcolePromesse"] = "transitionPromiseSchoolShare",
+        };
+
+        /// <summary>Les réglages des passages entre classes ; tous sont des parts (au plus 1), sauf les points d'éducation.</summary>
+        private void ApplyTransitions()
+        {
+            if (Sheet("Passages") is not { } sheet || !KeyColumnAt(sheet, 1, "D"))
+                return;
+
+            var rows = Rows(sheet, 2, "A").ToDictionary(r => Text(r.Cell("D")), r => r);
+            foreach (var (key, _, current, _) in Book.TransitionRows)
+            {
+                if (!rows.TryGetValue(key, out var row) || !TransitionPaths.TryGetValue(key, out var path))
+                {
+                    Errors.Add($"Passages : la clé « {key} » manque : régénérez le tableur.");
+                    continue;
+                }
+
+                var value = Number(row.Cell("B"));
+                if (key != "PassageEducation" && value > 1)
+                {
+                    Errors.Add($"{Where(row.Cell("B"))} : {Show(value.Value)} dépasse 1 (100 %).");
+                    value = null;
+                }
+
+                Set(balanceJson, path, value, current(_balance), $"passage « {Text(row.Cell("A"))} »");
+            }
+        }
+
         private void ApplyConstants()
         {
             if (Sheet("Constantes") is not { } sheet)
@@ -402,6 +461,49 @@ public static class BalanceApplier
                 }
 
                 Set(ObjectAt(balanceJson, path[..^1]), path[^1], value, current(_balance), $"constante « {Text(row.Cell("A"))} »");
+            }
+        }
+
+        /// <summary>Le nom de chaque Promesse (colonne A), retrouvée par sa clé (colonne F) ; deux Promesses ne partagent pas un nom.</summary>
+        private void ApplyPromises()
+        {
+            if (promisesJson is null)
+                return;
+            if (Sheet("Promesses") is not { } sheet || !KeyColumnAt(sheet, 1, "F"))
+                return;
+
+            var names = new Dictionary<string, string>();
+            foreach (var row in Rows(sheet, 2, "F"))
+            {
+                var key = Text(row.Cell("F"));
+                var nameCell = row.Cell("A");
+                var name = Text(nameCell);
+                var json = promisesJson.OfType<JsonObject>().FirstOrDefault(p => p["id"]?.GetValue<string>() == key);
+                if (json is null)
+                {
+                    Errors.Add($"{Where(row.Cell("F"))} : la Promesse « {key} » n'existe pas dans le jeu : régénérez le tableur.");
+                    continue;
+                }
+
+                if (name == "")
+                {
+                    Errors.Add($"{Where(nameCell)} : le nom de la Promesse est vide.");
+                    continue;
+                }
+
+                if (names.TryGetValue(name, out var other))
+                {
+                    Errors.Add($"{Where(nameCell)} : « {name} » est déjà le nom de la Promesse {other}.");
+                    continue;
+                }
+
+                names[name] = key;
+                var current = json["name"]?.GetValue<string>() ?? "";
+                if (current == name)
+                    continue;
+
+                json["name"] = name;
+                Changes.Add($"Promesse {key} : « {current} » → « {name} »");
             }
         }
 

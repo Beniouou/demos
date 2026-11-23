@@ -39,7 +39,7 @@ $logos = [ordered]@{
     "pole-se-segregationniste" = @{ name = "Classes / Pôle Ségrégationniste"; folder = "classes" }
     "pole-po-positiviste" = @{ name = "Classes / Pôle Positiviste"; folder = "classes" }
     "pole-ec-ecologiste" = @{ name = "Classes / Pôle Écologiste"; folder = "classes" }
-    "pole-pr-protectionniste" = @{ name = "Classes / Pôle Protectionniste"; folder = "classes" }
+    "pole-co-collectiviste" = @{ name = "Classes / Pôle Collectiviste"; folder = "classes" }
     "pole-li-liberaux" = @{ name = "Classes / Pôle Libéraux"; folder = "classes" }
 
     # Bâtiments

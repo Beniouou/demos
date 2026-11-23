@@ -9,7 +9,7 @@ using Orientation = Demos.Domain.Politics.Orientation;
 namespace Demos.Game;
 
 /// <summary>
-/// Population → Vue d'ensemble, en lecture : pour toutes les communes ou une seule, les habitants, logements, emplois et
+/// Communes → Habitants (déplacé du menu Population le 21 novembre 2026), en lecture : pour la commune du menu Communes, les habitants, logements, emplois et
 /// chômeurs, et les moyennes des besoins, des logés et de l'adhésion ; une barre des membres par rang et une barre par
 /// axe idéologique (la part de chaque pôle) ; pour toutes les communes, un tableau commune par commune. Chaque terme a
 /// sa bulle d'aide, qui dit la règle.
@@ -18,20 +18,24 @@ public partial class PopulationOverviewPage : ScrollContainer, IMenuPage
 {
     private readonly GameView _view = null!;
     private readonly CommuneChoice _commune = new();
+    private readonly CommuneFocus? _focus;
     private readonly RichTextLabel _summary = null!;
     private readonly StackedBar _ranks = new();
     private readonly Dictionary<IdeologicalAxis, StackedBar> _axes = [];
     private readonly RichTextLabel _table = null!;
 
-    public PopulationOverviewPage(GameView view)
+    public PopulationOverviewPage(GameView view, CommuneFocus? focus = null)
     {
         _view = view;
+        _focus = focus;
         HorizontalScrollMode = ScrollMode.Disabled;
         var content = new VBoxContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill };
         content.AddThemeConstantOverride("separation", 8);
         AddChild(content);
 
-        content.AddChild(_commune.Row());
+        // Dans le menu Communes, la commune est celle du menu (au-dessus des onglets) : pas de menu ici.
+        if (_focus is null)
+            content.AddChild(_commune.Row());
         _summary = Text();
         content.AddChild(_summary);
 
@@ -76,12 +80,13 @@ public partial class PopulationOverviewPage : ScrollContainer, IMenuPage
     {
         var communes = _view.Communes();
         _commune.Fill(communes);
-        var chosen = _commune.SelectedId is { } id ? communes.Where(c => c.Id == id).ToList() : communes;
+        var selectedId = _focus is not null ? _focus.Current(communes)?.Id : _commune.SelectedId;
+        var chosen = selectedId is { } id ? communes.Where(c => c.Id == id).ToList() : communes;
         var stats = PopulationStats.Of(chosen);
 
         // Les textes ne sont remis que s'ils ont changé : sinon la page remonterait en haut à chaque image.
         SetText(_summary, Summary(chosen, stats));
-        SetText(_table, _commune.SelectedId is null ? Table(communes) : "");
+        SetText(_table, selectedId is null ? Table(communes) : "");
 
         var ranks = System.Enum.GetValues<Rank>();
         _ranks.SetParts(ranks.Select((rank, index) =>

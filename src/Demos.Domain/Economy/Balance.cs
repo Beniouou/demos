@@ -281,6 +281,56 @@ public sealed record BalanceSettings
     /// <summary>Pollution par habitant et par jour au-delà de laquelle une commune est polluée.</summary>
     public double PollutedThreshold { get; init; } = 0.1;
 
+    // Passages entre classes (ClassTransitions ; feuille Passages du tableur). Tous des propositions.
+
+    /// <summary>Points d'éducation qui font monter un membre d'un rang (une année d'études : 365).</summary>
+    public double TransitionEducationPointsPerPromotion { get; init; } = 365;
+
+    /// <summary>Part des membres d'une classe qui peuvent monter de rang chaque année.</summary>
+    public double TransitionMaxYearlyPromotionShare { get; init; } = 0.02;
+
+    /// <summary>Part de chômeurs au-delà de laquelle le chômage pèse sur une classe.</summary>
+    public double TransitionUnemploymentThreshold { get; init; } = 0.2;
+
+    /// <summary>Part des chômeurs d'une classe touchée qui descendent d'un rang ou basculent chaque saison.</summary>
+    public double TransitionUnemployedShare { get; init; } = 0.1;
+
+    /// <summary>Part de chômeurs sous laquelle une classe est en plein emploi.</summary>
+    public double TransitionFullEmploymentThreshold { get; init; } = 0.05;
+
+    /// <summary>Part des membres d'une classe ségrégationniste en plein emploi qui redeviennent égalitaristes chaque saison.</summary>
+    public double TransitionFullEmploymentShare { get; init; } = 0.05;
+
+    /// <summary>Part des besoins non couverte faute d'argent au-delà de laquelle une classe qui travaille manque d'argent.</summary>
+    public double TransitionMoneyShortfallThreshold { get; init; } = 0.2;
+
+    /// <summary>Part des revenus de la saison prélevée au-delà de laquelle un prélèvement est lourd.</summary>
+    public double TransitionHeavyTaxThreshold { get; init; } = 0.3;
+
+    /// <summary>Besoins couverts au-delà desquels une classe est comblée.</summary>
+    public double TransitionFullySatisfiedThreshold { get; init; } = 0.99;
+
+    /// <summary>Part des membres qui basculent chaque saison sur l'axe hiérarchie (manque d'argent, prélèvements).</summary>
+    public double TransitionHierarchyShare { get; init; } = 0.05;
+
+    /// <summary>Part des membres concernés qui basculent chaque saison sur l'axe propriété.</summary>
+    public double TransitionPropertyShare { get; init; } = 0.05;
+
+    /// <summary>Part des besoins non couverte faute de produits ou de places au-delà de laquelle une classe manque de produits.</summary>
+    public double TransitionSupplyShortageThreshold { get; init; } = 0.2;
+
+    /// <summary>Part des membres qui basculent chaque saison sur l'axe production.</summary>
+    public double TransitionProductionShare { get; init; } = 0.05;
+
+    /// <summary>Adhésion à partir de laquelle une classe en crise fait confiance aux institutions (solidarité).</summary>
+    public double TransitionTrustThreshold { get; init; } = 0.5;
+
+    /// <summary>Part des membres en crise qui vont vers l'égalitarisme quand la crise divise (confiance et déclassement mêlés).</summary>
+    public double TransitionCrisisSplit { get; init; } = 0.5;
+
+    /// <summary>Part des élèves de la saison qui rejoignent un pôle de La Promesse (mode avec promesse).</summary>
+    public double TransitionPromiseSchoolShare { get; init; } = 0.02;
+
     /// <summary>Dotation d'une nouvelle commune, en jours de salaires de son camp de base.</summary>
     public int FoundingGrantDays { get; init; } = 60;
 

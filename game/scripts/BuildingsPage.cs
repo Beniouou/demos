@@ -160,9 +160,9 @@ public partial class BuildingsPage : HBoxContainer, IMenuPage
         if (sheet is { Buyout: { } buyout, Expropriation: { } expropriation })
             _nationalizationNote.Text =
                 $"Entreprise {(sheet.IsStruggling ? "en difficulté" : "qui paie ses salaires")}.\n" +
-                $"Rachat : {buyout.Price:N0} du trésor et {buyout.LegitimacyCost} de légitimité PR.\n" +
-                $"Expropriation : sans payer, {expropriation.LegitimacyCost} de légitimité PR.\n" +
-                $"(Légitimité PR disponible : {sheet.NationalizationLegitimacyAvailable:F1})";
+                $"Rachat : {buyout.Price:N0} du trésor et {buyout.LegitimacyCost} de légitimité CO.\n" +
+                $"Expropriation : sans payer, {expropriation.LegitimacyCost} de légitimité CO.\n" +
+                $"(Légitimité CO disponible : {sheet.NationalizationLegitimacyAvailable:F1})";
     }
 
     private string? SelectedId() => _picker.BuildingId;

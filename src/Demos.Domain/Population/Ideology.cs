@@ -11,7 +11,7 @@ public enum IdeologicalAxis
     /// <summary>Pôle A = PO positiviste, pôle B = EC écologiste.</summary>
     Production,
 
-    /// <summary>Pôle A = PR protectionniste, pôle B = LI libéraux.</summary>
+    /// <summary>Pôle A = CO collectiviste, pôle B = LI libéraux.</summary>
     Property,
 }
 

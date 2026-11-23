@@ -38,7 +38,7 @@ public class LawCostTests
 
         // Membres pondérés : 1 000 ouvriers visés + 100 cadres × 0,5 = 1 050. 1 050 × 0,001 × 30 × 0,25 = 7,875.
         Assert.Equal(7.875 / 2, cost[EG], precision: 9);
-        Assert.Equal(7.875 / 2, cost[PR], precision: 9);
+        Assert.Equal(7.875 / 2, cost[CO], precision: 9);
         Assert.Equal(2, cost.Count);
     }
 
@@ -92,14 +92,14 @@ public class LawCostTests
     {
         Balance.Current = new BalanceSettings();
         var customs = new BrickDefinition("droits", "Droits de douane", "douanes", BrickFamily.Modifier, [SubjectKind.Everyone], 0, -1, 1,
-            [new([PR], [LI])]);
+            [new([CO], [LI])]);
         var catalogue = Catalogue with { Bricks = [.. Catalogue.Bricks, customs] };
         Law Customs(string level) => Law("douane", level, "douanes", Brick(customs, LawSubject.Everyone, 0.5));
 
         var national = LawCost.Of(new LawBook(catalogue, [], Structures), Classes(), null, Customs("etat"));
         var local = LawCost.Of(new LawBook(catalogue, [], Structures), Classes(), null, Customs("commune"));
 
-        Assert.Equal(2 * national[PR], local[PR], precision: 9);
+        Assert.Equal(2 * national[CO], local[CO], precision: 9);
     }
 }
 

@@ -84,7 +84,8 @@ public class ProductionAxisTests
     public void Seuls_les_habitants_de_la_commune_polluee_deviennent_ecologistes()
     {
         var workers = SpreadOverTwoCommunes(Communist);
-        var pollution = new Dictionary<string, double> { ["commune"] = 0.2, ["commune-2"] = 0.01 };
+        // Au-dessus du seuil de pollution, qu'il soit celui par défaut (0,1) ou celui du jeu (0,3, l'écologie en retrait).
+        var pollution = new Dictionary<string, double> { ["commune"] = 0.5, ["commune-2"] = 0.01 };
 
         var ecologists = Assert.Single(ClassTransitions.RunSeasonal([workers], TestTown.Structures, pollution));
 
@@ -140,7 +141,8 @@ public class ProductionAxisTests
     [Fact]
     public void Le_chomage_ne_fait_descendre_que_les_habitants_de_la_commune_sans_emploi()
     {
-        var intermediates = new SocialClass("classe", "classe", Rank.Intermediate, Communist, 1_000) { Wealth = 0 };
+        // Une classe en défiance (adhésion 0,2) : la crise la pousse au repli, sans partage.
+        var intermediates = new SocialClass("classe", "classe", Rank.Intermediate, Communist, 1_000) { Wealth = 0, Adhesion = 0.2 };
         intermediates.SetResidence("commune", 0.5);
         intermediates.SetResidence("commune-2", 0.5);
         intermediates.SetEmployment("ferme", 500);

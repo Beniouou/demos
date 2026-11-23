@@ -7,10 +7,13 @@ public class UnemploymentTests
     private static readonly Ideology Communist = new(Pole.A, Pole.A, Pole.A);
     private static readonly Ideology Feudalist = new(Pole.B, Pole.A, Pole.A);
 
-    /// <summary>Une classe de 1 000 membres dont 200 ont un emploi, et dont la richesse par membre a baissé.</summary>
+    /// <summary>
+    /// Une classe de 1 000 membres dont 200 ont un emploi, dont la richesse par membre a baissé et qui ne fait plus
+    /// confiance aux institutions (adhésion 0,2) : la crise la pousse au repli.
+    /// </summary>
     private static SocialClass HardHit(Rank rank, Ideology ideology, string id = "classe")
     {
-        var socialClass = new SocialClass(id, id, rank, ideology, 1_000) { Wealth = 5_000 };
+        var socialClass = new SocialClass(id, id, rank, ideology, 1_000) { Wealth = 5_000, Adhesion = 0.2 };
         socialClass.SetResidence("commune", 1);
         socialClass.SetEmployment("ferme", 200);
         socialClass.WealthPerMemberLastSeason = 10;
@@ -30,6 +33,37 @@ public class UnemploymentTests
         Assert.Equal("Ouvriers féodalistes", created.Name);
         Assert.Equal(80, created.Population);
         Assert.Equal(920, intermediates.Population);
+    }
+
+    [Fact]
+    public void Une_classe_confiante_et_pas_declassee_repond_a_la_crise_par_la_solidarite()
+    {
+        // Des ouvriers ségrégationnistes ruinés depuis longtemps (richesse stable à 0), qui font confiance (0,8).
+        var workers = HardHit(Rank.Workers, Feudalist);
+        workers.Adhesion = 0.8;
+        workers.Wealth = 0;
+        workers.WealthPerMemberLastSeason = 0;
+
+        var created = Assert.Single(ClassTransitions.RunSeasonal([workers], TestTown.Structures, TestTown.NoPollution));
+
+        Assert.Equal(Communist, created.Ideology);
+        Assert.Equal(80, created.Population);
+    }
+
+    [Fact]
+    public void Une_classe_confiante_mais_declassee_se_divise()
+    {
+        // Des professions intermédiaires communistes qui descendent d'un rang (déclassées) mais font confiance.
+        var intermediates = HardHit(Rank.Intermediate, Communist);
+        intermediates.Adhesion = 0.8;
+
+        var created = ClassTransitions.RunSeasonal([intermediates], TestTown.Structures, TestTown.NoPollution);
+
+        // 80 chômeurs descendent : la moitié reste égalitariste, l'autre devient ségrégationniste.
+        Assert.Equal(2, created.Count);
+        Assert.All(created, c => Assert.Equal(Rank.Workers, c.Rank));
+        Assert.Equal(40, created.Single(c => c.Ideology == Communist).Population);
+        Assert.Equal(40, created.Single(c => c.Ideology == Feudalist).Population);
     }
 
     [Fact]

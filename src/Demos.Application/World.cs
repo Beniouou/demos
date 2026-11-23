@@ -217,6 +217,12 @@ public sealed class World
     /// <summary>Ressource « légitimité » du joueur, un stock par pôle.</summary>
     public LegitimacyPool Legitimacy { get; } = new();
 
+    /// <summary>
+    /// La Promesse de la partie (mode avec promesse) ; nulle en bac à sable. Le choix au départ n'est pas encore codé :
+    /// seule l'école qui l'enseigne s'en sert pour l'instant.
+    /// </summary>
+    public PromiseDefinition? Promise { get; set; }
+
     /// <summary>Ressources financières du joueur.</summary>
     public Treasury Treasury { get; } = new();
 

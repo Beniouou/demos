@@ -35,9 +35,9 @@ try {
         "classe-cadres" = @{ title = "Cadres & Dirigeants (Rang)"; cat = "Classes Sociales"; folder = "classes"; desc = "Plume d'oie calligraphique et sceau d'État. Direction, haute administration et décisionnaires." }
         "pole-eg-egalitariste" = @{ title = "Égalitariste (Pôle EG)"; cat = "Classes Sociales"; folder = "classes"; desc = "Balance parfaitement horizontale (Rouge #E5484D). Égalité stricte, droits universels et redistribution." }
         "pole-se-segregationniste" = @{ title = "Ségrégationniste (Pôle SE)"; cat = "Classes Sociales"; folder = "classes"; desc = "Pyramide à 3 étages stricts (Bleu #4C8DF6). Ordre hiérarchique et privilèges de rang." }
-        "pole-po-positiviste" = @{ title = "Positiviste (Pôle PO)"; cat = "Classes Sociales"; folder = "classes"; desc = "Soleil de la science & dynamo (Violet #9A6CE0). Foi dans l'industrie et maximisation de la production." }
+        "pole-po-positiviste" = @{ title = "Positiviste (Pôle PO)"; cat = "Classes Sociales"; folder = "classes"; desc = "Soleil de la science & dynamo (Orange #F76808). Foi dans l'industrie et maximisation de la production." }
         "pole-ec-ecologiste" = @{ title = "Écologiste (Pôle EC)"; cat = "Classes Sociales"; folder = "classes"; desc = "Feuille de chêne & semence germée (Vert #30A46C). Préservation des ressources et équilibre naturel." }
-        "pole-pr-protectionniste" = @{ title = "Protectionniste (Pôle PR)"; cat = "Classes Sociales"; folder = "classes"; desc = "Bouclier de rempart protégeant le grenier (Turquoise #3DD6B5). Structures collectives et barrières douanières." }
+        "pole-co-collectiviste" = @{ title = "Collectiviste (Pôle CO)"; cat = "Classes Sociales"; folder = "classes"; desc = "Grenier commun (Violet #9A6CE0). Moyens de produire possédés et gérés par la collectivité." }
         "pole-li-liberaux" = @{ title = "Libéraux (Pôle LI)"; cat = "Classes Sociales"; folder = "classes"; desc = "Ailes de Mercure & deniers flottants (Or #F5C542). Liberté d'entreprendre, marché dérégulé et propriété privée." }
 
         # --- BÂTIMENTS (20) ---

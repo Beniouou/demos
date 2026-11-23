@@ -5,9 +5,10 @@ using Demos.Application;
 namespace Demos.Game;
 
 /// <summary>
-/// Le relevé des produits le 1er de chaque mois, pris par l'interface : pour chaque commune et chaque produit, les
-/// totaux depuis le début de la partie (produit, utilisé, envoyé, perdu au stockage, perdu en route) et le stock. La différence entre deux relevés
-/// donne ce qui s'est passé pendant le mois. Il ne dure que le temps de la partie.
+/// Le relevé des produits, pris par l'interface chaque jour joué (décidé le 21 novembre 2026, avant : le 1er de chaque
+/// mois) : pour chaque commune et chaque produit, les totaux depuis le début de la partie (produit, utilisé, envoyé,
+/// perdu au stockage, perdu en route) et le stock. La différence entre deux relevés donne ce qui s'est passé entre eux.
+/// Un relevé de plus d'un an n'est gardé que s'il est du 1er du mois (ou le tout premier). Il ne dure que la partie.
 /// </summary>
 public sealed class ProductionHistory
 {
@@ -18,14 +19,27 @@ public sealed class ProductionHistory
 
     public IReadOnlyList<Snapshot> Snapshots => _snapshots;
 
-    /// <summary>Relève les produits ; un second relevé dans le même mois remplace le premier.</summary>
+    /// <summary>
+    /// Les relevés qui ouvrent un mois (le 1er, et le tout premier de la partie) : deux relevés qui se suivent dans cette
+    /// liste encadrent un mois fini, sauf le dernier, qui ouvre le mois en cours.
+    /// </summary>
+    public IReadOnlyList<Snapshot> MonthStarts => _snapshots.Where((s, index) => index == 0 || s.Date.Day == 1).ToList();
+
+    /// <summary>Relève les produits ; un second relevé le même jour remplace le premier. Tasse ce qui a plus d'un an.</summary>
     public void Record(GameView view)
     {
         var snapshot = new Snapshot(view.Today, view.ProductFlows());
-        if (_snapshots.Count > 0 && _snapshots[^1].Date.Month == snapshot.Date.Month && _snapshots[^1].Date.Year == snapshot.Date.Year)
+        if (_snapshots.Count > 0 && _snapshots[^1].Date == snapshot.Date)
             _snapshots[^1] = snapshot;
         else
             _snapshots.Add(snapshot);
+
+        var limit = view.Today.AddDays(-365);
+        for (var index = _snapshots.Count - 1; index > 0; index--)
+        {
+            if (_snapshots[index].Date < limit && _snapshots[index].Date.Day != 1)
+                _snapshots.RemoveAt(index);
+        }
     }
 }
 

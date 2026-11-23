@@ -55,6 +55,19 @@ public sealed class SocialClass(string id, string name, Rank rank, Ideology ideo
     /// <summary>Part des lois qui s'appliquent à la classe qu'elle accepte, de 0 à 1.</summary>
     public double Adhesion { get; set; } = 1;
 
+    /// <summary>
+    /// Relevé du dernier jour, besoin par besoin (identifiant du besoin, « Housing » pour se loger) : part couverte, part
+    /// manquante faute d'argent, part manquante faute de produits ou de places. Sans effet sur la partie (décidé le
+    /// 21 novembre 2026, pour l'interface) ; la moyenne des parts couvertes fait <see cref="NeedsSatisfaction"/>.
+    /// </summary>
+    public IReadOnlyDictionary<string, NeedRecord> NeedDetails { get; set; } = new Dictionary<string, NeedRecord>();
+
+    /// <summary>
+    /// Relevé du dernier jour, loi par loi : le poids de ses briques que la classe juge et celui qu'elle accepte (voir
+    /// <see cref="LawEffects"/>). Sans effet sur la partie (décidé le 21 novembre 2026, pour l'interface).
+    /// </summary>
+    public IReadOnlyDictionary<string, LawStance> LawStances { get; set; } = new Dictionary<string, LawStance>();
+
     /// <summary>Points d'éducation de base (école, lycée), dépensés pour passer d'ouvrier à profession intermédiaire.</summary>
     public double EducationPoints { get; set; }
 
@@ -114,8 +127,26 @@ public sealed class SocialClass(string id, string name, Rank rank, Ideology ideo
         _seasonSupplyShortageDays++;
     }
 
+    /// <summary>Points d'éducation (de base et avancée) reçus depuis le début de la saison.</summary>
+    public double SeasonEducationPoints { get; private set; }
+
+    /// <summary>Jours d'école comptés depuis le début de la saison.</summary>
+    public int SeasonSchoolDays { get; private set; }
+
+    /// <summary>Élèves moyens de la saison : un point d'éducation par jour compte pour un élève (un lycée compte double).</summary>
+    public double SeasonPupils => SeasonSchoolDays > 0 ? SeasonEducationPoints / SeasonSchoolDays : 0;
+
+    /// <summary>Un jour d'école : les points reçus ce jour-là (zéro si aucun membre n'est à l'école).</summary>
+    public void RecordSchoolDay(double points)
+    {
+        SeasonEducationPoints += points;
+        SeasonSchoolDays++;
+    }
+
     public void StartNewSeason()
     {
+        SeasonEducationPoints = 0;
+        SeasonSchoolDays = 0;
         SeasonIncome = 0;
         SeasonTaxes = 0;
         _seasonShortfallSum = 0;
@@ -245,4 +276,13 @@ public sealed class SocialClass(string id, string name, Rank rank, Ideology ideo
 
     /// <summary>Poids politique = population × modificateur (multiplicateur de rang, ajusté par les lois).</summary>
     public double PoliticalWeight(double rankMultiplier) => Population * rankMultiplier;
+}
+
+/// <summary>Un besoin d'un groupe au dernier jour : part couverte, part manquante faute d'argent, faute de produits ou de places.</summary>
+public sealed record NeedRecord(double Coverage, double MoneyShortfall, double SupplyShortage);
+
+/// <summary>Une loi jugée par un groupe au dernier jour : le poids jugé et le poids accepté (adhésion = accepté ÷ jugé).</summary>
+public sealed record LawStance(double Applicable, double Accepted)
+{
+    public double Share => Applicable > 0 ? Accepted / Applicable : 1;
 }

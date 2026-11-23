@@ -39,7 +39,7 @@ public static class FlowText
     /// <summary>« 120 le mois dernier (toute la commune) », ou depuis le début s'il n'y a pas encore de mois fini.</summary>
     private static string SentText(GameView view, ProductionHistory history, string communeId, string productId)
     {
-        var snapshots = history.Snapshots;
+        var snapshots = history.MonthStarts;
         if (snapshots.Count >= 2)
         {
             var sent = ProductFigures.Of(snapshots[^1].Flows, productId, communeId).Since(ProductFigures.Of(snapshots[^2].Flows, productId, communeId)).Sent;

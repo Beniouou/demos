@@ -74,6 +74,57 @@ public sealed class WorkbookTests : IDisposable
     }
 
     [Fact]
+    public void Le_nom_d_une_Promesse_se_change_dans_la_feuille_Promesses()
+    {
+        WorkbookGenerator.Generate(Saved(), Workbook);
+        using (var workbook = new XLWorkbook(Workbook))
+        {
+            var sheet = workbook.Worksheet("Promesses");
+            Assert.Equal(27, sheet.LastRowUsed()!.RowNumber());
+            var row = sheet.RowsUsed().First(r => r.Cell(6).GetString() == "eg-ec-co");
+            Assert.Equal("La Commune Libre", row.Cell(1).GetString());
+            row.Cell(1).Value = "La Promesse Libre";
+            workbook.Save();
+        }
+
+        Assert.Equal(0, BalanceApplier.Apply(Workbook, _folder, Saved()));
+        Assert.Equal("La Promesse Libre", Saved().LoadPromises().Single(p => p.Id == "eg-ec-co").Name);
+    }
+
+    [Fact]
+    public void Les_passages_se_reglent_dans_la_feuille_Passages()
+    {
+        WorkbookGenerator.Generate(Saved(), Workbook);
+        using (var workbook = new XLWorkbook(Workbook))
+        {
+            var sheet = workbook.Worksheet("Passages");
+            var row = sheet.RowsUsed().First(r => r.Cell(4).GetString() == "PassageConfiance");
+            Assert.Equal(0.5, row.Cell(2).GetDouble(), precision: 9);
+            row.Cell(2).Value = 0.6;
+            workbook.Save();
+        }
+
+        Assert.Equal(0, BalanceApplier.Apply(Workbook, _folder, Saved()));
+        Assert.Equal(0.6, Saved().LoadBalance().TransitionTrustThreshold, precision: 9);
+    }
+
+    [Fact]
+    public void Deux_Promesses_ne_peuvent_pas_porter_le_meme_nom()
+    {
+        WorkbookGenerator.Generate(Saved(), Workbook);
+        using (var workbook = new XLWorkbook(Workbook))
+        {
+            var sheet = workbook.Worksheet("Promesses");
+            sheet.RowsUsed().First(r => r.Cell(6).GetString() == "se").Cell(1).Value = "Le Pacte des Égaux";
+            workbook.Save();
+        }
+
+        var before = File.ReadAllText(Path.Combine(_folder, "promesses.json"));
+        Assert.Equal(1, BalanceApplier.Apply(Workbook, _folder, Saved()));
+        Assert.Equal(before, File.ReadAllText(Path.Combine(_folder, "promesses.json")));
+    }
+
+    [Fact]
     public void Le_cout_et_la_duree_de_construction_se_reglent_dans_la_feuille_Batiments()
     {
         WorkbookGenerator.Generate(Saved(), Workbook);

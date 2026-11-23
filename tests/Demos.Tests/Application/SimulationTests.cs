@@ -278,14 +278,15 @@ public class SimulationTests
     {
         var simulation = CreatePrototype();
 
-        // Du 1er janvier au 31 décembre 1900 : les points s'accumulent, personne ne monte encore.
+        // Du 1er janvier au 31 décembre 1900 : les points s'accumulent, personne ne monte encore. (Des professions
+        // intermédiaires libertaires qui travaillent dans le public deviennent déjà communistes par l'axe propriété.)
         AdvanceDays(simulation, 364);
-        Assert.DoesNotContain(simulation.World.Classes, c => c.Name == "Professions intermédiaires communistes");
+        var before = simulation.World.Classes.Where(c => c.Name == "Professions intermédiaires communistes").Sum(c => c.Population);
 
         // 1er janvier 1901 : les points d'éducation des ouvriers communistes en font monter certains au rang supérieur.
         simulation.AdvanceDay();
         var intermediates = Assert.Single(simulation.World.Classes, c => c.Name == "Professions intermédiaires communistes");
-        Assert.True(intermediates.Population > 0);
+        Assert.True(intermediates.Population > before);
         Assert.Same(intermediates, simulation.World.ClassesById[intermediates.Id]);
 
         // L'université forme, elle, des cadres parmi les professions intermédiaires libertaires.

@@ -47,11 +47,11 @@ Jeu solo de construction de nation (Godot .NET 4.7, C#, .NET 10), en français. 
 | Petites images de la carte | `dotnet run --project tools/Demos.Carte -- --images` (dessine celles qui manquent dans `game/assets/carte/` ; `--forcer` les redessine toutes) |
 
 Le tableur (`equilibrage demos.xlsx`) et le rapport (`rapport simulation.html`) sont **à côté** du dossier `demos/`,
-hors du dépôt. Référence actuelle de la simulation : trésor **252 286** la 3e année (`simuler`, 3 ans, départ préréglé, depuis les
+hors du dépôt. Référence actuelle de la simulation : trésor **254 865** la 3e année (`simuler`, 3 ans, départ préréglé, depuis la crise, l'école et le seuil de pollution à 0,3 du 23 novembre 2026 ; 255 091 depuis les moteurs de l'axe Propriété ; 252 286 depuis les
 objets durables et la chaîne du fer réduite du 20 novembre 2026 ; 252 563 avec la chaîne à 10, 3 et 3 emplois ; 255 632 avec les seuls biens durables ; 251 118 depuis l'ordre
 de la journée par étapes de la chaîne ; avant : 251 177 depuis les routes des bâtiments, 252 207 depuis
 l'atelier de matériaux d'État, 258 846 avant lui ; le chiffre sans loi, 410 815, date d'avant l'atelier). Avec une deuxième
-commune (`simuler 3 commune`) : **114 738** depuis les objets durables (114 268 depuis la durée des trajets du 20 novembre 2026, 114 271 depuis les échanges de
+commune (`simuler 3 commune`) : **118 701** depuis la crise et le seuil de pollution (114 571 depuis les moteurs de l'axe Propriété, 114 738 depuis les objets durables, 114 268 depuis la durée des trajets du 20 novembre 2026, 114 271 depuis les échanges de
 matières, 114 954 avant eux,
 114 989 avant l'ordre par étapes, 116 018 avant les routes des bâtiments, 141 622 avant les routes).
 
@@ -67,7 +67,19 @@ matières, 114 954 avant eux,
 - Contenu dans `game/data/` : `products.json`, `buildings.json`, `besoins.json`, `equilibrage.json` (réglages de
   l'économie, `BalanceSettings`, lus via `Balance.Current`), `partie-depart.json` (partie de départ et lois du départ
   préréglé), `lois.json` (catalogue des lois : domaines, briques, modèles ; voir `Politics/LawBook.cs`),
-  `carte.json` (définition vectorielle du monde : `VectorMapDefinition`).
+  `carte.json` (définition vectorielle du monde : `VectorMapDefinition`), `promesses.json` (les 26 Promesses des exilés,
+  une par combinaison de 1 à 3 pôles, et leurs noms : `Politics/PromiseDefinition.cs`, `LoadPromises`, feuille Promesses du
+  tableur où le nom se change ; sans effet sur la partie pour l'instant).
+- Codes des pôles (`Orientation.Code`) : EG, SE, PO, EC, **CO** (collectiviste, ancien PR « protectionniste », renommé
+  le 23 novembre 2026 partout : code, `lois.json`, `promesses.json`, icône `pole-co-collectiviste.svg`), LI. Axes
+  indépendants : la redistribution relève de la Hiérarchie, la Propriété de qui possède et gère ; chaque brique de
+  `lois.json` ne touche qu'un axe (test `Chaque_brique_de_loi_ne_touche_qu_un_seul_axe`). Les moteurs de l'axe Propriété
+  dans `ClassTransitions` (23 novembre 2026) : expérience du travail (`isStruggling` = `World.Wages.IsStruggling`, lieu
+  public ou SCOP qui va bien → CO, en difficulté → LI, l'inverse pour le privé) et propriété (`OwnerClassId`) ; le manque
+  d'argent et le chômage (la crise) poussent vers EG ou SE selon la confiance (adhésion) et le déclassement ; les
+  prélèvements lourds vers SE ; l'école enseigne La Promesse (`World.Promise`, `SocialClass.SeasonPupils`). Tous les réglages
+  des passages sont dans `BalanceSettings.Transition…` (feuille Passages du tableur, `Book.TransitionRows`, `ApplyTransitions`) ;
+  `pollutedThreshold` 0,3 (écologie en retrait). Pas codés : licenciés, expropriation.
 - **Ne pas coder de réglage en dur** : un chiffre d'équilibrage va dans `BalanceSettings` et `equilibrage.json`, et
   dans la feuille Constantes du tableur (clé dans `AppliedConstants`, ligne dans `WriteConstants`, chemin JSON dans
   `BalanceApplier.Constants`). Les formules du tableur doivent suivre le jeu : la colonne « Écart » de la feuille
@@ -86,7 +98,8 @@ selon `Simulation.PlanConstruction` (`ConstructionPlan` : réserve, stock de l'�
 `Trade.BuildingDemand`. Interface : `ConstructionPage` (taille − +, origine des matériaux, zone vérifiée à la pose).
 Familles de produits (21 novembre 2026, sans effet sur la partie) : `ProductDefinition.Family` (`ProductFamily`, champ
 `family` de `products.json`, test `Chaque_produit_a_une_famille`) ; noms et rangement dans `game/scripts/ProductFamilies.cs` ;
-Ressources → Stocks (`StocksPage`) et Communes → Statistiques (`ProductionStatsPage`) rangés par famille, repliables.
+Ressources → Stocks (`StocksPage` : famille → produit avec son total → répartition par commune ; stockage des communes en
+bas) et Communes → Statistiques (`ProductionStatsPage`) rangés par famille, repliables.
 Objets durables (20 novembre 2026) : `ProductDefinition.UsageDays` (vêtements, meubles, poterie, outils, charrette) ;
 habitants : `SocialClass.Possessions`, possession visée `possessionByRank`, rachat de l'usure + `possessionCatchUp` du manque
 (`Consumption`, seulement si le produit a une durée d'usage), équipés au départ (`Consumption.EquipFully`) ; bâtiments :
@@ -197,16 +210,20 @@ désactivés : TVA sur la valeur ajoutée, épargne progressive des entreprises.
   `YearPassed` (bilan : trésor et habitants depuis le 1er janvier) et le bilan des routes ; les messages d'une même image
   vont ensemble dans la barre du bas (textes dans `EventText.cs` ; le message entier au survol). La charte de fondation
   (`GameView.CharterOf`) s'affiche dans la fiche d'une commune, avec son effet sur les migrations en bulle d'aide.
-- Menu Population (13 novembre 2026), en lecture : « Vue d'ensemble » (`PopulationOverviewPage` : toutes les communes ou
-  une seule ; habitants, logements, emplois, chômeurs, moyennes des besoins, logés et adhésion, barres des membres par
-  rang et par pôle, tableau par commune), « Groupes sociaux » (`PopulationGroupsPage` : arbre communes → rangs
-  repliables → groupes locaux nommés par leur idéologie ; fiche d'un rang : ses groupes ; fiche du groupe : idéologie, chômeurs, richesse, revenus et impôts de la saison, manques, éducation, lieux de
-  travail), « Évolution » (`PopulationHistoryPage` : courbe de la mesure choisie, une par commune, un point par mois ;
-  tableau d'une ligne par saison). Chiffres agrégés dans `PopulationStats.cs`, bulles d'aide (règles et constantes du
+- Menu Population (refait le 21 novembre 2026), en lecture, pour toute la nation ou une commune : « Besoins »
+  (`PopulationNeedsPage` : tableau en couleurs besoin × rang, clic → causes du manque en barre, groupes, croissance et
+  pôles poussés), « Groupes et attentes » (`PopulationGroupsPage` : carte `GroupMap`, une bulle par classe sur deux axes
+  au choix, le troisième en couleur ; fiche : pôles voulus, adhésion, lois rejetées et acceptées, pressions comparées
+  aux seuils de `ClassTransitions`, besoins, puis commune par commune), « Évolution » (`PopulationHistoryPage` : courbes
+  de la satisfaction de chaque besoin, des membres par rang, de l'adhésion par pôle, du chômage par rang, de la richesse).
+  Relevés sans effet sur la partie : `SocialClass.NeedDetails` (`NeedRecord`, par `Consumption`) et `LawStances`
+  (`LawStance`, par `LawEffects`), lus par `SocialClassView.NeedDetails` / `LawStances` (`LawStanceView`).
+  L'ancienne vue d'ensemble est devenue Communes → Habitants (`PopulationOverviewPage(view, Focus)`).
+  Chiffres agrégés dans `PopulationStats.cs` (`NeedCells`, `UnemployedByRank`, `AdhesionByPole`, `NeedsByRank`), bulles d'aide (règles et constantes du
   moteur) dans `PopulationText.cs`. Graphiques dessinés par Godot, réutilisables : `LineChart` (courbes, axe serré
   autour des relevés sauf pour une part, survol) et `StackedBar` (barre en parts) ; couleurs `UiTheme.SeriesColor`.
   La simulation ne garde pas d'historique : le relevé (`PopulationHistory`, `MainMenu.History`) est pris par `Main`
-  après le premier jour joué puis le 1er de chaque mois (décidé le 15 novembre 2026), et ne dure que la partie. `SocialClassView` porte aussi les pôles, le nom de l'idéologie, les chômeurs, les revenus
+  chaque jour joué, tassé à un relevé par mois au-delà d'un an (décidé le 21 novembre 2026 ; de même pour `ProductionHistory`, dont `MonthStarts` sert au tableau de Statistiques et à `FlowText`), et ne dure que la partie. `SocialClassView` porte aussi les pôles, le nom de l'idéologie, les chômeurs, les revenus
   et manques de la saison, la richesse par membre et les lieux de travail (`WorkplaceView`).
 - Communes → Statistiques (15 novembre 2026), en lecture (`ProductionStatsPage`) : pour la commune du menu (avant le
   20 novembre : toutes les communes ou une
@@ -218,7 +235,7 @@ désactivés : TVA sur la valeur ajoutée, épargne progressive des entreprises.
   se périment en fin de journée par `Storage.SpoilOutsideStorage`, comptés par `Market.CountLost`) et
   `World.CountProduced` (appelé par
   `Simulation.CountProduction` après la journée de travail) ; lecture par `GameView.ProductFlows` (totaux depuis le
-  début). Relevé mensuel par l'interface (`ProductionHistory`, `MainMenu.ProductionHistory`), pris avec celui de la
+  début). Relevé quotidien par l'interface (`ProductionHistory`, `MainMenu.ProductionHistory`), pris avec celui de la
   population ; un mois = différence entre deux relevés.
 - Communes → Chaîne de production (15 novembre 2026, `ProductionChainPage`) : schéma d'une commune (`ChainDiagram`,
   dessiné par Godot, en bandes depuis le 19 novembre 2026 : une bande par besoin nourri — Se nourrir, Se distraire,

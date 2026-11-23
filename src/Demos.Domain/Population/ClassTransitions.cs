@@ -11,8 +11,11 @@ namespace Demos.Domain.Population;
 /// - chaque saison, vers le bas, par le chômage : des chômeurs descendent d'un rang (sauf les ouvriers) et
 ///   deviennent ségrégationnistes s'ils étaient égalitaristes ;
 /// - chaque saison, par le plein emploi : des membres d'une classe ségrégationniste redeviennent égalitaristes ;
-/// - chaque saison, sur l'axe propriété : une classe qui travaille sans pouvoir couvrir ses besoins devient
-///   protectionniste, une classe comblée mais fortement prélevée devient libérale ;
+/// - chaque saison, sur l'axe hiérarchie aussi : une classe qui travaille sans pouvoir couvrir ses besoins devient
+///   égalitariste, une classe comblée mais fortement prélevée devient ségrégationniste ;
+/// - chaque saison, sur l'axe propriété (décidé le 23 novembre 2026) : l'expérience du travail (un lieu de travail
+///   collectif qui va bien rend collectiviste, en difficulté libéral ; l'inverse pour une entreprise privée) et ce que
+///   l'on posséde (posséder une entreprise privée retient vers libéral, une SCOP vers collectiviste) ;
 /// - chaque saison, sur l'axe production : vivre dans une commune polluée rend écologiste, manquer de
 ///   produits ou de places rend positiviste.
 /// Les passages saisonniers se jugent commune par commune (voir <see cref="RunSeasonal"/>).
@@ -20,22 +23,22 @@ namespace Demos.Domain.Population;
 public static class ClassTransitions
 {
     /// <summary>Proposition : une année d'études (365 points) fait monter un membre d'un rang.</summary>
-    public const double EducationPointsPerPromotion = 365;
+    public static double EducationPointsPerPromotion => Economy.Balance.Current.TransitionEducationPointsPerPromotion;
 
     /// <summary>Proposition : au plus 2 % des membres d'une classe montent de rang chaque année.</summary>
-    public const double MaxYearlyPromotionShare = 0.02;
+    public static double MaxYearlyPromotionShare => Economy.Balance.Current.TransitionMaxYearlyPromotionShare;
 
     /// <summary>Proposition : le chômage pèse au-delà de 20 % de chômeurs dans la classe.</summary>
-    public const double UnemploymentThreshold = 0.2;
+    public static double UnemploymentThreshold => Economy.Balance.Current.TransitionUnemploymentThreshold;
 
     /// <summary>Proposition : chaque saison, 10 % des chômeurs d'une classe touchée descendent ou basculent.</summary>
-    public const double UnemployedShareAffected = 0.1;
+    public static double UnemployedShareAffected => Economy.Balance.Current.TransitionUnemployedShare;
 
     /// <summary>Proposition : une classe est en plein emploi quand moins de 5 % de ses membres sont au chômage.</summary>
-    public const double FullEmploymentThreshold = 0.05;
+    public static double FullEmploymentThreshold => Economy.Balance.Current.TransitionFullEmploymentThreshold;
 
     /// <summary>Proposition : chaque saison, 5 % des membres d'une classe ségrégationniste en plein emploi redeviennent égalitaristes.</summary>
-    public const double FullEmploymentShareAffected = 0.05;
+    public static double FullEmploymentShareAffected => Economy.Balance.Current.TransitionFullEmploymentShare;
 
     /// <summary>Un passage d'un rang à un autre, et la ressource de la classe qu'il dépense.</summary>
     private sealed record Promotion(Rank From, Rank To, Func<SocialClass, double> Points, Action<SocialClass, double> Spend);
@@ -68,22 +71,34 @@ public static class ClassTransitions
     }
 
     /// <summary>Proposition : une classe qui travaille manque d'argent quand 20 % de ses besoins restent non couverts faute d'argent.</summary>
-    public const double MoneyShortfallThreshold = 0.2;
+    public static double MoneyShortfallThreshold => Economy.Balance.Current.TransitionMoneyShortfallThreshold;
 
     /// <summary>Proposition : un prélèvement est important au-delà de 30 % des revenus de la saison.</summary>
-    public const double HeavyTaxRateThreshold = 0.3;
+    public static double HeavyTaxRateThreshold => Economy.Balance.Current.TransitionHeavyTaxThreshold;
 
     /// <summary>Proposition : une classe a ses besoins complètement satisfaits au-delà de 99 %.</summary>
-    public const double FullySatisfiedThreshold = 0.99;
+    public static double FullySatisfiedThreshold => Economy.Balance.Current.TransitionFullySatisfiedThreshold;
 
     /// <summary>Proposition : chaque saison, 5 % des membres d'une classe concernée basculent sur l'axe propriété.</summary>
-    public const double PropertyShareAffected = 0.05;
+    public static double PropertyShareAffected => Economy.Balance.Current.TransitionPropertyShare;
 
     /// <summary>Proposition : une classe manque de produits quand 20 % de ses besoins restent non couverts faute de produits ou de places.</summary>
-    public const double SupplyShortageThreshold = 0.2;
+    public static double SupplyShortageThreshold => Economy.Balance.Current.TransitionSupplyShortageThreshold;
 
     /// <summary>Proposition : chaque saison, 5 % des membres concernés basculent sur l'axe production.</summary>
-    public const double ProductionShareAffected = 0.05;
+    public static double ProductionShareAffected => Economy.Balance.Current.TransitionProductionShare;
+
+    /// <summary>Proposition : chaque saison, 5 % des membres basculent sur l'axe hiérarchie par le manque d'argent ou les prélèvements.</summary>
+    public static double HierarchyShareAffected => Economy.Balance.Current.TransitionHierarchyShare;
+
+    /// <summary>Proposition : une classe en crise fait confiance aux institutions à partir de 0,5 d'adhésion.</summary>
+    public static double TrustThreshold => Economy.Balance.Current.TransitionTrustThreshold;
+
+    /// <summary>Proposition : quand la crise divise, la moitié des membres concernés va vers l'égalitarisme, l'autre vers le ségrégationnisme.</summary>
+    public static double CrisisSplit => Economy.Balance.Current.TransitionCrisisSplit;
+
+    /// <summary>Proposition : chaque saison, 2 % des élèves rejoignent un pôle de La Promesse.</summary>
+    public static double PromiseSchoolShare => Economy.Balance.Current.TransitionPromiseSchoolShare;
 
     /// <summary>Un départ prévu : des membres d'une classe, pris dans une commune, vers une autre classe.</summary>
     private sealed record Move(SocialClass Source, string CommuneId, Rank Rank, Ideology Ideology, double Members);
@@ -95,10 +110,16 @@ public static class ClassTransitions
     /// dépendent du marché national et de la richesse de la classe, se mesurent pour toute la classe.
     /// Renvoie les classes nées de ces passages.
     /// </summary>
+    /// <param name="isStruggling">
+    /// Un bâtiment est-il en difficulté (moins de 80 % des salaires payés sur 30 jours) ? Sans lui, l'expérience du
+    /// travail ne joue pas sur l'axe propriété (seule la propriété des entreprises compte).
+    /// </param>
     public static List<SocialClass> RunSeasonal(
         IReadOnlyList<SocialClass> classes,
         IReadOnlyDictionary<string, Structure> structures,
-        IReadOnlyDictionary<string, double> pollutionByCommune)
+        IReadOnlyDictionary<string, double> pollutionByCommune,
+        Func<string, bool>? isStruggling = null,
+        PromiseDefinition? promise = null)
     {
         var destinations = new ClassFinder(classes);
         var workplacesByCommune = Communes.All(structures).ToDictionary(
@@ -109,6 +130,7 @@ public static class ClassTransitions
         var moves = new List<Move>();
         foreach (var source in destinations.All.Where(c => c.Population > 0))
         {
+            var ownership = OwnershipOf(source, structures);
             foreach (var (communeId, workplaces) in workplacesByCommune)
             {
                 var living = source.MembersLivingIn(communeId);
@@ -117,7 +139,9 @@ public static class ClassTransitions
 
                 var employed = workplaces.Sum(s => source.MembersWorkingIn(s.Id));
                 var unemployed = Math.Max(0, living - employed);
-                moves.AddRange(PlanMoves(source, communeId, living, unemployed / living, unemployed, pollutionByCommune.GetValueOrDefault(communeId)));
+                var work = isStruggling is null ? default : WorkExperienceOf(source, workplaces, isStruggling);
+                moves.AddRange(PlanMoves(source, communeId, living, unemployed / living, unemployed, pollutionByCommune.GetValueOrDefault(communeId),
+                    work, ownership, promise));
             }
         }
 
@@ -133,43 +157,100 @@ public static class ClassTransitions
         return destinations.Created;
     }
 
+    /// <summary>
+    /// Les membres d'une classe que leur travail pousse sur l'axe propriété, dans une commune : vers collectiviste
+    /// (un lieu public ou une SCOP qui va bien, une entreprise privée en difficulté), vers libéral (l'inverse).
+    /// </summary>
+    private readonly record struct WorkExperience(double TowardCollective, double TowardPrivate);
+
+    /// <summary>Ce que possède une classe : des entreprises privées, des SCOP.</summary>
+    private readonly record struct Holdings(bool OwnsPrivate, bool OwnsCooperative);
+
+    private static WorkExperience WorkExperienceOf(SocialClass source, IEnumerable<Structure> workplaces, Func<string, bool> isStruggling)
+    {
+        double collective = 0, @private = 0;
+        foreach (var workplace in workplaces)
+        {
+            var members = source.MembersWorkingIn(workplace.Id);
+            if (members <= 0)
+                continue;
+
+            var goesWell = !isStruggling(workplace.Id);
+            if ((workplace.Ownership == Ownership.Private) == goesWell)
+                @private += members;
+            else
+                collective += members;
+        }
+
+        return new WorkExperience(collective, @private);
+    }
+
+    private static Holdings OwnershipOf(SocialClass source, IReadOnlyDictionary<string, Structure> structures) => new(
+        structures.Values.Any(s => s.Ownership == Ownership.Private && s.OwnerClassId == source.Id),
+        structures.Values.Any(s => s.Ownership == Ownership.Cooperative && s.OwnerClassId == source.Id));
+
     private static IEnumerable<Move> PlanMoves(
-        SocialClass source, string communeId, double living, double unemploymentRate, double unemployed, double pollution)
+        SocialClass source, string communeId, double living, double unemploymentRate, double unemployed, double pollution,
+        WorkExperience work = default, Holdings holdings = default, PromiseDefinition? promise = null)
     {
         var ideology = source.Ideology;
         Move Switch(IdeologicalAxis axis, Pole pole, double share) =>
             new(source, communeId, source.Rank, ideology.With(axis, pole), living * share);
 
-        // Axe hiérarchie. Chômage : si plus de 20 % de chômeurs et une richesse par membre qui n'augmente plus,
-        // 10 % des chômeurs descendent d'un rang (s'ils le peuvent) et deviennent ségrégationnistes.
-        // Plein emploi : moins de 5 % de chômeurs ramène 5 % des ségrégationnistes vers l'égalitarisme.
-        if (unemploymentRate > UnemploymentThreshold
-            && source.WealthPerMemberLastSeason is { } previous
-            && source.WealthPerMember <= previous)
+        // Axe hiérarchie (crise : solidarité ou repli, décidé le 23 novembre 2026). Une classe en crise — le chômage
+        // (plus de 20 % de chômeurs et une richesse par membre qui ne monte plus) ou le manque d'argent en travaillant —
+        // bascule selon la confiance (son adhésion) et le déclassement (richesse par membre en baisse sur la saison, ou
+        // descente de rang) : confiance sans déclassement, solidarité (vers l'égalitarisme) ; défiance et déclassement,
+        // repli (vers le ségrégationnisme) ; sinon la crise divise. Le chômage fait aussi descendre d'un rang (10 % des
+        // chômeurs), le manque d'argent fait basculer 5 % des membres. Hors crise : le plein emploi ramène 5 % des
+        // ségrégationnistes vers l'égalitarisme, et être comblé mais fortement prélevé rend ségrégationniste.
+        var trusting = source.Adhesion >= TrustThreshold;
+        var poorer = source.WealthPerMemberLastSeason is { } previous && source.WealthPerMember < previous;
+        var unemploymentCrisis = unemploymentRate > UnemploymentThreshold
+            && source.WealthPerMemberLastSeason is { } last && source.WealthPerMember <= last;
+        var moneyCrisis = !unemploymentCrisis
+            && unemploymentRate <= UnemploymentThreshold && source.SeasonMoneyShortfall >= MoneyShortfallThreshold;
+
+        if (unemploymentCrisis || moneyCrisis)
         {
-            var rank = source.Rank == Rank.Workers ? Rank.Workers : source.Rank - 1;
-            var segregationist = ideology.With(IdeologicalAxis.Hierarchy, Pole.B);
-            if (rank != source.Rank || segregationist != ideology)
-                yield return new Move(source, communeId, rank, segregationist, unemployed * UnemployedShareAffected);
+            var rank = unemploymentCrisis && source.Rank != Rank.Workers ? source.Rank - 1 : source.Rank;
+            var members = unemploymentCrisis ? unemployed * UnemployedShareAffected : living * HierarchyShareAffected;
+            var declassed = poorer || rank != source.Rank;
+            var towardEgalitarian = trusting && !declassed ? 1 : !trusting && declassed ? 0 : CrisisSplit;
+            foreach (var (pole, part) in new[] { (Pole.A, towardEgalitarian), (Pole.B, 1 - towardEgalitarian) })
+            {
+                var target = ideology.With(IdeologicalAxis.Hierarchy, pole);
+                if (part > 0 && (rank != source.Rank || target != ideology))
+                    yield return new Move(source, communeId, rank, target, members * part);
+            }
         }
-        else if (unemploymentRate < FullEmploymentThreshold && ideology[IdeologicalAxis.Hierarchy] == Pole.B)
+        else if (ideology[IdeologicalAxis.Hierarchy] == Pole.B && unemploymentRate < FullEmploymentThreshold)
         {
             yield return Switch(IdeologicalAxis.Hierarchy, Pole.A, FullEmploymentShareAffected);
         }
-
-        // Axe propriété. Travailler sans pouvoir couvrir ses besoins rend protectionniste ;
-        // être comblé mais fortement prélevé rend libéral.
-        if (unemploymentRate <= UnemploymentThreshold
-            && source.SeasonMoneyShortfall >= MoneyShortfallThreshold
-            && ideology[IdeologicalAxis.Property] == Pole.B)
+        else if (ideology[IdeologicalAxis.Hierarchy] == Pole.A
+            && source.NeedsSatisfaction >= FullySatisfiedThreshold
+            && source.SeasonTaxRate >= HeavyTaxRateThreshold)
         {
-            yield return Switch(IdeologicalAxis.Property, Pole.A, PropertyShareAffected);
+            yield return Switch(IdeologicalAxis.Hierarchy, Pole.B, HierarchyShareAffected);
         }
-        else if (source.NeedsSatisfaction >= FullySatisfiedThreshold
-            && source.SeasonTaxRate >= HeavyTaxRateThreshold
-            && ideology[IdeologicalAxis.Property] == Pole.A)
+
+        // Axe propriété (décidé le 23 novembre 2026). L'expérience du travail : les membres d'un lieu collectif qui va
+        // bien, ou d'une entreprise privée en difficulté, tirent vers le collectivisme ; l'inverse vers le libéralisme.
+        // Ce que l'on possède retient (ou pousse) toute la classe : une entreprise privée vers le libéralisme, une SCOP
+        // vers le collectivisme. Chaque membre compte une fois ; 5 % des membres poussés basculent.
+        var ownersPull = living * ((holdings.OwnsCooperative ? 1 : 0) - (holdings.OwnsPrivate ? 1 : 0));
+        if (ideology[IdeologicalAxis.Property] == Pole.B)
         {
-            yield return Switch(IdeologicalAxis.Property, Pole.B, PropertyShareAffected);
+            var pushed = Math.Clamp(work.TowardCollective + ownersPull, 0, living);
+            if (pushed >= 1)
+                yield return new Move(source, communeId, source.Rank, ideology.With(IdeologicalAxis.Property, Pole.A), pushed * PropertyShareAffected);
+        }
+        else
+        {
+            var pushed = Math.Clamp(work.TowardPrivate - ownersPull, 0, living);
+            if (pushed >= 1)
+                yield return new Move(source, communeId, source.Rank, ideology.With(IdeologicalAxis.Property, Pole.B), pushed * PropertyShareAffected);
         }
 
         // Axe production. Vivre dans une commune polluée rend écologiste ;
@@ -178,6 +259,16 @@ public static class ClassTransitions
             yield return Switch(IdeologicalAxis.Production, Pole.B, ProductionShareAffected);
         else if (source.SeasonSupplyShortage >= SupplyShortageThreshold && ideology[IdeologicalAxis.Production] == Pole.B)
             yield return Switch(IdeologicalAxis.Production, Pole.A, ProductionShareAffected);
+
+        // L'école enseigne La Promesse (décidé le 23 novembre 2026, mode avec promesse) : 2 % des élèves de la saison
+        // rejoignent un pôle de La Promesse, sur le premier axe où la classe s'en écarte (un axe à la fois).
+        var missing = promise?.Orientations.Where(p => ideology[p.Axis] != p.Pole).ToList() ?? [];
+        if (missing.Count > 0 && source.SeasonPupils > 0 && source.Population > 0)
+        {
+            var wanted = missing[0];
+            var pupilsHere = source.SeasonPupils * living / source.Population;
+            yield return new Move(source, communeId, source.Rank, ideology.With(wanted.Axis, wanted.Pole), pupilsHere * PromiseSchoolShare);
+        }
     }
 
     /// <summary>

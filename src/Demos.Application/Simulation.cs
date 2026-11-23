@@ -344,7 +344,7 @@ public sealed class Simulation(World world, GameClock clock)
         World.Wages.Forget(building.Id);
     }
 
-    /// <summary>Pôle d'une nationalisation : protectionniste (PR).</summary>
+    /// <summary>Pôle d'une nationalisation : collectiviste (CO).</summary>
     public static readonly Orientation NationalizationPole = new(IdeologicalAxis.Property, Pole.A);
 
     /// <summary>Une entreprise est en difficulté quand elle a versé moins de 80 % des salaires dus sur 30 jours.</summary>
@@ -1035,7 +1035,7 @@ public sealed class Simulation(World world, GameClock clock)
         foreach (var socialClass in World.Classes)
             socialClass.Grow();
 
-        foreach (var created in ClassTransitions.RunSeasonal(World.Classes, World.Structures, World.PollutionByCommune))
+        foreach (var created in ClassTransitions.RunSeasonal(World.Classes, World.Structures, World.PollutionByCommune, World.Wages.IsStruggling, World.Promise))
             World.AddClass(created);
 
         foreach (var created in Migration.RunSeasonal(World.Structures, World.Classes, World.CharterOf))

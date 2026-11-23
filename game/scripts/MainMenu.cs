@@ -104,8 +104,8 @@ public partial class MainMenu : HBoxContainer
             ], Wide: true),
             new("Population",
             [
-                new("Vue d'ensemble", () => new PopulationOverviewPage(view)),
-                new("Groupes sociaux", () => new PopulationGroupsPage(view)),
+                new("Besoins", () => new PopulationNeedsPage(view)),
+                new("Groupes et attentes", () => new PopulationGroupsPage(view)),
                 new("Évolution", () => new PopulationHistoryPage(view, History)),
             ], Wide: true),
             // Le menu d'une commune (décidé le 20 novembre 2026) : tous ses onglets montrent la commune choisie au-dessus d'eux
@@ -117,6 +117,7 @@ public partial class MainMenu : HBoxContainer
                 new("Transport", () => new TransportPage(view, desk, Focus)),
                 new("Chaîne de production", () => new ProductionChainPage(view, ShowBuilding, Focus)),
                 new("Statistiques", () => new ProductionStatsPage(view, ProductionHistory, Focus)),
+                new("Habitants", () => new PopulationOverviewPage(view, Focus)),
             ], Wide: true),
             new("Recherche",
             [
@@ -359,8 +360,8 @@ public partial class MainMenu : HBoxContainer
         "Code civil" or "Éditeur de lois" => IconRegistry.GetMenuIcon("Lois", 16),
         "Gestion des entités politiques" or "Organisme" => IconRegistry.GetMenuIcon("Structure", 16),
         "Création d'entité politique" => IconRegistry.GetCategoryIcon("Administration", 16),
-        "Vue d'ensemble" or "Évolution" => IconRegistry.GetMenuIcon("Population", 16),
-        "Groupes sociaux" => IconRegistry.GetRankIcon(Demos.Domain.Population.Rank.Executives, 16),
+        "Besoins" or "Évolution" or "Habitants" => IconRegistry.GetMenuIcon("Population", 16),
+        "Groupes et attentes" => IconRegistry.GetRankIcon(Demos.Domain.Population.Rank.Executives, 16),
         "Unités de production" or "Chaîne de production" => IconRegistry.GetCategoryIcon("Production", 16),
         "Construire" => IconRegistry.GetCategoryIcon("Extraction", 16),
         "Transport" => IconRegistry.GetCategoryIcon("Logistique", 16),

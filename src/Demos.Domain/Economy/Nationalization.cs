@@ -22,7 +22,7 @@ public enum NationalizationOutcome
 /// <summary>
 /// Nationalisation : l'État reprend un bâtiment privé ou coopératif, sans que le propriétaire puisse refuser. Une
 /// entreprise en difficulté (qui ne paie plus ses salaires) se rachète presque pour rien et coûte peu de légitimité
-/// protectionniste (PR) ; une entreprise qui marche se rachète cher, en argent et en légitimité. L'expropriation ne
+/// collectiviste (CO) ; une entreprise qui marche se rachète cher, en argent et en légitimité. L'expropriation ne
 /// coûte rien en argent mais beaucoup en légitimité. Toutes les valeurs sont des propositions.
 /// </summary>
 public static class Nationalization

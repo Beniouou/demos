@@ -7,7 +7,7 @@ namespace Demos.Tests.Application;
 public class LawCommissionTests
 {
     private static readonly Orientation EG = Orientation.FromCode("EG");
-    private static readonly Orientation PR = Orientation.FromCode("PR");
+    private static readonly Orientation CO = Orientation.FromCode("CO");
     private static readonly Orientation EC = Orientation.FromCode("EC");
 
     private static Simulation WithoutLaws() => PrototypeScenario.Create(GameData.Content(), StartingLaws.None);
@@ -65,7 +65,7 @@ public class LawCommissionTests
     {
         var simulation = WithoutLaws();
         simulation.World.Legitimacy.Add(EG, 100);
-        simulation.World.Legitimacy.Add(PR, 100);
+        simulation.World.Legitimacy.Add(CO, 100);
         var state = simulation.World.Structures.Values.Single(s => s.IsNational).Id;
 
         Assert.Null(simulation.DraftBlank("Essai", "domaine-inconnu", state));
@@ -88,7 +88,7 @@ public class LawCommissionTests
     {
         var simulation = WithoutLaws();
         simulation.World.Legitimacy.Add(EG, 100);
-        simulation.World.Legitimacy.Add(PR, 100);
+        simulation.World.Legitimacy.Add(CO, 100);
         IReadOnlyList<LawDraft>? enacted = null;
         simulation.LawsEnacted += changes => enacted = changes;
 
@@ -162,7 +162,7 @@ public class LawCommissionTests
         var simulation = WithoutLaws();
         var locked = simulation.World.LawCatalogue.TemplateOf("liberte-entreprendre")!.ToLaw("liberte");
         simulation.EnactAtStart(locked with { Bricks = [locked.Bricks[0] with { Locked = true }] });
-        simulation.World.Legitimacy.Add(PR, 1_000);
+        simulation.World.Legitimacy.Add(CO, 1_000);
         simulation.World.Legitimacy.Add(Orientation.FromCode("LI"), 1_000);
 
         var draftId = simulation.DraftFromTemplate("economie-cooperative")!;
@@ -183,6 +183,6 @@ public class LawCommissionTests
         // La liberté d'entreprendre de l'État autorise (1) ; la commune interdit dans l'alimentation (0).
         Assert.Equal(1, ban.Reference);
         Assert.Equal(1, ban.Intensity, precision: 9);
-        Assert.Equal([PR], ban.Poles);
+        Assert.Equal([CO], ban.Poles);
     }
 }

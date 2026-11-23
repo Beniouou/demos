@@ -6,7 +6,7 @@ namespace Demos.Tests.Application;
 
 public class NationalizationTests
 {
-    /// <summary>Partie de départ après 5 jours, avec assez de légitimité PR et d'argent au trésor.</summary>
+    /// <summary>Partie de départ après 5 jours, avec assez de légitimité CO et d'argent au trésor.</summary>
     private static Simulation Prototype()
     {
         var simulation = PrototypeScenario.Create(GameData.Content());

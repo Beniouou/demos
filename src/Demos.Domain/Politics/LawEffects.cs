@@ -23,9 +23,12 @@ public static class LawEffects
         {
             double applicable = 0;
             double accepted = 0;
+            // Le relevé loi par loi, pour l'interface (sans effet sur la partie).
+            var stances = new Dictionary<string, LawStance>();
 
             foreach (var law in book.Laws)
             {
+                var (lawApplicable, lawAccepted) = (applicable, accepted);
                 if (!book.Structures.TryGetValue(law.StructureId, out var level))
                     continue;
 
@@ -53,9 +56,13 @@ public static class LawEffects
                         legitimacy.Add(pole, LegitimacyPerMemberPerDay * socialClass.Population * weight);
                     }
                 }
+
+                if (applicable > lawApplicable)
+                    stances[law.Id] = new LawStance(applicable - lawApplicable, accepted - lawAccepted);
             }
 
             socialClass.Adhesion = applicable > 0 ? accepted / applicable : 1;
+            socialClass.LawStances = stances;
         }
     }
 }
