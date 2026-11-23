@@ -34,4 +34,7 @@ public interface IContentSource
 
     /// <summary>Les Promesses des exilés (une par combinaison de 1 à 3 pôles) et leurs noms ; vide si le fichier manque.</summary>
     IReadOnlyList<PromiseDefinition> LoadPromises() => [];
+
+    /// <summary>Le catalogue des engagements de La Promesse, par pôle ; vide si le fichier manque.</summary>
+    IReadOnlyList<EngagementDefinition> LoadEngagements() => [];
 }

@@ -109,6 +109,28 @@ public sealed class WorkbookTests : IDisposable
     }
 
     [Fact]
+    public void Les_engagements_se_reglent_dans_la_feuille_Engagements()
+    {
+        WorkbookGenerator.Generate(Saved(), Workbook);
+        using (var workbook = new XLWorkbook(Workbook))
+        {
+            var sheet = workbook.Worksheet("Engagements");
+            var row = sheet.RowsUsed().First(r => r.Cell(8).GetString() == "li-expropriation");
+            Assert.Equal("Nul ne sera dépossédé", row.Cell(3).GetString());
+            row.Cell(3).Value = "Nul ne sera spolié";
+            row.Cell(5).Value = 2;
+            row.Cell(6).Value = "non";
+            workbook.Save();
+        }
+
+        Assert.Equal(0, BalanceApplier.Apply(Workbook, _folder, Saved()));
+        var engagement = Saved().LoadEngagements().Single(e => e.Id == "li-expropriation");
+        Assert.Equal("Nul ne sera spolié", engagement.Text);
+        Assert.Equal(2, engagement.Difficulty);
+        Assert.False(engagement.Kept);
+    }
+
+    [Fact]
     public void Deux_Promesses_ne_peuvent_pas_porter_le_meme_nom()
     {
         WorkbookGenerator.Generate(Saved(), Workbook);

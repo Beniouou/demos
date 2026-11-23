@@ -23,6 +23,7 @@ public static class BalanceApplier
     private const string ProductsFile = "products.json";
     private const string ScenarioFile = "partie-depart.json";
     private const string PromisesFile = "promesses.json";
+    private const string EngagementsFile = "engagements.json";
 
     /// <summary>La possession visée par personne d'un besoin durable pour un rang (0 sans réglage).</summary>
     private static double Possession(BalanceSettings balance, Rank rank, NeedCategory need) =>
@@ -158,12 +159,16 @@ public static class BalanceApplier
         var promisesPath = Path.Combine(dataDirectory, PromisesFile);
         if (File.Exists(promisesPath))
             texts[PromisesFile] = File.ReadAllText(promisesPath);
+        var engagementsPath = Path.Combine(dataDirectory, EngagementsFile);
+        if (File.Exists(engagementsPath))
+            texts[EngagementsFile] = File.ReadAllText(engagementsPath);
         var applier = new Applier(workbook, content,
             JsonNode.Parse(texts[BalanceFile])!.AsObject(),
             JsonNode.Parse(texts[BuildingsFile])!.AsArray(),
             JsonNode.Parse(texts[ProductsFile])!.AsArray(),
             JsonNode.Parse(texts[ScenarioFile])!.AsObject(),
-            texts.TryGetValue(PromisesFile, out var promisesText) ? JsonNode.Parse(promisesText)!.AsArray() : null);
+            texts.TryGetValue(PromisesFile, out var promisesText) ? JsonNode.Parse(promisesText)!.AsArray() : null,
+            texts.TryGetValue(EngagementsFile, out var engagementsText) ? JsonNode.Parse(engagementsText)!.AsArray() : null);
 
         applier.Run();
         using (workbook) { }
@@ -191,6 +196,8 @@ public static class BalanceApplier
         };
         if (applier.PromisesJson is { } promisesJson)
             written[PromisesFile] = JsonFormat.Write(promisesJson, texts[PromisesFile]);
+        if (applier.EngagementsJson is { } engagementsJson)
+            written[EngagementsFile] = JsonFormat.Write(engagementsJson, texts[EngagementsFile]);
 
         // Essai à blanc : le jeu doit pouvoir charger les nouveaux fichiers et créer la partie de départ.
         var saved = Balance.Current;
@@ -220,7 +227,7 @@ public static class BalanceApplier
     }
 
     private sealed class Applier(XLWorkbook workbook, IContentSource content, JsonObject balanceJson, JsonArray buildingsJson,
-        JsonArray productsJson, JsonObject scenarioJson, JsonArray? promisesJson)
+        JsonArray productsJson, JsonObject scenarioJson, JsonArray? promisesJson, JsonArray? engagementsJson)
     {
         public List<string> Errors { get; } = [];
 
@@ -235,6 +242,8 @@ public static class BalanceApplier
         public JsonObject ScenarioJson => scenarioJson;
 
         public JsonArray? PromisesJson => promisesJson;
+
+        public JsonArray? EngagementsJson => engagementsJson;
 
         private readonly BalanceSettings _balance = content.LoadBalance();
         private readonly Dictionary<string, BuildingType> _types = content.LoadBuildingTypes().ToDictionary(t => t.Id);
@@ -252,6 +261,7 @@ public static class BalanceApplier
             ApplyStartingGame();
             ApplyTransitions();
             ApplyPromises();
+            ApplyEngagements();
         }
 
         private IXLWorksheet? Sheet(string name)
@@ -507,6 +517,72 @@ public static class BalanceApplier
 
                 json["name"] = name;
                 Changes.Add($"Promesse {key} : « {current} » → « {name} »");
+            }
+        }
+
+        /// <summary>
+        /// Le catalogue des engagements : texte (C), acte qui le rompt (D), difficulté de 1 à 3 (E), retenu (F), retrouvés
+        /// par leur clé (H).
+        /// </summary>
+        private void ApplyEngagements()
+        {
+            if (engagementsJson is null)
+                return;
+            if (Sheet("Engagements") is not { } sheet || !KeyColumnAt(sheet, 1, "H"))
+                return;
+
+            foreach (var row in Rows(sheet, 2, "H"))
+            {
+                var key = Text(row.Cell("H"));
+                var json = engagementsJson.OfType<JsonObject>().FirstOrDefault(e => e["id"]?.GetValue<string>() == key);
+                if (json is null)
+                {
+                    Errors.Add($"{Where(row.Cell("H"))} : l'engagement « {key} » n'existe pas dans le jeu : régénérez le tableur.");
+                    continue;
+                }
+
+                foreach (var (column, field, label) in new[] { ("C", "text", "texte"), ("D", "breach", "ce qui le rompt") })
+                {
+                    var text = Text(row.Cell(column));
+                    if (text == "")
+                    {
+                        Errors.Add($"{Where(row.Cell(column))} : la case est vide.");
+                        continue;
+                    }
+
+                    var current = json[field]?.GetValue<string>() ?? "";
+                    if (current != text)
+                    {
+                        json[field] = text;
+                        Changes.Add($"engagement {key} : {label} « {current} » → « {text} »");
+                    }
+                }
+
+                if (Number(row.Cell("E"), integer: true) is { } difficulty)
+                {
+                    var current = json["difficulty"]?.GetValue<int>() ?? 1;
+                    if (difficulty is < 1 or > 3)
+                        Errors.Add($"{Where(row.Cell("E"))} : la difficulté va de 1 à 3.");
+                    else if ((int)difficulty != current)
+                    {
+                        json["difficulty"] = (int)difficulty;
+                        Changes.Add($"engagement {key} : difficulté {current} → {(int)difficulty}");
+                    }
+                }
+
+                if (Pick<bool>(row.Cell("F"), text => text == Labels.Yes ? true : text == Labels.No ? false : null) is { } kept)
+                {
+                    var current = json["kept"]?.GetValue<bool>() ?? true;
+                    if (kept != current)
+                    {
+                        // Retenu par défaut : la clé n'est écrite que pour un engagement écarté.
+                        if (kept)
+                            json.Remove("kept");
+                        else
+                            json["kept"] = false;
+                        Changes.Add($"engagement {key} : {(kept ? "retenu" : "écarté")}");
+                    }
+                }
             }
         }
 

@@ -38,6 +38,21 @@ public class GameDataTests
     }
 
     [Fact]
+    public void Chaque_pole_propose_des_engagements_de_principe_et_concrets()
+    {
+        var engagements = GameData.Content().LoadEngagements();
+
+        Assert.Equal(engagements.Count, engagements.Select(e => e.Id).Distinct().Count());
+        Assert.All(engagements, e => Assert.InRange(e.Difficulty, 1, 3));
+        Assert.All(engagements, e => Assert.False(string.IsNullOrWhiteSpace(e.Text)));
+        foreach (var pole in Demos.Domain.Politics.Orientation.All)
+        {
+            Assert.Contains(engagements, e => e.Orientation == pole && e.Kind == Demos.Domain.Politics.EngagementKind.Principle);
+            Assert.Contains(engagements, e => e.Orientation == pole && e.Kind == Demos.Domain.Politics.EngagementKind.Concrete);
+        }
+    }
+
+    [Fact]
     public void Chaque_combinaison_de_poles_a_une_promesse_nommee()
     {
         var promises = GameData.Content().LoadPromises();

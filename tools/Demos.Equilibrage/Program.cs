@@ -89,6 +89,7 @@ public static class WorkbookGenerator
         book.WriteStartingGame();
         book.WriteTransitions();
         book.WritePromises(content.LoadPromises());
+        book.WriteEngagements(content.LoadEngagements());
 
         // Les bâtiments et les recettes sont écrits avant les produits (les prix s'y réfèrent), mais rangés après.
         workbook.Worksheet("Produits").Position = 3;
@@ -329,6 +330,7 @@ internal sealed class Book(XLWorkbook workbook, World world, BalanceSettings bal
             "- Partie de départ : population, emplois des bâtiments de départ, production comparée à la demande.",
             "- Passages : les réglages de la dérive des classes (chômage, crise, propriété, production, école de La Promesse).",
             "- Promesses : les 26 Promesses des exilés (1 à 3 axes) ; leur nom se change dans la colonne jaune.",
+            "- Engagements : le catalogue des engagements de La Promesse (texte, acte qui le rompt, difficulté, retenu ou écarté).",
             "",
             "Les prix recalculés suivent les mêmes règles que le jeu ; la colonne Écart doit rester à 0 tant que rien n'est changé.",
             "Le jeu recalcule ses prix à partir des réglages : après « appliquer », régénérez pour voir les nouveaux prix du jeu.",
@@ -834,6 +836,34 @@ internal sealed class Book(XLWorkbook workbook, World world, BalanceSettings bal
 
         Finish(sheet, 1);
         sheet.Column(1).Width = 32;
+    }
+
+    /// <summary>
+    /// Le catalogue des engagements de La Promesse, pôle par pôle, de principe puis concrets : le texte, l'acte qui le
+    /// rompt, la difficulté et « retenu » sont des réglages (cases jaunes) ; un engagement écarté reste pour mémoire.
+    /// </summary>
+    public void WriteEngagements(IReadOnlyList<EngagementDefinition> engagements)
+    {
+        var sheet = workbook.AddWorksheet("Engagements");
+        Header(sheet, 1, "Pôle", "Type", "Engagement", "Ce qui le rompt", "Difficulté (1 à 3)", "Retenu", "Note", "Clé (ne pas modifier)");
+        var poles = Orientation.All.Select(o => o.Code).ToList();
+        var row = 2;
+        foreach (var engagement in engagements.OrderBy(e => poles.IndexOf(e.Pole)).ThenBy(e => e.Kind))
+        {
+            sheet.Cell(row, 1).Value = $"{engagement.Pole} {PoleName(engagement.Pole)}";
+            sheet.Cell(row, 2).Value = engagement.Kind == EngagementKind.Principle ? "De principe" : "Concret";
+            Input(sheet.Cell(row, 3), engagement.Text);
+            Input(sheet.Cell(row, 4), engagement.Breach);
+            Input(sheet.Cell(row, 5), engagement.Difficulty);
+            Choice(sheet.Cell(row, 6), engagement.Kept ? Labels.Yes : Labels.No, _yesNoList);
+            sheet.Cell(row, 7).Value = engagement.Note ?? "";
+            sheet.Cell(row, 8).Value = engagement.Id;
+            row++;
+        }
+
+        Finish(sheet, 1);
+        sheet.Column(3).Width = 42;
+        sheet.Column(4).Width = 60;
     }
 
     private static string PoleName(string code) => code switch

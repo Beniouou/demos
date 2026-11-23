@@ -88,6 +88,48 @@ Le document de règles de référence est dans Claude Docs, et tu n'y as pas acc
 - Code : `src/Demos.Domain/Map/ExtractionSites.cs` (la règle), `World.BuildingPositions`, `Simulation.TryBuild(…, position)`,
   `game/scripts/Map/MapCanvas.Placement.cs` (icônes et mode placement). Ne pas retirer `TryPlaceAt` du clic de `MapCanvas`.
 
+**Terre d'exil (décidé par l'utilisateur le 23 novembre 2026, pas encore codé)**
+- Le jeu a deux modes : avec La Promesse (mode principal) et bac à sable. En mode avec Promesse, la partie commence
+  pauvre (départ d'exil) sur une **terre d'exil** : une zone ingrate, avec peu de terre fertile et loin des gisements
+  (proposition : gisements à plus de 20 km du camp, atteignables en fondant une commune) ; les terres riches existent
+  plus loin.
+- Chaque carte porte **1 à 3 terres d'exil, marquées à la main dans l'éditeur de carte**, chacune avec sa zone
+  d'arrivée, son nom et l'emplacement du camp de base.
+- L'éditeur **calcule et affiche leur pauvreté** pour vérifier qu'elles sont jouables (terre fertile et forêt à portée,
+  distance aux gisements de fer, de charbon et de pierre, emplois de ferme possibles avec les zones limitées) et
+  **prévient quand un départ est injouable**.
+- **Cartes au hasard (décidé le 23 novembre 2026) : le hasard se fait dans l'éditeur, pas dans le jeu.** L'éditeur
+  génère une carte (relief, biomes, fleuves, gisements, terres d'exil proposées d'après leur pauvreté) ; l'utilisateur
+  la retouche, la vérifie, puis l'enregistre sous un nom. Le jeu ne propose que des cartes enregistrées et ne calcule
+  rien au lancement. Le même générateur pourra plus tard être appelé par le jeu : le garder indépendant de la fenêtre.
+- **Départ en mode avec Promesse (décidé le 23 novembre 2026)** : le joueur choisit la carte parmi les cartes
+  enregistrées, puis la terre d'exil est **tirée au hasard** parmi celles de cette carte. Toutes les terres d'exil d'une
+  carte doivent donc être jouables : la fiche de pauvreté de l'éditeur le vérifie.
+- **Départ du bac à sable (décidé le 23 novembre 2026)** : chaque carte a aussi **un départ riche**, marqué dans
+  l'éditeur, où le départ préréglé (`partie-depart.json`) doit tenir : chaque bâtiment d'extraction y trouve sa zone et
+  ses emplois (zones limitées). En bac à sable, le joueur choisit la carte, puis le départ riche (départ préréglé) ou
+  une terre d'exil de la carte (départ d'exil, sans Promesse). La carte actuelle devient la première carte enregistrée,
+  son point actuel (`defaultCommune`) son départ riche (proposition).
+- **Ce que l'éditeur doit permettre (décidé le 23 novembre 2026, pas encore codé)** :
+  1. Un 9e outil « Départs » : poser le départ riche (un par carte) et les terres d'exil (1 à 3), chacun avec un nom.
+     Une terre d'exil est l'emplacement du camp ; sa zone est dessinée autour (ressort de 8 km, portée d'extraction de
+     20 km), sans contour à la main (proposition).
+  2. Une fiche par départ, recalculée à chaque retouche : terre fertile et forêt à moins de 8 km et de 20 km (km² ; 8 km
+     car le départ d'exil n'a pas de loi d'extension), emplois de ferme et de bûcheron possibles d'après les zones
+     limitées (`Map/ZoneCapacity`, densités `zoneDensity…`, rayon `zoneRadius`), distance au gisement de fer, de charbon
+     et de pierre le plus proche, côte, fleuve, altitude. Lire les réglages dans `equilibrage.json`, pas en dur.
+  3. Un verdict : départ riche, le départ préréglé tient-il (chaque bâtiment d'extraction trouve sa zone et ses
+     emplois) ; terre d'exil, jouable, injouable ou trop facile, selon des seuils (proposition, à régler par la
+     simulation : au moins 100 emplois de ferme à moins de 8 km ; fer au-delà de 20 km mais à moins de 40 km ; une
+     forêt et de la pierre à moins de 20 km).
+  4. « Nouvelle carte au hasard » : relief et biomes (existent), fleuves qui coulent des sommets vers la mer, gisements
+     de fer, de charbon et de pierre placés selon le relief en nombre réglable, départ riche et 3 terres d'exil proposés
+     d'après leur fiche. Retouche ensuite avec les outils existants.
+  5. Plusieurs cartes : « Enregistrer sous » un nom, un dossier par carte (`game/data/cartes/<nom>/` : carte et images
+     de relief, proposition) ; ouvrir une carte enregistrée.
+  Le choix de la carte et le tirage de la terre d'exil se font dans le jeu (écran de départ, chantier de l'interface).
+- À trancher : les terres d'exil de la carte actuelle, les seuils de pauvreté.
+
 **Structures politiques (décidé et codé)**
 - L'État contient des communes et des **préfectures**. Une préfecture contient des communes ou d'autres préfectures,
   empilées librement. Tout habitant vit dans une commune.

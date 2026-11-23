@@ -69,7 +69,9 @@ matières, 114 954 avant eux,
   préréglé), `lois.json` (catalogue des lois : domaines, briques, modèles ; voir `Politics/LawBook.cs`),
   `carte.json` (définition vectorielle du monde : `VectorMapDefinition`), `promesses.json` (les 26 Promesses des exilés,
   une par combinaison de 1 à 3 pôles, et leurs noms : `Politics/PromiseDefinition.cs`, `LoadPromises`, feuille Promesses du
-  tableur où le nom se change ; sans effet sur la partie pour l'instant).
+  tableur où le nom se change ; sans effet sur la partie pour l'instant). `engagements.json` : les 42 engagements de La Promesse
+  (`Politics/EngagementDefinition.cs`, de principe ou concrets, par pôle ; `LoadEngagements`, feuille Engagements du tableur ;
+  sans effet sur la partie pour l'instant).
 - Codes des pôles (`Orientation.Code`) : EG, SE, PO, EC, **CO** (collectiviste, ancien PR « protectionniste », renommé
   le 23 novembre 2026 partout : code, `lois.json`, `promesses.json`, icône `pole-co-collectiviste.svg`), LI. Axes
   indépendants : la redistribution relève de la Hiérarchie, la Propriété de qui possède et gère ; chaque brique de
