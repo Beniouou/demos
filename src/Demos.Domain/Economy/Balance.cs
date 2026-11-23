@@ -278,6 +278,12 @@ public sealed record BalanceSettings
     /// <summary>Tracé : taille d'une case de la grille du tracé, en km.</summary>
     public double RoadGridCell { get; init; } = 0.8;
 
+    /// <summary>
+    /// Dette de légitimité permise par pôle pour voter une loi à crédit (décidé le 23 novembre 2026, proposition) : le
+    /// stock d'un pôle peut descendre jusqu'à −cette valeur.
+    /// </summary>
+    public double LegitimacyMaxDebt { get; init; } = 100;
+
     /// <summary>Pollution par habitant et par jour au-delà de laquelle une commune est polluée.</summary>
     public double PollutedThreshold { get; init; } = 0.1;
 
@@ -364,10 +370,22 @@ public sealed record BalanceSettings
     public double CooperativeWageCutMax { get; init; } = 0.2;
 
     /// <summary>
-    /// Une brique de loi coûte de quoi être remboursée en ce nombre de jours si tous les membres qu'elle touche
-    /// l'acceptaient.
+    /// Une brique de loi coûte ce nombre de jours de légitimité au taux du coût (<see cref="LawCostPerMemberPerDay"/>)
+    /// pour tous les membres qu'elle touche.
     /// </summary>
     public double LawPaybackDays { get; init; } = 30;
+
+    /// <summary>
+    /// Légitimité produite par jour et par membre qui accepte une brique de loi (décidé le 23 novembre 2026, proposition :
+    /// 1 point pour 10 000 membres ; avant, 1 pour 1 000, on en gagnait beaucoup trop).
+    /// </summary>
+    public double LegitimacyPerMemberPerDay { get; init; } = 0.0001;
+
+    /// <summary>
+    /// Taux qui sert à calculer le coût d'une loi (membres × ce taux × jours de remboursement) : 0,001, inchangé quand la
+    /// production a été divisée par 10 ; une loi acceptée de tous se rembourse donc en 300 jours.
+    /// </summary>
+    public double LawCostPerMemberPerDay { get; init; } = 0.001;
 
     /// <summary>Poids des membres du niveau d'une loi que le sujet d'une brique ne vise pas (ceux qu'il vise comptent pour 1).</summary>
     public double UntargetedMemberWeight { get; init; } = 0.5;

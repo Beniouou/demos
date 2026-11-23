@@ -202,7 +202,13 @@ désactivés : TVA sur la valeur ajoutée, épargne progressive des entreprises.
   « Rattacher » sous la fiche d'une commune ou d'une préfecture, `StructurePage.Attach.cs`), « Création d'entité
   politique » (`EntityCreationPage` : Commune ou Préfecture ; remplace `PrefecturesPage` et l'ancienne fenêtre de
   fondation), « Organisme » (à venir).
-- Fonder une commune : Structure → Création d'entité politique, formulaire Commune (nom, commune qui paie, charte, coût) ;
+- Fonder une commune : Structure → Création d'entité politique, formulaire Commune (nom, commune qui paie, charte, coût) ; la légitimité se paie toujours en PO
+  (`Simulation.FoundingPole`, `FoundingLegitimacyCostOf` : coût de base × `LawBook.FoundingCostFactor`, brique « Défrichement »), la
+  charte se choisit à part ; il faut une loi d'extension (brique « Extension », `LawBook.AllowsExtension`, aussi pour poser un
+  bâtiment d'extraction au-delà du ressort de la commune, `World.ExtractionSiteProblem`) — 23 novembre 2026 ; voter une loi peut se
+  faire à crédit (`LegitimacyPool.TrySpendOnCredit`, plafond `legitimacyMaxDebt` 100, constante DetteLegitimite) : un pôle en
+  dette ne paie rien d'autre (`TrySpend` refuse) ; la légitimité produite par les lois acceptées est un réglage (`legitimacyPerMemberPerDay`
+  0,0001, constante LegitimiteParMembre), séparé du taux du coût des lois (`lawCostPerMemberPerDay` 0,001, LoiCoutParMembre) ;
   la touche C et le bouton « Camp de base » y mènent (`MainMenu.ShowCommuneCreation`). Puis la carte passe en mode pose
   (`MapCanvas.PlacementRequest`, sans zones, avec `ExclusionRadius` : cercles rouges autour des communes) ;
   `PlayerDesk.FoundCommune` (`PlayerDesk.Communes.cs`) fonde et explique un refus.

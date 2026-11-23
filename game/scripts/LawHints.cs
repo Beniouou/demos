@@ -55,10 +55,12 @@ public static class LawHints
     {
         var settings = Balance.Current;
         return "Coût en légitimité, brique par brique : membres concernés × "
-            + $"{LawEffects.LegitimacyPerMemberPerDay:0.###} × {settings.LawPaybackDays:0} jours × écart × poids de la brique, au moins {settings.MinimumBrickCost:0.#}. "
+            + $"{settings.LawCostPerMemberPerDay:0.####} × {settings.LawPaybackDays:0} jours × écart × poids de la brique, au moins {settings.MinimumBrickCost:0.#}. "
             + $"Les membres du niveau hors du sujet comptent pour {settings.UntargetedMemberWeight:P0}. "
             + $"×{settings.LockedBrickCostFactor:0.##} si la brique est verrouillée, ×{settings.RegalianCostFactor:0.##} pour un domaine régalien voté sous l'État. "
-            + "Payé dans les pôles du mouvement, à parts égales. Il suit les membres du moment : il change d'un jour à l'autre.";
+            + "Payé dans les pôles du mouvement, à parts égales. Il suit les membres du moment : il change d'un jour à l'autre. "
+            + $"On peut voter à crédit : un pôle peut s'endetter jusqu'à {settings.LegitimacyMaxDebt:0.#}, et les classes qui acceptent "
+            + "la loi remboursent la dette ; tant qu'il est en dette, le pôle ne paie rien d'autre.";
     }
 
     public const string Paid =

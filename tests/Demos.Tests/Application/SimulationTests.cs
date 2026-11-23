@@ -68,9 +68,9 @@ public class SimulationTests
         simulation.AdvanceDay();
 
         // Professions intermédiaires et cadres (LI) acceptent la liberté d'entreprendre, loi de l'État (autorisation,
-        // intensité 1, poids 0,5) : 500 × 0,5 × 0,001 par jour.
-        Assert.Equal(0.25, afterOneDay, precision: 6);
-        Assert.Equal(0.5, simulation.World.Legitimacy[libertarian], precision: 6);
+        // intensité 1, poids 0,5) : 500 × 0,5 × 0,0001 par jour.
+        Assert.Equal(0.025, afterOneDay, precision: 6);
+        Assert.Equal(0.05, simulation.World.Legitimacy[libertarian], precision: 6);
     }
 
     [Fact]
@@ -102,7 +102,7 @@ public class SimulationTests
         Assert.NotNull(commune);
         Assert.True(simulation.World.IsGhostTown(commune.Id));
 
-        // Le pôle payé devient la charte de fondation de la commune ; ce n'est pas une loi.
+        // Le pôle choisi devient la charte de fondation de la commune (la légitimité, elle, se paie en PO) ; ce n'est pas une loi.
         Assert.Equal(pole, simulation.World.CharterOf(commune.Id));
         Assert.DoesNotContain(simulation.World.Laws, l => l.StructureId == commune.Id);
         // Le camp de base est en chantier 30 jours : pas encore de logements.

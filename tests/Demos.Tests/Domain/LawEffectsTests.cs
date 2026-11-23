@@ -42,9 +42,9 @@ public class LawEffectsTests
 
         LawEffects.ApplyDaily([EgalitarianClass()], Book(Structures, VillageMinimumWage("Workers", 2.5)), pool);
 
-        // Salaire minimum des ouvriers de 2 à 2,5 (borne 4) : intensité 0,25. 200 membres × 25 % × 0,25 × 0,001 par pôle.
-        Assert.Equal(0.0125, pool[EG], precision: 9);
-        Assert.Equal(0.0125, pool[CO], precision: 9);
+        // Salaire minimum des ouvriers de 2 à 2,5 (borne 4) : intensité 0,25. 200 membres × 25 % × 0,25 × 0,0001 par pôle.
+        Assert.Equal(0.00125, pool[EG], precision: 9);
+        Assert.Equal(0.00125, pool[CO], precision: 9);
         Assert.Equal(0, pool[SE]);
     }
 
@@ -69,7 +69,7 @@ public class LawEffectsTests
         LawEffects.ApplyDaily([EgalitarianClass()], Book(Structures, VillageMinimumWage("Executives", 2.5)), pool);
 
         // Le sujet vise les cadres : les ouvriers du village comptent pour 0,5.
-        Assert.Equal(0.00625, pool[EG], precision: 9);
+        Assert.Equal(0.000625, pool[EG], precision: 9);
     }
 
     [Fact]

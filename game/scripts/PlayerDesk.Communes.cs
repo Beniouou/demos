@@ -11,12 +11,17 @@ namespace Demos.Game;
 /// Ce que coûte un camp de base (fonder une commune), vu depuis la commune qui le paie : le matériau, ce qui peut le
 /// payer, la légitimité, la dotation et le trésor.
 /// </summary>
+/// <param name="LegitimacyCost">Légitimité PO à payer (fonder dégrade la terre), après le défrichement voté.</param>
+/// <param name="LegitimacyAvailable">Légitimité PO disponible.</param>
+/// <param name="ExtensionAllowed">Vrai si une loi d'extension couvre la commune qui paie.</param>
 public sealed record FoundingOffer(
     string MaterialName,
     double MaterialQuantity,
     MaterialAvailability Availability,
     double LegitimacyCost,
-    double Grant);
+    double Grant,
+    double LegitimacyAvailable,
+    bool ExtensionAllowed);
 
 /// <summary>
 /// Le bureau du joueur, fondation d'une commune : un camp de base, payé par la commune choisie, posé sur la carte là où
@@ -31,7 +36,8 @@ public sealed partial class PlayerDesk
         if (camp?.Construction is not { } cost)
             return null;
         return new FoundingOffer(ProductName(cost.ProductId), cost.Quantity, AvailabilityOf(payingCommuneId, cost.ProductId),
-            Balance.Current.BaseCampLegitimacyCost, Simulation.FoundingGrantOf(camp));
+            Simulation.FoundingLegitimacyCostOf(payingCommuneId), Simulation.FoundingGrantOf(camp),
+            World.Legitimacy[Simulation.FoundingPole], Simulation.AllowsExtension(payingCommuneId));
     }
 
     /// <summary>Ce qui empêche de fonder une commune à cette position, ou null si c'est permis.</summary>
@@ -42,23 +48,26 @@ public sealed partial class PlayerDesk
 
     /// <summary>
     /// Fonde une commune à cette position : son camp de base est payé par la commune choisie (réserve de chantier, stock
-    /// de l'État, puis achat avec le trésor), la légitimité dans le pôle choisi (sa charte), la dotation par le trésor.
+    /// de l'État, puis achat avec le trésor), la légitimité PO (fonder dégrade la terre), la dotation par le trésor ; la
+    /// charte est le pôle choisi. Il faut une loi d'extension qui couvre la commune qui paie.
     /// </summary>
     public DeskAnswer FoundCommune(string name, string payingCommuneId, Orientation pole, Point2D position)
     {
-        var legitimacy = Balance.Current.BaseCampLegitimacyCost;
         if (string.IsNullOrWhiteSpace(name))
             return new("Donnez un nom à la commune.");
         if (World.CommuneSiteProblem(position) is { } problem)
             return new($"Impossible de fonder ici : {problem}.");
-        if (World.Legitimacy[pole] < legitimacy)
-            return new($"Pas assez de légitimité {pole.Code} (il en faut {legitimacy:0.#}).");
         if (FoundingOfferFrom(payingCommuneId) is not { } offer)
             return new("Le camp de base ne se construit pas.");
+        if (!offer.ExtensionAllowed)
+            return new("Fonder une commune demande une loi d'extension (domaine Environnement).");
+        if (offer.LegitimacyAvailable < offer.LegitimacyCost)
+            return new($"Pas assez de légitimité {Simulation.FoundingPole.Code} : il en faut {offer.LegitimacyCost:0.#}, "
+                + $"il y en a {offer.LegitimacyAvailable:0.#}. Fonder une commune dégrade la terre : elle se paie en productivisme.");
         if (World.Treasury.Balance < offer.Grant)
             return new($"Le trésor n'a pas de quoi verser la dotation ({offer.Grant:N0}).");
 
-        if (Simulation.TryFoundCommune(name.Trim(), payingCommuneId, PaymentMode.StockFirst, pole, legitimacy, position) is { } commune)
+        if (Simulation.TryFoundCommune(name.Trim(), payingCommuneId, PaymentMode.StockFirst, pole, offer.LegitimacyCost, position) is { } commune)
             return new($"{commune.Name} fondée, charte {WorldText.PoleName(pole)} ({pole.Code}), caisse de {World.CommuneFundOf(commune.Id).Balance:N0} ; "
                 + "son camp de base est en chantier.", commune.Id);
 

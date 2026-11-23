@@ -1,4 +1,5 @@
 using Demos.Application;
+using Demos.Domain.Economy;
 using Demos.Domain.Politics;
 
 namespace Demos.Tests.Application;
@@ -23,7 +24,7 @@ public class LawCommissionTests
     {
         var world = WithoutLaws().World;
 
-        Assert.Equal(12, world.LawCatalogue.Templates.Count);
+        Assert.Equal(14, world.LawCatalogue.Templates.Count);
         foreach (var template in world.LawCatalogue.Templates)
         {
             Assert.Null(world.LawCatalogue.ProblemWith(template.ToLaw("essai")));
@@ -54,7 +55,7 @@ public class LawCommissionTests
         var chosen = PrototypeScenario.Create(GameData.Content(),
             new StartingLaws(StartingLawsMode.Chosen, [new ScenarioLaw("impot-progressif"), new ScenarioLaw("plafond-loyers")]));
 
-        Assert.Equal(["liberte-entreprendre", "economie-cooperative", "salaire-minimum-ouvrier", "quotas-extraction"],
+        Assert.Equal(["liberte-entreprendre", "economie-cooperative", "salaire-minimum-ouvrier", "quotas-extraction", "loi-extension"],
             preset.World.Laws.Select(l => l.TemplateId));
         Assert.Empty(none.World.Laws);
         Assert.Equal(["impot-progressif", "plafond-loyers"], chosen.World.Laws.Select(l => l.TemplateId));
@@ -111,15 +112,17 @@ public class LawCommissionTests
     }
 
     [Fact]
-    public void Sans_assez_de_legitimite_le_vote_est_refuse_et_rien_n_est_paye()
+    public void Au_dela_de_la_dette_permise_le_vote_est_refuse_et_rien_n_est_paye()
     {
+        // Voter à crédit (décidé le 23 novembre 2026) : un pôle peut s'endetter jusqu'au plafond, pas au-delà.
         var simulation = WithoutLaws();
-        simulation.World.Legitimacy.Add(EG, 1);
+        var nearlyMaxedOut = 0.5 - Balance.Current.LegitimacyMaxDebt;
+        simulation.World.Legitimacy.Add(EG, nearlyMaxedOut);
 
         var draftId = simulation.DraftFromTemplate("salaire-minimum-ouvrier")!;
 
         Assert.Equal(LawVoteOutcome.NotEnoughLegitimacy, simulation.TryVote(draftId));
-        Assert.Equal(1, simulation.World.Legitimacy[EG]);
+        Assert.Equal(nearlyMaxedOut, simulation.World.Legitimacy[EG], precision: 9);
         Assert.Single(simulation.World.LawCommission.Drafts);
     }
 

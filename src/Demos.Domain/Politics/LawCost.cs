@@ -46,7 +46,7 @@ public static class LawCost
 
             var members = population.Sum(c => c.Population * book.WeightedShare(c, subject, level, settings.UntargetedMemberWeight));
             var amount = Math.Max(settings.MinimumBrickCost,
-                members * LawEffects.LegitimacyPerMemberPerDay * settings.LawPaybackDays * movement.Intensity * brick.Weight);
+                members * settings.LawCostPerMemberPerDay * settings.LawPaybackDays * movement.Intensity * brick.Weight);
             if (next?.Locked == true)
                 amount *= settings.LockedBrickCostFactor;
             if (regalian)

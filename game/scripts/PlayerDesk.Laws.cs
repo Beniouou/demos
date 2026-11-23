@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using Demos.Domain.Politics;
+using Demos.Domain.Economy;
 
 namespace Demos.Game;
 
@@ -226,7 +227,7 @@ public sealed partial class PlayerDesk
         var draft = World.LawCommission.DraftOf(draftId);
         return Simulation.TryVote(draftId) switch
         {
-            LawVoteOutcome.Voted => $"Voté. Payé : {Paid(cost)}. Entre en vigueur {NextEnactmentDay()}.",
+            LawVoteOutcome.Voted => $"Voté. Payé : {Paid(cost)}. Entre en vigueur {NextEnactmentDay()}.{Debts(cost)}",
             LawVoteOutcome.UnknownLevel => "Le niveau de cette loi n'existe plus.",
             LawVoteOutcome.Invalid when draft is not null =>
                 $"Loi non valable : {World.LawCatalogue.ProblemWith(draft.Law)}.",
@@ -252,8 +253,23 @@ public sealed partial class PlayerDesk
     private static string Paid(IReadOnlyDictionary<Orientation, double> cost) =>
         cost.Count == 0 ? "rien" : string.Join(", ", cost.Select(c => $"{c.Value:0.#} {c.Key.Code}"));
 
-    private string Missing(IReadOnlyDictionary<Orientation, double> cost) =>
-        string.Join(", ", cost
-            .Where(c => World.Legitimacy[c.Key] < c.Value)
-            .Select(c => $"{c.Value - World.Legitimacy[c.Key]:0.#} {c.Key.Code} (il en faut {c.Value:0.#})"));
+    // Voter à crédit : un pôle peut s'endetter jusqu'au plafond ; il ne manque que ce qui le dépasse.
+    private string Missing(IReadOnlyDictionary<Orientation, double> cost)
+    {
+        var maxDebt = Balance.Current.LegitimacyMaxDebt;
+        return string.Join(", ", cost
+            .Where(c => !World.Legitimacy.CanSpendOnCredit(c.Key, c.Value, maxDebt))
+            .Select(c => $"{c.Value - World.Legitimacy[c.Key] - maxDebt:0.#} {c.Key.Code} (il en faut {c.Value:0.#}, "
+                + $"dette permise comprise : {maxDebt:0.#})"));
+    }
+
+    // Après un vote à crédit : la dette de chaque pôle passé en négatif, que les classes qui acceptent remboursent.
+    private string Debts(IReadOnlyDictionary<Orientation, double> cost)
+    {
+        var debts = cost.Keys.Where(p => World.Legitimacy[p] < 0).Select(p => $"{-World.Legitimacy[p]:0.#} {p.Code}").ToList();
+        return debts.Count == 0
+            ? ""
+            : $" Voté à crédit : dette de {string.Join(", ", debts)}, remboursée par les classes qui acceptent la loi ; "
+              + "en attendant, ce pôle ne paie rien d'autre.";
+    }
 }

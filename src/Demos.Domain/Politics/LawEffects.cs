@@ -5,8 +5,11 @@ namespace Demos.Domain.Politics;
 
 public static class LawEffects
 {
-    /// <summary>Légitimité produite par jour et par membre concerné : 1 point pour 1 000 membres.</summary>
-    public const double LegitimacyPerMemberPerDay = 0.001;
+    /// <summary>
+    /// Légitimité produite par jour et par membre concerné qui accepte (réglage legitimacyPerMemberPerDay) : 1 point pour
+    /// 10 000 membres depuis le 23 novembre 2026 (proposition ; avant, 1 point pour 1 000, on en gagnait beaucoup trop).
+    /// </summary>
+    public static double LegitimacyPerMemberPerDay => Balance.Current.LegitimacyPerMemberPerDay;
 
     /// <summary>
     /// Calcul quotidien. Chaque classe juge chaque brique des lois en vigueur sur ses pôles, selon le sens du curseur.

@@ -42,6 +42,7 @@
     { "template": "liberte-entreprendre" },
     { "template": "economie-cooperative" },
     { "template": "salaire-minimum-ouvrier" },
-    { "template": "quotas-extraction" }
+    { "template": "quotas-extraction" },
+    { "template": "loi-extension" }
   ]
 }

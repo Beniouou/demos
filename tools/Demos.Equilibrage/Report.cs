@@ -114,6 +114,9 @@ internal static class SimulationReport
         Demos.Domain.Map.Point2D? position = world.CapitalId is { } capitalId && world.CommunePositions.TryGetValue(capitalId, out var capital)
             ? new(capital.X - Demos.Domain.Map.MapScale.ToUnits(distance), capital.Y)
             : null;
+        // La fondation se paie en légitimité PO (décidé le 23 novembre 2026), que la partie de départ ne produit pas : le
+        // rapport la donne, pour mesurer l'économie à deux communes comme avant. La charte reste le pôle le mieux pourvu.
+        world.Legitimacy.Add(Simulation.FoundingPole, 5);
         var commune = simulation.TryFoundCommune("Deuxième commune", PrototypeScenario.FirstCommuneId, PaymentMode.StockFirst, pole, 5, position);
         var cost = world.BuildingTypes[Simulation.BaseCampTypeId].Construction;
         var materials = cost is null ? "aucun coût de construction" : $"{Count(cost.Quantity)} {cost.ProductId}, {cost.Days} jours de chantier";

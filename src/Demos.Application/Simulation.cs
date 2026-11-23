@@ -383,21 +383,42 @@ public sealed class Simulation(World world, GameClock clock)
         return NationalizationOutcome.Done;
     }
 
+    /// <summary>Fonder une commune dégrade la terre : la légitimité se paie toujours en productivisme (décidé le 23 novembre 2026).</summary>
+    public static readonly Orientation FoundingPole = new(IdeologicalAxis.Production, Pole.A);
+
+    /// <summary>
+    /// Ce que coûte en légitimité PO une commune fondée depuis cette commune : le coût de base, changé par le défrichement
+    /// que votent les lois qui la couvrent.
+    /// </summary>
+    public double FoundingLegitimacyCostOf(string payingCommuneId) =>
+        Balance.Current.BaseCampLegitimacyCost * World.LawBook.FoundingCostFactor(payingCommuneId);
+
+    /// <summary>Vrai si les lois qui couvrent cette commune autorisent l'expansion (brique « Extension »).</summary>
+    public bool AllowsExtension(string communeId) => World.LawBook.AllowsExtension(communeId);
+
+    /// <summary>
+    /// Action du joueur : fonder une commune depuis celle qui paie, avec sa charte, pour le coût en légitimité PO que fixent
+    /// les lois (voir <see cref="FoundingLegitimacyCostOf"/>).
+    /// </summary>
+    public Structure? TryFoundCommune(string name, string payingCommuneId, PaymentMode mode, Orientation charter, Point2D? position = null) =>
+        TryFoundCommune(name, payingCommuneId, mode, charter, FoundingLegitimacyCostOf(payingCommuneId), position);
+
     /// <summary>
     /// Action du joueur : bâtir un camp de base, qui fonde une nouvelle commune rattachée à l'État.
     /// Il coûte son coût de construction (celui du type camp de base), pris dans la commune qui l'envoie, de la
-    /// légitimité (dans le pôle choisi), et la dotation que l'État verse du trésor à la caisse de la nouvelle commune.
+    /// légitimité PO (fonder dégrade la terre, décidé le 23 novembre 2026), et la dotation que l'État verse du trésor à
+    /// la caisse de la nouvelle commune. Il faut une loi d'extension (brique « Extension ») qui couvre la commune qui paie.
     /// La commune est fondée tout de suite ; son camp de base est en chantier. Elle reçoit sa réserve de chantier de
-    /// fondation. Le pôle choisi devient la charte de fondation de la commune : il attire les classes du même pôle
-    /// et repousse celles du pôle opposé. Une position sur la carte doit être permise (<see cref="World.CommuneSiteProblem"/> :
-    /// ni l'eau, ni une falaise, ni un glacier, ni trop près d'une autre commune).
+    /// fondation. La charte, choisie à part, attire les classes du même pôle et repousse celles du pôle opposé. Une
+    /// position sur la carte doit être permise (<see cref="World.CommuneSiteProblem"/> : ni l'eau, ni une falaise, ni un
+    /// glacier, ni trop près d'une autre commune).
     /// Renvoie la nouvelle commune, ou null, sans rien dépenser, si c'est impossible.
     /// </summary>
     public Structure? TryFoundCommune(
         string name,
         string payingCommuneId,
         PaymentMode mode,
-        Orientation legitimacyPole,
+        Orientation charter,
         double legitimacyCost,
         Point2D? position = null)
     {
@@ -411,7 +432,8 @@ public sealed class Simulation(World world, GameClock clock)
         if (World.IsIdTaken(commune.Id)
             || (position is { } site && World.CommuneSiteProblem(site) is not null)
             || !campType.CanBeBuilt
-            || World.Legitimacy[legitimacyPole] < legitimacyCost
+            || !AllowsExtension(payingCommuneId)
+            || World.Legitimacy[FoundingPole] < legitimacyCost
             || !World.Treasury.TrySpend(grant))
             return null;
 
@@ -422,14 +444,14 @@ public sealed class Simulation(World world, GameClock clock)
             return null;
         }
 
-        World.Legitimacy.TrySpend(legitimacyPole, legitimacyCost);
+        World.Legitimacy.TrySpend(FoundingPole, legitimacyCost);
         World.CommuneFundOf(commune.Id).Deposit(grant);
         World.AddStructure(commune);
         if (position.HasValue)
             World.SetCommunePosition(commune.Id, position.Value);
         World.AddConstructionSite(new ConstructionSite(camp, campType.Construction.Days));
         GiveFoundingMaterials(commune.Id);
-        World.SetCharter(commune.Id, legitimacyPole);
+        World.SetCharter(commune.Id, charter);
         return commune;
     }
 
@@ -673,12 +695,15 @@ public sealed class Simulation(World world, GameClock clock)
         if (draft.Kind != LawChangeKind.Repeal && draft.Law.Bricks.Any(s => book.IsLockedAbove(draft.Law, s)))
             return LawVoteOutcome.LockedAbove;
 
+        // Voter à crédit (décidé le 23 novembre 2026) : un pôle peut s'endetter jusqu'au plafond ; les classes qui
+        // acceptent la loi remboursent ensuite la dette.
         var cost = CostOf(draft);
-        if (cost.Any(c => World.Legitimacy[c.Key] < c.Value))
+        var maxDebt = Balance.Current.LegitimacyMaxDebt;
+        if (cost.Any(c => !World.Legitimacy.CanSpendOnCredit(c.Key, c.Value, maxDebt)))
             return LawVoteOutcome.NotEnoughLegitimacy;
 
         foreach (var (pole, amount) in cost)
-            World.Legitimacy.TrySpend(pole, amount);
+            World.Legitimacy.TrySpendOnCredit(pole, amount, maxDebt);
         World.LawCommission.MarkVoted(draft, cost);
         return LawVoteOutcome.Voted;
     }

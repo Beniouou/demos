@@ -118,7 +118,14 @@ public sealed class World
             return null;
         if (!_communePositions.TryGetValue(communeId, out var commune))
             return "la commune n'a pas de position sur la carte";
-        return ExtractionSites.ProblemWith(kinds, position, commune, Balance.Current.ExtractionMaxDistance, MapZones);
+        if (ExtractionSites.ProblemWith(kinds, position, commune, Balance.Current.ExtractionMaxDistance, MapZones) is { } problem)
+            return problem;
+
+        // Au-delà du ressort de la commune, il faut une loi d'extension (décidé le 23 novembre 2026).
+        var radius = Balance.Current.CommuneJurisdictionRadius;
+        return MapScale.KmBetween(commune, position) > radius && !LawBook.AllowsExtension(communeId)
+            ? $"au-delà de {MapScale.Format(radius)} de la commune, il faut une loi d'extension"
+            : null;
     }
 
     /// <summary>

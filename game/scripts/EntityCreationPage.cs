@@ -141,7 +141,8 @@ public partial class EntityCreationPage : VBoxContainer, IMenuPage
         _payer = Choice(column, "Payée par");
         _payer.TooltipText = "La commune qui envoie les matériaux du camp de base (sa réserve de chantier, le stock de l'État, puis des achats avec le trésor)";
         _communePole = Choice(column, "Charte");
-        _communePole.TooltipText = "Le pôle où se paie la légitimité devient la charte de la commune : il attire les classes de ce pôle et repousse celles du pôle opposé.";
+        _communePole.TooltipText = "La charte de la commune : elle attire les classes de ce pôle et repousse celles du pôle opposé. "
+            + "La légitimité, elle, se paie toujours en productivisme (PO) : fonder une commune dégrade la terre.";
 
         _communeCost = new HintText
         {
@@ -176,24 +177,40 @@ public partial class EntityCreationPage : VBoxContainer, IMenuPage
     private void RefreshCommune()
     {
         var settings = Balance.Current;
-        FillPoles(_communePole, settings.BaseCampLegitimacyCost);
+        // La charte se choisit librement : tous les pôles sont permis.
+        FillPoles(_communePole, 0);
 
         var text = new StringBuilder();
+        var blocked = false;
         if (Pick(_payer, _payerIds) is { } payer && _desk.FoundingOfferFrom(payer) is { } offer)
         {
             var available = offer.Availability;
+            var po = Simulation.FoundingPole;
             text.Append(SheetText.Section("Coût"));
-            text.AppendLine($"{offer.MaterialQuantity:N0} {SheetText.Escape(offer.MaterialName)} · {offer.LegitimacyCost:0.#} de légitimité · "
+            text.AppendLine($"{offer.MaterialQuantity:N0} {SheetText.Escape(offer.MaterialName)} · "
+                + SheetText.Hint($"{offer.LegitimacyCost:0.#} de légitimité {po.Code}",
+                    "Fonder une commune dégrade la terre : la légitimité se paie toujours en productivisme, quelle que soit la charte. "
+                    + "La brique « Défrichement » change ce coût (moitié moins cher au plus, ou moitié plus cher).")
+                + $" ({offer.LegitimacyAvailable:0.#} disponible) · "
                 + SheetText.Hint($"dotation de {offer.Grant:N0}", "Versée par le trésor de l'État à la caisse de la nouvelle commune : de quoi payer les salaires de son camp de base."));
+            if (!offer.ExtensionAllowed)
+            {
+                blocked = true;
+                text.AppendLine($"[color=#{UiTheme.Danger.ToHtml(false)}]Il faut une loi d'extension : sans elle, on ne fonde pas de nouvelle commune "
+                    + "(Lois, domaine Environnement, brique « Extension »).[/color]");
+            }
+            else if (offer.LegitimacyAvailable < offer.LegitimacyCost)
+            {
+                blocked = true;
+                text.AppendLine($"[color=#{UiTheme.Danger.ToHtml(false)}]Pas assez de légitimité {po.Code} : il en faut {offer.LegitimacyCost:0.#}.[/color]");
+            }
             text.AppendLine(SheetText.Muted($"Dans la commune qui paie : réserve de chantier {available.Reserve:N0}, stock de l'État {available.StateStock:N0}, "
                 + $"en vente {available.OnSale:N0} (au prix de {available.Price:N1}). Trésor : {available.Treasury:N0}."));
         }
         text.Append(SheetText.Section("Emplacement"));
         text.AppendLine(SheetText.Muted($"N'importe où sur la carte, sauf sur l'eau, une falaise ou un glacier, et à {MapScale.Format(settings.CommuneMinDistance)} "
             + "au moins de toute autre commune. Le bouton ferme le menu ; un clic sur la carte fonde la commune, Échap annule."));
-        var noPole = _communePole.Selected < 0 || _communePole.IsItemDisabled(_communePole.Selected);
-        if (noPole)
-            text.AppendLine($"[color=#{UiTheme.Danger.ToHtml(false)}]Aucun pôle n'a assez de légitimité ({settings.BaseCampLegitimacyCost:0.#}).[/color]");
+        var noPole = _communePole.Selected < 0 || blocked;
 
         // Le texte n'est remis que s'il change : sinon sa bulle d'aide clignoterait.
         var bbcode = text.ToString();

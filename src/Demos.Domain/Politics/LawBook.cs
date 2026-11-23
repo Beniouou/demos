@@ -18,6 +18,8 @@ public static class Bricks
     public const string Production = "production";
     public const string Pollution = "pollution";
     public const string SupplierChoice = "choix-fournisseurs";
+    public const string Extension = "extension";
+    public const string Clearing = "defrichement";
 }
 
 /// <summary>
@@ -144,6 +146,22 @@ public sealed class LawBook(
                 subject => subject.Kind == SubjectKind.Everyone
                     || subject.Kind == SubjectKind.Ownership && subject.Values.Contains(seller.ToString())) ?? 1) >= 0.5;
     }
+
+    /// <summary>
+    /// Vrai si les lois qui couvrent cette structure (une commune et les niveaux au-dessus) autorisent l'expansion : fonder
+    /// une commune, poser un bâtiment d'extraction hors du ressort de la commune (brique « Extension », décidé le 23
+    /// novembre 2026). Sans la brique dans le catalogue, l'expansion reste libre.
+    /// </summary>
+    public bool AllowsExtension(string structureId) =>
+        Catalogue.BrickOf(Bricks.Extension) is not { } brick
+        || (LegislatedValue(Bricks.Extension, structureId, subject => subject.Kind == SubjectKind.Everyone) ?? brick.Default) >= 0.5;
+
+    /// <summary>
+    /// Le coût en légitimité d'une fondation, par rapport au coût de base : 1 − le défrichement voté (brique
+    /// « Défrichement » : +0,5 = moitié moins cher, −0,5 = moitié plus cher).
+    /// </summary>
+    public double FoundingCostFactor(string structureId) =>
+        Math.Max(0, 1 - (LegislatedValue(Bricks.Clearing, structureId, subject => subject.Kind == SubjectKind.Everyone) ?? 0));
 
     /// <summary>Vrai si les lois de la commune d'une classe réservent des logements à son rang : elle est logée d'abord.</summary>
     public bool HasHousingPriority(SocialClass socialClass) =>
