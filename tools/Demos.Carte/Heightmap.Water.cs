@@ -289,7 +289,7 @@ public sealed partial class Heightmap
             return points;
         if (outlet[cells[^1]] == EdgeOutlet)
             path[^1] = OnBorder(path[^1]);
-        var smooth = Chaikin(path, 2);
+        var smooth = Meander(Chaikin(path, 2), sourceX, sourceY);
 
         // Confluence : le fleuve s'arrête en rejoignant un autre fleuve (à moins de 12 unités).
         foreach (var p in smooth)
@@ -316,6 +316,81 @@ public sealed partial class Heightmap
                     return new Point2D(Math.Round(px, 1), Math.Round(py, 1));
             }
         return null;
+    }
+
+    /// <summary>Écart des ondulations sur le plat, de part et d'autre du tracé (unités ; 10 = 1 km, proposition).</summary>
+    private const double MeanderAmplitude = 10.0;
+
+    /// <summary>Longueur d'une ondulation (unités ; 175 = 17,5 km, proposition), un peu irrégulière.</summary>
+    private const double MeanderWavelength = 175.0;
+
+    /// <summary>
+    /// Les ondulations d'un fleuve (remises le 24 novembre 2026) : chaque point est décalé sur le côté selon une vague,
+    /// marquée en plaine et presque nulle en montagne (l'écart est divisé par 1 + pente en % ÷ 3 : moitié moins à 3 %). Les deux bouts ne
+    /// bougent pas ; la vague dépend de la source, donc un fleuve retracé au même endroit retrouve ses ondulations.
+    /// </summary>
+    private List<Point2D> Meander(List<Point2D> path, double sourceX, double sourceY)
+    {
+        // Des points tous les 5 unités, pour une vague régulière.
+        const double spacing = 5.0;
+        var points = new List<Point2D> { path[0] };
+        for (var i = 1; i < path.Count; i++)
+        {
+            var (a, b) = (points[^1], path[i]);
+            var length = Distance(a, b);
+            if (length < spacing && i < path.Count - 1)
+                continue;
+            var steps = Math.Max(1, (int)Math.Round(length / spacing));
+            for (var s = 1; s <= steps; s++)
+                points.Add(new Point2D(a.X + (b.X - a.X) * s / steps, a.Y + (b.Y - a.Y) * s / steps));
+        }
+        if (points.Count < 5)
+            return path;
+
+        var along = new double[points.Count];
+        for (var i = 1; i < points.Count; i++)
+            along[i] = along[i - 1] + Distance(points[i - 1], points[i]);
+        var total = along[^1];
+
+        // La pente en % le long du fleuve (sur ±4 points), puis moyennée pour que l'écart change doucement.
+        var share = new double[points.Count];
+        for (var i = 0; i < points.Count; i++)
+        {
+            var (lo, hi) = (Math.Max(0, i - 4), Math.Min(points.Count - 1, i + 4));
+            var drop = Math.Abs(SampleElevation(points[lo].X, points[lo].Y) - SampleElevation(points[hi].X, points[hi].Y));
+            var slope = drop / Math.Max(1e-6, along[hi] - along[lo]);
+            share[i] = 1.0 / (1.0 + slope / 3.0);
+        }
+        var smoothShare = new double[points.Count];
+        for (var i = 0; i < points.Count; i++)
+        {
+            var (lo, hi) = (Math.Max(0, i - 10), Math.Min(points.Count - 1, i + 10));
+            for (var k = lo; k <= hi; k++)
+                smoothShare[i] += share[k];
+            smoothShare[i] /= hi - lo + 1;
+        }
+
+        var phase0 = (sourceX * 0.013 + sourceY * 0.007) % (2 * Math.PI);
+        var result = new List<Point2D>(points.Count);
+        for (var i = 0; i < points.Count; i++)
+        {
+            var (prev, next) = (points[Math.Max(0, i - 1)], points[Math.Min(points.Count - 1, i + 1)]);
+            var (tx, ty) = (next.X - prev.X, next.Y - prev.Y);
+            var tLen = Math.Sqrt(tx * tx + ty * ty);
+            if (tLen < 1e-9)
+            {
+                result.Add(points[i]);
+                continue;
+            }
+            var s = along[i];
+            // Les bouts restent en place : l'écart monte sur les 3 premiers et les 3 derniers km.
+            var ends = Math.Clamp(Math.Min(s, total - s) / 30.0, 0.0, 1.0);
+            var taper = ends * ends * (3 - 2 * ends);
+            var wave = Math.Sin(2 * Math.PI * s / MeanderWavelength + 0.7 * Math.Sin(2 * Math.PI * s / (MeanderWavelength * 3.1)) + phase0);
+            var offset = MeanderAmplitude * smoothShare[i] * taper * wave;
+            result.Add(new Point2D(points[i].X - ty / tLen * offset, points[i].Y + tx / tLen * offset));
+        }
+        return result;
     }
 
     /// <summary>Adoucit un tracé de case en case (coins coupés au quart), en gardant ses deux bouts.</summary>

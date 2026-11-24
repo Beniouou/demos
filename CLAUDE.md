@@ -171,7 +171,7 @@ désactivés : TVA sur la valeur ajoutée, épargne progressive des entreprises.
   Fleuves (24 novembre 2026, `Heightmap.Water.cs`) : le tracé (`SimulateSpontaneousRiver`) prend le chemin qui creuse le
   moins (décidé le 24 novembre 2026) : réseau d'écoulement par remplissage par priorité depuis les sorties (mer, lacs, bord ;
   `Drainage`, gardé tant que le relief et les lacs ne changent pas), chaque case liée à la voisine de plus forte pente sur
-  la hauteur d'eau, à pente égale la mer puis un lac puis le bord ; tracé de case en case adouci (Chaikin), confluence à
+  la hauteur d'eau, à pente égale la mer puis un lac puis le bord ; tracé de case en case adouci (Chaikin) puis ondulé (`Meander` : écart 1 km sur le plat, divisé par 1 + pente % ÷ 3, une vague tous les ~17,5 km, propositions ; bouts fixes ; même source, mêmes ondulations), confluence à
   12 unités, arrêt dans un lac. Lacs (même date, `MapEditorForm.Lakes.cs`, outil « Lacs », `LakeData` dans `carte.json`,
   champ `lakes`) : clic dans une cuvette (`FindBasin` : seuil = hauteur à franchir pour rejoindre une vraie sortie), curseur
   de niveau ; au seuil, fleuve de sortie « Sortie du … » (`LakeData.Outlet`) ; bouton « Effacer les lacs » (`ClearAllLakes`, avec leurs sorties, annulable) ; contour par `LakeShape` ; dessin
