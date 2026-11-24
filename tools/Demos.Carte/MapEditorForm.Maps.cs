@@ -111,8 +111,7 @@ public sealed partial class MapEditorForm
             if (loaded is null) throw new InvalidOperationException("Format JSON invalide.");
 
             var (w, h) = (loaded.Width, loaded.Height);
-            var cols = Math.Clamp((int)Math.Round(w / 6.25), 100, 360);
-            var rows = Math.Clamp((int)Math.Round(h / 6.25), 64, 230);
+            var (cols, rows) = MapSizes.ReliefGrid(w, h);
             // Le relief de la carte elle-même (ses images), pas un relief recalculé au hasard.
             var (relief, reliefSource) = LoadMapRelief(loaded, folder);
             _currentHeightmap = Heightmap.FromRelief(relief, cols, rows, w, h);
@@ -122,8 +121,7 @@ public sealed partial class MapEditorForm
                 .ToList();
 
             _currentMap = loaded with { WaterBodies = sanitizedWater };
-            var zcols = Math.Clamp((int)Math.Round(w / 10.0), 100, 360);
-            var zrows = Math.Clamp((int)Math.Round(h / 10.0), 64, 230);
+            var (zcols, zrows) = MapSizes.ZoneGrid(w, h);
             _currentZoneGrid = new ZoneMaskGrid(zcols, zrows, w, h);
             _currentZoneGrid.RasterizeFromMap(_currentMap);
             _canvas.SetMap(_currentMap, _currentHeightmap, GetCurrentStyle(), _currentZoneGrid);
@@ -164,7 +162,7 @@ public sealed partial class MapEditorForm
         }
 
         var sw = Stopwatch.StartNew();
-        var built = ReliefBuilder.Build(map, new ReliefSettings());
+        var built = ReliefBuilder.Build(map, ReliefSettings.For(map.Width, map.Height));
         return (built, $"recalculé depuis les courbes en {sw.ElapsedMilliseconds} ms (refait à l'enregistrement)");
     }
 

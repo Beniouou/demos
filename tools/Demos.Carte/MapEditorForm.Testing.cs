@@ -1,5 +1,7 @@
 using System;
+using System.IO;
 using System.Linq;
+using Demos.Infrastructure;
 using Demos.Domain.Map;
 
 namespace Demos.Carte;
@@ -591,6 +593,92 @@ public sealed partial class MapEditorForm
                     (best, bestDist) = (new Point2D(x, y), d);
             }
         return best;
+    }
+
+    /// <summary>
+    /// Mesure de l'éditeur pour chaque taille de carte (24 novembre 2026, <c>--mesurer-tailles</c>) : carte vierge, île,
+    /// dix coups de pinceau et les courbes, un fleuve (réseau d'écoulement calculé, puis gardé), un dessin complet.
+    /// </summary>
+    public string MeasureSizesForTesting(string? saveLastTo = null)
+    {
+        var lines = new System.Collections.Generic.List<string>();
+        for (var index = 0; index < MapSizes.All.Length; index++)
+        {
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+            _comboDimensions.SelectedIndex = index;
+            var blank = sw.ElapsedMilliseconds;
+
+            var (sw0, sh0) = GetCurrentDimensions();
+            sw.Restart();
+            var probe = MapGenerator.CreateIsland(sw0, sh0, out var probeHeights, 42, IslandMorphology.Natural, 2800);
+            var tRelief = sw.ElapsedMilliseconds;
+            var (pc, pr) = MapSizes.ZoneGrid(sw0, sh0);
+            var probeZones = new ZoneMaskGrid(pc, pr, sw0, sh0);
+            sw.Restart();
+            probeZones.AutoGenerateBiomes(probeHeights, probe.AllRivers);
+            var tAuto = sw.ElapsedMilliseconds;
+            sw.Restart();
+            probeZones.ExtractBiomes();
+            var tExtract = sw.ElapsedMilliseconds;
+            sw.Restart();
+            probeZones.ExtractForests();
+            var tForests = sw.ElapsedMilliseconds;
+            lines.Add($"  île en détail : relief et courbes {tRelief} ms, biomes {tAuto} ms, contours des biomes {tExtract} ms, forêts {tForests} ms");
+
+            sw.Restart();
+            CreateIslandMap();
+            var island = sw.ElapsedMilliseconds;
+
+            var (w, h) = (_currentMap.Width, _currentMap.Height);
+            sw.Restart();
+            for (var step = 0; step < 10; step++)
+                _currentHeightmap.ApplyBrush(w * 0.4, h * 0.4, w * 0.03, 20);
+            var brushOnly = sw.ElapsedMilliseconds;
+            var levelsProbe = new System.Collections.Generic.List<double>();
+            for (var alt = 25.0; alt <= _currentHeightmap.MaxElevation; alt += 25.0) levelsProbe.Add(alt);
+            sw.Restart();
+            ContourExtractor.ExtractContours(_currentHeightmap, levelsProbe);
+            var tContours = sw.ElapsedMilliseconds;
+            sw.Restart();
+            ContourExtractor.ExtractWaterBodies(_currentHeightmap);
+            var tWater = sw.ElapsedMilliseconds;
+            lines.Add($"  courbes seules {tContours} ms, côte {tWater} ms");
+            sw.Restart();
+            ReextractContoursAfterElevationChange();
+            var brush = sw.ElapsedMilliseconds;
+
+            var source = FindLandForTesting(300, 2500, (w * 0.5, h * 0.45));
+            sw.Restart();
+            var river = _currentHeightmap.SimulateSpontaneousRiver(source.X, source.Y, _currentMap.AllRivers, _currentMap.AllLakes);
+            var firstRiver = sw.ElapsedMilliseconds;
+            sw.Restart();
+            _currentHeightmap.SimulateSpontaneousRiver(source.X + 30, source.Y, _currentMap.AllRivers, _currentMap.AllLakes);
+            var nextRiver = sw.ElapsedMilliseconds;
+
+            using var image = new System.Drawing.Bitmap(Math.Max(1, _canvas.Width), Math.Max(1, _canvas.Height));
+            _canvas.DrawToBitmap(image, new System.Drawing.Rectangle(0, 0, image.Width, image.Height));
+            sw.Restart();
+            _canvas.SetMap(_currentMap, _currentHeightmap, GetCurrentStyle(), _currentZoneGrid);
+            _canvas.DrawToBitmap(image, new System.Drawing.Rectangle(0, 0, image.Width, image.Height));
+            var draw = sw.ElapsedMilliseconds;
+
+            lines.Add($"{MapSizes.All[index].Label} : relief {_currentHeightmap.Columns} × {_currentHeightmap.Rows} cases, " +
+                $"zones {_currentZoneGrid.Columns} × {_currentZoneGrid.Rows} ; vierge {blank} ms, île {island} ms, " +
+                $"10 coups de pinceau {brushOnly} ms + courbes {brush} ms, fleuve {firstRiver} ms puis {nextRiver} ms ({river.Count} points), " +
+                $"dessin complet {draw} ms ; {_currentMap.Contours.Count} courbes, {_currentMap.AllBiomes.Count} biomes");
+        }
+
+        // La dernière carte (le petit continent), enregistrée pour l'essayer dans le jeu, avec son relief.
+        if (saveLastTo is not null)
+        {
+            Directory.CreateDirectory(saveLastTo);
+            var options = new System.Text.Json.JsonSerializerOptions { WriteIndented = true, PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase };
+            File.WriteAllText(Path.Combine(saveLastTo, MapFiles.MapFile), System.Text.Json.JsonSerializer.Serialize(_currentMap with { Name = "Essai continent (provisoire)" }, options));
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+            ReliefExport.Run(saveLastTo, previewPath: null);
+            lines.Add($"Enregistrée dans {saveLastTo} ; relief en {sw.ElapsedMilliseconds} ms");
+        }
+        return string.Join(Environment.NewLine, lines);
     }
 
     /// <summary>Le tracé finit dans la mer (ou à moins de 1 m au-dessus), au bord de la carte, ou sur un autre fleuve.</summary>

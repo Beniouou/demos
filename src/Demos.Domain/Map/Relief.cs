@@ -13,6 +13,14 @@ public sealed record ReliefSettings
     /// <summary>La taille d'un pixel des images, en unités de carte (2 : 200 m).</summary>
     public double CellSize { get; init; } = 2.0;
 
+    /// <summary>
+    /// Les réglages pour une carte de cette taille (24 novembre 2026, cartes de 100 × 60 à 1 600 × 1 000 km) : des pixels de
+    /// 200 m, mais des images jamais plus grandes que celles de la carte d'origine (1 800 × 1 125 pixels) ; un petit
+    /// continent a des pixels de presque 900 m.
+    /// </summary>
+    public static ReliefSettings For(double width, double height) =>
+        new() { CellSize = Math.Max(2.0, Math.Max(width / 1800.0, height / 1125.0)) };
+
     /// <summary>Le nombre de passes de l'interpolation, à chaque niveau de détail (plus : plus juste, plus lent).</summary>
     public int SolverIterations { get; init; } = 80;
 

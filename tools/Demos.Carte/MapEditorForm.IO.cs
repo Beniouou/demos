@@ -81,13 +81,8 @@ public sealed partial class MapEditorForm
 
     private (double Width, double Height) GetCurrentDimensions()
     {
-        return _comboDimensions.SelectedIndex switch
-        {
-            1 => (3600.0, 2250.0),
-            2 => (1200.0, 800.0),
-            3 => (1000.0, 640.0),
-            _ => (2400.0, 1500.0),
-        };
+        var size = MapSizes.All[Math.Clamp(_comboDimensions.SelectedIndex, 0, MapSizes.All.Length - 1)];
+        return (size.Width, size.Height);
     }
 
     /// <summary>
@@ -100,8 +95,7 @@ public sealed partial class MapEditorForm
 
         var (w, h) = GetCurrentDimensions();
         _currentMap = MapGenerator.CreateBlank(w, h, out _currentHeightmap);
-        var zcols = Math.Clamp((int)Math.Round(w / 10.0), 100, 360);
-        var zrows = Math.Clamp((int)Math.Round(h / 10.0), 64, 230);
+        var (zcols, zrows) = MapSizes.ZoneGrid(w, h);
         _currentZoneGrid = new ZoneMaskGrid(zcols, zrows, w, h);
         _currentZoneGrid.RasterizeFromMap(_currentMap);
         _canvas.SetMap(_currentMap, _currentHeightmap, GetCurrentStyle(), _currentZoneGrid);
@@ -131,8 +125,7 @@ public sealed partial class MapEditorForm
         var maxAlt = _contextBar.GetSelectedMaxAltitude();
 
         _currentMap = MapGenerator.CreateIsland(w, h, out _currentHeightmap, seed, morph, maxAlt);
-        var zcols = Math.Clamp((int)Math.Round(w / 10.0), 100, 360);
-        var zrows = Math.Clamp((int)Math.Round(h / 10.0), 64, 230);
+        var (zcols, zrows) = MapSizes.ZoneGrid(w, h);
         _currentZoneGrid = new ZoneMaskGrid(zcols, zrows, w, h);
         _currentZoneGrid.AutoGenerateBiomes(_currentHeightmap, _currentMap.AllRivers);
         var biomes = _currentZoneGrid.ExtractBiomes();
@@ -176,8 +169,7 @@ public sealed partial class MapEditorForm
         _currentMap = MapGenerator.Generate(parameters, out _currentHeightmap);
         sw.Stop();
 
-        var zcols = Math.Clamp((int)Math.Round(w / 10.0), 100, 360);
-        var zrows = Math.Clamp((int)Math.Round(h / 10.0), 64, 230);
+        var (zcols, zrows) = MapSizes.ZoneGrid(w, h);
         _currentZoneGrid = new ZoneMaskGrid(zcols, zrows, w, h);
         _currentZoneGrid.RasterizeFromMap(_currentMap);
         _canvas.SetMap(_currentMap, _currentHeightmap, GetCurrentStyle(), _currentZoneGrid);

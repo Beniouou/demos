@@ -428,12 +428,18 @@ public sealed class ZoneMaskGrid
     /// <summary>
     /// Extrait les polygones vectoriels de tous les biomes peints par Marching Squares.
     /// </summary>
-    public List<PolygonArea> ExtractBiomes(string? activeKey = null, string? preferredName = null)
+    public List<PolygonArea> ExtractBiomes(string? activeKey = null, string? preferredName = null) =>
+        ExtractBiomeKinds(activeKey, preferredName, only: null);
+
+    /// <summary>Les contours des biomes, tous ou d'un seul type (<paramref name="only"/> : son numéro).</summary>
+    private List<PolygonArea> ExtractBiomeKinds(string? activeKey, string? preferredName, byte? only)
     {
         var biomes = new List<PolygonArea>();
 
         for (byte id = 1; id <= 7; id++)
         {
+            if (only is { } single && id != single)
+                continue;
             var key = BiomeIdToKey(id);
             var defaultName = BiomeIdToDefaultName(id);
 
@@ -489,8 +495,8 @@ public sealed class ZoneMaskGrid
     /// </summary>
     public List<PolygonArea> ExtractForests(string forestName = "Bois des Chênes")
     {
-        var allBiomes = ExtractBiomes("foret", forestName);
-        return allBiomes.Where(b => b.Kind is "foret" or "Forest").ToList();
+        // Les forêts seules (1 = forêt) : avant le 24 novembre 2026, tous les biomes étaient refaits pour n'en garder qu'un.
+        return ExtractBiomeKinds("foret", forestName, only: 1).Where(b => b.Kind is "foret" or "Forest").ToList();
     }
 
     /// <summary>

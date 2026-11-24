@@ -64,6 +64,19 @@ public static class Program
             return success ? 0 : 1;
         }
 
+        // Mesure de l'éditeur pour chaque taille de carte (24 novembre 2026)
+        if (args.Length > 0 && args[0].Equals("--mesurer-tailles", StringComparison.OrdinalIgnoreCase))
+        {
+            ApplicationConfiguration.Initialize();
+            var form = new MapEditorForm(dataDir);
+            form.ClientSize = new System.Drawing.Size(1440, 900);
+            form.Show();
+            System.Windows.Forms.Application.DoEvents();
+            Console.WriteLine(form.MeasureSizesForTesting(args.Length > 1 ? args[1] : null));
+            form.Close();
+            return 0;
+        }
+
         // Mode export d'images
         if (args.Length > 1 && args[0].Equals("--export", StringComparison.OrdinalIgnoreCase))
         {

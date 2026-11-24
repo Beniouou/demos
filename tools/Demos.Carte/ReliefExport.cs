@@ -35,7 +35,7 @@ internal static class ReliefExport
             return 1;
         }
 
-        var settings = new ReliefSettings();
+        var settings = ReliefSettings.For(map.Width, map.Height);
         var watch = Stopwatch.StartNew();
         var grid = ReliefBuilder.Build(map, settings);
         var shade = Hillshade.Compute(grid, settings);

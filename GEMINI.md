@@ -42,7 +42,7 @@ Tu peux créer tes propres fichiers : par exemple un dossier `src/Demos.Domain/M
 Le document de règles de référence est dans Claude Docs, et tu n'y as pas accès. Voici ce qu'il dit d'utile pour toi.
 
 **Carte géographique vectorielle continue (implémentée et opérationnelle)**
-- Une carte vectorielle continue en coordonnées réelles (unités de 100 m : 360 × 225 km), sans cases ni hexagones, enregistrée dans `game/data/cartes/<nom>/carte.json` (une carte par dossier, avec ses images de relief ; carte par défaut nommée dans `game/data/cartes/carte-par-defaut.txt`, aujourd'hui `origine` ; chemins dans `src/Demos.Infrastructure/MapFiles.cs` ; `VectorMapDefinition` dans `src/Demos.Domain/Map/MapVectorData.cs`).
+- Une carte vectorielle continue en coordonnées réelles (unités de 100 m ; la carte d'origine fait 360 × 225 km, les cartes neuves ont quatre tailles, de 100 × 60 à 1 600 × 1 000 km), sans cases ni hexagones, enregistrée dans `game/data/cartes/<nom>/carte.json` (une carte par dossier, avec ses images de relief ; carte par défaut nommée dans `game/data/cartes/carte-par-defaut.txt`, aujourd'hui `origine` ; chemins dans `src/Demos.Infrastructure/MapFiles.cs` ; `VectorMapDefinition` dans `src/Demos.Domain/Map/MapVectorData.cs`).
 - Rendu vectoriel sous deux styles : **IGN Pastel Moderne** et **Parchemin Ancien 1874**.
 - Relief ombré physique continu (*Hillshading 3D* Azimut 315° NW, Zénith 45°, méthode de Horn) avec adret crème chaud et ubac bistre/sépia.
 - Réseau hydrographique thalweg (creusement de vallées naturelles) et trait de côte avec hauts-fonds/estran et écume marine blanche.
@@ -150,8 +150,10 @@ Le document de règles de référence est dans Claude Docs, et tu n'y as pas acc
 - **Côte et désert (décidé le 23 novembre 2026)** : chaque carte a une côte et un désert (biome Désert), que le
   générateur garantit et que l'éditeur vérifie, pour les Grands Œuvres « Vaisseau du Second Exil » et « Terre Rendue ».
   Une autre rive (terre séparée par l'eau, pour le « Pont vers l'Autre Rive ») est facultative ; un Grand Œuvre que la
-  carte ne permet pas n'est pas proposé. Les cartes au hasard gardent 360 × 225 km (proposition : les réglages de
-  distance sont faits pour cette taille).
+  carte ne permet pas n'est pas proposé. Tailles des cartes neuves (décidé le 24 novembre 2026, remplace
+  « 360 × 225 km ») : département 100 × 60 km, petit pays 240 × 150 km, grand pays 800 × 500 km, petit continent
+  1 600 × 1 000 km. Les règles (en km) valent partout ; l'équilibrage reste à vérifier par la simulation. La carte
+  d'origine garde 360 × 225 km.
 - Points à reprendre en codant :
   - la fiche vérifie qu'un passage par la terre (pente de 12 % au plus, pas de mer, comme les routes de `Roads.cs`) relie
     la terre d'exil à ses gisements, sinon aucune route ne s'y fera (proposition) ;
@@ -178,7 +180,7 @@ Le document de règles de référence est dans Claude Docs, et tu n'y as pas acc
 - Chaque préfecture traversée entre l'entité qui décide et la commune fait perdre 10 % d'efficacité.
 
 **Échelle de la carte (décidé le 12 novembre 2026 ; la « lieue » est abandonnée)**
-- Une unité de carte vaut 100 m (`src/Demos.Domain/Map/MapScale.cs`) : la carte fait 360 × 225 km. Les règles et les
+- Une unité de carte vaut 100 m (`src/Demos.Domain/Map/MapScale.cs`) : la carte d'origine fait 360 × 225 km. Les règles et les
   réglages de distance sont en km ; les coordonnées restent en unités, converties par `MapScale`. Ne plus écrire « lieue ».
 - Ressort d'une commune : 8 km ; d'une préfecture : 40 km autour du chef-lieu, plus les ressorts de ses communes.
 - Maisons et arbres sont presque à l'échelle (un toit figure un îlot de 100 m, un arbre un bosquet). Tailles dans

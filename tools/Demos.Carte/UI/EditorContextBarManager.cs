@@ -35,7 +35,7 @@ public sealed class EditorContextBarManager
     public Button BtnQuickBlank { get; } = new() { Text = "📄 Carte vierge", AutoSize = true, Margin = new Padding(0, 1, 4, 0) };
     public Button BtnQuickNoise { get; } = new() { Text = "🎲 Relief procédural", AutoSize = true, Margin = new Padding(0, 1, 6, 0) };
     public Button BtnZoomReset { get; } = new() { Text = "🎯 Recentrer vue", AutoSize = true, Margin = new Padding(0, 1, 6, 0) };
-    public ComboBox ComboDimensions { get; } = new() { DropDownStyle = ComboBoxStyle.DropDownList, Width = 215, Margin = new Padding(0, 3, 8, 0) };
+    public ComboBox ComboDimensions { get; } = new() { DropDownStyle = ComboBoxStyle.DropDownList, Width = 215, DropDownWidth = 270, Margin = new Padding(0, 3, 8, 0) };
 
     // Génération procédurale (Graine, Morphologie, Plafond d'altitude)
     public Label LblSeed { get; } = new() { Text = "Graine :", AutoSize = true, Margin = new Padding(0, 6, 2, 0) };
@@ -224,13 +224,8 @@ public sealed class EditorContextBarManager
     private void InitDimensions()
     {
         ComboDimensions.Items.Clear();
-        ComboDimensions.Items.AddRange([
-            "Petit Pays (240 × 150 km)",
-            "Grand Royaume (360 × 225 km)",
-            "Région / Duché (120 × 80 km)",
-            "Standard (100 × 64 km)"
-        ]);
-        ComboDimensions.SelectedIndex = 0;
+        ComboDimensions.Items.AddRange([.. MapSizes.All.Select(s => (object)s.Label)]);
+        ComboDimensions.SelectedIndex = MapSizes.DefaultIndex;
     }
 
     public static Control CreateSep() =>

@@ -13,122 +13,139 @@ public static class ContourExtractor
 {
     public readonly record struct Segment(Point2D P1, Point2D P2);
 
+    /// <summary>
+    /// Les courbes de niveau. Une seule passe sur la grille (24 novembre 2026) : chaque case ne calcule que les altitudes
+    /// comprises entre son point le plus bas et le plus haut, au lieu d'une passe par altitude ; puis les segments de
+    /// chaque altitude sont reliés en lignes.
+    /// </summary>
     public static List<ContourLine> ExtractContours(
         Heightmap heightmap,
         IReadOnlyList<double> levels)
     {
-        var result = new List<ContourLine>();
-
-        foreach (var level in levels)
+        var sorted = levels.OrderBy(l => l).ToArray();
+        var perLevel = sorted.Select(_ => new List<Segment>()).ToArray();
+        for (var i = 0; i < heightmap.Columns - 1; i++)
         {
-            var segments = ExtractSegmentsForLevel(heightmap, level);
-            var polylines = ChainSegments(segments);
-
-            var isIndex = ((int)Math.Round(level) % 100) == 0;
-
-            foreach (var poly in polylines)
+            for (var j = 0; j < heightmap.Rows - 1; j++)
             {
-                if (poly.Count < 2)
-                    continue;
-
-                // Vérifier si la polyligne forme une boucle fermée
-                var isClosed = Distance(poly[0], poly[^1]) < 8.0;
-                result.Add(new ContourLine(level, isIndex, isClosed, poly));
+                var (a, b, c, d) = (heightmap[i, j], heightmap[i + 1, j], heightmap[i + 1, j + 1], heightmap[i, j + 1]);
+                var low = Math.Min(Math.Min(a, b), Math.Min(c, d));
+                var high = Math.Max(Math.Max(a, b), Math.Max(c, d));
+                // La première altitude au-dessus du point le plus bas ; la case n'est coupée que jusqu'au plus haut.
+                var k = Array.BinarySearch(sorted, low);
+                k = k >= 0 ? k + 1 : ~k;
+                for (; k < sorted.Length && sorted[k] <= high; k++)
+                    AddCellSegments(heightmap, i, j, sorted[k], perLevel[k]);
             }
         }
 
-        return result;
+        var lines = new List<ContourLine>[sorted.Length];
+        for (var k = 0; k < sorted.Length; k++)
+        {
+            var level = sorted[k];
+            var isIndex = ((int)Math.Round(level) % 100) == 0;
+            lines[k] = [];
+            foreach (var poly in ChainSegments(perLevel[k]))
+            {
+                if (poly.Count < 2)
+                    continue;
+                // Vérifier si la polyligne forme une boucle fermée
+                var isClosed = Distance(poly[0], poly[^1]) < 8.0;
+                lines[k].Add(new ContourLine(level, isIndex, isClosed, poly));
+            }
+        }
+        return [.. lines.SelectMany(l => l)];
     }
 
     public static List<Segment> ExtractSegmentsForLevel(Heightmap hm, double level)
     {
         var segments = new List<Segment>();
-
         for (var i = 0; i < hm.Columns - 1; i++)
-        {
             for (var j = 0; j < hm.Rows - 1; j++)
-            {
-                var x0 = hm.GetWorldX(i);
-                var x1 = hm.GetWorldX(i + 1);
-                var y0 = hm.GetWorldY(j);
-                var y1 = hm.GetWorldY(j + 1);
-
-                var zTL = hm[i, j];
-                var zTR = hm[i + 1, j];
-                var zBR = hm[i + 1, j + 1];
-                var zBL = hm[i, j + 1];
-
-                var config = (zTL >= level ? 8 : 0) |
-                             (zTR >= level ? 4 : 0) |
-                             (zBR >= level ? 2 : 0) |
-                             (zBL >= level ? 1 : 0);
-
-                if (config is 0 or 15)
-                    continue;
-
-                // Points d'intersection sur les 4 arêtes
-                Point2D? ptTop = (config & 12) is 4 or 8 ? Interp(x0, y0, zTL, x1, y0, zTR, level) : null;
-                Point2D? ptRight = (config & 6) is 2 or 4 ? Interp(x1, y0, zTR, x1, y1, zBR, level) : null;
-                Point2D? ptBottom = (config & 3) is 1 or 2 ? Interp(x0, y1, zBL, x1, y1, zBR, level) : null;
-                Point2D? ptLeft = (config & 9) is 1 or 8 ? Interp(x0, y0, zTL, x0, y1, zBL, level) : null;
-
-                switch (config)
-                {
-                    case 1: // BL
-                    case 14:
-                        if (ptBottom.HasValue && ptLeft.HasValue) segments.Add(new(ptBottom.Value, ptLeft.Value));
-                        break;
-                    case 2: // BR
-                    case 13:
-                        if (ptRight.HasValue && ptBottom.HasValue) segments.Add(new(ptRight.Value, ptBottom.Value));
-                        break;
-                    case 3: // BL + BR
-                    case 12:
-                        if (ptLeft.HasValue && ptRight.HasValue) segments.Add(new(ptLeft.Value, ptRight.Value));
-                        break;
-                    case 4: // TR
-                    case 11:
-                        if (ptTop.HasValue && ptRight.HasValue) segments.Add(new(ptTop.Value, ptRight.Value));
-                        break;
-                    case 6: // TR + BR
-                    case 9:
-                        if (ptTop.HasValue && ptBottom.HasValue) segments.Add(new(ptTop.Value, ptBottom.Value));
-                        break;
-                    case 7: // TR + BR + BL
-                    case 8:
-                        if (ptLeft.HasValue && ptTop.HasValue) segments.Add(new(ptLeft.Value, ptTop.Value));
-                        break;
-                    case 5: // Selle BL + TR
-                        var avg5 = (zTL + zTR + zBR + zBL) * 0.25;
-                        if (avg5 >= level)
-                        {
-                            if (ptTop.HasValue && ptLeft.HasValue) segments.Add(new(ptTop.Value, ptLeft.Value));
-                            if (ptRight.HasValue && ptBottom.HasValue) segments.Add(new(ptRight.Value, ptBottom.Value));
-                        }
-                        else
-                        {
-                            if (ptTop.HasValue && ptRight.HasValue) segments.Add(new(ptTop.Value, ptRight.Value));
-                            if (ptLeft.HasValue && ptBottom.HasValue) segments.Add(new(ptLeft.Value, ptBottom.Value));
-                        }
-                        break;
-                    case 10: // Selle TL + BR
-                        var avg10 = (zTL + zTR + zBR + zBL) * 0.25;
-                        if (avg10 >= level)
-                        {
-                            if (ptTop.HasValue && ptRight.HasValue) segments.Add(new(ptTop.Value, ptRight.Value));
-                            if (ptLeft.HasValue && ptBottom.HasValue) segments.Add(new(ptLeft.Value, ptBottom.Value));
-                        }
-                        else
-                        {
-                            if (ptTop.HasValue && ptLeft.HasValue) segments.Add(new(ptTop.Value, ptLeft.Value));
-                            if (ptRight.HasValue && ptBottom.HasValue) segments.Add(new(ptRight.Value, ptBottom.Value));
-                        }
-                        break;
-                }
-            }
-        }
-
+                AddCellSegments(hm, i, j, level, segments);
         return segments;
+    }
+
+    /// <summary>Les segments de la courbe de cette altitude dans la case (i, j) (Marching Squares).</summary>
+    private static void AddCellSegments(Heightmap hm, int i, int j, double level, List<Segment> segments)
+    {
+        var x0 = hm.GetWorldX(i);
+        var x1 = hm.GetWorldX(i + 1);
+        var y0 = hm.GetWorldY(j);
+        var y1 = hm.GetWorldY(j + 1);
+
+        var zTL = hm[i, j];
+        var zTR = hm[i + 1, j];
+        var zBR = hm[i + 1, j + 1];
+        var zBL = hm[i, j + 1];
+
+        var config = (zTL >= level ? 8 : 0) |
+                     (zTR >= level ? 4 : 0) |
+                     (zBR >= level ? 2 : 0) |
+                     (zBL >= level ? 1 : 0);
+
+        if (config is 0 or 15)
+            return;
+
+        // Points d'intersection sur les 4 arêtes
+        Point2D? ptTop = (config & 12) is 4 or 8 ? Interp(x0, y0, zTL, x1, y0, zTR, level) : null;
+        Point2D? ptRight = (config & 6) is 2 or 4 ? Interp(x1, y0, zTR, x1, y1, zBR, level) : null;
+        Point2D? ptBottom = (config & 3) is 1 or 2 ? Interp(x0, y1, zBL, x1, y1, zBR, level) : null;
+        Point2D? ptLeft = (config & 9) is 1 or 8 ? Interp(x0, y0, zTL, x0, y1, zBL, level) : null;
+
+        switch (config)
+        {
+            case 1: // BL
+            case 14:
+                if (ptBottom.HasValue && ptLeft.HasValue) segments.Add(new(ptBottom.Value, ptLeft.Value));
+                break;
+            case 2: // BR
+            case 13:
+                if (ptRight.HasValue && ptBottom.HasValue) segments.Add(new(ptRight.Value, ptBottom.Value));
+                break;
+            case 3: // BL + BR
+            case 12:
+                if (ptLeft.HasValue && ptRight.HasValue) segments.Add(new(ptLeft.Value, ptRight.Value));
+                break;
+            case 4: // TR
+            case 11:
+                if (ptTop.HasValue && ptRight.HasValue) segments.Add(new(ptTop.Value, ptRight.Value));
+                break;
+            case 6: // TR + BR
+            case 9:
+                if (ptTop.HasValue && ptBottom.HasValue) segments.Add(new(ptTop.Value, ptBottom.Value));
+                break;
+            case 7: // TR + BR + BL
+            case 8:
+                if (ptLeft.HasValue && ptTop.HasValue) segments.Add(new(ptLeft.Value, ptTop.Value));
+                break;
+            case 5: // Selle BL + TR
+                var avg5 = (zTL + zTR + zBR + zBL) * 0.25;
+                if (avg5 >= level)
+                {
+                    if (ptTop.HasValue && ptLeft.HasValue) segments.Add(new(ptTop.Value, ptLeft.Value));
+                    if (ptRight.HasValue && ptBottom.HasValue) segments.Add(new(ptRight.Value, ptBottom.Value));
+                }
+                else
+                {
+                    if (ptTop.HasValue && ptRight.HasValue) segments.Add(new(ptTop.Value, ptRight.Value));
+                    if (ptLeft.HasValue && ptBottom.HasValue) segments.Add(new(ptLeft.Value, ptBottom.Value));
+                }
+                break;
+            case 10: // Selle TL + BR
+                var avg10 = (zTL + zTR + zBR + zBL) * 0.25;
+                if (avg10 >= level)
+                {
+                    if (ptTop.HasValue && ptRight.HasValue) segments.Add(new(ptTop.Value, ptRight.Value));
+                    if (ptLeft.HasValue && ptBottom.HasValue) segments.Add(new(ptLeft.Value, ptBottom.Value));
+                }
+                else
+                {
+                    if (ptTop.HasValue && ptLeft.HasValue) segments.Add(new(ptTop.Value, ptLeft.Value));
+                    if (ptRight.HasValue && ptBottom.HasValue) segments.Add(new(ptRight.Value, ptBottom.Value));
+                }
+                break;
+        }
     }
 
     private static Point2D Interp(double x1, double y1, double z1, double x2, double y2, double z2, double target)
@@ -140,79 +157,80 @@ public static class ContourExtractor
             Math.Round(y1 + t * (y2 - y1), 1));
     }
 
+    /// <summary>
+    /// Relie les segments en lignes : un segment prolonge une ligne si l'un de ses bouts est à moins d'1 unité du bout de
+    /// la ligne. Les bouts sont rangés par carré d'1 unité (24 novembre 2026) : on ne regarde que les 9 carrés autour,
+    /// au lieu de tous les segments restants (les grandes cartes prenaient des secondes).
+    /// </summary>
     public static List<List<Point2D>> ChainSegments(List<Segment> segments)
     {
-        var polylines = new List<List<Point2D>>();
-        var pool = new HashSet<Segment>(segments);
-
-        while (pool.Count > 0)
+        var unique = new HashSet<Segment>(segments).ToList();
+        var used = new bool[unique.Count];
+        var byCell = new Dictionary<(long, long), List<int>>();
+        static (long, long) CellOf(Point2D p) => ((long)Math.Floor(p.X), (long)Math.Floor(p.Y));
+        void Add(Point2D p, int index)
         {
-            var first = pool.First();
-            pool.Remove(first);
+            if (!byCell.TryGetValue(CellOf(p), out var list))
+                byCell[CellOf(p)] = list = [];
+            list.Add(index);
+        }
+        for (var k = 0; k < unique.Count; k++)
+        {
+            Add(unique[k].P1, k);
+            Add(unique[k].P2, k);
+        }
 
+        // Le premier segment libre dont un bout touche ce point (TouchesWithP1 : c'est son P1 qui le touche).
+        (int Index, bool TouchesWithP1)? Find(Point2D point, bool preferP1)
+        {
+            var (cx, cy) = CellOf(point);
+            for (var dx = -1; dx <= 1; dx++)
+                for (var dy = -1; dy <= 1; dy++)
+                {
+                    if (!byCell.TryGetValue((cx + dx, cy + dy), out var list))
+                        continue;
+                    foreach (var k in list)
+                    {
+                        if (used[k])
+                            continue;
+                        var (first, second) = preferP1 ? (unique[k].P1, unique[k].P2) : (unique[k].P2, unique[k].P1);
+                        if (Distance(first, point) < 1.0)
+                            return (k, preferP1);
+                        if (Distance(second, point) < 1.0)
+                            return (k, !preferP1);
+                    }
+                }
+            return null;
+        }
+
+        var polylines = new List<List<Point2D>>();
+        for (var start = 0; start < unique.Count; start++)
+        {
+            if (used[start])
+                continue;
+            used[start] = true;
             var poly = new LinkedList<Point2D>();
-            poly.AddFirst(first.P1);
-            poly.AddLast(first.P2);
+            poly.AddFirst(unique[start].P1);
+            poly.AddLast(unique[start].P2);
 
             bool grew;
             do
             {
                 grew = false;
-                var head = poly.First!.Value;
-                var tail = poly.Last!.Value;
-
-                // Tenter d'étendre la tête
-                Segment? foundHead = null;
-                var flipHead = false;
-                foreach (var seg in pool)
+                // La tête se prolonge par un segment qui y finit (son P2), ou y commence (retourné).
+                if (Find(poly.First!.Value, preferP1: false) is { } head)
                 {
-                    if (Distance(seg.P2, head) < 1.0)
-                    {
-                        foundHead = seg;
-                        flipHead = false;
-                        break;
-                    }
-                    if (Distance(seg.P1, head) < 1.0)
-                    {
-                        foundHead = seg;
-                        flipHead = true;
-                        break;
-                    }
-                }
-
-                if (foundHead.HasValue)
-                {
-                    pool.Remove(foundHead.Value);
-                    poly.AddFirst(flipHead ? foundHead.Value.P2 : foundHead.Value.P1);
+                    used[head.Index] = true;
+                    poly.AddFirst(head.TouchesWithP1 ? unique[head.Index].P2 : unique[head.Index].P1);
                     grew = true;
                 }
-
-                // Tenter d'étendre la queue
-                Segment? foundTail = null;
-                var flipTail = false;
-                foreach (var seg in pool)
+                // La queue, par un segment qui y commence (son P1), ou y finit (retourné).
+                if (Find(poly.Last!.Value, preferP1: true) is { } tail)
                 {
-                    if (Distance(seg.P1, tail) < 1.0)
-                    {
-                        foundTail = seg;
-                        flipTail = false;
-                        break;
-                    }
-                    if (Distance(seg.P2, tail) < 1.0)
-                    {
-                        foundTail = seg;
-                        flipTail = true;
-                        break;
-                    }
-                }
-
-                if (foundTail.HasValue)
-                {
-                    pool.Remove(foundTail.Value);
-                    poly.AddLast(flipTail ? foundTail.Value.P1 : foundTail.Value.P2);
+                    used[tail.Index] = true;
+                    poly.AddLast(tail.TouchesWithP1 ? unique[tail.Index].P2 : unique[tail.Index].P1);
                     grew = true;
                 }
-
             } while (grew);
 
             polylines.Add(poly.ToList());

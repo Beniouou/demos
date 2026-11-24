@@ -19,8 +19,7 @@ public static class MapGenerator
     /// </summary>
     public static VectorMapDefinition CreateBlank(double worldWidth, double worldHeight, out Heightmap heightmap)
     {
-        var cols = Math.Clamp((int)Math.Round(worldWidth / 6.25), 100, 360);
-        var rows = Math.Clamp((int)Math.Round(worldHeight / 6.25), 64, 230);
+        var (cols, rows) = MapSizes.ReliefGrid(worldWidth, worldHeight);
 
         // Carte altimétrique plane (plaine douce à 50 m)
         heightmap = Heightmap.CreateFlat(cols, rows, worldWidth, worldHeight, baseElevation: 50.0);
@@ -68,8 +67,7 @@ public static class MapGenerator
         IslandMorphology morphology = IslandMorphology.Natural,
         double maxAltitude = 2800.0)
     {
-        var cols = Math.Clamp((int)Math.Round(worldWidth / 6.25), 100, 360);
-        var rows = Math.Clamp((int)Math.Round(worldHeight / 6.25), 64, 230);
+        var (cols, rows) = MapSizes.ReliefGrid(worldWidth, worldHeight);
 
         heightmap = Heightmap.CreateIsland(cols, rows, worldWidth, worldHeight, seed, morphology, maxAltitude);
 
@@ -135,8 +133,7 @@ public static class MapGenerator
         Point2D S(double x, double y) => new(Math.Round(x * sx, 1), Math.Round(y * sy, 1));
 
         // 1. Grille altimétrique adaptée aux dimensions (160x102 pour 1000x640, monte proportionnellement)
-        var cols = Math.Clamp((int)Math.Round(worldWidth / 6.25), 100, 360);
-        var rows = Math.Clamp((int)Math.Round(worldHeight / 6.25), 64, 230);
+        var (cols, rows) = MapSizes.ReliefGrid(worldWidth, worldHeight);
         heightmap = new Heightmap(cols, rows, worldWidth, worldHeight, p);
 
         // 2. Extraction des courbes de niveau IGN (isohypses régulières selon le pas paramétré)
