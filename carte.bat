@@ -1,7 +1,7 @@
 @echo off
 chcp 65001 >nul
 rem Ouvre l'editeur graphique de carte topographique IGN : reglage du relief,
-rem courbes de niveau en direct, filtres et enregistrement dans game/data/carte.json.
+rem courbes de niveau en direct, filtres ; une carte par dossier dans game/data/cartes/.
 
 cd /d "%~dp0"
 

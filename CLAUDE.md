@@ -43,7 +43,7 @@ Jeu solo de construction de nation (Godot .NET 4.7, C#, .NET 10), en français. 
 | Éditeur de carte | `carte.bat` (fenêtre Windows, `tools/Demos.Carte`) |
 | Gestionnaire d'icônes | `icones.bat` (fenêtre application 74 logos, `galerie-icones.html` ; `remplacer.bat` pour remplacement direct) |
 | Test auto de la carte | `dotnet run --project tools/Demos.Carte -- --test-sliders` |
-| Relief de la carte (images) | `dotnet run --project tools/Demos.Carte -- --relief` (après chaque changement de `carte.json`) |
+| Relief d'une carte (images) | `dotnet run --project tools/Demos.Carte -- --relief [carte]` (la carte par défaut sans nom ; l'éditeur le refait à chaque enregistrement) |
 | Petites images de la carte | `dotnet run --project tools/Demos.Carte -- --images` (dessine celles qui manquent dans `game/assets/carte/` ; `--forcer` les redessine toutes) |
 
 Le tableur (`equilibrage demos.xlsx`) et le rapport (`rapport simulation.html`) sont **à côté** du dossier `demos/`,
@@ -67,7 +67,7 @@ matières, 114 954 avant eux,
 - Contenu dans `game/data/` : `products.json`, `buildings.json`, `besoins.json`, `equilibrage.json` (réglages de
   l'économie, `BalanceSettings`, lus via `Balance.Current`), `partie-depart.json` (partie de départ et lois du départ
   préréglé), `lois.json` (catalogue des lois : domaines, briques, modèles ; voir `Politics/LawBook.cs`),
-  `carte.json` (définition vectorielle du monde : `VectorMapDefinition`), `promesses.json` (les 26 Promesses des exilés,
+  `cartes/<nom>/` (une carte par dossier : `carte.json`, définition vectorielle du monde, `VectorMapDefinition`, et ses images de relief ; la carte par défaut est nommée dans `cartes/carte-par-defaut.txt`, aujourd'hui `origine` ; `essai-1` est une carte d'essai ; chemins dans `Demos.Infrastructure/MapFiles.cs`, `JsonContentSource(…, mapName)` lit une carte par son nom, la carte par défaut sinon, l'ancien `carte.json` à la racine en secours ; Godot : `MapData.LoadVectorMap(mapName)`, `MapRelief.Load(dossier)`), `promesses.json` (les 26 Promesses des exilés,
   une par combinaison de 1 à 3 pôles, et leurs noms : `Politics/PromiseDefinition.cs`, `LoadPromises`, feuille Promesses du
   tableur où le nom se change ; sans effet sur la partie pour l'instant). `engagements.json` : les 42 engagements de La Promesse
   (`Politics/EngagementDefinition.cs`, de principe ou concrets, par pôle ; `LoadEngagements`, feuille Engagements du tableur ;
@@ -134,7 +134,7 @@ désactivés : TVA sur la valeur ajoutée, épargne progressive des entreprises.
 
 ## Carte & Géographie : état actuel (résumé)
 
-- Données produites dans `game/data/carte.json` (`VectorMapDefinition` dans `src/Demos.Domain/Map/MapVectorData.cs`) :
+- Données produites dans `game/data/cartes/<nom>/carte.json` (`VectorMapDefinition` dans `src/Demos.Domain/Map/MapVectorData.cs`) :
   carte vectorielle continue (3 600 × 2 250 unités de 100 m, soit 360 × 225 km), 1 567 contours d'isohypses Marching Squares, 17 cours d'eau thalweg (`AllRivers`), 150 biomes naturels avec trous polygonaux intérieurs (`Biomes` et `Forests`), 66 gisements de sol (`ResourceZones`, `Resources`), communes et toponymie.
 - Le moteur Godot affiche la carte vectorielle IGN Pastel au centre de l'écran (`game/scripts/Map/MapCanvas.cs`, `game/scripts/Hud.cs` et menu Carte `game/scripts/MainMenu.cs`) :
   - Enveloppes départementales continues des préfectures fusionnées dynamiquement sans grille (`Geometry2D.MergePolygons`).
@@ -165,9 +165,12 @@ désactivés : TVA sur la valeur ajoutée, épargne progressive des entreprises.
   `ZoneMaskGrid.CliffMinSlope`… : falaise ≥ 8 %, fertile < 10 %, marais < 1 %, désert et plage < 2 % ; 12 novembre 2026).
   Le canevas garde la carte dessinée en image (`MapCanvasControl.DrawMapFromCache`) : toute modification de la carte
   ou du relief doit passer par `SetMap` (ou `NotifyReliefChanged`), sinon l'affichage ne suit pas. Les pinceaux de
-  biomes et de gisements recalculent les contours au relâcher seulement.
+  biomes et de gisements recalculent les contours au relâcher seulement. Contours des biomes et gisements
+  (`ZoneMaskGrid.ExtractMarchingSquaresLoops`) : la grille est entourée d'un cadre vide, pour qu'une zone qui touche le
+  bord de la carte se referme le long du bord (corrigé le 24 novembre 2026 : le contour restait ouvert et la zone
+  s'inversait ; test dans `--test-sliders`). La pente au bord de la carte se mesure dans la carte (`ComputeSlope`, 24 novembre 2026 : hors de la carte l'altitude valait 0 m, d'où des falaises le long du bord). Plusieurs cartes (24 novembre 2026, `MapEditorForm.Maps.cs`) : « Ouvrir » (liste des cartes), « Enregistrer » (dans la carte ouverte ; une carte neuve demande un nom), « Enregistrer sous… », « ★ Par défaut » ; chaque enregistrement refait le relief de la carte (`ReliefExport.Run(dossier)`).
 - Routes (décidé et codé le 10 novembre 2026, `src/Demos.Domain/Map/Roads.cs`) : le trafic entre communes crée sentier, chemin,
-  route (un niveau par mois) ; tracé le moins cher sur la carte d'altitude (`game/data/relief-*.png`, lue par
+  route (un niveau par mois) ; tracé le moins cher sur la carte d'altitude (`game/data/cartes/<nom>/relief-*.png`, lue par
   `JsonContentSource.LoadRelief`) ; un chemin retire 25 % de la perte de transport, une route 50 % ; construction et
   entretien payés par la plus petite structure qui contient les deux communes (préfecture : l'État paie pour l'instant).
   Chiffres : réglages `road…` de `BalanceSettings` (validés le 11 novembre 2026). Routes des bâtiments (décidé le
@@ -177,11 +180,27 @@ désactivés : TVA sur la valeur ajoutée, épargne progressive des entreprises.
 - Fonder une commune (décidé le 12 novembre 2026, `Map/CommuneSites.cs`, `World.CommuneSiteProblem`, contrôlé par
   `TryFoundCommune`) : sur la carte, pas sur l'eau (altitude sous 0), une falaise ou un glacier, et à 16 km au moins de
   toute autre commune (`communeMinDistance`) ; pas de distance maximale. Légitimité du camp : `baseCampLegitimacyCost` (20).
+- Départs d'une carte (décidé le 23 novembre 2026, règles dans `GEMINI.md`, « Terre d'exil ») : `VectorMapDefinition.ExileSites`
+  (`ExileSite` : nom et camp, 1 à 3 par carte, champ `exileSites` facultatif de `carte.json`, `AllExileSites`) ; le départ
+  riche du bac à sable est la commune de base (`DefaultCommune`). Fiche et verdict dans `Map/StartSites.cs` : `Report`
+  (terre fertile et forêt à 8 et 20 km, emplois de ferme et de bûcheron sur la zone la plus proche du ressort, gisement le
+  plus proche, côte, fleuve, altitude), `Judge` (`ExileVerdict` jouable, injouable, trop facile ; seuils `ExileThresholds`,
+  propositions, pas encore dans le tableur), `PresetProblems` (le départ préréglé tient-il : chaque bâtiment posé comme
+  au départ, zones limitées). Éditeur : outil « Départs » (`EditorTool.PlaceStart`, `MapCanvasControl.Starts.cs`,
+  `MapEditorForm.Starts.cs` : panneau des fiches à droite, verdict en couleur sur la carte). Une fiche prend ~0,4 s
+  (surtout `ExtractionSites.NearestSite`). Pas encore codé : carte au hasard complète (fleuves, gisements, départs
+  proposés), tirage de la terre d'exil dans le jeu, passage par la terre vers les gisements.
 - Chantiers suivants ouverts :
   - Bonus logistique de transport fluvial le long des 17 cours d'eau navigables.
 
 ## Interface Godot : état actuel (résumé)
 
+- Écran « Nouvelle partie » (24 novembre 2026, `NewGameScreen.cs`) : avant la partie, `Main._Ready` le montre ; il liste les
+  cartes de `res://data/cartes/` (nom lu en tête de `carte.json`, `MapFiles.NameFromStart`), la carte par défaut choisie
+  d'avance et marquée ★ ; « Commencer » (ou double-clic) appelle `Main.StartGame(carte)`, qui crée la partie
+  (`JsonContentSource(…, mapName)`) puis l'écran de jeu (`Hud.Init(…, mapName)` → `MapCanvas.Init(view, mapName)`).
+  `-- --carte <nom>` en ligne de commande passe l'écran (essais, captures avec `--write-movie`). Pas encore : le mode
+  (avec Promesse ou bac à sable) et le départ (riche ou terre d'exil).
 - Menus dans `game/scripts/MainMenu.cs` (Carte, Lois, Structure, Population, Communes, Recherche, Ressources, Aide) ; une page
   par fichier (`*Page.cs`) ; `Coming(...)` = entrée grisée « à venir ». Lecture de la partie par `GameView`
   (`src/Demos.Application/GameView.cs`), **actions du joueur par `PlayerDesk`** (`game/scripts/PlayerDesk.cs`, qui

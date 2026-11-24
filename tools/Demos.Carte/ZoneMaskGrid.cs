@@ -686,13 +686,18 @@ public sealed class ZoneMaskGrid
         }
     }
 
-    /// <summary>La pente en un point, en % (mètres de dénivelé pour 100 m), mesurée de part et d'autre sur 600 m.</summary>
+    /// <summary>
+    /// La pente en un point, en % (mètres de dénivelé pour 100 m), mesurée de part et d'autre sur 600 m. Au bord de la
+    /// carte, la mesure reste dans la carte (d'un seul côté) : hors de la carte l'altitude vaut 0 m, ce qui faisait
+    /// croire à une falaise tout le long du bord (corrigé le 24 novembre 2026).
+    /// </summary>
     public static double ComputeSlope(double wx, double wy, Heightmap hm)
     {
         const double delta = 6.0; // unités de carte (600 m)
-        var run = 2.0 * delta * MapScale.MetersPerUnit;
-        var dx = (hm.SampleElevation(wx + delta, wy) - hm.SampleElevation(wx - delta, wy)) / run;
-        var dy = (hm.SampleElevation(wx, wy + delta) - hm.SampleElevation(wx, wy - delta)) / run;
+        var (x0, x1) = (Math.Max(0, wx - delta), Math.Min(hm.WorldWidth, wx + delta));
+        var (y0, y1) = (Math.Max(0, wy - delta), Math.Min(hm.WorldHeight, wy + delta));
+        var dx = x1 > x0 ? (hm.SampleElevation(x1, wy) - hm.SampleElevation(x0, wy)) / ((x1 - x0) * MapScale.MetersPerUnit) : 0;
+        var dy = y1 > y0 ? (hm.SampleElevation(wx, y1) - hm.SampleElevation(wx, y0)) / ((y1 - y0) * MapScale.MetersPerUnit) : 0;
         return Math.Sqrt(dx * dx + dy * dy) * 100;
     }
 
@@ -767,20 +772,25 @@ public sealed class ZoneMaskGrid
     {
         var segments = new List<ContourExtractor.Segment>();
 
-        for (var i = 0; i < Columns - 1; i++)
+        // La grille est entourée d'un cadre vide (une case hors de la carte de chaque côté) : un biome qui touche le
+        // bord y trouve sa limite, et son contour se referme le long du bord au lieu de rester ouvert (un contour
+        // ouvert, refermé par un trait droit, inversait la zone).
+        double At(int i, int j) => i < 0 || j < 0 || i >= Columns || j >= Rows ? 0.0 : grid[i, j];
+
+        for (var i = -1; i < Columns; i++)
         {
             var x0 = GetWorldX(i);
             var x1 = GetWorldX(i + 1);
 
-            for (var j = 0; j < Rows - 1; j++)
+            for (var j = -1; j < Rows; j++)
             {
                 var y0 = GetWorldY(j);
                 var y1 = GetWorldY(j + 1);
 
-                var zTL = grid[i, j];
-                var zTR = grid[i + 1, j];
-                var zBR = grid[i + 1, j + 1];
-                var zBL = grid[i, j + 1];
+                var zTL = At(i, j);
+                var zTR = At(i + 1, j);
+                var zBR = At(i + 1, j + 1);
+                var zBL = At(i, j + 1);
 
                 var config = (zTL >= threshold ? 8 : 0) |
                              (zTR >= threshold ? 4 : 0) |
@@ -839,7 +849,7 @@ public sealed class ZoneMaskGrid
         {
             if (poly.Count < 3) continue;
 
-            var pts = poly.ToList();
+            var pts = poly.Select(ClampToMap).ToList();
             if (Distance(pts[0], pts[^1]) > 1.0)
             {
                 pts.Add(pts[0]);
@@ -858,6 +868,10 @@ public sealed class ZoneMaskGrid
 
         return loops;
     }
+
+    /// <summary>Ramène sur le bord de la carte un point du contour tombé dans le cadre vide.</summary>
+    private Point2D ClampToMap(Point2D p) =>
+        new(Math.Clamp(p.X, 0.0, WorldWidth), Math.Clamp(p.Y, 0.0, WorldHeight));
 
     private static Point2D Interp(double x1, double y1, double z1, double x2, double y2, double z2, double level)
     {

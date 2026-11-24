@@ -11,7 +11,6 @@ namespace Demos.Carte;
 public sealed partial class MapEditorForm : Form
 {
     private readonly string _dataDir;
-    private readonly string _targetJsonPath;
     private readonly MapCanvasControl _canvas = new() { Dock = DockStyle.Fill };
 
     // Bandeau d'état inférieur
@@ -33,7 +32,7 @@ public sealed partial class MapEditorForm : Form
         Dock = DockStyle.Top,
         AutoSize = true,
         AutoSizeMode = AutoSizeMode.GrowAndShrink,
-        WrapContents = false,
+        WrapContents = true, // passe à la ligne si la fenêtre est étroite (24 novembre 2026)
         Padding = new Padding(6, 4, 6, 4),
         BackColor = Color.FromArgb(238, 233, 222)
     };
@@ -47,6 +46,8 @@ public sealed partial class MapEditorForm : Form
     private readonly Button _btnLoadExisting = new();
     private readonly Button _btnExportPng = new();
     private readonly Button _btnSave = new();
+    private readonly Button _btnSaveAs = new();
+    private readonly Button _btnSetDefault = new();
 
     // Bandeau contextuel dynamique au-dessus de la carte (Ligne 2)
     private readonly EditorContextBarManager _contextBar = new();
@@ -93,9 +94,7 @@ public sealed partial class MapEditorForm : Form
     public MapEditorForm(string dataDir)
     {
         _dataDir = dataDir;
-        _targetJsonPath = Path.Combine(dataDir, "carte.json");
-
-        Text = "Projet Démos — Éditeur de Carte & Arpentage Vectoriel";
+        Text = TitleBase;
         Font = new Font("Segoe UI", 9.5f);
         Size = new Size(1400, 860);
         MinimumSize = new Size(1000, 600);
@@ -105,6 +104,7 @@ public sealed partial class MapEditorForm : Form
 
         BuildLayout();
         BindEvents();
+        BindStartEvents();
 
         Log("Dossier de données : " + _dataDir);
         CreateBlankMap(isInitial: true);
@@ -131,6 +131,7 @@ public sealed partial class MapEditorForm : Form
         BuildTopToolbar();
 
         Controls.Add(_canvas);
+        Controls.Add(_startsReport);
         Controls.Add(_statusStrip);
         Controls.Add(headerPanel);
     }
@@ -189,7 +190,8 @@ public sealed partial class MapEditorForm : Form
             (EditorTool.DrawBiome, "🗺️", "Biomes", "Peinture des 7 milieux naturels (Forêts, Marais, Glaciers...)", 98),
             (EditorTool.PlaceResource, "⛏️", "Gisements", "Implantation des filons miniers et carrières", 114),
             (EditorTool.MoveCommune, "🏛️", "Communes", "Fondation et déplacement des communes", 122),
-            (EditorTool.NamePlace, "📍", "Toponymie", "Toponymie et cotation altimétrique des lieux", 120)
+            (EditorTool.NamePlace, "📍", "Toponymie", "Toponymie et cotation altimétrique des lieux", 120),
+            (EditorTool.PlaceStart, "🏕️", "Départs", "Départ riche et terres d'exil : fiche de pauvreté et verdict de chaque départ", 104)
         };
 
         foreach (var (tool, icon, text, tip, w) in tools)
@@ -234,15 +236,19 @@ public sealed partial class MapEditorForm : Form
 
         SetupActionButton(_btnUndo, "↶", "Annuler la dernière action (Ctrl+Z)", width: 28);
         SetupActionButton(_btnRedo, "↷", "Rétablir l'action annulée (Ctrl+Y)", width: 28);
-        SetupActionButton(_btnLoadExisting, "📂", "Charger une carte existante (carte.json)", width: 32);
+        SetupActionButton(_btnLoadExisting, "📂", "Ouvrir une carte enregistrée (game/data/cartes)", width: 32);
         SetupActionButton(_btnExportPng, "🖼", "Exporter la carte en image haute résolution PNG", width: 32);
-        SetupActionButton(_btnSave, "💾 Enregistrer", "Enregistrer définitivement la carte vectorielle (carte.json)", width: 126, isPrimary: true);
+        SetupActionButton(_btnSave, "💾 Enregistrer", "Enregistrer la carte ouverte dans son dossier (une carte neuve demande un nom) ; refait son relief", width: 126, isPrimary: true);
+        SetupActionButton(_btnSaveAs, "Enregistrer sous…", "Enregistrer comme une nouvelle carte, dans un nouveau dossier de game/data/cartes");
+        SetupActionButton(_btnSetDefault, "★ Par défaut", "Faire de la carte ouverte la carte par défaut du jeu (cartes/carte-par-defaut.txt)");
 
         _topToolbar.Controls.Add(_btnUndo);
         _topToolbar.Controls.Add(_btnRedo);
         _topToolbar.Controls.Add(_btnLoadExisting);
         _topToolbar.Controls.Add(_btnExportPng);
         _topToolbar.Controls.Add(_btnSave);
+        _topToolbar.Controls.Add(_btnSaveAs);
+        _topToolbar.Controls.Add(_btnSetDefault);
     }
 
     public void SelectTool(EditorTool tool)
@@ -271,6 +277,7 @@ public sealed partial class MapEditorForm : Form
 
         _statusTool.Text = $"Outil : {_toolButtons[tool].Text.Split(' ')[1]}";
         _contextBar.Populate(tool, _currentMap?.AllRivers.Count ?? 0);
+        ShowStartReports(tool == EditorTool.PlaceStart);
     }
 
     private void OnHoverChanged(HoverInfo info)

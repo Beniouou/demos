@@ -35,14 +35,14 @@ Claude y répond sous l'entrée, en écrivant **« Décision : … »**. Appliqu
 - Les formules du tableur (`tools/Demos.Equilibrage`) : la colonne « Écart » de la feuille Produits doit rester à 0.
 
 Tu peux créer tes propres fichiers : par exemple un dossier `src/Demos.Domain/Map/`, des données
-`game/data/carte.json`, des scènes et scripts de carte dans `game/`, et leurs tests dans `tests/Demos.Tests/`.
+`game/data/cartes/<nom>/carte.json`, des scènes et scripts de carte dans `game/`, et leurs tests dans `tests/Demos.Tests/`.
 
 ## Les règles déjà écrites qui touchent la carte
 
 Le document de règles de référence est dans Claude Docs, et tu n'y as pas accès. Voici ce qu'il dit d'utile pour toi.
 
 **Carte géographique vectorielle continue (implémentée et opérationnelle)**
-- Une carte vectorielle continue en coordonnées réelles (unités de 100 m : 360 × 225 km), sans cases ni hexagones, enregistrée dans `game/data/carte.json` (`VectorMapDefinition` dans `src/Demos.Domain/Map/MapVectorData.cs`).
+- Une carte vectorielle continue en coordonnées réelles (unités de 100 m : 360 × 225 km), sans cases ni hexagones, enregistrée dans `game/data/cartes/<nom>/carte.json` (une carte par dossier, avec ses images de relief ; carte par défaut nommée dans `game/data/cartes/carte-par-defaut.txt`, aujourd'hui `origine` ; chemins dans `src/Demos.Infrastructure/MapFiles.cs` ; `VectorMapDefinition` dans `src/Demos.Domain/Map/MapVectorData.cs`).
 - Rendu vectoriel sous deux styles : **IGN Pastel Moderne** et **Parchemin Ancien 1874**.
 - Relief ombré physique continu (*Hillshading 3D* Azimut 315° NW, Zénith 45°, méthode de Horn) avec adret crème chaud et ubac bistre/sépia.
 - Réseau hydrographique thalweg (creusement de vallées naturelles) et trait de côte avec hauts-fonds/estran et écume marine blanche.
@@ -110,7 +110,12 @@ Le document de règles de référence est dans Claude Docs, et tu n'y as pas acc
   ses emplois (zones limitées). En bac à sable, le joueur choisit la carte, puis le départ riche (départ préréglé) ou
   une terre d'exil de la carte (départ d'exil, sans Promesse). La carte actuelle devient la première carte enregistrée,
   son point actuel (`defaultCommune`) son départ riche (proposition).
-- **Ce que l'éditeur doit permettre (décidé le 23 novembre 2026, pas encore codé)** :
+- **Codé par Claude le 23 novembre 2026** : les points 1 à 3 ci-dessous (outil « Départs », fiche, verdict).
+  Données : `ExileSites` dans `VectorMapDefinition` (`ExileSite`, champ `exileSites` facultatif) ; règle :
+  `src/Demos.Domain/Map/StartSites.cs` (`Report`, `Judge`, `PresetProblems`, seuils `ExileThresholds`) ; éditeur :
+  `EditorTool.PlaceStart`, `MapCanvasControl.Starts.cs`, `MapEditorForm.Starts.cs`. Le départ riche est la commune de
+  base (`DefaultCommune`, outil Communes). Restent les points 4 et 5.
+- **Ce que l'éditeur doit permettre (décidé le 23 novembre 2026)** :
   1. Un 9e outil « Départs » : poser le départ riche (un par carte) et les terres d'exil (1 à 3), chacun avec un nom.
      Une terre d'exil est l'emplacement du camp ; sa zone est dessinée autour (ressort de 8 km, portée d'extraction de
      20 km), sans contour à la main (proposition).
@@ -125,9 +130,23 @@ Le document de règles de référence est dans Claude Docs, et tu n'y as pas acc
   4. « Nouvelle carte au hasard » : relief et biomes (existent), fleuves qui coulent des sommets vers la mer, gisements
      de fer, de charbon et de pierre placés selon le relief en nombre réglable, départ riche et 3 terres d'exil proposés
      d'après leur fiche. Retouche ensuite avec les outils existants.
-  5. Plusieurs cartes : « Enregistrer sous » un nom, un dossier par carte (`game/data/cartes/<nom>/` : carte et images
+  5. Plusieurs cartes (codé par Claude le 24 novembre 2026, `MapEditorForm.Maps.cs` : Ouvrir, Enregistrer dans la carte ouverte, Enregistrer sous, ★ Par défaut, relief refait à chaque enregistrement ; `--relief [carte]`) : « Enregistrer sous » un nom, un dossier par carte (`game/data/cartes/<nom>/` : carte et images
      de relief, proposition) ; ouvrir une carte enregistrée.
-  Le choix de la carte et le tirage de la terre d'exil se font dans le jeu (écran de départ, chantier de l'interface).
+  Le choix de la carte et le tirage de la terre d'exil se font dans le jeu (écran de départ, chantier de l'interface) ; le
+  choix de la carte est codé (24 novembre 2026, écran « Nouvelle partie », `game/scripts/NewGameScreen.cs`), le tirage pas encore.
+- **Côte et désert (décidé le 23 novembre 2026)** : chaque carte a une côte et un désert (biome Désert), que le
+  générateur garantit et que l'éditeur vérifie, pour les Grands Œuvres « Vaisseau du Second Exil » et « Terre Rendue ».
+  Une autre rive (terre séparée par l'eau, pour le « Pont vers l'Autre Rive ») est facultative ; un Grand Œuvre que la
+  carte ne permet pas n'est pas proposé. Les cartes au hasard gardent 360 × 225 km (proposition : les réglages de
+  distance sont faits pour cette taille).
+- Points à reprendre en codant :
+  - la fiche vérifie qu'un passage par la terre (pente de 12 % au plus, pas de mer, comme les routes de `Roads.cs`) relie
+    la terre d'exil à ses gisements, sinon aucune route ne s'y fera (proposition) ;
+  - l'eau ne bloque ni la fondation sur une autre rive (`CommuneSites` ne contrôle que l'emplacement) ni les échanges à
+    vol d'oiseau : à régler avec le chantier du port et du transport fluvial, sans le changer seul ;
+  - le transport fluvial rendra moins ingrate une terre d'exil au bord d'un fleuve : seuils de pauvreté à revoir ;
+  - le jeu ne lit qu'un jeu d'images de relief à un chemin fixe (`JsonContentSource.LoadRelief`,
+    `game/scripts/Map/Layers/MapRelief.cs`) : à changer pour plusieurs cartes, en passant par le fichier de coordination.
 - À trancher : les terres d'exil de la carte actuelle, les seuils de pauvreté.
 
 **Structures politiques (décidé et codé)**
@@ -155,7 +174,7 @@ Le document de règles de référence est dans Claude Docs, et tu n'y as pas acc
 **Routes (décidé et codé le 10 novembre 2026)** — règle dans `src/Demos.Domain/Map/Roads.cs`
 - Le trafic les crée : quand deux communes échangent assez en un mois, un sentier apparaît, puis un chemin, puis une
   route (un niveau par mois au plus). Seuils validés (11 novembre 2026) : 1 000, 4 000 et 9 000 produits par mois.
-- Le tracé suit le chemin le moins cher sur la carte d'altitude (`game/data/relief-altitude.png`) : un pas coûte sa
+- Le tracé suit le chemin le moins cher sur la carte d'altitude (`game/data/cartes/<nom>/relief-altitude.png`) : un pas coûte sa
   longueur × (1 + 0,1 × pente), une pente de plus de 12 % et la mer sont interdites, une voie existante coûte
   moitié prix (le réseau se ramifie).
 - Effet : un chemin retire 25 % de la perte de transport, une route 50 %.

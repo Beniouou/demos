@@ -38,6 +38,8 @@ public sealed partial class MapEditorForm
         _btnLoadExisting.Click += (_, _) => LoadExistingMap();
         _btnExportPng.Click += (_, _) => ExportPng();
         _btnSave.Click += (_, _) => SaveMap();
+        _btnSaveAs.Click += (_, _) => SaveMapAs();
+        _btnSetDefault.Click += (_, _) => SetAsDefaultMap();
 
         _contextBar.BtnQuickIsland.Click += (_, _) => CreateIslandMap();
         _contextBar.BtnQuickBlank.Click += (_, _) => CreateBlankMap();

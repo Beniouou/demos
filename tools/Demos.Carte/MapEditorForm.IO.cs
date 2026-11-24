@@ -33,6 +33,7 @@ public sealed partial class MapEditorForm
             _canvas.SetMap(_currentMap, _currentHeightmap, GetCurrentStyle());
             UpdateCommuneLabels();
             UpdateRiverContextButtons();
+            RefreshStartReportsIfShown();
             Log("↶ Action annulée.");
         }
     }
@@ -51,6 +52,7 @@ public sealed partial class MapEditorForm
             _canvas.SetMap(_currentMap, _currentHeightmap, GetCurrentStyle());
             UpdateCommuneLabels();
             UpdateRiverContextButtons();
+            RefreshStartReportsIfShown();
             Log("↷ Action rétablie.");
         }
     }
@@ -94,6 +96,7 @@ public sealed partial class MapEditorForm
     public void CreateBlankMap(bool isInitial = false)
     {
         if (!isInitial) PushUndo();
+        StartNewMap();
 
         var (w, h) = GetCurrentDimensions();
         _currentMap = MapGenerator.CreateBlank(w, h, out _currentHeightmap);
@@ -120,6 +123,7 @@ public sealed partial class MapEditorForm
     public void CreateIslandMap()
     {
         PushUndo();
+        StartNewMap();
 
         var (w, h) = GetCurrentDimensions();
         var seed = (int)_contextBar.NumSeed.Value;
@@ -151,83 +155,10 @@ public sealed partial class MapEditorForm
         Log($"🏝️ Mode Île initialisé ({morphDesc}, graine {seed}, plafond {maxAlt:F0} m, {MapScale.ToKm(w):N0} × {MapScale.ToKm(h):N0} km).");
     }
 
-    /// <summary>
-    /// Charge la carte existante enregistrée dans game/data/carte.json.
-    /// </summary>
-    public void LoadExistingMap()
-    {
-        if (!File.Exists(_targetJsonPath))
-        {
-            MessageBox.Show("Aucun fichier carte.json trouvé dans le dossier de données.", "Fichier introuvable", MessageBoxButtons.OK, MessageBoxIcon.Information);
-            return;
-        }
-
-        try
-        {
-            PushUndo();
-            var json = File.ReadAllText(_targetJsonPath);
-            var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
-            var loaded = JsonSerializer.Deserialize<VectorMapDefinition>(json, options);
-            if (loaded is null) throw new InvalidOperationException("Format JSON invalide.");
-
-            var (w, h) = (loaded.Width, loaded.Height);
-            var cols = Math.Clamp((int)Math.Round(w / 6.25), 100, 360);
-            var rows = Math.Clamp((int)Math.Round(h / 6.25), 64, 230);
-            // Le relief de la carte elle-même (celui du jeu), pas un relief recalculé au hasard.
-            var (relief, reliefSource) = LoadMapRelief(loaded);
-            _currentHeightmap = Heightmap.FromRelief(relief, cols, rows, w, h);
-
-            var sanitizedWater = loaded.WaterBodies
-                .Where(wb => !wb.IsErroneousGlobalSea(w, h))
-                .ToList();
-
-            _currentMap = loaded with { WaterBodies = sanitizedWater };
-            var zcols = Math.Clamp((int)Math.Round(w / 10.0), 100, 360);
-            var zrows = Math.Clamp((int)Math.Round(h / 10.0), 64, 230);
-            _currentZoneGrid = new ZoneMaskGrid(zcols, zrows, w, h);
-            _currentZoneGrid.RasterizeFromMap(_currentMap);
-            _canvas.SetMap(_currentMap, _currentHeightmap, GetCurrentStyle(), _currentZoneGrid);
-            _canvas.ResetView();
-            UpdateCommuneLabels();
-            UpdateRiverContextButtons();
-
-            _statusDimensions.Text = $"{MapScale.ToKm(w):N0} × {MapScale.ToKm(h):N0} km";
-            _statusStats.Text = $"Chargée : {_currentMap.Contours.Count} courbes, {_currentMap.Forests.Count} forêts";
-            Log($"📂 Carte chargée depuis {_targetJsonPath} ({_currentMap.Contours.Count} courbes, {_currentMap.Forests.Count} forêts, {_currentMap.SpotElevations.Count} sommets).");
-            Log($"⛰️ Relief : {reliefSource}, altitude de {_currentHeightmap.MinElevation:F0} à {_currentHeightmap.MaxElevation:F0} m.");
-        }
-        catch (Exception ex)
-        {
-            MessageBox.Show($"Erreur lors de la lecture de carte.json :\n{ex.Message}", "Erreur de chargement", MessageBoxButtons.OK, MessageBoxIcon.Error);
-        }
-    }
-
-    /// <summary>
-    /// Le relief d'une carte chargée : les images du jeu (relief.json, relief-altitude.png) si elles sont plus récentes
-    /// que carte.json, sinon recalculé depuis les courbes de niveau (quelques secondes), comme le fait <c>--relief</c>.
-    /// </summary>
-    private (ReliefGrid Relief, string Source) LoadMapRelief(VectorMapDefinition map)
-    {
-        var dataDir = Path.GetDirectoryName(_targetJsonPath)!;
-        var reliefJson = Path.Combine(dataDir, "relief.json");
-        var reliefPng = Path.Combine(dataDir, "relief-altitude.png");
-        if (File.Exists(reliefJson) && File.Exists(reliefPng)
-            && File.GetLastWriteTimeUtc(reliefPng) >= File.GetLastWriteTimeUtc(_targetJsonPath))
-        {
-            var content = new Demos.Infrastructure.JsonContentSource(
-                file => File.ReadAllText(Path.Combine(dataDir, file)), file => File.ReadAllBytes(Path.Combine(dataDir, file)));
-            if (content.LoadRelief() is { } saved)
-                return (saved, "images du jeu (relief-altitude.png)");
-        }
-
-        var sw = Stopwatch.StartNew();
-        var built = ReliefBuilder.Build(map, new ReliefSettings());
-        return (built, $"recalculé depuis les courbes en {sw.ElapsedMilliseconds} ms (lancez --relief pour mettre le jeu à jour)");
-    }
-
     private void RecalculateMap(bool isInitial = false)
     {
         PushUndo();
+        StartNewMap();
         var sw = Stopwatch.StartNew();
         var (w, h) = GetCurrentDimensions();
 
@@ -260,65 +191,6 @@ public sealed partial class MapEditorForm
             ? $"✓ Carte initialisée : {w:N0} × {h:N0} ({_currentMap.Contours.Count} isohypses en {sw.ElapsedMilliseconds} ms)."
             : $"✓ Relief recalculé en {sw.ElapsedMilliseconds} ms : {w:N0} × {h:N0} ({_currentMap.Contours.Count} isohypses, alt. max {_currentHeightmap.MaxElevation:F0} m).";
         Log(msg);
-    }
-
-    private void SaveMap()
-    {
-        try
-        {
-            if (_currentZoneGrid != null)
-            {
-                var biomes = _currentZoneGrid.ExtractBiomes(_canvas.BiomeBrushType, _txtBiomeName.Text);
-                var forests = _currentZoneGrid.ExtractForests(_txtBiomeName.Text);
-                var (zones, deposits) = _currentZoneGrid.ExtractResources(_txtResourceRegion.Text);
-                _currentMap = _currentMap with
-                {
-                    Biomes = biomes,
-                    Forests = forests,
-                    ResourceZones = zones,
-                    Resources = deposits
-                };
-            }
-
-            var options = new JsonSerializerOptions
-            {
-                WriteIndented = true,
-                PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-            };
-
-            var json = JsonSerializer.Serialize(_currentMap, options);
-            File.WriteAllText(_targetJsonPath, json);
-
-            var fileInfo = new FileInfo(_targetJsonPath);
-            var sizeKb = Math.Round((double)fileInfo.Length / 1024.0, 1);
-
-            Log($"★ Carte enregistrée dans game/data/carte.json ({sizeKb} Ko)");
-
-            MessageBox.Show(
-                $"La carte a été enregistrée avec succès !\n\n" +
-                $"Fichier : {_targetJsonPath}\n" +
-                $"Dimensions : {MapScale.ToKm(_currentMap.Width):N0} × {MapScale.ToKm(_currentMap.Height):N0} km\n" +
-                $"Courbes de niveau : {_currentMap.Contours.Count} polylignes\n" +
-                $"Communes & localités : {_currentMap.AllCommunes.Count}\n" +
-                $"Réseau hydrographique : {_currentMap.AllRivers.Count} cours d'eau\n" +
-                $"Points cotés : {_currentMap.SpotElevations.Count} sommets\n" +
-                $"Biomes naturels : {_currentMap.AllBiomes.Count} zones\n" +
-                $"Gisements miniers : {_currentMap.AllResourceZones.Count} zones\n" +
-                $"Taille du fichier : {sizeKb} Ko\n\n" +
-                $"Le jeu Démos chargera automatiquement cette version.",
-                "Enregistrement réussi — Démos",
-                MessageBoxButtons.OK,
-                MessageBoxIcon.Information);
-        }
-        catch (Exception ex)
-        {
-            Log($"ERREUR lors de l'enregistrement : {ex.Message}");
-            MessageBox.Show(
-                $"Une erreur est survenue lors de l'enregistrement de la carte :\n{ex.Message}",
-                "Erreur d'enregistrement",
-                MessageBoxButtons.OK,
-                MessageBoxIcon.Error);
-        }
     }
 
     private void ExportPng()

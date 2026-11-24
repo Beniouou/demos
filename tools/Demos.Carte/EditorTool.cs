@@ -36,5 +36,11 @@ public enum EditorTool
     MoveCommune,
 
     /// <summary>Alias pour MoveCommune.</summary>
-    PlaceCommune = MoveCommune
+    PlaceCommune = MoveCommune,
+
+    /// <summary>
+    /// Départs (décidé le 23 novembre 2026) : poser, déplacer et retirer les terres d'exil (3 au plus) ; voir la fiche
+    /// de pauvreté de chacune et celle du départ riche (la commune de base).
+    /// </summary>
+    PlaceStart
 }

@@ -16,7 +16,7 @@ public partial class Hud : Control
     public Demos.Game.Map.MapCanvas Map { get; private set; } = null!;
     private Label _message = null!;
 
-    public void Init(GameView view, PlayerDesk desk, string[] speedLabels)
+    public void Init(GameView view, PlayerDesk desk, string[] speedLabels, string? mapName = null)
     {
         Theme = UiTheme.Create();
         SetAnchorsAndOffsetsPreset(LayoutPreset.FullRect);
@@ -41,7 +41,7 @@ public partial class Hud : Control
             SizeFlagsHorizontal = SizeFlags.ExpandFill,
             SizeFlagsVertical = SizeFlags.ExpandFill,
         };
-        Map.Init(view);
+        Map.Init(view, mapName);
 
         Menu = new MainMenu();
         Menu.Init(view, desk, Map);

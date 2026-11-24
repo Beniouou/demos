@@ -26,14 +26,25 @@ public sealed class MapData
     public MapRelief? Relief { get; private set; }
     public GameView? View { get; private set; }
 
-    public void LoadVectorMap()
+    /// <summary>Le nom de la carte affichée (son dossier dans <c>res://data/cartes/</c>).</summary>
+    public string MapName { get; private set; } = Demos.Infrastructure.MapFiles.OriginalMap;
+
+    /// <summary>
+    /// Lit la carte et son relief dans <c>res://data/cartes/&lt;nom&gt;/</c> (24 novembre 2026) : la carte nommée, ou la
+    /// carte par défaut (<c>cartes/carte-par-defaut.txt</c>) ; à l'ancienne (<c>res://data/carte.json</c>) si son dossier manque.
+    /// </summary>
+    public void LoadVectorMap(string? mapName = null)
     {
-        Relief = MapRelief.Load();
+        MapName = mapName ?? Demos.Infrastructure.MapFiles.DefaultName(file => FileAccess.GetFileAsString($"res://data/{file}"));
+        var folder = $"res://data/{Demos.Infrastructure.MapFiles.Folder}/{MapName}/";
+        if (!FileAccess.FileExists(folder + Demos.Infrastructure.MapFiles.MapFile))
+            folder = "res://data/";
+        Relief = MapRelief.Load(folder);
         try
         {
-            if (FileAccess.FileExists("res://data/carte.json"))
+            if (FileAccess.FileExists(folder + Demos.Infrastructure.MapFiles.MapFile))
             {
-                var json = FileAccess.GetFileAsString("res://data/carte.json");
+                var json = FileAccess.GetFileAsString(folder + Demos.Infrastructure.MapFiles.MapFile);
                 var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
                 VectorMap = JsonSerializer.Deserialize<VectorMapDefinition>(json, options);
             }

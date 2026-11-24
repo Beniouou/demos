@@ -300,6 +300,37 @@ public sealed partial class MapEditorForm
             return false;
         }
 
+        // Test des biomes qui touchent le bord de la carte (24 novembre 2026) : un coin de forêt (deux bords) et une bande
+        // de falaise le long du bord gauche (trois bords) ; leur contour doit se refermer le long du bord, sans inversion.
+        var edgeGrid = new ZoneMaskGrid(80, 80, 800, 800);
+        for (var ci = 0; ci < edgeGrid.Columns; ci++)
+        {
+            var gx = edgeGrid.GetWorldX(ci);
+            for (var cj = 0; cj < edgeGrid.Rows; cj++)
+            {
+                var gy = edgeGrid.GetWorldY(cj);
+                if (Math.Sqrt((gx - 800) * (gx - 800) + gy * gy) <= 300.0)
+                    edgeGrid.SetCellForTesting(ci, cj, 1); // forêt id = 1, coin en haut à droite
+                else if (gx <= 150.0)
+                    edgeGrid.SetCellForTesting(ci, cj, 5); // falaise id = 5, bande à gauche
+            }
+        }
+        var edgeBiomes = edgeGrid.ExtractBiomes();
+        var edgeForest = edgeBiomes.Where(b => b.Kind == "foret").ToList();
+        var edgeCliff = edgeBiomes.Where(b => b.Kind == "falaise").ToList();
+        if (edgeForest.Count != 1 || edgeCliff.Count != 1)
+        {
+            report = $"Failed: edge biomes should give 1 forest and 1 cliff, got {edgeForest.Count} and {edgeCliff.Count}";
+            return false;
+        }
+        bool InEdge(PolygonArea zone, double x, double y) => ExtractionSites.Contains(zone, new Point2D(x, y));
+        if (!InEdge(edgeForest[0], 750, 50) || !InEdge(edgeForest[0], 650, 100) || InEdge(edgeForest[0], 400, 400) || InEdge(edgeForest[0], 300, 700)
+            || !InEdge(edgeCliff[0], 50, 10) || !InEdge(edgeCliff[0], 60, 400) || !InEdge(edgeCliff[0], 40, 790) || InEdge(edgeCliff[0], 400, 400))
+        {
+            report = "Failed: edge biomes are inverted (a zone touching the map border must stay on its own side)";
+            return false;
+        }
+
         // Test de la pré-génération automatique des biomes naturels sur l'île
         CreateIslandMap();
         if (_currentMap.AllBiomes.Count == 0)

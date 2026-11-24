@@ -22,7 +22,7 @@ public sealed record HoverInfo(
 /// zoom à la molette fluide centré sur le curseur, navigation panoramique (pan),
 /// mini-carte (minimap) de repérage et outils de dessin interactifs (relief, sommets, fleuve, forêts, gisements).
 /// </summary>
-public sealed class MapCanvasControl : Control
+public sealed partial class MapCanvasControl : Control
 {
     private VectorMapDefinition? _map;
     private Heightmap? _heightmap;
@@ -614,6 +614,8 @@ public sealed class MapCanvasControl : Control
             }
         }
 
+        DrawStartOverlays(g, finalScale);
+
         g.Restore(state);
 
         // 4. Badge HUD contextuel au sommet du canvas (mode dessin fleuve/forêt)
@@ -721,7 +723,7 @@ public sealed class MapCanvasControl : Control
         }
 
         // Clic droit ou clic molette pour lancer le pan (sauf en mode Pinceau Terrain, Nommer un lieu, Fleuve, Commune, Biome ou Gisement)
-        if (e.Button == MouseButtons.Middle || (e.Button == MouseButtons.Right && _currentTool != EditorTool.ElevateBrush && _currentTool != EditorTool.NamePlace && _currentTool != EditorTool.DrawRiver && _currentTool != EditorTool.MoveCommune && _currentTool != EditorTool.DrawBiome && _currentTool != EditorTool.PlaceResource && _currentTool != EditorTool.SmoothBrush))
+        if (e.Button == MouseButtons.Middle || (e.Button == MouseButtons.Right && _currentTool != EditorTool.ElevateBrush && _currentTool != EditorTool.NamePlace && _currentTool != EditorTool.DrawRiver && _currentTool != EditorTool.MoveCommune && _currentTool != EditorTool.DrawBiome && _currentTool != EditorTool.PlaceResource && _currentTool != EditorTool.SmoothBrush && _currentTool != EditorTool.PlaceStart))
         {
             _isPanning = true;
             _dragStartMouse = e.Location;
@@ -857,6 +859,9 @@ public sealed class MapCanvasControl : Control
                     return;
                 }
             }
+
+            if (_currentTool == EditorTool.PlaceStart && HandleStartMouseDown(e.Button, wx, wy))
+                return;
         }
     }
 
@@ -920,6 +925,9 @@ public sealed class MapCanvasControl : Control
             Invalidate();
             return;
         }
+
+        if (HandleStartMouseMove(wx, wy))
+            return;
 
         if (_currentTool == EditorTool.MoveCommune && !_isDraggingCommune)
         {
@@ -1093,6 +1101,8 @@ public sealed class MapCanvasControl : Control
             }
             Invalidate();
         }
+
+        HandleStartMouseUp();
 
         EndBrushing();
     }

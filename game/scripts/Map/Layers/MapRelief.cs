@@ -6,7 +6,7 @@ namespace Demos.Game.Map.Layers;
 
 /// <summary>
 /// Le relief calculé une fois par l'outil de carte (<c>--relief</c>) : la carte d'altitude et ses ombres, lues dans
-/// <c>game/data/</c> (<c>relief.json</c>, <c>relief-altitude.png</c>, <c>relief-ombres.png</c>). Rien n'est calculé ici.
+/// le dossier de la carte, <c>game/data/cartes/&lt;nom&gt;/</c> (<c>relief.json</c>, <c>relief-altitude.png</c>, <c>relief-ombres.png</c>). Rien n'est calculé ici.
 /// Les images sont lues octet par octet (pas d'import de Godot) : l'altitude, codée sur deux octets, doit rester exacte.
 /// </summary>
 public sealed class MapRelief
@@ -43,17 +43,18 @@ public sealed class MapRelief
         return (Mathf.RoundToInt(pixel.R * 255) * 256 + Mathf.RoundToInt(pixel.G * 255)) / 10f - 1000f;
     }
 
-    public static MapRelief? Load()
+    /// <summary>Lit le relief dans ce dossier (« res://data/cartes/origine/ »).</summary>
+    public static MapRelief? Load(string folder)
     {
-        const string Info = "res://data/relief.json";
+        var info = folder + "relief.json";
         try
         {
-            if (!FileAccess.FileExists(Info))
+            if (!FileAccess.FileExists(info))
                 return null;
-            using var json = JsonDocument.Parse(FileAccess.GetFileAsString(Info));
+            using var json = JsonDocument.Parse(FileAccess.GetFileAsString(info));
             var root = json.RootElement;
-            var altitude = Image(root.GetProperty("altitude").GetString()!);
-            var shade = Image(root.GetProperty("ombres").GetString()!);
+            var altitude = Image(folder + root.GetProperty("altitude").GetString()!);
+            var shade = Image(folder + root.GetProperty("ombres").GetString()!);
             if (altitude is null || shade is null)
                 return null;
             return new MapRelief(altitude, shade,
@@ -67,9 +68,9 @@ public sealed class MapRelief
         }
     }
 
-    private static Image? Image(string file)
+    private static Image? Image(string path)
     {
-        var bytes = FileAccess.GetFileAsBytes($"res://data/{file}");
+        var bytes = FileAccess.GetFileAsBytes(path);
         if (bytes.Length == 0)
             return null;
         var image = new Image();

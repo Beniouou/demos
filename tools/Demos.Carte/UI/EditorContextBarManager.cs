@@ -158,6 +158,12 @@ public sealed class EditorContextBarManager
     public CheckBox ChkPlaceShowAlt { get; } = new() { Text = "Afficher alt.", Checked = true, AutoSize = true, Margin = new Padding(0, 6, 8, 0), Font = new Font("Segoe UI", 9f, FontStyle.Bold) };
     public Button BtnPlaceDeleteLast { get; } = new() { Text = "⌫ Retirer", AutoSize = true, Margin = new Padding(0, 1, 8, 0) };
 
+    // Départs (terres d'exil et départ riche)
+    public Label LblStartCount { get; } = new() { Text = "🏕️ 0 terre d'exil", Font = new Font("Segoe UI", 9.5f, FontStyle.Bold), AutoSize = true, Margin = new Padding(0, 6, 8, 0) };
+    public Label LblStartName { get; } = new() { Text = "Nom :", AutoSize = true, Margin = new Padding(0, 6, 2, 0) };
+    public TextBox TxtStartName { get; } = new() { Text = "Terre d'exil", Width = 150, Margin = new Padding(0, 3, 8, 0) };
+    public Button BtnStartRefresh { get; } = new() { Text = "🔄 Recalculer les fiches", AutoSize = true, Margin = new Padding(0, 1, 8, 0) };
+
     public EditorContextBarManager()
     {
         Panel.Controls.Add(FlowContent);
@@ -188,6 +194,8 @@ public sealed class EditorContextBarManager
         ApplyButtonStyle(BtnCommuneDeleteLast);
 
         ApplyButtonStyle(BtnPlaceDeleteLast);
+
+        ApplyButtonStyle(BtnStartRefresh);
     }
 
     private static void ApplyButtonStyle(Button btn, Color? backColor = null, Color? foreColor = null, Color? borderColor = null, bool bold = false)
@@ -327,6 +335,15 @@ public sealed class EditorContextBarManager
                 FlowContent.Controls.Add(CreateHint("👉 Clic GAUCHE = Poser lieu nommé | Clic DROIT = Supprimer", Color.FromArgb(110, 50, 20)));
                 break;
 
+            case EditorTool.PlaceStart:
+                FlowContent.Controls.Add(LblStartCount);
+                FlowContent.Controls.Add(LblStartName);
+                FlowContent.Controls.Add(TxtStartName);
+                FlowContent.Controls.Add(BtnStartRefresh);
+                FlowContent.Controls.Add(CreateSep());
+                FlowContent.Controls.Add(CreateHint("👉 Clic GAUCHE = Poser une terre d'exil (3 au plus) | Glisser = Déplacer | Clic DROIT = Retirer · Le départ riche est la commune de base (outil Communes)", Color.FromArgb(120, 80, 20)));
+                break;
+
             default: // Navigate
                 InitMorphologies();
                 InitMaxAltitudes();
@@ -359,6 +376,11 @@ public sealed class EditorContextBarManager
             : $"💧 {riverCount} fleuve{(riverCount > 1 ? "s" : "")}";
         BtnRiverDeleteLast.Enabled = riverCount > 0;
         BtnRiverClearAll.Enabled = riverCount > 0;
+    }
+
+    public void UpdateStartCount(int exileCount, int maxExiles)
+    {
+        LblStartCount.Text = $"🏕️ {exileCount} / {maxExiles} terre{(exileCount > 1 ? "s" : "")} d'exil";
     }
 
     public void UpdateCommuneCount(int communeCount)

@@ -97,6 +97,8 @@ public partial class MapCanvas : Control
         RecalculateInfluence();
     }
 
+    private string? _mapName;
+
     public override void _Ready()
     {
         ClipContents = true;
@@ -104,7 +106,7 @@ public partial class MapCanvas : Control
         FocusMode = FocusModeEnum.All;
 
         // La carte et le relief d'abord : les calques en ont besoin pour créer leurs nœuds.
-        _data.LoadVectorMap();
+        _data.LoadVectorMap(_mapName);
 
         _layers = new MapLayerStack(this, _camera, _geometry, _data, () => Filters);
         // La scène puis les étiquettes, derrière ce que la carte dessine elle-même (ce qui suit la souris).
@@ -144,8 +146,10 @@ public partial class MapCanvas : Control
         Redraw(MapChange.Game);
     }
 
-    public void Init(GameView view)
+    /// <summary>La partie à montrer, et la carte à lire (son dossier dans <c>res://data/cartes/</c> ; la carte par défaut si null).</summary>
+    public void Init(GameView view, string? mapName = null)
     {
+        _mapName = mapName;
         _data.SetView(view);
         Redraw(MapChange.Game);
     }

@@ -213,8 +213,11 @@ public class MapTests
     [Fact]
     public void Le_fichier_carte_json_est_conforme_au_modele_vectoriel()
     {
-        var path = Path.Combine(GameData.Folder, "carte.json");
-        Assert.True(File.Exists(path), "Le fichier game/data/carte.json doit exister.");
+        // La carte par défaut, dans son dossier (24 novembre 2026 : une carte par dossier, game/data/cartes/<nom>/).
+        var defaultMap = Demos.Infrastructure.MapFiles.DefaultName(file => File.ReadAllText(Path.Combine(GameData.Folder, file)));
+        Assert.Equal(Demos.Infrastructure.MapFiles.OriginalMap, defaultMap);
+        var path = Path.Combine(GameData.Folder, Demos.Infrastructure.MapFiles.PathOf(defaultMap, Demos.Infrastructure.MapFiles.MapFile));
+        Assert.True(File.Exists(path), $"La carte par défaut doit exister : {path}.");
 
         var json = File.ReadAllText(path);
         var options = new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true };

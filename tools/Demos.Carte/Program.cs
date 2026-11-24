@@ -31,10 +31,17 @@ public static class Program
             return RunCli(dataDir);
         }
 
-        // Mode relief : carte d'altitude et ombres calculées une fois, enregistrées dans game/data/ (le jeu les lit)
+        // Mode relief : carte d'altitude et ombres calculées une fois, enregistrées dans le dossier de la carte (le jeu les
+        // lit) : « --relief [carte] [apercu.png] », la carte par défaut si aucune n'est nommée.
         if (args.Length > 0 && args[0].Equals("--relief", StringComparison.OrdinalIgnoreCase))
         {
-            return ReliefExport.Run(dataDir, args.Length > 1 ? args[1] : null);
+            var rest = args.Skip(1).ToList();
+            var preview = rest.FirstOrDefault(a => a.EndsWith(".png", StringComparison.OrdinalIgnoreCase));
+            var mapName = rest.FirstOrDefault(a => a != preview)
+                ?? Demos.Infrastructure.MapFiles.DefaultName(file => File.ReadAllText(Path.Combine(dataDir, file)));
+            var folder = Path.Combine(dataDir, Demos.Infrastructure.MapFiles.Folder, mapName);
+            Console.WriteLine($"Carte « {mapName} » ({folder})");
+            return ReliefExport.Run(folder, preview);
         }
 
         // Mode images : les petites images de la carte du jeu (arbres, toits, fumée) dans game/assets/carte/

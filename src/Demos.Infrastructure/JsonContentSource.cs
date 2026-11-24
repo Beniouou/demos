@@ -12,10 +12,54 @@ namespace Demos.Infrastructure;
 /// Lit le contenu du jeu dans des fichiers JSON.
 /// <paramref name="readText"/> reçoit un nom de fichier (« products.json ») et renvoie son texte :
 /// Godot passe sa propre lecture de res://data/, les tests passent File.ReadAllText. <paramref name="readBytes"/> lit
-/// les images (la carte d'altitude) ; sans lui, pas de relief.
+/// les images (la carte d'altitude) ; sans lui, pas de relief. <paramref name="mapName"/> choisit la carte (un dossier de
+/// <c>cartes/</c>, voir <see cref="MapFiles"/>) ; sans lui, la carte par défaut. Une carte rangée à l'ancienne
+/// (<c>carte.json</c> et le relief à la racine des données) est lue si son dossier manque.
 /// </summary>
-public sealed class JsonContentSource(Func<string, string> readText, Func<string, byte[]>? readBytes = null) : IContentSource
+public sealed class JsonContentSource(Func<string, string> readText, Func<string, byte[]>? readBytes = null, string? mapName = null)
+    : IContentSource
 {
+    private string? _mapName = mapName;
+
+    /// <summary>Le nom de la carte lue (son dossier dans <c>cartes/</c>).</summary>
+    public string MapName => _mapName ??= MapFiles.DefaultName(SafeRead);
+
+    private string SafeRead(string file)
+    {
+        try
+        {
+            return readText(file);
+        }
+        catch (KeyNotFoundException)
+        {
+            throw new FileNotFoundException(file);
+        }
+    }
+
+    /// <summary>
+    /// Le texte d'un fichier de la carte : dans son dossier, sinon (ancienne carte) à la racine des données ; le
+    /// préfixe de chemin des autres fichiers de cette carte est rendu dans <paramref name="prefix"/>.
+    /// </summary>
+    private string ReadMapFile(string file, out string prefix)
+    {
+        var inFolder = MapFiles.PathOf(MapName, file);
+        try
+        {
+            var text = SafeRead(inFolder);
+            if (!string.IsNullOrWhiteSpace(text))
+            {
+                prefix = inFolder[..^file.Length];
+                return text;
+            }
+        }
+        catch (Exception ex) when (ex is FileNotFoundException or DirectoryNotFoundException)
+        {
+        }
+
+        prefix = "";
+        return SafeRead(file);
+    }
+
     private static readonly JsonSerializerOptions Options = new()
     {
         PropertyNameCaseInsensitive = true,
@@ -74,9 +118,9 @@ public sealed class JsonContentSource(Func<string, string> readText, Func<string
         string text;
         try
         {
-            text = readText("carte.json");
+            text = ReadMapFile(MapFiles.MapFile, out _);
         }
-        catch (FileNotFoundException)
+        catch (Exception ex) when (ex is FileNotFoundException or DirectoryNotFoundException)
         {
             return null;
         }
@@ -96,9 +140,9 @@ public sealed class JsonContentSource(Func<string, string> readText, Func<string
             return null;
         try
         {
-            using var info = JsonDocument.Parse(readText("relief.json"));
+            using var info = JsonDocument.Parse(ReadMapFile(MapFiles.ReliefFile, out var prefix));
             var root = info.RootElement;
-            var image = PngReader.Read(readBytes(root.GetProperty("altitude").GetString()!));
+            var image = PngReader.Read(readBytes(prefix + root.GetProperty("altitude").GetString()!));
             var altitudes = new float[image.Width * image.Height];
             for (var y = 0; y < image.Height; y++)
                 for (var x = 0; x < image.Width; x++)

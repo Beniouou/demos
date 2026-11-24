@@ -9,7 +9,8 @@ namespace Demos.Carte;
 
 /// <summary>
 /// Commande <c>--relief</c> : calcule une fois la carte d'altitude et ses ombres à partir de <c>carte.json</c>
-/// (<see cref="ReliefBuilder"/>, <see cref="Hillshade"/>) et les enregistre dans <c>game/data/</c> :
+/// (<see cref="ReliefBuilder"/>, <see cref="Hillshade"/>) et les enregistre dans le dossier de la carte
+/// (<c>game/data/cartes/&lt;nom&gt;/</c>, 24 novembre 2026) :
 /// - <c>relief-altitude.png</c> : l'altitude sur 16 bits (rouge et vert, voir <see cref="ReliefEncoding"/>), le bleu à 0
 ///   sur la mer et 255 sur terre ;
 /// - <c>relief-ombres.png</c> : l'éclairement en gris (0 dans l'ombre, 255 face à la lumière) ;
@@ -22,6 +23,7 @@ internal static class ReliefExport
     public const string ShadeFile = "relief-ombres.png";
     public const string InfoFile = "relief.json";
 
+    /// <param name="dataDir">Le dossier de la carte (<c>game/data/cartes/&lt;nom&gt;/</c>) : il contient sa carte.json et reçoit les images.</param>
     public static int Run(string dataDir, string? previewPath)
     {
         var mapPath = Path.Combine(dataDir, "carte.json");

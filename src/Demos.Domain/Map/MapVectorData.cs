@@ -98,8 +98,13 @@ public sealed record VectorMapDefinition(
     IReadOnlyList<RiverData>? Rivers = null,
     IReadOnlyList<CommuneData>? Communes = null,
     IReadOnlyList<PolygonArea>? ResourceZones = null,
-    IReadOnlyList<PolygonArea>? Biomes = null)
+    IReadOnlyList<PolygonArea>? Biomes = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    IReadOnlyList<ExileSite>? ExileSites = null)
 {
+    /// <summary>Les terres d'exil marquées sur la carte (vide pour une carte qui n'en a pas).</summary>
+    public IReadOnlyList<ExileSite> AllExileSites => ExileSites ?? [];
+
     public IReadOnlyList<RiverData> AllRivers =>
         Rivers is { Count: > 0 } ? Rivers : (River.Points.Count > 0 ? [River] : []);
 

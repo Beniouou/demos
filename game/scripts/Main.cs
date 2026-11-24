@@ -31,10 +31,40 @@ public partial class Main : Node
     private double _yearStartTreasury;
     private double _yearStartResidents;
 
+    // Vrai une fois la partie créée, après l'écran « Nouvelle partie ».
+    private bool _started;
+
+    /// <summary>
+    /// D'abord l'écran « Nouvelle partie » (choix de la carte, 24 novembre 2026) ; la partie n'est créée qu'après ce choix.
+    /// </summary>
     public override void _Ready()
     {
+        // « -- --carte <nom> » en ligne de commande : la partie commence tout de suite sur cette carte (essais, captures).
+        var args = OS.GetCmdlineUserArgs();
+        var asked = System.Array.IndexOf(args, "--carte");
+        if (asked >= 0 && asked + 1 < args.Length)
+        {
+            StartGame(args[asked + 1]);
+            return;
+        }
+
+        var layer = new CanvasLayer();
+        AddChild(layer);
+        var screen = new NewGameScreen();
+        screen.Init();
+        layer.AddChild(screen);
+        screen.Started += mapName =>
+        {
+            layer.QueueFree();
+            StartGame(mapName);
+        };
+    }
+
+    /// <summary>Crée la partie sur cette carte (la carte par défaut si null), puis l'écran de jeu.</summary>
+    private void StartGame(string? mapName)
+    {
         var content = new JsonContentSource(fileName => FileAccess.GetFileAsString($"res://data/{fileName}"),
-            fileName => FileAccess.GetFileAsBytes($"res://data/{fileName}"));
+            fileName => FileAccess.GetFileAsBytes($"res://data/{fileName}"), mapName);
         _simulation = PrototypeScenario.Create(content);
 
         // Sous un CanvasLayer, l'interface se cale sur la fenêtre (sous un simple Node, elle n'aurait pas de taille).
@@ -47,7 +77,7 @@ public partial class Main : Node
         // passe par la simulation : elle ne touche jamais le moteur.
         _view = new GameView(_simulation);
         _desk = new PlayerDesk(_simulation);
-        _hud.Init(_view, _desk, SpeedLabels);
+        _hud.Init(_view, _desk, SpeedLabels, content.MapName);
         _hud.TopBar.PauseToggled += () => _paused = !_paused;
         _hud.TopBar.SpeedChosen += speed => _speedIndex = speed;
         // Un clic sur une commune de la carte ouvre le menu Communes sur elle ; sur une préfecture, sa fiche dans Structure.
@@ -82,10 +112,14 @@ public partial class Main : Node
             _yearStartTreasury = _view.TreasuryBalance;
             _yearStartResidents = _view.TotalResidents;
         };
+        _started = true;
     }
 
     public override void _Process(double delta)
     {
+        if (!_started)
+            return;
+
         if (!_paused)
         {
             _pendingDays += delta / SecondsPerDay[_speedIndex];
@@ -118,6 +152,8 @@ public partial class Main : Node
 
     public override void _UnhandledInput(InputEvent @event)
     {
+        if (!_started)
+            return;
         if (@event is not InputEventKey { Pressed: true, Echo: false } key)
             return;
 
