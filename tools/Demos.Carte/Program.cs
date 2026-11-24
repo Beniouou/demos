@@ -113,6 +113,10 @@ public static class Program
                 {
                     form.AddRiverPointForTesting(300, 300);
                 }
+                else if (t == EditorTool.DrawLake)
+                {
+                    form.LakeScenarioForTesting();
+                }
                 else if (t == EditorTool.DrawBiome || t == EditorTool.DrawForest)
                 {
                     // 1. Élever un massif montagneux naturel culminant à > 2500m pour le glacier

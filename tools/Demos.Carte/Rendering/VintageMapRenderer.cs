@@ -14,6 +14,8 @@ namespace Demos.Carte.Rendering;
 /// </summary>
 public static class VintageMapRenderer
 {
+    private static readonly LayerCache BiomeLayer = new();
+
     public static void Render(
         Graphics g,
         VectorMapDefinition map,
@@ -30,7 +32,8 @@ public static class VintageMapRenderer
         DrawSea(g, map, heightmap);
 
         // 3. Biomes naturels avec aquarelles et motifs gravés à la plume
-        DrawBiomes(g, map);
+        // Gardés en image tant que les biomes et la vue ne changent pas (voir LayerCache).
+        BiomeLayer.Draw(g, map.AllBiomes, 1, layer => DrawBiomes(layer, map));
 
         // 4. Estompage topographique à la sanguine / sépia (Hillshading 1874)
         DrawHillshading(g, heightmap, map.Width, map.Height);
@@ -40,6 +43,9 @@ public static class VintageMapRenderer
         {
             DrawContours(g, map, showLabels);
         }
+
+        // 5 bis. Lacs (eau à plat, au-dessus du relief et des courbes)
+        LakeRenderer.Draw(g, map, Color.FromArgb(215, 226, 224), Color.FromArgb(120, 100, 75), Color.FromArgb(90, 70, 50), showLabels);
 
         // 5. Fleuves et cours d'eau (rives doubles et sinuosités)
         DrawRivers(g, map);

@@ -72,6 +72,27 @@ public sealed record PolygonArea(
     }
 }
 
+/// <summary>
+/// Un lac (décidé le 24 novembre 2026) : une cuvette remplie jusqu'à <paramref name="Level"/> (m, au-dessus de la mer). Le
+/// contour est la rive à ce niveau, les trous sont les îles. Un lac rempli jusqu'à son seuil déborde : il a un fleuve de
+/// sortie (<paramref name="Outlet"/> : son nom, un fleuve ordinaire de la carte) ; un lac baissé sous son seuil est fermé. Dans le
+/// jeu, un lac est de l'eau : pas de commune dessus, les routes le contournent ; sa rive n'est pas une côte.
+/// </summary>
+public sealed record LakeData(
+    string Name,
+    Point2D Seed,
+    double Level,
+    IReadOnlyList<Point2D> Boundary,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    IReadOnlyList<IReadOnlyList<Point2D>>? Holes = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    string? Outlet = null)
+{
+    /// <summary>Le point est-il dans l'eau du lac (dans le contour, hors des îles) ?</summary>
+    public bool Contains(Point2D point) =>
+        ExtractionSites.Contains(new PolygonArea(Name, "lac", Boundary, Holes), point);
+}
+
 public sealed record ResourceDeposit(
     string Resource,
     string Region,
@@ -100,8 +121,13 @@ public sealed record VectorMapDefinition(
     IReadOnlyList<PolygonArea>? ResourceZones = null,
     IReadOnlyList<PolygonArea>? Biomes = null,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    IReadOnlyList<ExileSite>? ExileSites = null)
+    IReadOnlyList<ExileSite>? ExileSites = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    IReadOnlyList<LakeData>? Lakes = null)
 {
+    /// <summary>Les lacs de la carte (vide pour une carte qui n'en a pas).</summary>
+    public IReadOnlyList<LakeData> AllLakes => Lakes ?? [];
+
     /// <summary>Les terres d'exil marquées sur la carte (vide pour une carte qui n'en a pas).</summary>
     public IReadOnlyList<ExileSite> AllExileSites => ExileSites ?? [];
 

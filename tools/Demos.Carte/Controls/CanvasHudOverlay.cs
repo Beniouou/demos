@@ -31,6 +31,7 @@ public static class CanvasHudOverlay
             EditorTool.PlaceResource => ($"Gisement {GetResourceDisplayName(resourceBrushType)}", "Clic G : Peindre  ·  Clic D : Gommer", Color.FromArgb(180, 95, 35)),
             EditorTool.MoveCommune => ("Communes", $"Glisser : Déplacer  ·  Clic G : Poser  ·  Clic D : Supprimer" + (communeCount > 0 ? $" ({communeCount})" : ""), Color.FromArgb(180, 50, 40)),
             EditorTool.NamePlace => ("Toponymie", "Clic G : Placer nom  ·  Clic D : Supprimer", Color.FromArgb(145, 70, 30)),
+            EditorTool.DrawLake => ("Lacs", "Clic G dans une cuvette : Remplir  ·  Clic D : Retirer le lac", Color.FromArgb(30, 90, 140)),
             EditorTool.PlaceStart => ("Départs", "Clic G : Poser une terre d'exil  ·  Glisser : Déplacer  ·  Clic D : Retirer", Color.FromArgb(150, 100, 30)),
             _ => ("", "", Color.FromArgb(70, 70, 70))
         };

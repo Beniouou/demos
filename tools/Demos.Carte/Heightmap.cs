@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Drawing;
 using System.Drawing.Imaging;
 using System.Runtime.InteropServices;
@@ -32,7 +33,7 @@ public enum BrushProfile
 /// Modèle altimétrique continu (Heightmap) : calcule l'élévation Z(x, y) en tout point,
 /// avec massifs rocheux paramétrables, crêtes continues, estuaire maritime et vallée fluviale encaissée (thalweg).
 /// </summary>
-public sealed class Heightmap
+public sealed partial class Heightmap
 {
     public int Columns { get; }
     public int Rows { get; }
@@ -423,35 +424,125 @@ public sealed class Heightmap
         UpdateMinMax();
     }
 
+    /// <summary>Le lit d'un fleuve ne descend pas sous cette altitude avant la mer (m).</summary>
+    private const double RiverBedFloor = 0.5;
+
     /// <summary>
-    /// Creuse la vallée fluviale (thalweg) le long d'un tracé de fleuve personnalisé.
+    /// Pente minimale du lit creusé, en m par unité de carte (0,01 = 0,1 m par km, proposition du 24 novembre 2026) : un
+    /// lit creusé n'est jamais plat, et un fleuve retracé dedans le suit jusqu'au bout.
     /// </summary>
-    public void DigRiverThalweg(IReadOnlyList<Point2D> riverPoints, double maxDepth = 45.0, double influenceRadius = 60.0)
+    private const double RiverBedMinSlope = 0.01;
+
+    private static double Distance(Point2D a, Point2D b) => Math.Sqrt((a.X - b.X) * (a.X - b.X) + (a.Y - b.Y) * (a.Y - b.Y));
+
+    /// <summary>
+    /// Creuse la vallée fluviale (thalweg) le long d'un tracé de fleuve. Le lit descend toujours de la source vers
+    /// l'embouchure (corrigé le 24 novembre 2026 : l'ancien creusement, proportionnel à l'altitude du lieu, laissait des
+    /// bosses, et le fleuve remontait par endroits, surtout sur les pentes faibles) : le lit visé est l'altitude du
+    /// terrain moins la profondeur de la vallée, jamais plus haut qu'en amont ; une bosse est entaillée jusqu'à lui.
+    /// Autour, la vallée rejoint le terrain en douceur. Le terrain n'est jamais relevé.
+    /// Lacs (24 novembre 2026) : un fleuve qui finit dans un lac a son lit au-dessus du niveau du lac ; la rive d'un lac
+    /// (ses cases et celles qui les touchent) n'est jamais creusée sous son niveau, pour que le lac ne se vide pas.
+    /// </summary>
+    public void DigRiverThalweg(IReadOnlyList<Point2D> riverPoints, double maxDepth = 45.0, double influenceRadius = 60.0,
+        IReadOnlyList<LakeData>? lakes = null)
     {
         if (riverPoints.Count < 2) return;
-        var riverList = riverPoints.ToList();
+        var shore = ShoreLevels(lakes ?? []);
+        var end = riverPoints[^1];
+        var baseLevel = (lakes ?? []).FirstOrDefault(l => l.Contains(end))?.Level ?? 0.0;
 
-        for (var i = 0; i < Columns; i++)
+        // 1. Le lit visé à chaque point du tracé, de la source vers l'aval : toujours un peu plus bas qu'en amont, d'au
+        //    moins RiverBedMinSlope (24 novembre 2026 : un lit plat par paliers égarait le fleuve retracé dedans). Le
+        //    plancher monte avec la distance à l'embouchure, de la même pente, pour que le lit descende jusqu'au bout.
+        var toEnd = new double[riverPoints.Count];
+        for (var k = riverPoints.Count - 2; k >= 0; k--)
+            toEnd[k] = toEnd[k + 1] + Distance(riverPoints[k], riverPoints[k + 1]);
+
+        // Sur une plaine plus plate que cette pente, le lit descend de ce que le terrain permet entre la source et la mer.
+        var sourceGround = SampleElevation(riverPoints[0].X, riverPoints[0].Y);
+        var slope = toEnd[0] <= 0 ? 0.0 : Math.Clamp((sourceGround - baseLevel - RiverBedFloor) / toEnd[0], 0.0, RiverBedMinSlope);
+
+        var bed = new double[riverPoints.Count];
+        var upstream = double.PositiveInfinity;
+        for (var k = 0; k < riverPoints.Count; k++)
+        {
+            var ground = SampleElevation(riverPoints[k].X, riverPoints[k].Y);
+            var fall = k == 0 ? 0.0 : slope * Distance(riverPoints[k - 1], riverPoints[k]);
+            if (ground <= 0.0)
+            {
+                // La mer : rien à creuser, le lit y finit.
+                bed[k] = Math.Min(ground, upstream - fall);
+                upstream = bed[k];
+                continue;
+            }
+            var target = ground - Math.Min(maxDepth, ground * 0.45);
+            var floor = baseLevel + RiverBedFloor + slope * toEnd[k];
+            bed[k] = Math.Max(floor, Math.Min(target, upstream - fall));
+            upstream = bed[k];
+        }
+
+        // 2. Les cases autour du tracé : au fond du lit tout près (moins d'une case), puis la vallée remonte vers le
+        //    terrain (gaussienne). Seulement dans le cadre du tracé élargi de la vallée.
+        var cell = Math.Max(WorldWidth / (Columns - 1), WorldHeight / (Rows - 1));
+        var core = cell * 0.75;
+        var width = influenceRadius * 0.4;
+        var minX = riverPoints.Min(p => p.X) - influenceRadius;
+        var maxX = riverPoints.Max(p => p.X) + influenceRadius;
+        var minY = riverPoints.Min(p => p.Y) - influenceRadius;
+        var maxY = riverPoints.Max(p => p.Y) + influenceRadius;
+        var i0 = Math.Clamp((int)Math.Floor(minX / (WorldWidth / (Columns - 1))), 0, Columns - 1);
+        var i1 = Math.Clamp((int)Math.Ceiling(maxX / (WorldWidth / (Columns - 1))), 0, Columns - 1);
+        var j0 = Math.Clamp((int)Math.Floor(minY / (WorldHeight / (Rows - 1))), 0, Rows - 1);
+        var j1 = Math.Clamp((int)Math.Ceiling(maxY / (WorldHeight / (Rows - 1))), 0, Rows - 1);
+
+        for (var i = i0; i <= i1; i++)
         {
             var wx = GetWorldX(i);
-            for (var j = 0; j < Rows; j++)
+            for (var j = j0; j <= j1; j++)
             {
-                var wy = GetWorldY(j);
                 var elev = _grid[i, j];
-                if (elev > 5.0)
-                {
-                    var dist = DistanceToSpline(wx, wy, riverList);
-                    if (dist < influenceRadius)
-                    {
-                        var depth = Math.Min(maxDepth, elev * 0.45);
-                        var effect = depth * Math.Exp(-Math.Pow(dist / (influenceRadius * 0.4), 2));
-                        _grid[i, j] = Math.Round(Math.Max(2.0, elev - effect), 1);
-                    }
-                }
+                if (elev <= 0.0)
+                    continue;
+                var wy = GetWorldY(j);
+                var (dist, bedHere) = NearestBed(wx, wy, riverPoints, bed);
+                if (dist >= influenceRadius || bedHere >= elev)
+                    continue;
+                var rise = dist <= core ? 0.0 : 1.0 - Math.Exp(-Math.Pow((dist - core) / width, 2));
+                var lowered = bedHere + (elev - bedHere) * rise;
+                if (shore is not null && !double.IsNaN(shore[i, j]))
+                    lowered = Math.Max(lowered, shore[i, j]);
+                // Au centimètre : arrondi au décimètre, la pente minimale du lit (10 cm par case, souvent moins sur une plaine très plate) disparaîtrait.
+                _grid[i, j] = Math.Round(Math.Min(elev, lowered), 2);
             }
         }
 
         UpdateMinMax();
+        InvalidateHillshadeCache();
+    }
+
+    /// <summary>La distance au tracé et l'altitude du lit au point du tracé le plus proche (interpolée sur le segment).</summary>
+    private static (double Dist, double Bed) NearestBed(double x, double y, IReadOnlyList<Point2D> points, double[] bed)
+    {
+        var best = double.MaxValue;
+        var bestBed = bed[0];
+        for (var k = 0; k < points.Count - 1; k++)
+        {
+            var a = points[k];
+            var b = points[k + 1];
+            var (dx, dy) = (b.X - a.X, b.Y - a.Y);
+            var lenSq = dx * dx + dy * dy;
+            var t = lenSq < 1e-6 ? 0.0 : Math.Clamp(((x - a.X) * dx + (y - a.Y) * dy) / lenSq, 0.0, 1.0);
+            var px = a.X + t * dx - x;
+            var py = a.Y + t * dy - y;
+            var d = Math.Sqrt(px * px + py * py);
+            if (d < best)
+            {
+                best = d;
+                bestBed = bed[k] + (bed[k + 1] - bed[k]) * t;
+            }
+        }
+        return (best, bestBed);
     }
 
     private Bitmap? _cachedHillshadeIgn;
@@ -773,262 +864,4 @@ public sealed class Heightmap
         return (dist, projX, projY);
     }
 
-    /// <summary>
-    /// Simule l'écoulement gravitaire spontané d'un cours d'eau depuis une source (x, y)
-    /// suivant la ligne de plus grande pente (-∇h) jusqu'à la mer, un lac ou un autre fleuve (confluence).
-    /// <summary>
-    /// Simule l'écoulement naturel d'un fleuve selon la gravité (-∇h).
-    /// Gère la traversée prolongée des plaines avec inertie hydraulique, méandres et attraction marine,
-    /// et s'arrête lorsqu'il atteint la mer (alt &lt;= 0), une confluence ou le bord de la carte.
-    /// </summary>
-    public List<Point2D> SimulateSpontaneousRiver(
-        double sourceX,
-        double sourceY,
-        IReadOnlyList<RiverData>? existingRivers = null,
-        double stepSize = 10.0,
-        int maxSteps = 500)
-    {
-        var points = new List<Point2D>();
-        var curX = Math.Clamp(sourceX, 0, WorldWidth);
-        var curY = Math.Clamp(sourceY, 0, WorldHeight);
-
-        // Si la source est déjà sous l'eau (mer), pas d'écoulement
-        if (SampleElevation(curX, curY) <= 0.0)
-            return points;
-
-        points.Add(new Point2D(Math.Round(curX, 1), Math.Round(curY, 1)));
-
-        double vx = 0.0, vy = 0.0;
-        const double delta = 4.0;
-        var flatSteps = 0;
-
-        for (var step = 0; step < maxSteps; step++)
-        {
-            // 1. Condition d'arrêt : niveau marin atteint (embouchure)
-            var currentElev = SampleElevation(curX, curY);
-            if (currentElev <= 0.0)
-            {
-                break;
-            }
-
-            // 2. Condition d'arrêt : bordure de carte
-            if (curX <= 3.0 || curX >= WorldWidth - 3.0 || curY <= 3.0 || curY >= WorldHeight - 3.0)
-            {
-                break;
-            }
-
-            // 3. Confluence naturelle : si on approche à moins de 12 unités d'un cours d'eau existant
-            if (existingRivers is not null && points.Count >= 3)
-            {
-                Point2D? confluencePoint = null;
-                foreach (var river in existingRivers)
-                {
-                    if (river.Points.Count < 2) continue;
-                    for (var i = 0; i < river.Points.Count - 1; i++)
-                    {
-                        var p1 = river.Points[i];
-                        var p2 = river.Points[i + 1];
-                        var (dist, projX, projY) = DistanceAndProjectionPointToSegment(curX, curY, p1.X, p1.Y, p2.X, p2.Y);
-                        if (dist < 12.0)
-                        {
-                            confluencePoint = new Point2D(Math.Round(projX, 1), Math.Round(projY, 1));
-                            break;
-                        }
-                    }
-                    if (confluencePoint.HasValue) break;
-                }
-
-                if (confluencePoint.HasValue)
-                {
-                    points.Add(confluencePoint.Value);
-                    break;
-                }
-            }
-
-            // 4. Calcul du gradient d'altitude -∇h
-            var dxElev = (SampleElevation(curX + delta, curY) - SampleElevation(curX - delta, curY)) / (2.0 * delta);
-            var dyElev = (SampleElevation(curX, curY + delta) - SampleElevation(curX, curY - delta)) / (2.0 * delta);
-
-            var gx = -dxElev;
-            var gy = -dyElev;
-            var gLen = Math.Sqrt(gx * gx + gy * gy);
-            var isFlat = gLen < 0.01;
-
-            if (isFlat)
-            {
-                // Zone quasi-plate, cuvette ou plaine : recherche multi-échelle du dénivelé descendant
-                double bestElev = currentElev;
-                double bestDx = 0, bestDy = 0;
-                var foundDescent = false;
-
-                // Sonde à 18, 36 puis 72 unités pour trouver le cheminement vers la mer ou la vallée
-                double[] probeDistances = [18.0, 36.0, 72.0];
-                foreach (var probeDist in probeDistances)
-                {
-                    for (var a = 0; a < 16; a++)
-                    {
-                        var angle = a * (Math.PI * 2.0 / 16.0);
-                        var probeX = Math.Clamp(curX + Math.Cos(angle) * probeDist, 0, WorldWidth);
-                        var probeY = Math.Clamp(curY + Math.Sin(angle) * probeDist, 0, WorldHeight);
-                        var probeElev = SampleElevation(probeX, probeY);
-
-                        // Si la mer est détectée, foncer vers l'embouchure
-                        if (probeElev <= 0.0)
-                        {
-                            bestElev = probeElev;
-                            bestDx = Math.Cos(angle);
-                            bestDy = Math.Sin(angle);
-                            foundDescent = true;
-                            break;
-                        }
-
-                        if (probeElev < bestElev - 0.0001)
-                        {
-                            bestElev = probeElev;
-                            bestDx = Math.Cos(angle);
-                            bestDy = Math.Sin(angle);
-                            foundDescent = true;
-                        }
-                    }
-
-                    if (foundDescent && bestElev <= 0.0)
-                    {
-                        break;
-                    }
-                }
-
-                if (foundDescent)
-                {
-                    flatSteps = 0;
-                    gx = bestDx;
-                    gy = bestDy;
-                    gLen = 1.0;
-                }
-                else
-                {
-                    // Aucun dénivelé descendant direct trouvé à 72 unités.
-                    if (step == 0 || (vx * vx + vy * vy < 0.0001))
-                    {
-                        // Premier pas en terrain plat : orienter vers l'extérieur (direction du littoral/bordure)
-                        var toCenterX = curX - (WorldWidth * 0.5);
-                        var toCenterY = curY - (WorldHeight * 0.5);
-                        var cLen = Math.Sqrt(toCenterX * toCenterX + toCenterY * toCenterY);
-                        if (cLen > 1.0)
-                        {
-                            gx = toCenterX / cLen;
-                            gy = toCenterY / cLen;
-                        }
-                        else
-                        {
-                            gx = 1.0;
-                            gy = 0.0;
-                        }
-                        gLen = 1.0;
-                    }
-                    else
-                    {
-                        // L'eau est déjà en mouvement : vérifier si le relief devant nous bloque le passage
-                        var probeAheadX = Math.Clamp(curX + vx * 25.0, 0, WorldWidth);
-                        var probeAheadY = Math.Clamp(curY + vy * 25.0, 0, WorldHeight);
-                        var elevAhead = SampleElevation(probeAheadX, probeAheadY);
-
-                        if (elevAhead > currentElev + 0.5)
-                        {
-                            // Mur ou colline montante devant nous, et aucune issue descendante trouvée
-                            flatSteps++;
-                            if (flatSteps > 30)
-                            {
-                                // Véritable cuvette fermée / dépression endoréique
-                                break;
-                            }
-                        }
-                        else
-                        {
-                            // Plaine continue plate : prolonger le tracé sans interruption
-                            flatSteps = 0;
-                        }
-
-                        gx = vx;
-                        gy = vy;
-                        gLen = Math.Sqrt(gx * gx + gy * gy);
-                        if (gLen < 0.0001)
-                        {
-                            gx = 1.0;
-                            gy = 0.0;
-                            gLen = 1.0;
-                        }
-                    }
-                }
-            }
-            else
-            {
-                flatSteps = 0;
-            }
-
-            // Normaliser le gradient cible
-            var targetVx = gx / gLen;
-            var targetVy = gy / gLen;
-
-            // En terrain plat ou basse altitude, ajouter de doux méandres sinueux naturels
-            if (isFlat || currentElev < 30.0)
-            {
-                var meanderAngle = step * 0.28 + (sourceX + sourceY) * 0.005;
-                var meanderAmount = isFlat ? 0.32 : 0.16;
-                var perpX = -targetVy;
-                var perpY = targetVx;
-                targetVx += perpX * Math.Sin(meanderAngle) * meanderAmount;
-                targetVy += perpY * Math.Sin(meanderAngle) * meanderAmount;
-                var tLen = Math.Sqrt(targetVx * targetVx + targetVy * targetVy);
-                if (tLen > 0.0001)
-                {
-                    targetVx /= tLen;
-                    targetVy /= tLen;
-                }
-            }
-
-            // 5. Inertie / momentum de l'eau
-            if (step == 0)
-            {
-                vx = targetVx;
-                vy = targetVy;
-            }
-            else
-            {
-                var inertia = isFlat ? 0.72 : 0.58;
-                vx = vx * inertia + targetVx * (1.0 - inertia);
-                vy = vy * inertia + targetVy * (1.0 - inertia);
-                var vLen = Math.Sqrt(vx * vx + vy * vy);
-                if (vLen > 0.0001)
-                {
-                    vx /= vLen;
-                    vy /= vLen;
-                }
-            }
-
-            // 6. Avancer le point d'écoulement
-            curX = Math.Clamp(curX + vx * stepSize, 0, WorldWidth);
-            curY = Math.Clamp(curY + vy * stepSize, 0, WorldHeight);
-
-            // Vérifier boucle / auto-intersection (en ignorant les pas immédiats pour laisser méandrer)
-            var tooCloseToPrevious = false;
-            for (var k = 0; k < points.Count - 4; k++)
-            {
-                var p = points[k];
-                var dSq = (curX - p.X) * (curX - p.X) + (curY - p.Y) * (curY - p.Y);
-                if (dSq < 64.0) // < 8 unités
-                {
-                    tooCloseToPrevious = true;
-                    break;
-                }
-            }
-            if (tooCloseToPrevious)
-            {
-                break;
-            }
-
-            points.Add(new Point2D(Math.Round(curX, 1), Math.Round(curY, 1)));
-        }
-
-        return points;
-    }
 }

@@ -230,7 +230,7 @@ public sealed record RoadPlan(IReadOnlyList<Point2D> Route, double Length, doubl
 
 /// <summary>
 /// Le tracé d'une liaison : le chemin le moins cher sur une grille posée sur la carte d'altitude. Un pas coûte sa
-/// longueur × (1 + poids × pente en %) ; une pente plus forte que la pente permise est interdite, comme la mer ; un pas sur
+/// longueur × (1 + poids × pente en %) ; une pente plus forte que la pente permise est interdite, comme la mer et les lacs ; un pas sur
 /// une voie déjà tracée coûte moins cher, donc le réseau se ramifie. Sans carte d'altitude, le tracé est la ligne droite.
 /// </summary>
 public sealed class RoadPlanner(ReliefGrid? relief, BalanceSettings settings)
@@ -239,6 +239,8 @@ public sealed class RoadPlanner(ReliefGrid? relief, BalanceSettings settings)
     // La case de la grille, en unités de carte (le réglage est en km).
     private readonly double _cell = Math.Max(1, MapScale.ToUnits(settings.RoadGridCell));
     private float[]? _altitudes;
+    // Les cases d'eau, interdites : la mer, et les lacs depuis le 24 novembre 2026.
+    private bool[]? _water;
     private int _width;
     private int _height;
 
@@ -281,8 +283,8 @@ public sealed class RoadPlanner(ReliefGrid? relief, BalanceSettings settings)
                     if (nx < 0 || ny < 0 || nx >= _width || ny >= _height)
                         continue;
                     var next = ny * _width + nx;
-                    // La mer est interdite, sauf au départ et à l'arrivée.
-                    if (_altitudes![next] < 0 && next != goalIndex)
+                    // L'eau (la mer, un lac) est interdite, sauf au départ et à l'arrivée.
+                    if (_water![next] && next != goalIndex)
                         continue;
                     var step = _cell * Math.Sqrt(dx * dx + dy * dy);
                     // La pente en % : mètres de dénivelé pour 100 m.
@@ -336,11 +338,13 @@ public sealed class RoadPlanner(ReliefGrid? relief, BalanceSettings settings)
         _width = Math.Max(1, (int)Math.Ceiling(worldWidth / _cell));
         _height = Math.Max(1, (int)Math.Ceiling(worldHeight / _cell));
         _altitudes = new float[_width * _height];
+        _water = new bool[_width * _height];
         for (var y = 0; y < _height; y++)
             for (var x = 0; x < _width; x++)
             {
                 var c = CenterOf(y * _width + x);
                 _altitudes[y * _width + x] = (float)_relief.Sample(c.X, c.Y);
+                _water[y * _width + x] = _altitudes[y * _width + x] < 0 || _relief.IsLake(c);
             }
     }
 

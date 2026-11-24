@@ -132,6 +132,19 @@ Le document de règles de référence est dans Claude Docs, et tu n'y as pas acc
      d'après leur fiche. Retouche ensuite avec les outils existants.
   5. Plusieurs cartes (codé par Claude le 24 novembre 2026, `MapEditorForm.Maps.cs` : Ouvrir, Enregistrer dans la carte ouverte, Enregistrer sous, ★ Par défaut, relief refait à chaque enregistrement ; `--relief [carte]`) : « Enregistrer sous » un nom, un dossier par carte (`game/data/cartes/<nom>/` : carte et images
      de relief, proposition) ; ouvrir une carte enregistrée.
+  6. Lacs (décidé et codé le 24 novembre 2026) : un outil « Lac » à part (l'outil du niveau de la mer ne convient
+     pas : un lac a son propre niveau, au-dessus de la mer). Un clic dans une cuvette la remplit jusqu'à son seuil (le
+     point le plus bas de son bord, par où elle déborderait) ; un curseur baisse le niveau pour un lac plus petit. Les
+     lacs se posent avant les fleuves. Sortie : le curseur décide (décidé le 24 novembre 2026) — un lac au niveau de
+     son seuil a toujours un fleuve de sortie, créé tout seul au seuil ; un lac baissé sous son seuil est fermé, sans
+     sortie. Un fleuve qui arrive à un lac s'y arrête. Tracé des fleuves (décidé le 24 novembre 2026) : vers la mer, le
+     bord ou un lac, par le chemin qui creuse le moins (le point le plus haut à franchir est le plus bas ; il suit la
+     pente là où le terrain descend, une cuvette se vide par son col le plus bas) ; à pente identique, il vise la mer ;
+     même règle pour le fleuve de sortie d'un lac. Remplace le tracé par pente et élan. Dans le jeu (décidé le 24 novembre 2026) : un lac compte comme
+     de l'eau, pas de commune dessus, les routes le contournent, il est navigable avec les fleuves (quand le transport
+     fluvial sera codé), ses rives ne sont pas une côte pour une terre d'exil. Codé par Claude le 24 novembre 2026
+     (éditeur : outil « Lacs », `MapEditorForm.Lakes.cs`, `Heightmap.Water.cs` ; jeu : `LakesLayer`, `ReliefGrid.SetLakes`,
+     `CommuneSites`, `RoadPlanner`), sauf la navigation.
   Le choix de la carte et le tirage de la terre d'exil se font dans le jeu (écran de départ, chantier de l'interface) ; le
   choix de la carte est codé (24 novembre 2026, écran « Nouvelle partie », `game/scripts/NewGameScreen.cs`), le tirage pas encore.
 - **Côte et désert (décidé le 23 novembre 2026)** : chaque carte a une côte et un désert (biome Désert), que le

@@ -331,7 +331,7 @@ public sealed partial class MapEditorForm
     {
         if (_canvas.CurrentTool != EditorTool.DrawRiver) return;
 
-        var pts = _currentHeightmap.SimulateSpontaneousRiver(wx, wy, _currentMap.AllRivers);
+        var pts = _currentHeightmap.SimulateSpontaneousRiver(wx, wy, _currentMap.AllRivers, _currentMap.AllLakes);
         if (pts.Count < 2)
         {
             Log("⚠️ Source trop proche de la mer ou d'une dépression fermée pour former un cours d'eau.");
@@ -350,7 +350,7 @@ public sealed partial class MapEditorForm
 
         if (_chkDigThalweg.Checked && depth > 0)
         {
-            _currentHeightmap.DigRiverThalweg(pts, maxDepth: depth);
+            _currentHeightmap.DigRiverThalweg(pts, maxDepth: depth, lakes: _currentMap.AllLakes);
             ReextractContoursAfterElevationChange();
             Log($"✓ Cours d'eau \"{name}\" généré ({pts.Count} points) avec thalweg creusé à {depth:F0} m.");
         }

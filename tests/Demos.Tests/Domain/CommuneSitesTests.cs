@@ -28,6 +28,16 @@ public class CommuneSitesTests
     }
 
     [Fact]
+    public void Pas_sur_un_lac_mais_sur_sa_rive_oui()
+    {
+        // Un lac (décidé le 24 novembre 2026) : au-dessus de la mer, mais de l'eau quand même.
+        var relief = new ReliefGrid(4, 4, 100, [.. Enumerable.Repeat(10f, 16)]);
+        relief.SetLakes([new LakeData("Lac", new(200, 200), 12, [new(150, 150), new(250, 150), new(250, 250), new(150, 250)])]);
+        Assert.Equal("sur un lac", CommuneSites.ProblemWith(new Point2D(200, 200), [], relief, [], minDistance: 16));
+        Assert.Null(CommuneSites.ProblemWith(new Point2D(270, 200), [], relief, [], minDistance: 16));
+    }
+
+    [Fact]
     public void Pas_sur_une_falaise_ni_sur_un_glacier()
     {
         Assert.Equal("sur une falaise", Problem(new Point2D(350, 350)));

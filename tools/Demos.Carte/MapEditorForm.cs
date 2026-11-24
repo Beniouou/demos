@@ -105,6 +105,7 @@ public sealed partial class MapEditorForm : Form
         BuildLayout();
         BindEvents();
         BindStartEvents();
+        BindLakeEvents();
 
         Log("Dossier de données : " + _dataDir);
         CreateBlankMap(isInitial: true);
@@ -187,6 +188,7 @@ public sealed partial class MapEditorForm : Form
             (EditorTool.ElevateBrush, "⛰️", "Terrain", "Pinceau de relief (Surélever / Creuser)", 94),
             (EditorTool.SmoothBrush, "〰️", "Adoucir", "Adoucisseur de pente & aplanisseur en plateau", 94),
             (EditorTool.DrawRiver, "💧", "Fleuves", "Tracé spontané gravitaire des cours d'eau", 94),
+            (EditorTool.DrawLake, "🏞️", "Lacs", "Remplir une cuvette en lac, jusqu'à son seuil ou plus bas", 80),
             (EditorTool.DrawBiome, "🗺️", "Biomes", "Peinture des 7 milieux naturels (Forêts, Marais, Glaciers...)", 98),
             (EditorTool.PlaceResource, "⛏️", "Gisements", "Implantation des filons miniers et carrières", 114),
             (EditorTool.MoveCommune, "🏛️", "Communes", "Fondation et déplacement des communes", 122),
@@ -277,6 +279,7 @@ public sealed partial class MapEditorForm : Form
 
         _statusTool.Text = $"Outil : {_toolButtons[tool].Text.Split(' ')[1]}";
         _contextBar.Populate(tool, _currentMap?.AllRivers.Count ?? 0);
+        _contextBar.UpdateLakeCount(_currentMap?.AllLakes.Count ?? 0);
         ShowStartReports(tool == EditorTool.PlaceStart);
     }
 
@@ -301,5 +304,7 @@ public sealed partial class MapEditorForm : Form
         var timestamp = DateTime.Now.ToString("HH:mm:ss");
         _logBox.AppendText($"[{timestamp}] {message}{Environment.NewLine}");
         _statusFeature.Text = message;
+        // CARTE_LOG=1 : le journal aussi dans la console (captures et essais en ligne de commande).
+        if (Environment.GetEnvironmentVariable("CARTE_LOG") == "1") Console.WriteLine(message);
     }
 }

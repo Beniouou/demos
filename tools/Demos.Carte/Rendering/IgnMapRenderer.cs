@@ -13,6 +13,8 @@ namespace Demos.Carte.Rendering;
 /// </summary>
 public static class IgnMapRenderer
 {
+    private static readonly LayerCache BiomeLayer = new();
+
     public static void Render(
         Graphics g,
         VectorMapDefinition map,
@@ -32,7 +34,8 @@ public static class IgnMapRenderer
         DrawSea(g, map, heightmap);
 
         // 3. Biomes naturels (Forêts, Marais, Terres fertiles, Plages, Falaises, Déserts, Glaciers)
-        DrawBiomes(g, map);
+        // Gardés en image tant que les biomes et la vue ne changent pas (voir LayerCache).
+        BiomeLayer.Draw(g, map.AllBiomes, 0, layer => DrawBiomes(layer, map));
 
         // 4. Estompage topographique physique continu (Hillshading Nord-Ouest 3D)
         DrawHillshading(g, heightmap, map.Width, map.Height);
@@ -42,6 +45,9 @@ public static class IgnMapRenderer
         {
             DrawContours(g, map, showLabels);
         }
+
+        // 5 bis. Lacs (eau à plat, au-dessus du relief et des courbes)
+        LakeRenderer.Draw(g, map, Color.FromArgb(148, 181, 197), Color.FromArgb(85, 125, 155), Color.FromArgb(50, 85, 105), showLabels);
 
         // 6. Fleuves et cours d'eau
         DrawRivers(g, map, showLabels);

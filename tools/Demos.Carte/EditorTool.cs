@@ -39,6 +39,12 @@ public enum EditorTool
     PlaceCommune = MoveCommune,
 
     /// <summary>
+    /// Lacs (décidé le 24 novembre 2026) : un clic dans une cuvette la remplit jusqu'au niveau du curseur (au seuil, le
+    /// lac déborde par un fleuve de sortie) ; clic droit dans un lac pour le retirer.
+    /// </summary>
+    DrawLake,
+
+    /// <summary>
     /// Départs (décidé le 23 novembre 2026) : poser, déplacer et retirer les terres d'exil (3 au plus) ; voir la fiche
     /// de pauvreté de chacune et celle du départ riche (la commune de base).
     /// </summary>

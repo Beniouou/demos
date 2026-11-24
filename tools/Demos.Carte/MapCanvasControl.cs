@@ -58,6 +58,14 @@ public sealed partial class MapCanvasControl : Control
     private (VectorMapDefinition? Map, int Relief, float Zoom, PointF Pan, Size Size, MapRenderStyle Style, int Flags) _cacheKey;
     private int _reliefVersion;
     private long _lastRenderTicks;
+    // Durée du dernier dessin complet (ms) : pendant un coup de pinceau, on attend au moins autant avant le suivant,
+    // pour laisser la moitié du temps à la souris (24 novembre 2026 ; un dessin prend ~100 à 250 ms sur une grande carte).
+    private long _lastRenderMs;
+    // Le relief a changé sous le pinceau : la côte (WaterBodies) est recalculée au prochain dessin complet, pas à chaque
+    // mouvement de souris (~25 ms chacun).
+    private bool _waterDirty;
+
+    private int RedrawInterval => (int)Math.Max(MinRedrawInterval, _lastRenderMs);
     private readonly System.Windows.Forms.Timer _redrawTimer = new() { Interval = MinRedrawInterval };
 
     // Pinceaux de biomes et de gisements : les contours ne sont recalculés qu'au relâcher ; en attendant, la trace
@@ -167,6 +175,8 @@ public sealed partial class MapCanvasControl : Control
     public event Action<double, double>? PeakPlaced;
     public event Action<double, double>? RiverSourcePlaced;
     public event Action<double, double>? RiverDeleted;
+    public event Action<double, double>? LakePlaced;
+    public event Action<double, double>? LakeDeleted;
     public event Action<int, double, double>? CommuneMoved;
     public event Action<double, double>? CommunePlaced;
     public event Action<double, double>? CommuneDeleted;
@@ -322,6 +332,14 @@ public sealed partial class MapCanvasControl : Control
         if (size.Width <= 0 || size.Height <= 0)
             return;
 
+        // La côte, recalculée seulement quand un dessin complet va avoir lieu.
+        var throttled = _isBrushing && _mapCache is not null && Environment.TickCount64 - _lastRenderTicks < RedrawInterval;
+        if (_waterDirty && !throttled && !_isPanning && _heightmap is not null && _map is not null)
+        {
+            _waterDirty = false;
+            _map = _map with { WaterBodies = ContourExtractor.ExtractWaterBodies(_heightmap) };
+        }
+
         var flags = (ShowContours ? 1 : 0) | (ShowLabels ? 2 : 0) | (ShowResources ? 4 : 0) | (ShowCadastre ? 8 : 0);
         (VectorMapDefinition? Map, int Relief, float Zoom, PointF Pan, Size Size, MapRenderStyle Style, int Flags) key =
             (_map, _reliefVersion, _zoom, _panOffset, size, _style, flags);
@@ -341,11 +359,14 @@ public sealed partial class MapCanvasControl : Control
             }
 
             // Coup de pinceau : pas plus d'un dessin complet toutes les MinRedrawInterval ms.
-            if (_isBrushing && sinceLast < MinRedrawInterval)
+            if (_isBrushing && sinceLast < RedrawInterval)
             {
                 g.DrawImageUnscaled(_mapCache, 0, 0);
                 if (!_redrawTimer.Enabled)
+                {
+                    _redrawTimer.Interval = (int)Math.Max(1, RedrawInterval - sinceLast);
                     _redrawTimer.Start();
+                }
                 return;
             }
         }
@@ -357,11 +378,13 @@ public sealed partial class MapCanvasControl : Control
                 _mapCache?.Dispose();
                 _mapCache = new Bitmap(size.Width, size.Height);
             }
+            var renderStart = Environment.TickCount64;
             using (var cg = Graphics.FromImage(_mapCache))
                 MapRenderer.Render(cg, new Rectangle(Point.Empty, size), _map!, _heightmap!, _style, _zoom, _panOffset,
                     ShowContours, ShowLabels, ShowResources, ShowCadastre);
             _cacheKey = key;
             _lastRenderTicks = Environment.TickCount64;
+            _lastRenderMs = _lastRenderTicks - renderStart;
         }
 
         g.DrawImageUnscaled(_mapCache!, 0, 0);
@@ -723,7 +746,7 @@ public sealed partial class MapCanvasControl : Control
         }
 
         // Clic droit ou clic molette pour lancer le pan (sauf en mode Pinceau Terrain, Nommer un lieu, Fleuve, Commune, Biome ou Gisement)
-        if (e.Button == MouseButtons.Middle || (e.Button == MouseButtons.Right && _currentTool != EditorTool.ElevateBrush && _currentTool != EditorTool.NamePlace && _currentTool != EditorTool.DrawRiver && _currentTool != EditorTool.MoveCommune && _currentTool != EditorTool.DrawBiome && _currentTool != EditorTool.PlaceResource && _currentTool != EditorTool.SmoothBrush && _currentTool != EditorTool.PlaceStart))
+        if (e.Button == MouseButtons.Middle || (e.Button == MouseButtons.Right && _currentTool != EditorTool.ElevateBrush && _currentTool != EditorTool.NamePlace && _currentTool != EditorTool.DrawRiver && _currentTool != EditorTool.DrawLake && _currentTool != EditorTool.MoveCommune && _currentTool != EditorTool.DrawBiome && _currentTool != EditorTool.PlaceResource && _currentTool != EditorTool.SmoothBrush && _currentTool != EditorTool.PlaceStart))
         {
             _isPanning = true;
             _dragStartMouse = e.Location;
@@ -748,8 +771,7 @@ public sealed partial class MapCanvasControl : Control
                 var delta = e.Button == MouseButtons.Left ? Math.Abs(BrushPower) : -Math.Abs(BrushPower);
                 _heightmap.ApplyBrush(wx, wy, BrushRadius, delta, BrushProfile);
                 _reliefVersion++;
-                var updatedWater = ContourExtractor.ExtractWaterBodies(_heightmap);
-                _map = _map with { WaterBodies = updatedWater };
+                _waterDirty = true;
                 Invalidate();
                 return;
             }
@@ -768,8 +790,7 @@ public sealed partial class MapCanvasControl : Control
                     _heightmap.ApplySmoothBrush(wx, wy, SmoothBrushRadius, powerFactor);
                 }
                 _reliefVersion++;
-                var updatedWater = ContourExtractor.ExtractWaterBodies(_heightmap);
-                _map = _map with { WaterBodies = updatedWater };
+                _waterDirty = true;
                 Invalidate();
                 return;
             }
@@ -830,6 +851,13 @@ public sealed partial class MapCanvasControl : Control
                     Invalidate();
                     return;
                 }
+            }
+
+            if (_currentTool == EditorTool.DrawLake && e.Button is MouseButtons.Left or MouseButtons.Right)
+            {
+                (e.Button == MouseButtons.Left ? LakePlaced : LakeDeleted)?.Invoke(wx, wy);
+                Invalidate();
+                return;
             }
 
             if (_currentTool == EditorTool.MoveCommune)
@@ -952,9 +980,7 @@ public sealed partial class MapCanvasControl : Control
                 var delta = (e.Button & MouseButtons.Left) != 0 ? Math.Abs(BrushPower) : -Math.Abs(BrushPower);
                 heightmap.ApplyBrush(wx, wy, BrushRadius, delta * 0.4, BrushProfile);
                 _reliefVersion++;
-                var updatedWater = ContourExtractor.ExtractWaterBodies(heightmap);
-                map = map with { WaterBodies = updatedWater };
-                _map = map;
+                _waterDirty = true;
                 Invalidate();
             }
             else if (_currentTool == EditorTool.SmoothBrush)
@@ -969,9 +995,7 @@ public sealed partial class MapCanvasControl : Control
                     heightmap.ApplySmoothBrush(wx, wy, SmoothBrushRadius, powerFactor * 0.4);
                 }
                 _reliefVersion++;
-                var updatedWater = ContourExtractor.ExtractWaterBodies(heightmap);
-                map = map with { WaterBodies = updatedWater };
-                _map = map;
+                _waterDirty = true;
                 Invalidate();
             }
             else if (_currentTool == EditorTool.DrawBiome)
@@ -998,7 +1022,7 @@ public sealed partial class MapCanvasControl : Control
         // Prévisualisation en direct du fleuve gravitaire spontané
         if (_currentTool == EditorTool.DrawRiver && wx >= 0 && wx <= map.Width && wy >= 0 && wy <= map.Height)
         {
-            SpontaneousPreviewRiver = heightmap.SimulateSpontaneousRiver(wx, wy, map.AllRivers);
+            SpontaneousPreviewRiver = heightmap.SimulateSpontaneousRiver(wx, wy, map.AllRivers, map.AllLakes);
             Invalidate();
         }
 
@@ -1032,6 +1056,7 @@ public sealed partial class MapCanvasControl : Control
                 _reliefVersion++;
                 var updatedWater = ContourExtractor.ExtractWaterBodies(_heightmap);
                 _map = _map with { WaterBodies = updatedWater };
+                _waterDirty = false;
             }
             ElevationModified?.Invoke();
         }
@@ -1042,6 +1067,7 @@ public sealed partial class MapCanvasControl : Control
                 _reliefVersion++;
                 var updatedWater = ContourExtractor.ExtractWaterBodies(_heightmap);
                 _map = _map with { WaterBodies = updatedWater };
+                _waterDirty = false;
             }
             ElevationModified?.Invoke();
         }

@@ -80,7 +80,10 @@ public static class PrototypeScenario
             foreach (var commune in map.AllCommunes)
                 world.SetCommunePosition(commune.Id, commune.Position);
             world.SetMapZones([.. map.AllBiomes, .. map.AllResourceZones]);
-            world.SetRelief(content.LoadRelief());
+            // Les lacs sont de l'eau pour la fondation et les routes (24 novembre 2026).
+            var relief = content.LoadRelief();
+            relief?.SetLakes(map.AllLakes);
+            world.SetRelief(relief);
             PlaceExtractionBuildings(world);
         }
 

@@ -146,7 +146,7 @@ désactivés : TVA sur la valeur ajoutée, épargne progressive des entreprises.
     fois par jour ; bordure or pour la capitale, pourpre pour un chef-lieu, argent sinon. Remplace les anciens sceaux.
   - Une vue de base, Monde, et des filtres qu'on superpose (`MapFilters`, cases à cocher du menu Carte, légende qui
     suit) : Géographie physique, Biomes, Ressources minières et sols, Politique, Production et transport. Dessin en
-    calques, un par fichier, dans `game/scripts/Map/Layers/` (plan : `plan-refonte-carte.md`, à côté du dépôt).
+    calques, un par fichier, dans `game/scripts/Map/Layers/` (lacs : `LakesLayer.cs`, eau à plat au-dessus du relief, 24 novembre 2026) (plan : `plan-refonte-carte.md`, à côté du dépôt).
 - Calculs géographiques branchés dans la simulation :
   - Terme de distance administrative dans `src/Demos.Domain/Politics/Extension.cs` via `AdministrativeDistance.cs` (200 km par point de charge, réglage `extensionDistancePerLoad`).
   - Pertes de transport dans `Trade.cs` (5 % à 60 %, réglages `transport…`) et dispersion de pollution dans `Pollution.cs` (part ÷ (1 + (d ÷ 25 km)²)) via `GeographicEconomics.cs`.
@@ -164,13 +164,26 @@ désactivés : TVA sur la valeur ajoutée, épargne progressive des entreprises.
   `carte.json`, sinon `ReliefBuilder`), échantillonné en `Heightmap.FromRelief`. Pentes des biomes en vrais % (seuils
   `ZoneMaskGrid.CliffMinSlope`… : falaise ≥ 8 %, fertile < 10 %, marais < 1 %, désert et plage < 2 % ; 12 novembre 2026).
   Le canevas garde la carte dessinée en image (`MapCanvasControl.DrawMapFromCache`) : toute modification de la carte
-  ou du relief doit passer par `SetMap` (ou `NotifyReliefChanged`), sinon l'affichage ne suit pas. Les pinceaux de
+  ou du relief doit passer par `SetMap` (ou `NotifyReliefChanged`), sinon l'affichage ne suit pas. Pinceau de relief
+  (24 novembre 2026) : la côte n'est recalculée qu'au dessin complet suivant (`_waterDirty`), pas à chaque mouvement ;
+  deux dessins complets sont espacés d'au moins la durée du dernier (`RedrawInterval`) ; les biomes sont gardés en image
+  (`Rendering/LayerCache.cs`, refaits seulement si la liste des biomes ou la vue change) : ~250 ms → ~80 ms par dessin.
+  Fleuves (24 novembre 2026, `Heightmap.Water.cs`) : le tracé (`SimulateSpontaneousRiver`) prend le chemin qui creuse le
+  moins (décidé le 24 novembre 2026) : réseau d'écoulement par remplissage par priorité depuis les sorties (mer, lacs, bord ;
+  `Drainage`, gardé tant que le relief et les lacs ne changent pas), chaque case liée à la voisine de plus forte pente sur
+  la hauteur d'eau, à pente égale la mer puis un lac puis le bord ; tracé de case en case adouci (Chaikin), confluence à
+  12 unités, arrêt dans un lac. Lacs (même date, `MapEditorForm.Lakes.cs`, outil « Lacs », `LakeData` dans `carte.json`,
+  champ `lakes`) : clic dans une cuvette (`FindBasin` : seuil = hauteur à franchir pour rejoindre une vraie sortie), curseur
+  de niveau ; au seuil, fleuve de sortie « Sortie du … » (`LakeData.Outlet`) ; bouton « Effacer les lacs » (`ClearAllLakes`, avec leurs sorties, annulable) ; contour par `LakeShape` ; dessin
+  `Rendering/LakeRenderer.cs`. Au creusement (`DigRiverThalweg`, paramètre `lakes`), un fleuve qui finit dans un lac garde
+  son lit au-dessus du niveau du lac, et la rive d'un lac n'est jamais creusée sous son niveau. Au creusement (`DigRiverThalweg`), le lit visé ne
+  remonte jamais vers l'aval et les bosses sont entaillées, la vallée rejoint le terrain en gaussienne. Contrôles dans `--test-sliders` : fleuves d'îles qui ne remontent pas une fois creusés, fleuves de plaine retracés, lacs (`LakesHoldTheirWater`). Le lit creusé descend d'au moins 0,1 m par km (`RiverBedMinSlope`, proposition ; moins si la source est trop basse pour cela) ; une cuvette se vide par son col le plus bas (le creusement l'entaille) ; pour un lac, l'outil Lacs ; un fleuve effacé (la vallée reste) puis retracé suit son lit jusqu'à la mer. Les pinceaux de
   biomes et de gisements recalculent les contours au relâcher seulement. Contours des biomes et gisements
   (`ZoneMaskGrid.ExtractMarchingSquaresLoops`) : la grille est entourée d'un cadre vide, pour qu'une zone qui touche le
   bord de la carte se referme le long du bord (corrigé le 24 novembre 2026 : le contour restait ouvert et la zone
   s'inversait ; test dans `--test-sliders`). La pente au bord de la carte se mesure dans la carte (`ComputeSlope`, 24 novembre 2026 : hors de la carte l'altitude valait 0 m, d'où des falaises le long du bord). Plusieurs cartes (24 novembre 2026, `MapEditorForm.Maps.cs`) : « Ouvrir » (liste des cartes), « Enregistrer » (dans la carte ouverte ; une carte neuve demande un nom), « Enregistrer sous… », « ★ Par défaut » ; chaque enregistrement refait le relief de la carte (`ReliefExport.Run(dossier)`).
 - Routes (décidé et codé le 10 novembre 2026, `src/Demos.Domain/Map/Roads.cs`) : le trafic entre communes crée sentier, chemin,
-  route (un niveau par mois) ; tracé le moins cher sur la carte d'altitude (`game/data/cartes/<nom>/relief-*.png`, lue par
+  route (un niveau par mois) ; tracé le moins cher sur la carte d'altitude, sans passer par la mer ni les lacs (`ReliefGrid.SetLakes`, `IsLake`, posés par `PrototypeScenario` ; 24 novembre 2026) (`game/data/cartes/<nom>/relief-*.png`, lue par
   `JsonContentSource.LoadRelief`) ; un chemin retire 25 % de la perte de transport, une route 50 % ; construction et
   entretien payés par la plus petite structure qui contient les deux communes (préfecture : l'État paie pour l'instant).
   Chiffres : réglages `road…` de `BalanceSettings` (validés le 11 novembre 2026). Routes des bâtiments (décidé le
@@ -178,7 +191,7 @@ désactivés : TVA sur la valeur ajoutée, épargne progressive des entreprises.
   (`Simulation.AddBuildingTraffic`), mêmes seuils, payé par la commune, **sans perte de transport** ; `GameView.TradeFlows`
   ne garde que les paires de communes.
 - Fonder une commune (décidé le 12 novembre 2026, `Map/CommuneSites.cs`, `World.CommuneSiteProblem`, contrôlé par
-  `TryFoundCommune`) : sur la carte, pas sur l'eau (altitude sous 0), une falaise ou un glacier, et à 16 km au moins de
+  `TryFoundCommune`) : sur la carte, pas sur l'eau (altitude sous 0) ni sur un lac (« sur un lac », 24 novembre 2026), une falaise ou un glacier, et à 16 km au moins de
   toute autre commune (`communeMinDistance`) ; pas de distance maximale. Légitimité du camp : `baseCampLegitimacyCost` (20).
 - Départs d'une carte (décidé le 23 novembre 2026, règles dans `GEMINI.md`, « Terre d'exil ») : `VectorMapDefinition.ExileSites`
   (`ExileSite` : nom et camp, 1 à 3 par carte, champ `exileSites` facultatif de `carte.json`, `AllExileSites`) ; le départ

@@ -141,6 +141,19 @@ public class RoadsTests
     }
 
     [Fact]
+    public void Le_trace_contourne_un_lac()
+    {
+        // Un lac (décidé le 24 novembre 2026) au milieu d'une plaine à 50 m : de l'eau, comme la mer, même au-dessus d'elle.
+        var plain = Relief((_, _) => 50f);
+        plain.SetLakes([new LakeData("Lac", new(100, 40), 50, [new(80, 0), new(120, 0), new(120, 140), new(80, 140)])]);
+        var plan = new RoadPlanner(plain, Settings).Plan(new(20, 40), new(180, 40), []);
+
+        Assert.NotNull(plan);
+        Assert.DoesNotContain(plan.Route, p => p.X is > 82 and < 118 && p.Y < 138);
+        Assert.Contains(plan.Route, p => p.Y >= 138); // par le bas du lac, le long de sa rive
+    }
+
+    [Fact]
     public void Le_trace_prefere_une_voie_deja_tracee()
     {
         var flat = Relief((_, _) => 50f);

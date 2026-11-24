@@ -66,6 +66,17 @@ public sealed class ReliefGrid
 
     public bool IsWater(int x, int y) => this[x, y] < 0;
 
+    /// <summary>
+    /// Les lacs de la carte (décidé le 24 novembre 2026) : de l'eau comme la mer (pas de commune dessus, les routes les
+    /// contournent), mais au-dessus d'elle : leur altitude est celle de leur fond, et leur rive n'est pas une côte.
+    /// </summary>
+    public IReadOnlyList<LakeData> Lakes { get; private set; } = [];
+
+    public void SetLakes(IReadOnlyList<LakeData> lakes) => Lakes = lakes;
+
+    /// <summary>Le point est-il dans un lac ?</summary>
+    public bool IsLake(Point2D point) => Lakes.Count > 0 && Lakes.Any(lake => lake.Contains(point));
+
     /// <summary>L'altitude en un point de la carte (en unités de carte), interpolée entre les quatre pixels voisins.</summary>
     public double Sample(double worldX, double worldY)
     {

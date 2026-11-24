@@ -194,6 +194,47 @@ public sealed partial class MapEditorForm
             return false;
         }
 
+        // Test des fleuves qui ne remontent pas (24 novembre 2026) : sur des îles générées, chaque fleuve tracé puis creusé
+        // descend de la source à l'embouchure (1 m de tolérance), y compris sur les pentes faibles.
+        foreach (var (seed, morph) in new[] { (1, IslandMorphology.Natural), (42, IslandMorphology.Natural), (7, IslandMorphology.Archipelago), (99, IslandMorphology.Archipelago) })
+        {
+            var island = Heightmap.CreateIsland(360, 230, 3600, 2250, seed, morph, 2800);
+            for (var sx = 250.0; sx < 3400; sx += 330)
+            {
+                for (var sy = 250.0; sy < 2050; sy += 330)
+                {
+                    if (island.SampleElevation(sx, sy) < 150) continue;
+                    var pts = island.SimulateSpontaneousRiver(sx, sy);
+                    if (pts.Count < 5) continue;
+                    island.DigRiverThalweg(pts, 45);
+                    var lowest = island.SampleElevation(pts[0].X, pts[0].Y);
+                    foreach (var p in pts.Skip(1))
+                    {
+                        var z = island.SampleElevation(p.X, p.Y);
+                        if (z > lowest + 1.0)
+                        {
+                            report = $"Failed: river from ({sx}, {sy}) climbs {z - lowest:F1} m after digging (seed {seed})";
+                            return false;
+                        }
+                        lowest = Math.Min(lowest, z);
+                    }
+                }
+            }
+        }
+
+        // Test des fleuves de plaine (24 novembre 2026) : sur une pente très faible, un fleuve tracé va jusqu'à la mer ;
+        // creusé, effacé puis retracé de la même source, il suit son lit jusqu'à la mer sans remonter.
+        if (!PlainRiversReachTheSea(out var plainProblem))
+        {
+            report = $"Failed: {plainProblem}";
+            return false;
+        }
+        if (!LakesHoldTheirWater(out var lakeProblem))
+        {
+            report = $"Failed: {lakeProblem}";
+            return false;
+        }
+
         // Test de déplacement de la commune de base
         var origX = _currentMap.DefaultCommune.Position.X;
         var origY = _currentMap.DefaultCommune.Position.Y;
@@ -347,7 +388,217 @@ public sealed partial class MapEditorForm
             return false;
         }
 
+        // Outil Lacs (24 novembre 2026) : deux lacs posés sur l'île (un plein, avec sa sortie ; un fermé), puis tout effacé.
+        LakeScenarioForTesting();
+        if (_currentMap.AllLakes.Count != 2 || !_currentMap.AllRivers.Any(r => r.Name.StartsWith("Sortie du")))
+        {
+            report = $"Failed: lake tool placed {_currentMap.AllLakes.Count} lakes, outlet river: {_currentMap.AllRivers.Any(r => r.Name.StartsWith("Sortie du"))}";
+            return false;
+        }
+        ClearAllLakes();
+        if (_currentMap.AllLakes.Count != 0 || _currentMap.AllRivers.Any(r => r.Name.StartsWith("Sortie du")))
+        {
+            report = "Failed: clearing lakes left lakes or outlet rivers";
+            return false;
+        }
+
         report = $"All slider, hover, river, commune move, cliff hole extraction, and 7-biome rule tests passed successfully! (River test: {riverPts.Count} points, Mountain peak: {highAlt:F0}m, Auto-biomes: {_currentMap.AllBiomes.Count})";
         return true;
+    }
+
+    /// <summary>
+    /// Les fleuves de plaine (24 novembre 2026) : sur des plaines en pente très faible (0,13 et 0,05 m par km, avec de petites
+    /// ondulations), le fleuve tracé atteint la mer ; creusé, puis retracé depuis la même source (comme après la gomme,
+    /// qui laisse la vallée), il atteint encore la mer, sans remonter de plus de 1 m.
+    /// </summary>
+    private static bool PlainRiversReachTheSea(out string problem)
+    {
+        foreach (var drop in new[] { 40.0, 15.0 })
+        {
+            var plain = Heightmap.CreateFlat(360, 230, 3600, 2250, 0);
+            var grid = new double[360, 230];
+            for (var i = 0; i < 360; i++)
+                for (var j = 0; j < 230; j++)
+                {
+                    var (x, y) = (plain.GetWorldX(i), plain.GetWorldY(j));
+                    grid[i, j] = x >= 3000 ? -20 : drop * (1 - x / 3000) + 0.4 * Math.Sin(x / 70) * Math.Cos(y / 90) + 1;
+                }
+            plain.RestoreGrid(grid);
+
+            foreach (var sy in new[] { 600.0, 1100.0, 1600.0 })
+            {
+                var first = plain.SimulateSpontaneousRiver(300, sy);
+                if (!ReachesOutlet(plain, first))
+                {
+                    problem = $"plain river from (300, {sy}) stops at ({first[^1].X}, {first[^1].Y}) before the sea (drop {drop} m)";
+                    return false;
+                }
+                plain.DigRiverThalweg(first, 45);
+                var again = plain.SimulateSpontaneousRiver(300, sy);
+                if (!ReachesOutlet(plain, again))
+                {
+                    problem = $"retraced plain river from (300, {sy}) stops at ({again[^1].X}, {again[^1].Y}) before the sea (drop {drop} m)";
+                    return false;
+                }
+                var lowest = plain.SampleElevation(again[0].X, again[0].Y);
+                foreach (var p in again.Skip(1))
+                {
+                    var z = plain.SampleElevation(p.X, p.Y);
+                    if (z > lowest + 1.0)
+                    {
+                        problem = $"retraced plain river from (300, {sy}) climbs {z - lowest:F1} m (drop {drop} m)";
+                        return false;
+                    }
+                    lowest = Math.Min(lowest, z);
+                }
+            }
+        }
+        problem = "";
+        return true;
+    }
+
+    /// <summary>
+    /// Les lacs (24 novembre 2026) : une cuvette sur une plaine qui descend vers la mer se remplit jusqu'à son seuil ; un
+    /// fleuve tracé en amont s'arrête dans le lac ; le fleuve de sortie part du seuil et atteint la mer ; creuser les deux
+    /// ne vide pas le lac (le seuil garde son niveau). Sur une plaine plate, le fleuve va à la mer plutôt qu'au bord
+    /// pourtant plus proche (à pente identique, il vise la mer).
+    /// </summary>
+    private static bool LakesHoldTheirWater(out string problem)
+    {
+        var map = Heightmap.CreateFlat(360, 230, 3600, 2250, 0);
+        var grid = new double[360, 230];
+        for (var i = 0; i < 360; i++)
+            for (var j = 0; j < 230; j++)
+            {
+                var (x, y) = (map.GetWorldX(i), map.GetWorldY(j));
+                var r2 = ((x - 1500) * (x - 1500) + (y - 1100) * (y - 1100)) / (250.0 * 250.0);
+                grid[i, j] = x >= 3000 ? -20 : 60 * (1 - x / 3000) + 2 - (r2 < 1 ? 25 * (1 - r2) : 0);
+            }
+        map.RestoreGrid(grid);
+
+        var basin = map.FindBasin(1450, 1080);
+        if (basin is null || basin.Spill - basin.Bottom < 5)
+        {
+            problem = $"lake basin not found (spill {basin?.Spill:F1}, bottom {basin?.Bottom:F1})";
+            return false;
+        }
+        var shape = map.LakeShape(basin, basin.Spill).OrderByDescending(s => s.Outer.Count).FirstOrDefault();
+        if (shape.Outer is null)
+        {
+            problem = "lake shape is empty";
+            return false;
+        }
+        var lake = new LakeData("Essai", new Point2D(1450, 1080), basin.Spill, shape.Outer, shape.Holes.Count > 0 ? shape.Holes : null);
+        LakeData[] lakes = [lake];
+        if (!lake.Contains(new Point2D(1500, 1100)))
+        {
+            problem = "lake does not contain its centre";
+            return false;
+        }
+
+        var inflow = map.SimulateSpontaneousRiver(700, 1100, null, lakes);
+        if (inflow.Count < 2 || !lake.Contains(inflow[^1]))
+        {
+            problem = $"river upstream of the lake ends at ({inflow.LastOrDefault().X}, {inflow.LastOrDefault().Y}), not in the lake";
+            return false;
+        }
+
+        var beyond = new Point2D(map.GetWorldX(basin.Outflow.I), map.GetWorldY(basin.Outflow.J));
+        var outflow = map.SimulateSpontaneousRiver(beyond.X, beyond.Y, null, lakes);
+        if (!ReachesOutlet(map, outflow))
+        {
+            problem = $"lake outlet stops at ({outflow.LastOrDefault().X}, {outflow.LastOrDefault().Y}) before the sea";
+            return false;
+        }
+
+        var col = new Point2D(map.GetWorldX(basin.Col.I), map.GetWorldY(basin.Col.J));
+        map.DigRiverThalweg([col, .. outflow], 45, lakes: lakes);
+        map.DigRiverThalweg(inflow, 45, lakes: lakes);
+        var after = map.FindBasin(1450, 1080);
+        if (after is null || after.Spill < lake.Level - 0.05)
+        {
+            problem = $"digging drained the lake: spill {after?.Spill:F2} m, lake level {lake.Level:F2} m";
+            return false;
+        }
+
+        // À pente identique, la mer : plaine plate à 50 m, mer à l'est (2 700 unités), bord ouest à 300 unités.
+        var flat = Heightmap.CreateFlat(360, 230, 3600, 2250, 50);
+        var flatGrid = new double[360, 230];
+        for (var i = 0; i < 360; i++)
+            for (var j = 0; j < 230; j++)
+                flatGrid[i, j] = flat.GetWorldX(i) >= 3000 ? -20 : 50;
+        flat.RestoreGrid(flatGrid);
+        var toSea = flat.SimulateSpontaneousRiver(300, 1100);
+        if (toSea.Count < 2 || flat.SampleElevation(toSea[^1].X, toSea[^1].Y) > 0.5)
+        {
+            problem = $"on a flat plain the river ends at ({toSea.LastOrDefault().X}, {toSea.LastOrDefault().Y}), not at the sea";
+            return false;
+        }
+
+        problem = "";
+        return true;
+    }
+
+    /// <summary>
+    /// Pour la capture de l'outil Lacs : une cuvette creusée dans la plaine de l'île (vers 100 m), remplie jusqu'à son
+    /// seuil (avec son fleuve de sortie), une seconde plus petite baissée à 60 % (lac fermé), et un fleuve qui arrive au lac.
+    /// </summary>
+    public void LakeScenarioForTesting()
+    {
+        var spot = FindLandForTesting(90, 140, (1000, 800));
+        DigBowlForTesting(spot, 140, 30);
+        PlaceLake(spot.X, spot.Y, 1.0);
+
+        var second = FindLandForTesting(40, 100, (spot.X + 600, spot.Y + 300));
+        DigBowlForTesting(second, 90, 20);
+        PlaceLake(second.X, second.Y, 0.6);
+
+        var source = FindLandForTesting(250, 400, (spot.X + 150, spot.Y - 450));
+        SelectTool(EditorTool.DrawRiver);
+        OnRiverSourcePlaced(source.X, source.Y);
+        SelectTool(EditorTool.DrawLake);
+    }
+
+    /// <summary>Creuse une cuvette d'à peu près cette profondeur, sans passer sous la mer.</summary>
+    private void DigBowlForTesting(Point2D at, double radius, double depth)
+    {
+        // Le bord de la cuvette est au niveau du point le plus bas du cercle : elle est fermée jusque-là.
+        var rim = Enumerable.Range(0, 72).Min(a => _currentHeightmap.SampleElevation(at.X + radius * Math.Cos(a * Math.PI / 36), at.Y + radius * Math.Sin(a * Math.PI / 36)));
+        var grid = _currentHeightmap.CloneGrid();
+        for (var i = 0; i < _currentHeightmap.Columns; i++)
+            for (var j = 0; j < _currentHeightmap.Rows; j++)
+            {
+                var (dx, dy) = (_currentHeightmap.GetWorldX(i) - at.X, _currentHeightmap.GetWorldY(j) - at.Y);
+                var r2 = (dx * dx + dy * dy) / (radius * radius);
+                if (r2 < 1)
+                    grid[i, j] = Math.Min(grid[i, j], Math.Max(rim - depth * (1 - r2), 1));
+            }
+        _currentHeightmap.RestoreGrid(grid);
+        ReextractContoursAfterElevationChange();
+    }
+
+    /// <summary>Le point de terre le plus proche de <paramref name="near"/> dont l'altitude est entre les deux bornes.</summary>
+    private Point2D FindLandForTesting(double low, double high, (double X, double Y) near)
+    {
+        var best = new Point2D(near.X, near.Y);
+        var bestDist = double.MaxValue;
+        for (var x = 50.0; x < _currentMap.Width - 50; x += 20)
+            for (var y = 50.0; y < _currentMap.Height - 50; y += 20)
+            {
+                var z = _currentHeightmap.SampleElevation(x, y);
+                var d = (x - near.X) * (x - near.X) + (y - near.Y) * (y - near.Y);
+                if (z >= low && z <= high && d < bestDist)
+                    (best, bestDist) = (new Point2D(x, y), d);
+            }
+        return best;
+    }
+
+    /// <summary>Le tracé finit dans la mer (ou à moins de 1 m au-dessus), au bord de la carte, ou sur un autre fleuve.</summary>
+    private static bool ReachesOutlet(Heightmap map, System.Collections.Generic.IReadOnlyList<Point2D> points)
+    {
+        if (points.Count < 2) return false;
+        var end = points[^1];
+        return map.SampleElevation(end.X, end.Y) <= 1.0
+            || end.X <= 5 || end.Y <= 5 || end.X >= map.WorldWidth - 5 || end.Y >= map.WorldHeight - 5;
     }
 }

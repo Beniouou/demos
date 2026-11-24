@@ -1067,6 +1067,10 @@ public sealed class ZoneMaskGrid
     /// et trous intérieurs (négatifs), en associant chaque trou à son contour parent.
     /// Élimine définitivement le bug d'inversion des falaises / sommets.
     /// </summary>
+    /// <summary>Les contours où la grille dépasse le seuil, avec leurs trous (lacs : la rive à la hauteur d'eau 0).</summary>
+    public List<(List<Point2D> Outer, List<List<Point2D>> Holes)> ExtractShapes(double[,] grid, double threshold) =>
+        ExtractStructuredBiomeLoops(grid, threshold);
+
     private List<(List<Point2D> Outer, List<List<Point2D>> Holes)> ExtractStructuredBiomeLoops(double[,] grid, double threshold)
     {
         var allLoops = ExtractMarchingSquaresLoops(grid, threshold);

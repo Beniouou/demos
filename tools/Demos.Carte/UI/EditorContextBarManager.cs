@@ -158,6 +158,15 @@ public sealed class EditorContextBarManager
     public CheckBox ChkPlaceShowAlt { get; } = new() { Text = "Afficher alt.", Checked = true, AutoSize = true, Margin = new Padding(0, 6, 8, 0), Font = new Font("Segoe UI", 9f, FontStyle.Bold) };
     public Button BtnPlaceDeleteLast { get; } = new() { Text = "⌫ Retirer", AutoSize = true, Margin = new Padding(0, 1, 8, 0) };
 
+    // Lacs (24 novembre 2026)
+    public Label LblLakeCount { get; } = new() { Text = "🏞️ 0 lac", Font = new Font("Segoe UI", 9.5f, FontStyle.Bold), AutoSize = true, Margin = new Padding(0, 6, 8, 0) };
+    public Label LblLakeName { get; } = new() { Text = "Nom :", AutoSize = true, Margin = new Padding(0, 6, 2, 0) };
+    public TextBox TxtLakeName { get; } = new() { Text = "Lac", Width = 130, Margin = new Padding(0, 3, 8, 0) };
+    public Label LblLakeLevel { get; } = new() { Text = "Niveau :", AutoSize = true, Margin = new Padding(0, 6, 2, 0) };
+    public TrackBar SliderLakeLevel { get; } = new() { Minimum = 10, Maximum = 100, Value = 100, TickStyle = TickStyle.None, Height = 24, Width = 110, Margin = new Padding(0, 4, 2, 0) };
+    public Label LblLakeLevelVal { get; } = new() { Text = "au seuil (sortie)", AutoSize = true, Margin = new Padding(0, 6, 8, 0) };
+    public Button BtnLakeClearAll { get; } = new() { Text = "🗑 Effacer les lacs", AutoSize = true, Margin = new Padding(0, 1, 8, 0) };
+
     // Départs (terres d'exil et départ riche)
     public Label LblStartCount { get; } = new() { Text = "🏕️ 0 terre d'exil", Font = new Font("Segoe UI", 9.5f, FontStyle.Bold), AutoSize = true, Margin = new Padding(0, 6, 8, 0) };
     public Label LblStartName { get; } = new() { Text = "Nom :", AutoSize = true, Margin = new Padding(0, 6, 2, 0) };
@@ -196,6 +205,7 @@ public sealed class EditorContextBarManager
         ApplyButtonStyle(BtnPlaceDeleteLast);
 
         ApplyButtonStyle(BtnStartRefresh);
+        ApplyButtonStyle(BtnLakeClearAll, Color.FromArgb(198, 40, 40), Color.White, Color.FromArgb(160, 30, 30), bold: true);
     }
 
     private static void ApplyButtonStyle(Button btn, Color? backColor = null, Color? foreColor = null, Color? borderColor = null, bool bold = false)
@@ -335,6 +345,18 @@ public sealed class EditorContextBarManager
                 FlowContent.Controls.Add(CreateHint("👉 Clic GAUCHE = Poser lieu nommé | Clic DROIT = Supprimer", Color.FromArgb(110, 50, 20)));
                 break;
 
+            case EditorTool.DrawLake:
+                FlowContent.Controls.Add(LblLakeCount);
+                FlowContent.Controls.Add(LblLakeName);
+                FlowContent.Controls.Add(TxtLakeName);
+                FlowContent.Controls.Add(LblLakeLevel);
+                FlowContent.Controls.Add(SliderLakeLevel);
+                FlowContent.Controls.Add(LblLakeLevelVal);
+                FlowContent.Controls.Add(BtnLakeClearAll);
+                FlowContent.Controls.Add(CreateSep());
+                FlowContent.Controls.Add(CreateHint("👉 Clic GAUCHE dans une cuvette = Remplir jusqu'au niveau (au seuil : fleuve de sortie, creusé comme dans Fleuves) | Clic DROIT = Retirer", Color.FromArgb(30, 70, 110)));
+                break;
+
             case EditorTool.PlaceStart:
                 FlowContent.Controls.Add(LblStartCount);
                 FlowContent.Controls.Add(LblStartName);
@@ -377,6 +399,16 @@ public sealed class EditorContextBarManager
         BtnRiverDeleteLast.Enabled = riverCount > 0;
         BtnRiverClearAll.Enabled = riverCount > 0;
     }
+
+    public void UpdateLakeCount(int lakeCount)
+    {
+        LblLakeCount.Text = $"🏞️ {lakeCount} lac{(lakeCount > 1 ? "s" : "")}";
+        BtnLakeClearAll.Enabled = lakeCount > 0;
+    }
+
+    /// <summary>Le texte du curseur de niveau : au seuil, le lac déborde (fleuve de sortie) ; en dessous, il est fermé.</summary>
+    public void UpdateLakeLevelText() =>
+        LblLakeLevelVal.Text = SliderLakeLevel.Value >= 100 ? "au seuil (sortie)" : $"{SliderLakeLevel.Value} % (lac fermé)";
 
     public void UpdateStartCount(int exileCount, int maxExiles)
     {

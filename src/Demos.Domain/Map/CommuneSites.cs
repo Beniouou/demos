@@ -4,7 +4,7 @@ using System.Linq;
 namespace Demos.Domain.Map;
 
 /// <summary>
-/// Où se fonde une commune (décidé le 12 novembre 2026) : sur la carte, pas sur l'eau (altitude sous 0), ni sur une
+/// Où se fonde une commune (décidé le 12 novembre 2026) : sur la carte, pas sur l'eau (altitude sous 0, ou un lac depuis le 24 novembre 2026), ni sur une
 /// falaise, ni sur un glacier, et à une distance minimale de toute autre commune (deux ressorts de commune, réglage
 /// <c>communeMinDistance</c>). Pas de distance maximale à la commune qui paie.
 /// </summary>
@@ -27,6 +27,8 @@ public static class CommuneSites
                 return "hors de la carte";
             if (relief.Sample(position.X, position.Y) < 0)
                 return "sur l'eau";
+            if (relief.IsLake(position))
+                return "sur un lac";
         }
 
         if (zones.FirstOrDefault(z => ForbiddenZones.Contains(z.Kind) && ExtractionSites.Contains(z, position)) is { } zone)
