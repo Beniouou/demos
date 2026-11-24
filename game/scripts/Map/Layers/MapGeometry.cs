@@ -136,21 +136,34 @@ public sealed class MapGeometry(MapCamera camera)
             var holePoints = AtMaxZoom(World(hole));
             var nextPieces = new List<Vector2[]>();
             foreach (var piece in pieces)
-            {
-                var clipped = Geometry2D.ClipPolygons(piece, holePoints);
-                if (clipped != null && clipped.Count > 0)
-                {
-                    foreach (var cp in clipped) nextPieces.Add(cp);
-                }
-                else
-                {
-                    nextPieces.Add(piece);
-                }
-            }
+                nextPieces.AddRange(Subtract(piece, holePoints));
             pieces = nextPieces;
         }
 
         return _worldForestPieces[biome] = pieces.Where(piece => piece.Length >= 3).Select(piece => FromMaxZoom(SafeTriangulate(piece))).ToList();
+    }
+
+    /// <summary>
+    /// Le morceau moins la clairière. Quand la clairière est entièrement dedans, Godot rend le contour et le trou comme deux
+    /// polygones (corrigé le 24 novembre 2026 : les deux étaient remplis, et la clairière peinte comme le reste) : on coupe
+    /// alors le morceau en deux par une ligne verticale au milieu de la clairière, et on la retire de chaque moitié.
+    /// </summary>
+    private static List<Vector2[]> Subtract(Vector2[] piece, Vector2[] hole)
+    {
+        var clipped = Geometry2D.ClipPolygons(piece, hole);
+        if (clipped is null || clipped.Count == 0)
+            return []; // le morceau est tout entier dans la clairière
+        if (!clipped.Any(inner => clipped.Any(outer => !ReferenceEquals(inner, outer) && inner.Length > 0 && Geometry2D.IsPointInPolygon(inner[0], outer))))
+            return [.. clipped];
+
+        var box = BoundsOf(piece);
+        var middle = hole.Average(p => p.X);
+        Vector2[] left = [new(box.Position.X - 1, box.Position.Y - 1), new(middle, box.Position.Y - 1), new(middle, box.End.Y + 1), new(box.Position.X - 1, box.End.Y + 1)];
+        Vector2[] right = [new(middle, box.Position.Y - 1), new(box.End.X + 1, box.Position.Y - 1), new(box.End.X + 1, box.End.Y + 1), new(middle, box.End.Y + 1)];
+        var result = new List<Vector2[]>();
+        foreach (var half in Geometry2D.IntersectPolygons(piece, left).Concat(Geometry2D.IntersectPolygons(piece, right)))
+            result.AddRange(Geometry2D.ClipPolygons(half, hole));
+        return result;
     }
 
     /// <summary>

@@ -43,6 +43,7 @@ Jeu solo de construction de nation (Godot .NET 4.7, C#, .NET 10), en français. 
 | Éditeur de carte | `carte.bat` (fenêtre Windows, `tools/Demos.Carte`) |
 | Gestionnaire d'icônes | `icones.bat` (fenêtre application 74 logos, `galerie-icones.html` ; `remplacer.bat` pour remplacement direct) |
 | Test auto de la carte | `dotnet run --project tools/Demos.Carte -- --test-sliders` |
+| Mesure de l'éditeur par taille de carte | `dotnet run --project tools/Demos.Carte -- --mesurer-tailles [dossier]` (temps de chaque étape ; avec un dossier, y enregistre l'île du petit continent pour l'essayer dans le jeu) |
 | Relief d'une carte (images) | `dotnet run --project tools/Demos.Carte -- --relief [carte]` (la carte par défaut sans nom ; l'éditeur le refait à chaque enregistrement) |
 | Petites images de la carte | `dotnet run --project tools/Demos.Carte -- --images` (dessine celles qui manquent dans `game/assets/carte/` ; `--forcer` les redessine toutes) |
 
@@ -158,8 +159,23 @@ désactivés : TVA sur la valeur ajoutée, épargne progressive des entreprises.
   carte fait 360 × 225 km. Les règles et les réglages de distance sont **en km** (`equilibrage.json`, tableur) ; les
   coordonnées restent en unités et sont converties par `MapScale` (`KmBetween`, `ToKm`, `ToUnits`, `Format`). Ne plus
   écrire « lieue ». Ressorts : commune 8 km, préfecture 40 km autour du chef-lieu (`communeJurisdictionRadius`,
-  `prefectureJurisdictionRadius`). Maisons et arbres presque à l'échelle (tailles dans `MapPalette`). Barre
+  `prefectureJurisdictionRadius`). Maisons et arbres presque à l'échelle (les arbres sont devenus une canopée peinte le 24 novembre 2026) (tailles dans `MapPalette`). Barre
   d'échelle : `game/scripts/Map/MapCanvas.Scale.cs`.
+- Tailles des cartes neuves (décidé le 24 novembre 2026, `tools/Demos.Carte/MapSizes.cs`) : département 100 × 60, petit pays
+  240 × 150, grand pays 800 × 500, petit continent 1 600 × 1 000 km. Grille du relief : 360 × 230 cases au plus jusqu'à
+  360 × 225 km (comme avant), au-delà cases d'1 km au moins et 800 × 500 au plus ; images de relief jamais plus grandes
+  que celles de la carte d'origine (`ReliefSettings.For`, pixels de ~900 m pour un continent). Accélérations du même jour
+  (`ContourExtractor`) : segments reliés par carrés d'1 unité au lieu de tout parcourir, courbes en une passe sur la
+  grille ; forêts extraites seules (`ZoneMaskGrid.ExtractForests`). Mesures (`--mesurer-tailles`) : île du continent
+  17,5 s → 1,2 s ; courbes après un coup de pinceau 2,4 s → 0,08 s (petit pays 0,5 s → 0,03 s). Jeu sur un continent :
+  144 images/s, démarrage 14 s (4 s sur la carte d'origine), ~6,5 millions d'arbres (0,8 sur l'origine). Depuis la canopée (même
+  jour, `game/scripts/Map/Layers/ForestsLayer.cs`, shader `shaders/carte/foret.gdshader` : couronnes ~160 m, bosquets ~800 m,
+  massifs ~4 km, chaque échelle effacée sous 2 à 6 pixels, conifères au-dessus de 900 m ; plus d'arbres posés un par un dans
+  `BiomesLayer`) : continent 10 s, origine 4,5 s, ~780 images/s sans plafond sur les deux. Étape 2 (même jour, `ForestTrees.cs`) : de près (zoom 2 et plus, fondu jusqu'à 3), les arbres un par un avec leur ombre,
+  par tuiles de 20 × 20 km préparées à la première vue (2 à 7 ms chacune), 48 gardées au plus ; place tirée d'une grille
+  commune à toute la carte (mêmes arbres en revenant). Mesure : 15 tuiles, 97 000 arbres, ~790 images/s. Corrigé en passant
+  (`MapGeometry.ForestPieceTriangles`, `Subtract`) : une clairière entièrement dans une forêt était remplie comme la forêt
+  (Godot rend le contour et le trou comme deux polygones) ; elle est maintenant retirée (aussi pour la teinte des biomes).
 - Éditeur de carte : au chargement, il prend le relief de la carte (`relief-altitude.png` s'il est plus récent que
   `carte.json`, sinon `ReliefBuilder`), échantillonné en `Heightmap.FromRelief`. Pentes des biomes en vrais % (seuils
   `ZoneMaskGrid.CliffMinSlope`… : falaise ≥ 8 %, fertile < 10 %, marais < 1 %, désert et plage < 2 % ; 12 novembre 2026).

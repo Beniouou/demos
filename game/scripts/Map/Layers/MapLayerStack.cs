@@ -41,6 +41,7 @@ public sealed class MapLayerStack
             new TerrainLayer(),
             new WaterLayer(),
             new BiomesLayer(),
+            new ForestsLayer(),
             new ReliefLayer(),
             new LakesLayer(),
             new RiversLayer(),
