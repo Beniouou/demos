@@ -118,6 +118,9 @@ public sealed partial class Simulation(World world, GameClock clock)
         PayConstruction(plan, communeId);
         if (position is { } placed)
             World.SetBuildingPosition(structure.Id, placed);
+        // Exploiter loin du village peut trahir La Promesse (« on ne creusera pas plus loin »).
+        if (position is { } far && World.NeedsExtractionSite(typeId, productId) && IsBeyondCommune(communeId, far))
+            NotePromiseAct(EngagementAct.FarExtraction, $"{type.Name} posé au-delà du ressort de la commune", typeId: typeId);
         // Le chantier commence quand les matériaux venus d'ailleurs arrivent.
         World.AddConstructionSite(new ConstructionSite(structure, type.Construction!.Days + plan.TravelDays));
         return new ConstructionOutcome(true, plan, null);
@@ -338,6 +341,8 @@ public sealed partial class Simulation(World world, GameClock clock)
         World.Treasury.Deposit(price);
         World.UpdateStructure(building with { Ownership = Privatization.OwnershipFor(buyer), OwnerClassId = buyer.Id });
         World.Wages.Forget(building.Id);
+        NotePromiseAct(EngagementAct.Sale, $"vente de {World.DisplayNameOf(building)}",
+            need: World.Products.FirstOrDefault(p => p.Id == building.Production?.ProductId)?.Need?.Id);
         return SaleOutcome.Sold;
     }
 
@@ -366,6 +371,8 @@ public sealed partial class Simulation(World world, GameClock clock)
     /// <summary>Le bâtiment devient public. Sa caisse ferme : rachetée, son argent revient aux propriétaires ; expropriée, à la commune.</summary>
     private void TakeIntoPublicHands(Structure building, NationalizationMode mode)
     {
+        NotePromiseAct(mode == NationalizationMode.Expropriation ? EngagementAct.Expropriation : EngagementAct.Nationalization,
+            $"{(mode == NationalizationMode.Expropriation ? "expropriation" : "rachat")} de {World.DisplayNameOf(building)}");
         var owner = building.OwnerClassId is { } ownerId ? World.ClassesById.GetValueOrDefault(ownerId) : null;
         var remaining = World.CloseCompanyFund(building.Id);
         if (mode == NationalizationMode.Buyout && owner is not null)
@@ -486,6 +493,7 @@ public sealed partial class Simulation(World world, GameClock clock)
         World.AddConstructionSite(new ConstructionSite(camp, campType.Construction.Days));
         GiveFoundingMaterials(commune.Id);
         World.SetCharter(commune.Id, charter);
+        NotePromiseAct(EngagementAct.Founding, $"fondation de {name}");
         return commune;
     }
 
@@ -790,6 +798,7 @@ public sealed partial class Simulation(World world, GameClock clock)
         foreach (var voted in World.LawCommission.TakeVoted())
         {
             var draft = voted.Draft;
+            NotePromiseLawChange(draft, World.Laws.FirstOrDefault(l => l.Id == draft.Law.Id));
             switch (draft.Kind)
             {
                 case LawChangeKind.Enact:
@@ -1101,6 +1110,7 @@ public sealed partial class Simulation(World world, GameClock clock)
 
         // La légitimité s'use (décidé le 23 novembre 2026) : un douzième de l'usure annuelle, chaque mois.
         World.Legitimacy.Erode(1 - Math.Pow(1 - Balance.Current.LegitimacyYearlyErosion, 1.0 / 12));
+        RunPromiseMonthly();
 
         // Le trafic du mois fini (entre communes, et entre un bâtiment posé et sa commune) crée ou améliore les routes,
         // si la structure qui les paie en a les moyens.

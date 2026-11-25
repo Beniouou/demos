@@ -64,7 +64,7 @@ public static class LawEffects
                     stances[law.Id] = new LawStance(applicable - lawApplicable, accepted - lawAccepted);
             }
 
-            socialClass.Adhesion = applicable > 0 ? accepted / applicable : 1;
+            socialClass.Adhesion = Math.Max(0, (applicable > 0 ? accepted / applicable : 1) - socialClass.Distrust);
             socialClass.LawStances = stances;
         }
     }

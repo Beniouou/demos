@@ -56,6 +56,12 @@ public sealed class SocialClass(string id, string name, Rank rank, Ideology ideo
     public double Adhesion { get; set; } = 1;
 
     /// <summary>
+    /// Méfiance après une trahison de La Promesse (décidé le 23 novembre 2026, codé le 25) : retirée de l'adhésion chaque jour, elle
+    /// revient de 0,01 par mois.
+    /// </summary>
+    public double Distrust { get; set; }
+
+    /// <summary>
     /// Relevé du dernier jour, besoin par besoin (identifiant du besoin, « Housing » pour se loger) : part couverte, part
     /// manquante faute d'argent, part manquante faute de produits ou de places. Sans effet sur la partie (décidé le
     /// 21 novembre 2026, pour l'interface) ; la moyenne des parts couvertes fait <see cref="NeedsSatisfaction"/>.

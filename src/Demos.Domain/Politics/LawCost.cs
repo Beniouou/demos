@@ -12,6 +12,35 @@ namespace Demos.Domain.Politics;
 /// </summary>
 public static class LawCost
 {
+    /// <summary>
+    /// Les mouvements de briques d'un changement de loi (voter, changer, abroger), brique par brique et sujet par sujet,
+    /// depuis leur référence ou leur ancienne valeur ; seuls ceux qui bougent vraiment (pour juger les engagements de La
+    /// Promesse, décidé le 25 novembre 2026).
+    /// </summary>
+    public static List<BrickMovement> MovementsOf(LawBook book, Law? before, Law? after)
+    {
+        var movements = new List<BrickMovement>();
+        var law = after ?? before;
+        if (law is null)
+            return movements;
+
+        var keys = (before?.Bricks ?? []).Concat(after?.Bricks ?? []).Select(s => (s.Brick, s.Subject)).Distinct();
+        foreach (var (brickId, subject) in keys)
+        {
+            if (book.Catalogue.BrickOf(brickId) is not { } brick)
+                continue;
+
+            var old = before?.Bricks.FirstOrDefault(s => s.Brick == brickId && s.Subject == subject);
+            var next = after?.Bricks.FirstOrDefault(s => s.Brick == brickId && s.Subject == subject);
+            var reference = book.ReferenceOf(law, (next ?? old)!);
+            var movement = new BrickMovement(brick, subject, old?.Value ?? reference, next?.Value ?? reference, reference);
+            if (movement.Intensity > 0)
+                movements.Add(movement);
+        }
+
+        return movements;
+    }
+
     /// <param name="before">La loi en vigueur, ou null pour une nouvelle loi.</param>
     /// <param name="after">La nouvelle version, ou null pour abroger.</param>
     public static Dictionary<Orientation, double> Of(LawBook book, IEnumerable<SocialClass> classes, Law? before, Law? after)

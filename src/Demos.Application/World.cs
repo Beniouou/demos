@@ -225,10 +225,13 @@ public sealed class World
     public LegitimacyPool Legitimacy { get; } = new();
 
     /// <summary>
-    /// La Promesse de la partie (mode avec promesse) ; nulle en bac à sable. Le choix au départ n'est pas encore codé :
-    /// seule l'école qui l'enseigne s'en sert pour l'instant.
+    /// La Promesse de la partie, ses engagements et sa jauge (mode avec promesse) ; nulle en bac à sable. Après un pacte
+    /// déchiré, elle reste (déchirée) jusqu'à ce que le joueur choisisse la suite.
     /// </summary>
-    public PromiseDefinition? Promise { get; set; }
+    public PromiseState? PromiseState { get; set; }
+
+    /// <summary>La Promesse en vigueur (pour l'école qui l'enseigne) : nulle en bac à sable ou une fois le pacte déchiré.</summary>
+    public PromiseDefinition? Promise => PromiseState is { Torn: false } state ? state.Promise : null;
 
     /// <summary>Ressources financières du joueur.</summary>
     public Treasury Treasury { get; } = new();

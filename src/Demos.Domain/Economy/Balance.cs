@@ -324,6 +324,35 @@ public sealed record BalanceSettings
     /// </summary>
     public double LegitimacyCostReferenceJobs { get; init; } = 200;
 
+    // La jauge de la promesse (décidé le 25 novembre 2026 ; propositions, feuille Passages du tableur).
+
+    /// <summary>Blessure d'une trahison d'engagement.</summary>
+    public double PromiseBetrayalWound { get; init; } = 0.10;
+
+    /// <summary>Part de la blessure d'une trahison qui ne guérit jamais.</summary>
+    public double PromiseBetrayalPermanent { get; init; } = 0.02;
+
+    /// <summary>Ce que guérit chaque blessure par mois.</summary>
+    public double PromiseHealingPerMonth { get; init; } = 0.01;
+
+    /// <summary>Pénalité des chartes contraires : × la part de la population qui vit dans ces communes.</summary>
+    public double PromiseCharterPenalty { get; init; } = 0.10;
+
+    /// <summary>Seuil de rupture de la jauge.</summary>
+    public double PromiseRuptureThreshold { get; init; } = 0.3;
+
+    /// <summary>Mois de suite sous le seuil avant que le pacte se déchire.</summary>
+    public int PromiseRuptureMonths { get; init; } = 12;
+
+    /// <summary>Adhésion perdue par toutes les classes à une refondation.</summary>
+    public double RefoundingAdhesionLoss { get; init; } = 0.2;
+
+    /// <summary>Blessure permanente d'une refondation (la cicatrice).</summary>
+    public double RefoundingScar { get; init; } = 0.05;
+
+    /// <summary>Méfiance d'une classe attachée au pôle d'un engagement trahi : adhésion perdue, qui revient de 0,01 par mois.</summary>
+    public double BetrayalAdhesionLoss { get; init; } = 0.1;
+
     /// <summary>Vendre un bâtiment public au privé : légitimité LI, pour un bâtiment de référence.</summary>
     public double SaleLegitimacyCost { get; init; } = 10;
 

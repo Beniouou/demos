@@ -808,6 +808,20 @@ internal sealed class Book(XLWorkbook workbook, World world, BalanceSettings bal
             "Chaque saison, par la pollution (seuil : SeuilPollution, feuille Constantes) ou le manque de produits."),
         ("PassageEcolePromesse", "École : part des élèves qui rejoignent La Promesse", b => b.TransitionPromiseSchoolShare,
             "Chaque saison, en mode avec promesse, sur le premier axe où la classe s'écarte de La Promesse."),
+        ("PromesseTrahison", "Promesse : blessure d'une trahison", b => b.PromiseBetrayalWound,
+            "Ce qu'une trahison d'engagement retire à la jauge de la promesse."),
+        ("PromesseTrahisonDurable", "Promesse : part de la blessure qui reste", b => b.PromiseBetrayalPermanent,
+            "Cette part ne guérit jamais ; le reste guérit chaque mois."),
+        ("PromesseGuerison", "Promesse : guérison par mois", b => b.PromiseHealingPerMonth,
+            "Ce que guérit chaque blessure par mois ; la méfiance des classes trahies revient au même rythme."),
+        ("PromesseCharte", "Promesse : pénalité des chartes contraires", b => b.PromiseCharterPenalty,
+            "× la part de la population qui vit dans une commune dont la charte va contre un pôle de La Promesse."),
+        ("PromesseSeuil", "Promesse : seuil de rupture", b => b.PromiseRuptureThreshold, "Sous ce seuil, les mois se comptent."),
+        ("PromesseMoisRupture", "Promesse : mois sous le seuil avant le pacte déchiré", b => b.PromiseRuptureMonths, "Nombre de mois de suite."),
+        ("PromesseMefiance", "Promesse : méfiance des classes trahies", b => b.BetrayalAdhesionLoss,
+            "Adhésion retirée aux classes attachées au pôle d'un engagement trahi."),
+        ("PromesseRefondationCrise", "Refondation : crise", b => b.RefoundingAdhesionLoss, "Adhésion retirée à toutes les classes."),
+        ("PromesseRefondationCicatrice", "Refondation : cicatrice", b => b.RefoundingScar, "Blessure permanente de la nouvelle jauge."),
     ];
 
     /// <summary>Les réglages des passages entre classes, en cases jaunes.</summary>

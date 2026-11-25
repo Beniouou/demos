@@ -431,6 +431,15 @@ public static class BalanceApplier
             ["PassagePenurieSeuil"] = "transitionSupplyShortageThreshold",
             ["PassageProductionPart"] = "transitionProductionShare",
             ["PassageEcolePromesse"] = "transitionPromiseSchoolShare",
+            ["PromesseTrahison"] = "promiseBetrayalWound",
+            ["PromesseTrahisonDurable"] = "promiseBetrayalPermanent",
+            ["PromesseGuerison"] = "promiseHealingPerMonth",
+            ["PromesseCharte"] = "promiseCharterPenalty",
+            ["PromesseSeuil"] = "promiseRuptureThreshold",
+            ["PromesseMoisRupture"] = "promiseRuptureMonths",
+            ["PromesseMefiance"] = "betrayalAdhesionLoss",
+            ["PromesseRefondationCrise"] = "refoundingAdhesionLoss",
+            ["PromesseRefondationCicatrice"] = "refoundingScar",
         };
 
         /// <summary>Les réglages des passages entre classes ; tous sont des parts (au plus 1), sauf les points d'éducation.</summary>
@@ -448,8 +457,8 @@ public static class BalanceApplier
                     continue;
                 }
 
-                var value = Number(row.Cell("B"));
-                if (key != "PassageEducation" && value > 1)
+                var value = Number(row.Cell("B"), integer: key == "PromesseMoisRupture");
+                if (key is not ("PassageEducation" or "PromesseMoisRupture") && value > 1)
                 {
                     Errors.Add($"{Where(row.Cell("B"))} : {Show(value.Value)} dépasse 1 (100 %).");
                     value = null;
