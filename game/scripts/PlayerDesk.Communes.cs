@@ -64,8 +64,8 @@ public sealed partial class PlayerDesk
         if (offer.LegitimacyAvailable < offer.LegitimacyCost)
             return new($"Pas assez de légitimité {Simulation.FoundingPole.Code} : il en faut {offer.LegitimacyCost:0.#}, "
                 + $"il y en a {offer.LegitimacyAvailable:0.#}. Fonder une commune dégrade la terre : elle se paie en productivisme.");
-        if (World.Treasury.Balance < offer.Grant)
-            return new($"Le trésor n'a pas de quoi verser la dotation ({offer.Grant:N0}).");
+        if (World.EnvelopeOf(BudgetItem.Investment).Balance < offer.Grant)
+            return new($"Le trésor ou le poste Investissements du budget n'a pas de quoi verser la dotation ({offer.Grant:N0}).");
 
         if (Simulation.TryFoundCommune(name.Trim(), payingCommuneId, PaymentMode.StockFirst, pole, offer.LegitimacyCost, position) is { } commune)
             return new($"{commune.Name} fondée, charte {WorldText.PoleName(pole)} ({pole.Code}), caisse de {World.CommuneFundOf(commune.Id).Balance:N0} ; "

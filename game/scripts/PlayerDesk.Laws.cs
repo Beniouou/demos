@@ -50,7 +50,7 @@ public sealed partial class PlayerDesk
     }
 
     /// <summary>
-    /// Raccourci de Ressources → Revenus : un brouillon de loi d'impôt au niveau choisi (l'État ou une commune), avec la
+    /// Raccourci de Économie → Impôts : un brouillon de loi d'impôt au niveau choisi (l'État ou une commune), avec la
     /// brique « Impôt sur la richesse » pour tout le monde, à 0 %. Le joueur la règle et la vote dans l'éditeur de lois.
     /// </summary>
     public DeskAnswer DraftTaxLaw(string levelId)

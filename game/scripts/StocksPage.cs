@@ -6,7 +6,7 @@ using Godot;
 namespace Demos.Game;
 
 /// <summary>
-/// Ressources → Stocks (décidé le 21 novembre 2026) : le trésor de l'État, puis chaque produit rangé par famille avec son
+/// Économie → Stocks (décidé le 21 novembre 2026) : le trésor de l'État, puis chaque produit rangé par famille avec son
 /// total dans toutes les communes ; déplié, un produit montre sa répartition entre les communes. En bas, le stockage de
 /// chaque commune.
 /// </summary>

@@ -34,7 +34,7 @@ public partial class MainMenu : HBoxContainer
         "Un bâtiment se construit dans Communes → Construire, et se gère dans Communes → Unités de production : " +
         "vente au privé, nationalisation, " +
         "postes ouverts, recette et chauffage. Les impôts se changent par une loi (menu Lois) ; " +
-        "Ressources → Revenus montre ce qu'ils rapportent.";
+        "Économie → Impôts montre ce qu'ils rapportent, et Économie → Budget fixe ce que l'État dépense, poste par poste.";
 
     private const float PanelWidth = 640;
 
@@ -126,10 +126,11 @@ public partial class MainMenu : HBoxContainer
                 Coming("Projets de recherche", "Viser un objectif précis, plus cher et plus lent."),
                 Coming("Unités de recherche", "Les bâtiments et organismes qui font avancer la recherche."),
             ]),
-            new("Ressources",
+            new("Économie",
             [
+                new("Budget", () => new BudgetPage(view, desk)),
+                new("Impôts", () => new RevenuePage(view, desk)),
                 new("Stocks", () => new StocksPage(view)),
-                new("Revenus", () => new RevenuePage(view, desk)),
             ], Wide: true),
             new("Aide", [Text("Commandes", () => HelpText)]),
         ];
@@ -373,7 +374,8 @@ public partial class MainMenu : HBoxContainer
         "Statistiques" => IconRegistry.GetProductIcon("Blé", 16),
         "Projets de recherche" or "Unités de recherche" => IconRegistry.GetMenuIcon("Recherche", 16),
         "Stocks" => IconRegistry.GetMenuIcon("Ressources", 16),
-        "Revenus" => IconRegistry.GetTreasuryIcon(16),
+        "Budget" => IconRegistry.GetTreasuryIcon(16),
+        "Impôts" => IconRegistry.GetMenuIcon("Lois", 16),
         "Commandes" => IconRegistry.GetMenuIcon("Aide", 16),
         _ => null,
     };

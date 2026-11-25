@@ -9,7 +9,7 @@ using Rank = Demos.Domain.Population.Rank;
 namespace Demos.Game;
 
 /// <summary>
-/// Ressources → Revenus, en lecture seule : les impôts se règlent par les lois (brique « Impôt sur la richesse »), plus
+/// Économie → Impôts (ancien Ressources → Revenus), en lecture seule : les impôts se règlent par les lois (brique « Impôt sur la richesse »), plus
 /// ici. À gauche, le choix de l'entité politique (l'État ou une commune), son trésor ou sa caisse, ses taux de base et les
 /// lois sur l'impôt qui s'y appliquent. À droite, pour chaque classe, son impôt du jour selon les lois et ce qu'elle a
 /// payé depuis le début de la saison. Un raccourci prépare une loi d'impôt au niveau de l'entité choisie : le brouillon

@@ -234,6 +234,17 @@ public sealed class World
     public Treasury Treasury { get; } = new();
 
     /// <summary>
+    /// Le budget de l'État (décidé le 25 novembre 2026) : l'enveloppe de chaque poste. Il part du budget de départ des
+    /// réglages, lus à la première demande.
+    /// </summary>
+    public StateBudget Budget => _budget ??= new StateBudget(BudgetPlan.Initial(Balance.Current));
+
+    private StateBudget? _budget;
+
+    /// <summary>L'enveloppe d'un poste du budget, vue comme une caisse : ce qui reste au poste et au trésor.</summary>
+    public BudgetEnvelope EnvelopeOf(BudgetItem item) => new(Treasury, Budget, item);
+
+    /// <summary>
     /// Caisse d'une commune : la dotation versée par l'État à sa fondation. Elle paie d'abord les salaires des
     /// bâtiments publics de la commune ; plus tard, elle pourra devenir un budget communal.
     /// </summary>
@@ -272,11 +283,11 @@ public sealed class World
     public string? RoadPayerOf(string a, string b) => Domain.Map.Roads.PayerOf(a, b, _structures);
 
     /// <summary>
-    /// La caisse d'une structure qui paie : la caisse de la commune, ou le trésor pour l'État. Une préfecture n'a pas
-    /// encore de caisse : en attendant, l'État paie pour elle (question ouverte).
+    /// La caisse d'une structure qui paie une route : la caisse de la commune, ou pour l'État l'enveloppe Routes de son
+    /// budget. Une préfecture n'a pas encore de caisse : en attendant, l'État paie pour elle (question ouverte).
     /// </summary>
     public Treasury FundOf(string structureId) =>
-        _structures.TryGetValue(structureId, out var structure) && structure.IsCommune ? CommuneFundOf(structureId) : Treasury;
+        _structures.TryGetValue(structureId, out var structure) && structure.IsCommune ? CommuneFundOf(structureId) : EnvelopeOf(BudgetItem.Roads);
 
     /// <summary>Solde de la caisse d'une commune, sans la créer si elle n'existe pas encore (0 dans ce cas).</summary>
     public double CommuneFundBalanceOf(string communeId) => _communeFunds.TryGetValue(communeId, out var fund) ? fund.Balance : 0;

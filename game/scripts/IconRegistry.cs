@@ -32,6 +32,7 @@ public static class IconRegistry
         ["Production"] = "res://assets/icons/menus/menu-production.svg",
         ["Recherche"] = "res://assets/icons/menus/menu-recherche.svg",
         ["Ressources"] = "res://assets/icons/menus/menu-ressources.svg",
+        ["Économie"] = "res://assets/icons/menus/menu-ressources.svg",
         ["Aide"] = "res://assets/icons/menus/menu-aide.svg",
     };
 

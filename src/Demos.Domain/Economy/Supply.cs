@@ -121,15 +121,10 @@ public static class Supply
     {
         if (workplace.Ownership == Ownership.Public)
         {
-            return new Payer(
-                Market.StateSellerId(communeId),
-                () => (communeFund?.Balance ?? 0) + treasury.Balance,
-                amount =>
-                {
-                    var fromFund = Math.Min(amount, communeFund?.Balance ?? 0);
-                    communeFund?.TrySpend(fromFund);
-                    treasury.TrySpend(Math.Min(amount - fromFund, treasury.Balance));
-                });
+            // Un bâtiment public d'une commune achète avec sa caisse seule (le trésor ne prend plus le relais, décidé le
+            // 25 novembre 2026) ; hors commune, avec le trésor.
+            var payer = communeId == "" ? treasury : communeFund ?? treasury;
+            return new Payer(Market.StateSellerId(communeId), () => payer.Balance, amount => payer.TrySpend(Math.Min(amount, payer.Balance)));
         }
 
         if (companyFundOf?.Invoke(workplace) is { } fund)

@@ -101,7 +101,7 @@ selon `Simulation.PlanConstruction` (`ConstructionPlan` : réserve, stock de l'�
 `Trade.BuildingDemand`. Interface : `ConstructionPage` (taille − +, origine des matériaux, zone vérifiée à la pose).
 Familles de produits (21 novembre 2026, sans effet sur la partie) : `ProductDefinition.Family` (`ProductFamily`, champ
 `family` de `products.json`, test `Chaque_produit_a_une_famille`) ; noms et rangement dans `game/scripts/ProductFamilies.cs` ;
-Ressources → Stocks (`StocksPage` : famille → produit avec son total → répartition par commune ; stockage des communes en
+Économie → Stocks (`StocksPage` : famille → produit avec son total → répartition par commune ; stockage des communes en
 bas) et Communes → Statistiques (`ProductionStatsPage`) rangés par famille, repliables.
 Objets durables (20 novembre 2026) : `ProductDefinition.UsageDays` (vêtements, meubles, poterie, outils, charrette) ;
 habitants : `SocialClass.Possessions`, possession visée `possessionByRank`, rachat de l'usure + `possessionCatchUp` du manque
@@ -230,7 +230,7 @@ désactivés : TVA sur la valeur ajoutée, épargne progressive des entreprises.
   (`JsonContentSource(…, mapName)`) puis l'écran de jeu (`Hud.Init(…, mapName)` → `MapCanvas.Init(view, mapName)`).
   `-- --carte <nom>` en ligne de commande passe l'écran (essais, captures avec `--write-movie`). Pas encore : le mode
   (avec Promesse ou bac à sable) et le départ (riche ou terre d'exil).
-- Menus dans `game/scripts/MainMenu.cs` (Carte, Lois, Structure, Population, Communes, Recherche, Ressources, Aide) ; une page
+- Menus dans `game/scripts/MainMenu.cs` (Carte, Lois, Structure, Population, Communes, Recherche, Économie, Aide) ; une page
   par fichier (`*Page.cs`) ; `Coming(...)` = entrée grisée « à venir ». Lecture de la partie par `GameView`
   (`src/Demos.Application/GameView.cs`), **actions du joueur par `PlayerDesk`** (`game/scripts/PlayerDesk.cs`, qui
   appelle `Simulation`) ; textes de partie dans `WorldText.cs`, couleurs et styles dans `UiTheme.cs`.
@@ -287,6 +287,16 @@ désactivés : TVA sur la valeur ajoutée, épargne progressive des entreprises.
   `BeginDay`) et les dépenses avec leur motif (`LegitimacySpendingKind`, paramètre des `TrySpend`/`TrySpendOnCredit`,
   et `Add` pour un vote annulé) ; lu par `GameView.LegitimacyLedger()` (`GameView.Legitimacy.cs`). Textes et bulles
   dans `LegitimacyText.cs`. `LineChart` descend sous 0 quand une valeur est négative (pôle en dette).
+- Budget de l'État (25 novembre 2026) : menu Économie (ancien Ressources) → « Budget » (`BudgetPage`, textes `BudgetText.cs`),
+  « Impôts » (`RevenuePage`, ancien Revenus), « Stocks ». Domaine `src/Demos.Domain/Economy/Budget.cs` : `BudgetItem`
+  (Dotations CO, votées par habitant et par an, `BudgetItems.IsPerResident` ; Chantiers PO, Routes PO, Investissements CO), `BudgetPlan`, `StateBudget` (`World.Budget` : en vigueur,
+  dépensé de l'année, brouillon, voté en attente) et `BudgetEnvelope` (`World.EnvelopeOf(item)`, un `Treasury` plafonné :
+  `Treasury` n'est plus scellé, ses membres sont virtuels). Chantiers, camp de base et siège de préfecture paient par
+  l'enveloppe Chantiers, fondation et rachat par Investissements, routes de l'État par Routes (`World.FundOf`). Vote,
+  annulation, 1er du mois et dotations dans `Simulation.Budget.cs` (dotations versées par `PayGrantsIfDue` le 1er
+  jour joué de chaque mois : un douzième du montant par habitant × les habitants de chaque commune) ; lecture `GameView.Budget()` (`GameView.Budget.cs`) ; actions
+  `PlayerDesk.Budget.cs`. Fin du relais : `WorkDay.PayInMoney` et `Supply.PayerOf` font payer un bâtiment public
+  d'une commune par sa caisse seule (hors commune, une préfecture : le trésor). Réglages `Budget*` (feuille Constantes).
   Chiffres agrégés dans `PopulationStats.cs` (`NeedCells`, `UnemployedByRank`, `AdhesionByPole`, `NeedsByRank`), bulles d'aide (règles et constantes du
   moteur) dans `PopulationText.cs`. Graphiques dessinés par Godot, réutilisables : `LineChart` (courbes, axe serré
   autour des relevés sauf pour une part, survol) et `StackedBar` (barre en parts) ; couleurs `UiTheme.SeriesColor`.

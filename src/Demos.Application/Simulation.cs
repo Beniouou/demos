@@ -12,7 +12,7 @@ namespace Demos.Application;
 /// et les bilans chaque année. Chaque commune est une petite économie : son marché et son stockage, où
 /// arrive aussi la production de l'État, sa caisse, et des échanges avec les autres communes.
 /// </summary>
-public sealed class Simulation(World world, GameClock clock)
+public sealed partial class Simulation(World world, GameClock clock)
 {
     /// <summary>Type du catalogue qui fonde une commune : ses emplois et ses places attirent les premiers habitants.</summary>
     public const string BaseCampTypeId = "camp-de-base";
@@ -50,6 +50,9 @@ public sealed class Simulation(World world, GameClock clock)
         // avant la journée de travail.
         if (change.HasFlag(CalendarChange.NewMonth))
             RunMonthlyCalculations();
+
+        // Les dotations du mois arrivent dans les caisses des communes avant la journée de travail.
+        PayGrantsIfDue();
 
         RunDailyCalculations();
 
@@ -110,7 +113,7 @@ public sealed class Simulation(World world, GameClock clock)
         if (!plan.Feasible)
             return new ConstructionOutcome(false, plan, plan.Missing > 1e-6
                 ? $"il manque {plan.Missing:N0} matériaux, ici comme dans les communes avec lesquelles elle échange"
-                : $"il faut {plan.Money:N0} au trésor pour acheter les matériaux");
+                : $"il faut {plan.Money:N0} au trésor et au poste Chantiers du budget pour acheter les matériaux");
 
         PayConstruction(plan, communeId);
         if (position is { } placed)
@@ -168,14 +171,14 @@ public sealed class Simulation(World world, GameClock clock)
 
         var money = (boughtHere + boughtThere) * market.PriceOf(productId);
         return new ConstructionPlan(productId, quantity, reserve, fromState, boughtHere, other, fromOtherState, boughtThere, lost, days,
-            money, missing, World.Treasury.Balance >= money - 1e-6);
+            money, missing, World.EnvelopeOf(BudgetItem.Construction).Balance >= money - 1e-6);
     }
 
     /// <summary>Paie un chantier selon son plan : prend les matériaux, achète le reste avec le trésor, envoie ce qui vient d'ailleurs.</summary>
     private void PayConstruction(ConstructionPlan plan, string communeId)
     {
         var productId = plan.ProductId;
-        World.Treasury.TrySpend(plan.Money);
+        World.EnvelopeOf(BudgetItem.Construction).TrySpend(plan.Money);
         World.ConstructionReserveOf(communeId).TryRemove(productId, plan.FromReserve);
         var market = World.MarketOf(communeId);
         var state = Market.StateSellerId(communeId);
@@ -400,12 +403,13 @@ public sealed class Simulation(World world, GameClock clock)
 
         var price = NationalizationPriceOf(building, mode);
         var legitimacyCost = NationalizationLegitimacyCostOf(building, mode);
-        if (World.Treasury.Balance < price)
+        var investment = World.EnvelopeOf(BudgetItem.Investment);
+        if (investment.Balance < price)
             return NationalizationOutcome.TreasuryTooPoor;
         if (!World.Legitimacy.TrySpend(NationalizationPole, legitimacyCost, LegitimacySpendingKind.Nationalization, buildingId))
             return NationalizationOutcome.NotEnoughLegitimacy;
 
-        World.Treasury.TrySpend(price);
+        investment.TrySpend(price);
         if (building.OwnerClassId is { } ownerId && World.ClassesById.TryGetValue(ownerId, out var owner))
             owner.Wealth += price;
 
@@ -464,13 +468,13 @@ public sealed class Simulation(World world, GameClock clock)
             || !campType.CanBeBuilt
             || !AllowsExtension(payingCommuneId)
             || World.Legitimacy[FoundingPole] < legitimacyCost
-            || !World.Treasury.TrySpend(grant))
+            || !World.EnvelopeOf(BudgetItem.Investment).TrySpend(grant))
             return null;
 
-        if (!Construction.TryPay(campType.Construction!.Materials, mode, Market.StateSellerId(payingCommuneId), World.Treasury,
+        if (!Construction.TryPay(campType.Construction!.Materials, mode, Market.StateSellerId(payingCommuneId), World.EnvelopeOf(BudgetItem.Construction),
                 World.MarketOf(payingCommuneId), World.ConstructionReserveOf(payingCommuneId)))
         {
-            World.Treasury.Deposit(grant);
+            World.EnvelopeOf(BudgetItem.Investment).Deposit(grant);
             return null;
         }
 
@@ -544,7 +548,7 @@ public sealed class Simulation(World world, GameClock clock)
         var jobs = PrefectureJobsFor(type, members.Count);
         var building = type.Build($"{prefecture.Id}-siege", prefecture.Id, name: $"{type.Name} ({name})") with { Jobs = jobs, Capacity = jobs };
         if (World.IsIdTaken(building.Id)
-            || !Construction.TryPay(type.Construction!.Materials, mode, Market.StateSellerId(seatCommuneId), World.Treasury,
+            || !Construction.TryPay(type.Construction!.Materials, mode, Market.StateSellerId(seatCommuneId), World.EnvelopeOf(BudgetItem.Construction),
                 World.MarketOf(seatCommuneId), World.ConstructionReserveOf(seatCommuneId)))
             return null;
 
@@ -1093,6 +1097,7 @@ public sealed class Simulation(World world, GameClock clock)
     private void RunMonthlyCalculations()
     {
         EnactVotedLaws();
+        RunBudgetMonthly();
 
         // La légitimité s'use (décidé le 23 novembre 2026) : un douzième de l'usure annuelle, chaque mois.
         World.Legitimacy.Erode(1 - Math.Pow(1 - Balance.Current.LegitimacyYearlyErosion, 1.0 / 12));

@@ -205,7 +205,7 @@ public partial class EntityCreationPage : VBoxContainer, IMenuPage
                 text.AppendLine($"[color=#{UiTheme.Danger.ToHtml(false)}]Pas assez de légitimité {po.Code} : il en faut {offer.LegitimacyCost:0.#}.[/color]");
             }
             text.AppendLine(SheetText.Muted($"Dans la commune qui paie : réserve de chantier {available.Reserve:N0}, stock de l'État {available.StateStock:N0}, "
-                + $"en vente {available.OnSale:N0} (au prix de {available.Price:N1}). Trésor : {available.Treasury:N0}."));
+                + $"en vente {available.OnSale:N0} (au prix de {available.Price:N1}). Disponible au poste Chantiers du budget : {available.Treasury:N0}."));
         }
         text.Append(SheetText.Section("Emplacement"));
         text.AppendLine(SheetText.Muted($"N'importe où sur la carte, sauf sur l'eau, une falaise ou un glacier, et à {MapScale.Format(settings.CommuneMinDistance)} "

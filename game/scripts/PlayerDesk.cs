@@ -76,7 +76,7 @@ public sealed partial class PlayerDesk(Simulation simulation)
         {
             NationalizationOutcome.Done => mode == NationalizationMode.Buyout ? "Racheté par l'État." : "Exproprié par l'État.",
             NationalizationOutcome.NotPrivate => "Ce bâtiment est déjà public.",
-            NationalizationOutcome.TreasuryTooPoor => "Le trésor n'a pas assez d'argent.",
+            NationalizationOutcome.TreasuryTooPoor => "Le trésor ou le poste Investissements du budget n'a pas assez d'argent.",
             _ => "Pas assez de légitimité CO.",
         };
 
@@ -168,7 +168,7 @@ public sealed partial class PlayerDesk(Simulation simulation)
             market.QuantityOf(productId, stateSeller),
             market.QuantityOfOthers(productId, stateSeller),
             market.PriceOf(productId),
-            World.Treasury.Balance);
+            World.EnvelopeOf(BudgetItem.Construction).Balance);
     }
 
     /// <summary>

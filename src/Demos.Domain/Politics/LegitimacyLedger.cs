@@ -13,6 +13,12 @@ public enum LegitimacySpendingKind
 
     /// <summary>L'usure mensuelle du stock (décidé le 23 novembre 2026).</summary>
     Erosion,
+
+    /// <summary>Le vote du budget de l'État (décidé le 25 novembre 2026).</summary>
+    BudgetVote,
+
+    /// <summary>Un vote du budget annulé avant le 1er du mois (la légitimité est rendue).</summary>
+    BudgetVoteCancelled,
 }
 
 /// <summary>Une part du gain d'un jour : ce qu'un groupe a produit dans un pôle en acceptant une loi.</summary>

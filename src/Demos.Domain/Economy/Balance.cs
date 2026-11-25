@@ -291,6 +291,27 @@ public sealed record BalanceSettings
     public double LegitimacyYearlyErosion { get; init; } = 0.1;
 
     /// <summary>
+    /// Budget de départ de l'État (décidé le 25 novembre 2026, proposition) : dotations aux communes, par habitant et par
+    /// an (le relais du trésor payait environ 87 par habitant la 1re année de la partie de départ, 63 la 3e).
+    /// </summary>
+    public double BudgetGrantPerResident { get; init; } = 90;
+
+    /// <summary>Budget de départ : chantiers (matériaux achetés), par an (proposition).</summary>
+    public double BudgetConstruction { get; init; } = 50_000;
+
+    /// <summary>Budget de départ : routes payées par l'État, par an (proposition).</summary>
+    public double BudgetRoads { get; init; } = 20_000;
+
+    /// <summary>Budget de départ : investissements (fondations, rachats), par an (proposition).</summary>
+    public double BudgetInvestment { get; init; } = 50_000;
+
+    /// <summary>Vote du budget (proposition) : coût de base, dans son pôle, de chaque poste qui augmente.</summary>
+    public double BudgetVoteBaseCost { get; init; } = 20;
+
+    /// <summary>Vote du budget (proposition) : légitimité en plus par tranche de 1 000 d'augmentation d'un poste.</summary>
+    public double BudgetVoteCostPerThousand { get; init; } = 1;
+
+    /// <summary>
     /// Population de la nation à laquelle les coûts fixes valent leur coût de base (fonder une commune, rattacher) :
     /// au-delà, ils grandissent avec elle (décidé le 23 novembre 2026, proposition). Une préfecture se mesure aux
     /// habitants qu'elle regroupe.

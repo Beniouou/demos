@@ -31,6 +31,8 @@ public static class LegitimacyText
             LegitimacySpendingKind.Attach => $"Rattachement de {subject}",
             LegitimacySpendingKind.Sale => $"Vente de {subject}",
             LegitimacySpendingKind.Erosion => "Usure : la légitimité s'use avec le temps",
+            LegitimacySpendingKind.BudgetVote => "Vote du budget de l'État",
+            LegitimacySpendingKind.BudgetVoteCancelled => "Vote du budget annulé (rendu)",
             _ => $"Nationalisation de {subject}",
         };
     }

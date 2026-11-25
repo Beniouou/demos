@@ -161,7 +161,7 @@ public static class WorkDay
             // Les bâtiments d'une préfecture sont payés par le trésor de l'État, pas par la caisse de leur chef-lieu.
             var managedByPrefecture = Extension.ManagerOf(workplace, structures) is { } managerId
                 && structures.GetValueOrDefault(managerId)?.IsPrefecture == true;
-            var communeFund = managedByPrefecture ? null : communeFundOf?.Invoke(communeId);
+            var communeFund = managedByPrefecture || communeId == "" ? null : communeFundOf?.Invoke(communeId);
             var paidInMoney = PayInMoney(workplace, dues, totalDue, classesById, treasury, communeFund, companyFundOf);
             wageLedger?.Record(workplace.Id, initialDue, initialDue - totalDue + paidInMoney);
 
@@ -256,12 +256,11 @@ public static class WorkDay
         double paid;
         if (workplace.Ownership == Ownership.Public)
         {
-            // La caisse de la commune paie d'abord ; le trésor national prend le relais quand elle est vide.
-            var fromFund = Math.Min(totalDue, communeFund?.Balance ?? 0);
-            communeFund?.TrySpend(fromFund);
-            var fromTreasury = Math.Min(totalDue - fromFund, treasury.Balance);
-            treasury.TrySpend(fromTreasury);
-            paid = fromFund + fromTreasury;
+            // Un bâtiment public d'une commune est payé par sa caisse seule : le trésor ne prend plus le relais, il verse
+            // des dotations (décidé le 25 novembre 2026). Hors commune (une préfecture), le trésor paie.
+            var payer = communeFund ?? treasury;
+            paid = Math.Min(totalDue, payer.Balance);
+            payer.TrySpend(paid);
         }
         else if (companyFundOf?.Invoke(workplace) is { } companyFund)
         {

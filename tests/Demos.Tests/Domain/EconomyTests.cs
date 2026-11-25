@@ -111,7 +111,7 @@ public class EconomyTests
     }
 
     [Fact]
-    public void La_caisse_de_la_commune_paie_d_abord_puis_le_tresor_prend_le_relais()
+    public void La_caisse_de_la_commune_paie_seule_le_tresor_ne_prend_plus_le_relais()
     {
         var structures = Town(new Structure("scierie", "Scierie", StructureKind.Building, "commune", Jobs: 10, DailyWage: 2));
         SocialClass[] classes = [Workers(10)];
@@ -122,10 +122,10 @@ public class EconomyTests
 
         WorkDay.Run(structures, Employment.Assign(structures, classes), classes, treasury, _ => new Market(Products), _ => fund);
 
-        // 20 de salaires : 15 de la caisse, 5 du trésor.
+        // 20 de salaires dus : la caisse en verse 15, le trésor rien (décidé le 25 novembre 2026, il verse des dotations).
         Assert.Equal(0, fund.Balance, precision: 6);
-        Assert.Equal(95, treasury.Balance, precision: 6);
-        Assert.Equal(20, classes[0].Wealth, precision: 6);
+        Assert.Equal(100, treasury.Balance, precision: 6);
+        Assert.Equal(15, classes[0].Wealth, precision: 6);
     }
 
     [Fact]
