@@ -94,6 +94,31 @@ matières, 114 954 avant eux,
 - Les tests qui changent `Balance.Current` (réglages globaux) vont dans la collection `GlobalBalanceCollection`,
   qui tourne seule.
 
+## Thème, Promesse et fin de partie : état actuel (résumé)
+
+Décidé du 21 au 25 novembre 2026, détaillé dans le document des règles (section « Thème : l'exil et la promesse », et
+« Fin de partie ») ; lire seulement le passage utile.
+- Thème : l'exil, la promesse et la dérive (idées des *Dépossédés*, sans ses noms). Intention : responsabilité envers le
+  peuple, pas de dilemmes perdant-perdant. Principes : le jeu pose les problèmes sans proposer de solution ; tout se
+  répare, sauf la révolution.
+- Deux modes : avec La Promesse (principal) et bac à sable. La Promesse vise 1 à 3 axes (26 combinaisons nommées,
+  `promesses.json`) et un engagement par axe (de principe ou concret, 42 au catalogue, `engagements.json`). Un engagement
+  porte sur un acte, jamais bloqué ; le rompre est une trahison.
+- Deux jauges, deux fins : la tension révolutionnaire (le pouvoir, par paliers, toutes les classes ; décidée, **pas codée** :
+  la révolution reste l'ancienne règle) et la jauge de la promesse (le peuple ; **codée** dans la simulation, voir
+  Architecture). Pacte déchiré → terminer, bac à sable ou refonder (crise + cicatrice). Le texte signé s'efface avec la
+  jauge (décidé, pas codé). Une jauge **Autorité** de l'État (dérive autoritaire, pas un 4e axe) est décidée, pas codée.
+- Début de partie (décidé, **pas codé**) : on nomme son peuple, on choisit La Promesse et ses engagements, on recopie et
+  signe le serment ; départ d'exil pauvre (contenu à trancher) ; acte fondateur = lois de départ gratuites (à trancher) ;
+  terre d'exil = zone ingrate de la carte (prompt `prompt-terre-exil-carte.md`).
+- Victoire : le Grand Œuvre, né d'une recherche philosophique au fil de trois actes (noir, blanc, rouge), choisi par le
+  joueur (coût d'adhésion), achevé pacte intact ; épilogue selon la société (décidé, **pas codé**).
+- Codé à côté : école qui enseigne La Promesse, crise solidarité/repli, axes indépendants (CO collectiviste), moteurs de
+  l'axe Propriété, expansion par la loi (briques Extension, Défrichement), vote à crédit, usure de la légitimité, coûts
+  fixes indexés. L'état d'exception attend la définition des crises (prompt `prompt-crises-evenements.md`).
+- Prompts prêts, à côté du dépôt : `prompt-debut-de-partie.md` (UI et scénario du début de partie),
+  `prompt-trois-actes.md` (les trois actes et le Grand Œuvre), `prompt-crises-evenements.md`, `prompt-terre-exil-carte.md`.
+
 ## Économie : état actuel (résumé)
 
 Nouvelles communes (20 novembre 2026) : `Simulation.Build(structure, mode, position, size)` → `ConstructionOutcome` ; matériaux
