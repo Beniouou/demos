@@ -7,11 +7,13 @@ namespace Demos.Domain.Politics;
 /// </summary>
 /// <param name="First">« Nous, peuple de X, avons … » : à recopier.</param>
 /// <param name="Middle">« Sur cette terre qui ne nous doit rien, nous faisons serment … » : les pôles de La Promesse.</param>
-/// <param name="Last">« Que ceci soit notre Promesse à ceux qui viendront après nous. » : à recopier.</param>
+/// <param name="Last">« Que ceci soit notre Promesse : que cette terre en soit témoin, et que nos enfants seuls nous jugent. » : à recopier.</param>
 /// <param name="Signed">« Signé, en l'An I de l'exil. »</param>
 public sealed record PromiseOath(string First, string Middle, string Last, string Signed)
 {
-    public const string LastSentence = "Que ceci soit notre Promesse à ceux qui viendront après nous.";
+    // Décidée le 28 novembre 2026 : un témoin présent, un juge futur (elle remplace « … à ceux qui viendront après
+    // nous », trop proche d'une devise de jeu connue).
+    public const string LastSentence = "Que ceci soit notre Promesse : que cette terre en soit témoin, et que nos enfants seuls nous jugent.";
     public const string SignedLine = "Signé, en l'An I de l'exil.";
 
     /// <summary>Le texte à recopier, phrase par phrase : la première et la dernière.</summary>

@@ -116,7 +116,8 @@ Décidé du 21 au 25 novembre 2026, détaillé dans le document des règles (sec
   engagement par axe, 3 lois de l'An I (acte fondateur, gratuites ; une loi qui romprait un engagement est refusée,
   `PrototypeScenario.FoundingLawBreaches`), on recopie la première et la dernière phrase du serment et on signe à la
   souris. Serment : `PromiseOath` (première phrase par Promesse, champ `opening` de `promesses.json`, colonne G de la
-  feuille Promesses ; phrases de pôle dans `PromiseOath.PhraseOf`). Départ d'exil : `game/data/partie-exil.json`
+  feuille Promesses ; phrases de pôle dans `PromiseOath.PhraseOf` ; dernière phrase, décidée le 28 novembre 2026 :
+  « Que ceci soit notre Promesse : que cette terre en soit témoin, et que nos enfants seuls nous jugent. »). Départ d'exil : `game/data/partie-exil.json`
   (1 000 exilés 900/90/10, au pôle de La Promesse sur ses axes, pôle du bac à sable ailleurs ; camp de base, puits, ferme
   300, moulin 40, boulangerie 40, bûcheron 100, grenier, abris 700 places ; trésor 5 000, richesse au cinquième, 5 jours de
   farine, 10 charrettes, outils et objets durables à moitié, chauffage au bois), `ScenarioDefinition.Provisions` /
