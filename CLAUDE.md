@@ -113,8 +113,9 @@ Décidé du 21 au 25 novembre 2026, détaillé dans le document des règles (sec
   jauge (codé le 27 novembre 2026, `SignedText`). Une jauge **Autorité** de l'État (dérive autoritaire, pas un 4e axe) est décidée, pas codée.
 - Début de partie (décidé et **codé** les 27 et 28 novembre 2026, maquettes : canevas « Démos — début de partie et
   Promesse », https://claude.ai/artifact/UmQbTMaPwytPTuY7DfLtfX) : on nomme son peuple, on choisit La Promesse et un
-  engagement par axe, 3 lois de l'An I (acte fondateur, gratuites ; une loi qui romprait un engagement est refusée,
-  `PrototypeScenario.FoundingLawBreaches`), on recopie la première et la dernière phrase du serment et on signe à la
+  engagement par axe, 3 lois de l'An I (acte fondateur, gratuites ; une loi qui favorise un pôle opposé à La Promesse
+  ou qui romprait un engagement est refusée et grisée, `PrototypeScenario.FoundingLawProblem`, 28 novembre 2026 ;
+  essai : `--assistant lois`), on recopie la première et la dernière phrase du serment et on signe à la
   souris. Serment : `PromiseOath` (première phrase par Promesse, champ `opening` de `promesses.json`, colonne G de la
   feuille Promesses ; phrases de pôle dans `PromiseOath.PhraseOf` ; dernière phrase, décidée le 28 novembre 2026 :
   « Que ceci soit notre Promesse : que cette terre en soit témoin, et que nos enfants seuls nous jugent. »). Départ d'exil : `game/data/partie-exil.json`

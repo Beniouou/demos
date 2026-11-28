@@ -308,6 +308,16 @@ public partial class PromiseWizard : Control
     /// <summary>La largeur de la colonne de l'écran de La Promesse, en pixels.</summary>
     private const float PromiseColumnWidth = 760;
 
+    /// <summary>Essais (« --assistant lois ») : l'écran des lois de l'An I, avec deux axes et deux engagements concrets.</summary>
+    public void ShowLawsStepForTests()
+    {
+        ShowPromiseStepForTests();
+        _chosenEngagements[IdeologicalAxis.Hierarchy] = _engagements.First(e => e.Id == "eg-logement");
+        _chosenEngagements[IdeologicalAxis.Production] = _engagements.First(e => e.Id == "ec-defrichement");
+        _step = 4;
+        ShowStep();
+    }
+
     /// <summary>Essais (« --assistant promesse ») : un peuple nommé, l'écran de La Promesse avec deux axes choisis.</summary>
     public void ShowPromiseStepForTests()
     {
@@ -367,7 +377,7 @@ public partial class PromiseWizard : Control
                     {
                         _chosenEngagements[pole.Axis] = engagement;
                         // Une loi de l'An I qui romprait le nouvel engagement n'est plus permise.
-                        _chosenLaws.RemoveWhere(id => Breaches(id).Count > 0);
+                        _chosenLaws.RemoveWhere(id => Problem(id) is not null);
                         ShowStep();
                     };
                     column.AddChild(button);
@@ -387,15 +397,20 @@ public partial class PromiseWizard : Control
 
     // ---- 5. Les lois de l'An I -------------------------------------------------------------------------------------
 
-    private IReadOnlyList<EngagementDefinition> Breaches(string templateId) =>
-        PrototypeScenario.FoundingLawBreaches(_laws, new ScenarioLaw(templateId), CurrentEngagements());
+    /// <summary>Pourquoi une loi de l'An I est grisée (contraire à La Promesse, ou rompt un engagement), ou null.</summary>
+    private string? Problem(string templateId) =>
+        CurrentPromise() is { } promise
+            ? PrototypeScenario.FoundingLawProblem(_laws, new ScenarioLaw(templateId), promise, CurrentEngagements())
+            : null;
 
     private void BuildLaws()
     {
+        // Une loi cochée qui serait devenue contraire (Promesse ou engagement changés) est retirée.
+        _chosenLaws.RemoveWhere(id => Problem(id) is not null);
         var header = new HBoxContainer();
         _body.AddChild(header);
         header.AddChild(Wrapped($"L'acte fondateur : {FoundingLawCount} lois de l'État, votées sans coût, le jour du serment. "
-            + "Une loi qui romprait un engagement de La Promesse est grisée."));
+            + "Une loi contraire à La Promesse, ou qui romprait un engagement, est grisée."));
         header.AddChild(new Label { Text = $"{_chosenLaws.Count} sur {FoundingLawCount}", SizeFlagsHorizontal = SizeFlags.ShrinkEnd });
 
         var grid = new GridContainer { Columns = 3 };
@@ -404,14 +419,14 @@ public partial class PromiseWizard : Control
         _body.AddChild(grid);
         foreach (var template in _laws.Templates)
         {
-            var broken = Breaches(template.Id);
+            var problem = Problem(template.Id);
             var domain = _laws.Domains.FirstOrDefault(d => d.Id == template.Domain)?.Name ?? template.Domain;
             var box = new VBoxContainer { CustomMinimumSize = new Vector2(330, 0) };
             var check = new CheckBox
             {
                 Text = template.Name,
                 ButtonPressed = _chosenLaws.Contains(template.Id),
-                Disabled = broken.Count > 0 || (!_chosenLaws.Contains(template.Id) && _chosenLaws.Count >= FoundingLawCount),
+                Disabled = problem is not null || (!_chosenLaws.Contains(template.Id) && _chosenLaws.Count >= FoundingLawCount),
                 TooltipText = template.Description ?? "",
             };
             check.Toggled += on =>
@@ -423,8 +438,8 @@ public partial class PromiseWizard : Control
                 ShowStep();
             };
             box.AddChild(check);
-            var note = broken.Count > 0 ? UiTheme.Caption($"Rompt l'engagement « {broken[0].Text} »") : UiTheme.Caption(domain);
-            if (broken.Count > 0)
+            var note = problem is not null ? UiTheme.Caption(char.ToUpperInvariant(problem[0]) + problem[1..]) : UiTheme.Caption(domain);
+            if (problem is not null)
                 note.AddThemeColorOverride("font_color", UiTheme.Accent);
             note.AutowrapMode = TextServer.AutowrapMode.WordSmart;
             box.AddChild(note);

@@ -88,6 +88,22 @@ public class ExileStartTests
     }
 
     [Fact]
+    public void Une_loi_de_l_An_I_contraire_a_La_Promesse_est_refusee_meme_sans_rompre_l_engagement()
+    {
+        var catalogue = GameData.Content().LoadLawCatalogue();
+        var egaux = PromiseOf("eg");
+        var logement = new[] { Engagement("eg-logement") };
+
+        // « Nul ne sera logé à part » ne vise que les logements réservés, mais la hiérarchie des salaires favorise SE.
+        Assert.Empty(PrototypeScenario.FoundingLawBreaches(catalogue, new ScenarioLaw("hierarchie-salaires"), logement));
+        Assert.NotNull(PrototypeScenario.FoundingLawProblem(catalogue, new ScenarioLaw("hierarchie-salaires"), egaux, logement));
+        Assert.Null(PrototypeScenario.FoundingLawProblem(catalogue, new ScenarioLaw("impot-progressif"), egaux, logement));
+        // Une loi d'un axe libre reste permise.
+        Assert.Null(PrototypeScenario.FoundingLawProblem(catalogue, new ScenarioLaw("liberte-entreprendre"), egaux, logement));
+        Assert.Throws<InvalidDataException>(() => Exile("eg", ["eg-logement"], "hierarchie-salaires"));
+    }
+
+    [Fact]
     public void Le_jeu_previent_avant_un_acte_qui_trahit_sans_rien_noter()
     {
         var simulation = Exile("ec", ["ec-nouvelles-terres"]);

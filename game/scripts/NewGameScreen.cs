@@ -117,6 +117,8 @@ public partial class NewGameScreen : Control
         // « --assistant promesse » : droit à l'écran de La Promesse, avec un peuple et deux axes choisis.
         if (System.Array.IndexOf(OS.GetCmdlineUserArgs(), "promesse") >= 0)
             _wizard?.ShowPromiseStepForTests();
+        if (System.Array.IndexOf(OS.GetCmdlineUserArgs(), "lois") >= 0)
+            _wizard?.ShowLawsStepForTests();
     }
 
     private void Next()

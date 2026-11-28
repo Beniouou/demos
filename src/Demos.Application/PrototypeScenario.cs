@@ -135,11 +135,11 @@ public static class PrototypeScenario
         {
             if (world.LawCatalogue.TemplateOf(law.Template) is not { } template)
                 throw new InvalidDataException($"Loi de départ impossible : « {law.Template} ».");
-            // Une loi de l'An I qui romprait un engagement est refusée (grisée à l'écran) : La Promesse et les lois
-            // fondatrices sont signées le même jour (décidé le 27 novembre 2026).
+            // Une loi de l'An I contraire à La Promesse ou qui romprait un engagement est refusée (grisée à l'écran) : La
+            // Promesse et les lois fondatrices sont signées le même jour (décidé les 27 et 28 novembre 2026).
             if (world.PromiseState is { } promiseState
-                && FoundingLawBreaches(world.LawCatalogue, law, promiseState.Engagements) is [var broken, ..])
-                throw new InvalidDataException($"La loi de départ « {template.Name} » rompt l'engagement « {broken.Text} ».");
+                && FoundingLawProblem(world.LawCatalogue, law, promiseState.Promise, promiseState.Engagements) is { } problem)
+                throw new InvalidDataException($"La loi de départ « {template.Name} » est refusée : {problem}.");
             if (!simulation.EnactAtStart(template.ToLaw(world.LawCommission.NewId("loi"), law.Level)))
                 throw new InvalidDataException($"Loi de départ impossible : « {law.Template} ».");
         }
@@ -158,15 +158,45 @@ public static class PrototypeScenario
     /// Jugée comme une nouvelle loi votée sur une nation sans loi : ce que l'écran de création peut savoir avant la partie.
     /// </summary>
     public static IReadOnlyList<EngagementDefinition> FoundingLawBreaches(
-        LawCatalogue catalogue, ScenarioLaw law, IEnumerable<EngagementDefinition> engagements)
+        LawCatalogue catalogue, ScenarioLaw law, IEnumerable<EngagementDefinition> engagements) =>
+        FoundingDraft(catalogue, law) is var (book, draft) && draft is not null
+            ? Simulation.EngagementsBrokenBy(book, engagements, draft, null)
+            : [];
+
+    /// <summary>
+    /// Les pôles opposés à La Promesse qu'une loi de départ favorise (décidé le 28 novembre 2026 : elle est alors grisée
+    /// aussi, même sans rompre l'engagement choisi ; le jour du serment, tout le peuple partage La Promesse).
+    /// </summary>
+    public static IReadOnlyList<Orientation> FoundingLawContraryPoles(LawCatalogue catalogue, ScenarioLaw law, PromiseDefinition promise)
     {
-        if (catalogue.TemplateOf(law.Template) is not { } template)
+        var (book, draft) = FoundingDraft(catalogue, law);
+        if (draft is null)
             return [];
 
+        var opposites = promise.Orientations.Select(p => p.Opposite).ToHashSet();
+        return LawCost.MovementsOf(book, null, draft.Law).SelectMany(m => m.Poles).Where(opposites.Contains).Distinct().ToList();
+    }
+
+    /// <summary>
+    /// Pourquoi une loi de l'An I est refusée (grisée à l'écran), ou null : elle favorise un pôle opposé à La Promesse,
+    /// ou elle rompt un engagement choisi.
+    /// </summary>
+    public static string? FoundingLawProblem(
+        LawCatalogue catalogue, ScenarioLaw law, PromiseDefinition promise, IEnumerable<EngagementDefinition> engagements)
+    {
+        if (FoundingLawContraryPoles(catalogue, law, promise) is [var contrary, ..])
+            return $"contraire à La Promesse (pôle {contrary.Opposite.Code})";
+        return FoundingLawBreaches(catalogue, law, engagements) is [var broken, ..] ? $"rompt l'engagement « {broken.Text} »" : null;
+    }
+
+    /// <summary>Une loi de départ jugée comme une nouvelle loi de l'État, sur une nation sans loi.</summary>
+    private static (LawBook Book, LawDraft? Draft) FoundingDraft(LawCatalogue catalogue, ScenarioLaw law)
+    {
         var state = new Structure(StateId, "État", StructureKind.PoliticalEntity, null);
         var book = new LawBook(catalogue, [], new Dictionary<string, Structure> { [StateId] = state });
-        var draft = new LawDraft("loi-an-1", LawChangeKind.Enact, template.ToLaw("loi-an-1", law.Level));
-        return Simulation.EngagementsBrokenBy(book, engagements, draft, null);
+        return catalogue.TemplateOf(law.Template) is { } template
+            ? (book, new LawDraft("loi-an-1", LawChangeKind.Enact, template.ToLaw("loi-an-1", law.Level)))
+            : (book, null);
     }
 
     /// <summary>
