@@ -103,6 +103,33 @@ public class ExileStartTests
         Assert.Throws<InvalidDataException>(() => Exile("eg", ["eg-logement"], "hierarchie-salaires"));
     }
 
+    [Theory]
+    [InlineData("co-impot-entreprises", "Everyone", -0.5, true)]
+    [InlineData("co-impot-entreprises", "Cooperative", -1, false)]
+    [InlineData("li-impot-entreprises", "Everyone", 0.5, true)]
+    [InlineData("li-impot-entreprises", "Cooperative", 0.5, false)]
+    public void L_impot_des_entreprises_ne_trahit_que_vers_le_pole_oppose(string engagement, string subject, double value, bool broken)
+    {
+        var catalogue = GameData.Content().LoadLawCatalogue();
+        var state = new Structure(PrototypeScenario.StateId, "État", StructureKind.PoliticalEntity, null);
+        var book = new LawBook(catalogue, [], new Dictionary<string, Structure> { [state.Id] = state });
+        var target = subject == "Everyone" ? LawSubject.Everyone : new LawSubject(SubjectKind.Ownership, subject);
+        var law = new Law("loi", "Impôt", "propriete", state.Id, [new BrickSetting("impot-entreprises", target, value)]);
+
+        var breaches = Simulation.EngagementsBrokenBy(book, [Engagement(engagement)], new LawDraft("loi", LawChangeKind.Enact, law), null);
+
+        Assert.Equal(broken, breaches.Count > 0);
+    }
+
+    [Fact]
+    public void L_economie_cooperative_ne_rompt_pas_l_engagement_collectiviste_sur_l_impot()
+    {
+        var catalogue = GameData.Content().LoadLawCatalogue();
+
+        Assert.Null(PrototypeScenario.FoundingLawProblem(catalogue, new ScenarioLaw("economie-cooperative"), PromiseOf("co"),
+            [Engagement("co-impot-entreprises")]));
+    }
+
     [Fact]
     public void Le_jeu_previent_avant_un_acte_qui_trahit_sans_rien_noter()
     {

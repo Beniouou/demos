@@ -89,8 +89,12 @@ public sealed record EngagementRule(
             return false;
         if (Domain is not null && Domain != domain)
             return false;
+        // Vers le pôle opposé : toute brique, ou une brique précise (dans un sens au besoin) quand ses pôles dépendent de
+        // son sujet (l'impôt des entreprises : le baisser pour tous favorise LI, pour les SCOP CO ; 28 novembre 2026).
         if (TowardOpposite)
-            return movement.Poles.Contains(pole.Opposite);
+            return movement.Poles.Contains(pole.Opposite)
+                && (Brick is null || movement.Brick.Id == Brick)
+                && (Direction is null || (Direction == BrickDirection.Raise) == movement.IsRaise);
 
         return movement.Brick.Id == Brick
             && (Direction is null || (Direction == BrickDirection.Raise) == movement.IsRaise)

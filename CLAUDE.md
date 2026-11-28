@@ -74,7 +74,9 @@ matières, 114 954 avant eux,
   une par combinaison de 1 à 3 pôles, et leurs noms : `Politics/PromiseDefinition.cs`, `LoadPromises`, feuille Promesses du
   tableur où le nom se change ; sans effet sur la partie pour l'instant). `engagements.json` : les 42 engagements de La Promesse
   (`Politics/EngagementDefinition.cs`, de principe ou concrets, par pôle ; `LoadEngagements`, feuille Engagements du tableur ;
-  chaque engagement a ses `rules` : l'acte qui le rompt). La Promesse dans la partie : `World.PromiseState` (`PromiseState` :
+  chaque engagement a ses `rules` : l'acte qui le rompt ; `towardOpposite` avec une `brick` et une `direction` : cette
+  brique, dans ce sens, vers le pôle opposé seulement, pour les briques dont les pôles dépendent du sujet comme
+  l'impôt des entreprises, 28 novembre 2026). La Promesse dans la partie : `World.PromiseState` (`PromiseState` :
   engagements, blessures, mois sous le seuil, `Torn`), `Simulation.Promise.cs` (`ChoosePromise`, `PromiseGauge`, trahisons
   notées à l'entrée en vigueur des lois et sur les actes, méfiance `SocialClass.Distrust`, `RunPromiseMonthly`, `Refound`),
   lecture `GameView.Promise()` ; réglages `Promise…` (feuille Passages). Début de partie et interface : voir « Thème,
