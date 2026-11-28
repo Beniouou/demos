@@ -533,6 +533,14 @@ public static class BalanceApplier
                 }
 
                 names[name] = key;
+                var opening = Text(row.Cell("G"));
+                var currentOpening = json["opening"]?.GetValue<string>() ?? "";
+                if (opening != "" && opening != currentOpening)
+                {
+                    json["opening"] = opening;
+                    Changes.Add($"Promesse {key} : première phrase « {currentOpening} » → « {opening} »");
+                }
+
                 var current = json["name"]?.GetValue<string>() ?? "";
                 if (current == name)
                     continue;

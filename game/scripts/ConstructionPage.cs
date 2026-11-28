@@ -158,7 +158,9 @@ public partial class ConstructionPage : HBoxContainer, IMenuPage
             _view.ExtractionMaxDistance,
             // La zone doit aussi avoir la place pour ses emplois, à cette taille.
             position => _view.ExtractionSiteProblem(typeId, communeId, position, size),
-            position => _report(_desk.Build(typeId, communeId, position, size))));
+            // Avant de poser : extraire au-delà du ressort de la commune peut trahir La Promesse (avertissement, jamais d'interdiction).
+            position => PromiseWarning.Check(_map, _view.PromiseBreachesOfConstruction(typeId, null, communeId, position), "Poser",
+                "poser ce bâtiment ici", () => _report(_desk.Build(typeId, communeId, position, size)))));
     }
 
     // ---- Le catalogue ----------------------------------------------------------------------------------------------

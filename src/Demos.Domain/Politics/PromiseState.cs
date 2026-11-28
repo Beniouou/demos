@@ -42,6 +42,28 @@ public sealed class PromiseState
 
     public PromiseDefinition Promise { get; }
 
+    /// <summary>Le nom du peuple, dit dans le serment (décidé le 27 novembre 2026) ; il se change en jeu.</summary>
+    public string PeopleName { get; private set; } = "";
+
+    /// <summary>Les lois de l'An I (l'acte fondateur), écrites sous les articles du texte signé, sans encre propre.</summary>
+    public IReadOnlyList<string> FoundingLaws { get; set; } = [];
+
+    /// <summary>
+    /// La signature tracée à la souris au serment : des traits, chacun une suite de points (de 0 à 1 dans le cadre de
+    /// signature). Vide tant qu'on n'a pas signé.
+    /// </summary>
+    public IReadOnlyList<IReadOnlyList<Demos.Domain.Map.Point2D>> Signature { get; set; } = [];
+
+    /// <summary>Le texte du serment de cette Promesse, pour ce peuple.</summary>
+    public PromiseOath Oath => PromiseOath.Of(Promise, PeopleName);
+
+    /// <summary>Donne au peuple son nom (vide refusé : le nom reste).</summary>
+    public void NamePeople(string name)
+    {
+        if (!string.IsNullOrWhiteSpace(name))
+            PeopleName = name.Trim();
+    }
+
     /// <summary>Les engagements choisis, un par axe de La Promesse.</summary>
     public IReadOnlyList<EngagementDefinition> Engagements { get; }
 

@@ -5,11 +5,13 @@ namespace Demos.Domain.Politics;
 /// <summary>
 /// Une Promesse des exilés (décidé le 21 novembre 2026, document des règles, Thème : l'exil et la promesse) : un pôle
 /// sur 1, 2 ou 3 axes, et son nom. Les 26 combinaisons possibles ont chacune un nom (game/data/promesses.json, feuille
-/// Promesses du tableur). Sans effet sur la partie pour l'instant.
+/// Promesses du tableur), et la première phrase de son serment.
 /// </summary>
 /// <param name="Id">Les codes des pôles en minuscules, dans l'ordre des axes, séparés par « - » (« eg-ec-co »).</param>
 /// <param name="Poles">Les codes des pôles visés (« EG », « EC », « CO »), un par axe choisi.</param>
-public sealed record PromiseDefinition(string Id, string Name, IReadOnlyList<string> Poles)
+/// <param name="Opening">La suite de la première phrase du serment, après « Nous, peuple de X, » (décidé le 27 novembre
+/// 2026) ; elle suit les axes, pas le nom, si le joueur renomme sa Promesse.</param>
+public sealed record PromiseDefinition(string Id, string Name, IReadOnlyList<string> Poles, string? Opening = null)
 {
     /// <summary>Les pôles visés, dans l'ordre des axes.</summary>
     public IReadOnlyList<Orientation> Orientations =>

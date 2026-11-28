@@ -9,13 +9,36 @@ namespace Demos.Application;
 /// préréglé (quelques lois qui régulent déjà un peu).
 /// </summary>
 /// <param name="HeatingFuel">Combustible de tous les bâtiments de départ (le charbon) ; celui du catalogue si absent.</param>
+/// <param name="Provisions">Les vivres apportés, en jours de nourriture de tout le peuple (départ d'exil).</param>
+/// <param name="Carts">Les charrettes de la première commune au départ.</param>
+/// <param name="ToolShare">La part du stock d'outils visé que reçoit chaque bâtiment (1 : au complet).</param>
+/// <param name="PossessionShare">La part de la possession visée (vêtements, meubles) que reçoit chaque groupe (1 : au complet).</param>
 public sealed record ScenarioDefinition(
     double StartingTreasury,
     string? HeatingFuel,
     IReadOnlyList<ScenarioCommune> Communes,
     IReadOnlyList<ScenarioBuilding> Buildings,
     IReadOnlyList<ScenarioClass> Classes,
-    IReadOnlyList<ScenarioLaw>? PresetLaws = null);
+    IReadOnlyList<ScenarioLaw>? PresetLaws = null,
+    IReadOnlyList<ScenarioProvision>? Provisions = null,
+    int Carts = 0,
+    double ToolShare = 1,
+    double PossessionShare = 1);
+
+/// <summary>Des vivres de départ : un produit, en jours de nourriture de tout le peuple, mis en vente par l'État de la commune.</summary>
+public sealed record ScenarioProvision(string Product, double Days);
+
+/// <summary>
+/// Le départ d'exil choisi à la création de la partie (décidé le 27 novembre 2026) : le nom du peuple, La Promesse et un
+/// engagement par axe (null et vide en bac à sable avec une terre d'exil), et le tirage de la terre d'exil parmi celles
+/// de la carte, et la signature tracée au serment. Les lois de départ (l'acte fondateur) passent par <see cref="StartingLaws"/>.
+/// </summary>
+public sealed record ExileStart(
+    string PeopleName,
+    PromiseDefinition? Promise,
+    IReadOnlyList<EngagementDefinition> Engagements,
+    int Seed = 0,
+    IReadOnlyList<IReadOnlyList<Demos.Domain.Map.Point2D>>? Signature = null);
 
 public sealed record ScenarioCommune(string Id, string Name);
 

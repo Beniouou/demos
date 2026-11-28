@@ -28,10 +28,10 @@ public static class Tools
     public static double EffectOf(Structure building, double owned) =>
         1 - Balance.Current.ToolShortagePenalty * MissingShare(building, owned);
 
-    /// <summary>Donne à un bâtiment son stock d'outils visé au complet (nouveau bâtiment, partie de départ).</summary>
-    public static void Equip(Structure building, Inventory stock)
+    /// <summary>Donne à un bâtiment son stock d'outils visé au complet (nouveau bâtiment, partie de départ), ou une part (départ d'exil).</summary>
+    public static void Equip(Structure building, Inventory stock, double share = 1)
     {
-        var missing = TargetOf(building) - stock.QuantityOf(ProductId);
+        var missing = TargetOf(building) * share - stock.QuantityOf(ProductId);
         if (missing > 0)
             stock.Add(ProductId, missing);
     }

@@ -39,6 +39,7 @@ Jeu solo de construction de nation (Godot .NET 4.7, C#, .NET 10), en français. 
 | Tableur depuis le jeu | `generer-equilibrage.bat` (ou `dotnet run --project tools/Demos.Equilibrage -- generer`) |
 | Tableur vers le jeu | `appliquer-equilibrage.bat` (`-- appliquer`) |
 | Simulation et rapport | `simuler.bat [années] [commune]` (`-- simuler`) |
+| Simulation du départ d'exil | `dotnet run --project tools/Demos.Equilibrage -- exil [années]` (console, un relevé par mois) |
 | Éditeur de contenu | `editeur.bat` (fenêtre Windows, `tools/Demos.Editeur`) |
 | Éditeur de carte | `carte.bat` (fenêtre Windows, `tools/Demos.Carte`) |
 | Gestionnaire d'icônes | `icones.bat` (fenêtre application 74 logos, `galerie-icones.html` ; `remplacer.bat` pour remplacement direct) |
@@ -48,7 +49,8 @@ Jeu solo de construction de nation (Godot .NET 4.7, C#, .NET 10), en français. 
 | Petites images de la carte | `dotnet run --project tools/Demos.Carte -- --images` (dessine celles qui manquent dans `game/assets/carte/` ; `--forcer` les redessine toutes) |
 
 Le tableur (`equilibrage demos.xlsx`) et le rapport (`rapport simulation.html`) sont **à côté** du dossier `demos/`,
-hors du dépôt. Référence actuelle de la simulation : trésor **254 865** la 3e année (`simuler`, 3 ans, départ préréglé, depuis la crise, l'école et le seuil de pollution à 0,3 du 23 novembre 2026 ; 255 091 depuis les moteurs de l'axe Propriété ; 252 286 depuis les
+hors du dépôt. Relevé le 28 novembre 2026 : trésor **984** la 3e année (88 904 la 1re, 48 576 la 2e ; identique avant
+et après le début de partie scénarisé, la baisse vient d'avant, sans doute du budget de l'État). Ancienne référence : trésor 254 865 la 3e année (`simuler`, 3 ans, départ préréglé, depuis la crise, l'école et le seuil de pollution à 0,3 du 23 novembre 2026 ; 255 091 depuis les moteurs de l'axe Propriété ; 252 286 depuis les
 objets durables et la chaîne du fer réduite du 20 novembre 2026 ; 252 563 avec la chaîne à 10, 3 et 3 emplois ; 255 632 avec les seuls biens durables ; 251 118 depuis l'ordre
 de la journée par étapes de la chaîne ; avant : 251 177 depuis les routes des bâtiments, 252 207 depuis
 l'atelier de matériaux d'État, 258 846 avant lui ; le chiffre sans loi, 410 815, date d'avant l'atelier). Avec une deuxième
@@ -75,7 +77,8 @@ matières, 114 954 avant eux,
   chaque engagement a ses `rules` : l'acte qui le rompt). La Promesse dans la partie : `World.PromiseState` (`PromiseState` :
   engagements, blessures, mois sous le seuil, `Torn`), `Simulation.Promise.cs` (`ChoosePromise`, `PromiseGauge`, trahisons
   notées à l'entrée en vigueur des lois et sur les actes, méfiance `SocialClass.Distrust`, `RunPromiseMonthly`, `Refound`),
-  lecture `GameView.Promise()` ; réglages `Promise…` (feuille Passages). Pas d'interface encore.
+  lecture `GameView.Promise()` ; réglages `Promise…` (feuille Passages). Début de partie et interface : voir « Thème,
+  Promesse et fin de partie » et « Interface Godot ».
 - Codes des pôles (`Orientation.Code`) : EG, SE, PO, EC, **CO** (collectiviste, ancien PR « protectionniste », renommé
   le 23 novembre 2026 partout : code, `lois.json`, `promesses.json`, icône `pole-co-collectiviste.svg`), LI. Axes
   indépendants : la redistribution relève de la Hiérarchie, la Propriété de qui possède et gère ; chaque brique de
@@ -107,10 +110,23 @@ Décidé du 21 au 25 novembre 2026, détaillé dans le document des règles (sec
 - Deux jauges, deux fins : la tension révolutionnaire (le pouvoir, par paliers, toutes les classes ; décidée, **pas codée** :
   la révolution reste l'ancienne règle) et la jauge de la promesse (le peuple ; **codée** dans la simulation, voir
   Architecture). Pacte déchiré → terminer, bac à sable ou refonder (crise + cicatrice). Le texte signé s'efface avec la
-  jauge (décidé, pas codé). Une jauge **Autorité** de l'État (dérive autoritaire, pas un 4e axe) est décidée, pas codée.
-- Début de partie (décidé, **pas codé**) : on nomme son peuple, on choisit La Promesse et ses engagements, on recopie et
-  signe le serment ; départ d'exil pauvre (contenu à trancher) ; acte fondateur = lois de départ gratuites (à trancher) ;
-  terre d'exil = zone ingrate de la carte (prompt `prompt-terre-exil-carte.md`).
+  jauge (codé le 27 novembre 2026, `SignedText`). Une jauge **Autorité** de l'État (dérive autoritaire, pas un 4e axe) est décidée, pas codée.
+- Début de partie (décidé et **codé** les 27 et 28 novembre 2026, maquettes : canevas « Démos — début de partie et
+  Promesse », https://claude.ai/artifact/UmQbTMaPwytPTuY7DfLtfX) : on nomme son peuple, on choisit La Promesse et un
+  engagement par axe, 3 lois de l'An I (acte fondateur, gratuites ; une loi qui romprait un engagement est refusée,
+  `PrototypeScenario.FoundingLawBreaches`), on recopie la première et la dernière phrase du serment et on signe à la
+  souris. Serment : `PromiseOath` (première phrase par Promesse, champ `opening` de `promesses.json`, colonne G de la
+  feuille Promesses ; phrases de pôle dans `PromiseOath.PhraseOf`). Départ d'exil : `game/data/partie-exil.json`
+  (1 000 exilés 900/90/10, au pôle de La Promesse sur ses axes, pôle du bac à sable ailleurs ; camp de base, puits, ferme
+  300, moulin 40, boulangerie 40, bûcheron 100, grenier, abris 700 places ; trésor 5 000, richesse au cinquième, 5 jours de
+  farine, 10 charrettes, outils et objets durables à moitié, chauffage au bois), `ScenarioDefinition.Provisions` /
+  `Carts` / `ToolShare` / `PossessionShare`, `ExileStart`, `PrototypeScenario.Create(content, laws, exile)` (terre d'exil
+  tirée au hasard parmi `AllExileSites`, la commune de base si la carte n'en a pas). Contrôle avant un acte :
+  `Simulation.PromiseBreachesOf…` (brouillon, vente, nationalisation, fondation, construction), lu par
+  `GameView.PromiseBreachesOf…` (`PromiseBreachView`). `PromiseState.PeopleName`, `FoundingLaws`, `Signature`, `Oath`.
+  Simulation du départ : `dotnet run --project tools/Demos.Equilibrage -- exil [années]` (un relevé par mois, sans rien
+  faire : 993 habitants au bout d'un an, la faim faute de pain monte de 13 % à 40 % car la boulangerie perd des ouvriers,
+  la jauge glisse de 1 à 0,82). Terre d'exil = zone ingrate de la carte (prompt `prompt-terre-exil-carte.md`).
 - Victoire : le Grand Œuvre, né d'une recherche philosophique au fil de trois actes (noir, blanc, rouge), choisi par le
   joueur (coût d'adhésion), achevé pacte intact ; épilogue selon la société (décidé, **pas codé**).
 - Codé à côté : école qui enseigne La Promesse, crise solidarité/repli, axes indépendants (CO collectiviste), moteurs de
@@ -256,8 +272,19 @@ désactivés : TVA sur la valeur ajoutée, épargne progressive des entreprises.
   cartes de `res://data/cartes/` (nom lu en tête de `carte.json`, `MapFiles.NameFromStart`), la carte par défaut choisie
   d'avance et marquée ★ ; « Commencer » (ou double-clic) appelle `Main.StartGame(carte)`, qui crée la partie
   (`JsonContentSource(…, mapName)`) puis l'écran de jeu (`Hud.Init(…, mapName)` → `MapCanvas.Init(view, mapName)`).
-  `-- --carte <nom>` en ligne de commande passe l'écran (essais, captures avec `--write-movie`). Pas encore : le mode
-  (avec Promesse ou bac à sable) et le départ (riche ou terre d'exil).
+  `-- --carte <nom>` en ligne de commande passe l'écran (essais, captures avec `--write-movie`). Depuis le 28 novembre
+  2026, l'écran choisit aussi le mode : avec La Promesse (`PromiseWizard` : peuple, Promesse, engagements, lois de l'An I ;
+  puis `OathScreen` : recopier, signer, avec `SignaturePad`) ou bac à sable (départ riche ou terre d'exil) ; il donne un
+  `NewGameChoice` à `Main.StartGame`, qui montre l'arrivée en exil (`ArrivalText`). Essais : `-- --carte origine --exil
+  eg-ec-co` (départ d'exil direct, premier engagement de chaque pôle), `--menu "La Promesse"` (ouvre ce menu),
+  `--assistant` (passe l'écran du mode).
+- La Promesse en jeu (28 novembre 2026) : menu « La Promesse » (`PromisePage` : texte signé `SignedText.Of`, qui pâlit
+  par paliers et dont chaque article a son encre ; jauge `GaugeBar` et seuil ; alignement par axe ; blessures ; nom du
+  peuple). Avertissement avant un acte qui trahit (`PromiseWarning.Check`, jamais bloquant, « Revenir » en avant) :
+  vote d'une loi (`LawCommissionPage`), vente et nationalisation (`BuildingsPage`), pose d'un bâtiment (`ConstructionPage`),
+  fondation (`Main.ChooseCommuneSite`). Trahison : message dans la barre du bas (`PromiseBetrayed`). Pacte déchiré :
+  `PactTornScreen` (terminer avec un bilan, continuer sans promesse, refonder : `PromiseWizard` sans lois puis
+  `OathScreen`) ; actions dans `PlayerDesk.Promise.cs`. Le menu La Promesse n'a pas encore d'icône.
 - Menus dans `game/scripts/MainMenu.cs` (Carte, Lois, Structure, Population, Communes, Recherche, Économie, Aide) ; une page
   par fichier (`*Page.cs`) ; `Coming(...)` = entrée grisée « à venir ». Lecture de la partie par `GameView`
   (`src/Demos.Application/GameView.cs`), **actions du joueur par `PlayerDesk`** (`game/scripts/PlayerDesk.cs`, qui

@@ -34,17 +34,23 @@ public partial class Main : Node
     // Vrai une fois la partie créée, après l'écran « Nouvelle partie ».
     private bool _started;
 
+    // Le contenu du jeu, gardé pour la refondation (les Promesses et les engagements du catalogue).
+    private JsonContentSource _content = null!;
+
     /// <summary>
-    /// D'abord l'écran « Nouvelle partie » (choix de la carte, 24 novembre 2026) ; la partie n'est créée qu'après ce choix.
+    /// D'abord l'écran « Nouvelle partie » (carte, mode, puis La Promesse et le serment ; 24 et 27 novembre 2026) ; la
+    /// partie n'est créée qu'après ces choix.
     /// </summary>
     public override void _Ready()
     {
-        // « -- --carte <nom> » en ligne de commande : la partie commence tout de suite sur cette carte (essais, captures).
+        // « -- --carte <nom> » en ligne de commande : la partie commence tout de suite sur cette carte (essais, captures) ;
+        // avec « --exil <promesse> » (« eg-ec-co »), en départ d'exil avec cette Promesse et son premier engagement par axe.
         var args = OS.GetCmdlineUserArgs();
         var asked = System.Array.IndexOf(args, "--carte");
         if (asked >= 0 && asked + 1 < args.Length)
         {
-            StartGame(args[asked + 1]);
+            var exile = TestExile(args);
+            StartGame(new NewGameChoice(args[asked + 1], exile, exile is null ? null : StartingLaws.None));
             return;
         }
 
@@ -53,19 +59,38 @@ public partial class Main : Node
         var screen = new NewGameScreen();
         screen.Init();
         layer.AddChild(screen);
-        screen.Started += mapName =>
+        // Essais : « --assistant » passe l'écran du mode, en mode avec La Promesse (captures).
+        if (System.Array.IndexOf(args, "--assistant") >= 0)
+            screen.CallDeferred(NewGameScreen.MethodName.SkipToPromise);
+        screen.Started += choice =>
         {
             layer.QueueFree();
-            StartGame(mapName);
+            StartGame(choice);
         };
     }
 
-    /// <summary>Crée la partie sur cette carte (la carte par défaut si null), puis l'écran de jeu.</summary>
-    private void StartGame(string? mapName)
+    /// <summary>Le départ d'exil des essais en ligne de commande (« --exil eg-ec-co »), ou null.</summary>
+    private static ExileStart? TestExile(string[] args)
     {
-        var content = new JsonContentSource(fileName => FileAccess.GetFileAsString($"res://data/{fileName}"),
-            fileName => FileAccess.GetFileAsBytes($"res://data/{fileName}"), mapName);
-        _simulation = PrototypeScenario.Create(content);
+        var asked = System.Array.IndexOf(args, "--exil");
+        if (asked < 0 || asked + 1 >= args.Length)
+            return null;
+        var content = new JsonContentSource(fileName => FileAccess.GetFileAsString($"res://data/{fileName}"));
+        var promise = content.LoadPromises().FirstOrDefault(p => p.Id == args[asked + 1]);
+        if (promise is null)
+            return null;
+        var catalogue = content.LoadEngagements();
+        var engagements = promise.Orientations.Select(pole => catalogue.First(e => e.Kept && e.Orientation == pole)).ToList();
+        return new ExileStart("Essai", promise, engagements);
+    }
+
+    /// <summary>Crée la partie (carte, départ, Promesse, lois de l'An I), puis l'écran de jeu.</summary>
+    private void StartGame(NewGameChoice choice)
+    {
+        _content = new JsonContentSource(fileName => FileAccess.GetFileAsString($"res://data/{fileName}"),
+            fileName => FileAccess.GetFileAsBytes($"res://data/{fileName}"), choice.MapName);
+        var content = _content;
+        _simulation = PrototypeScenario.Create(content, choice.Laws, choice.Exile);
 
         // Sous un CanvasLayer, l'interface se cale sur la fenêtre (sous un simple Node, elle n'aurait pas de taille).
         var interfaceLayer = new CanvasLayer();
@@ -104,6 +129,10 @@ public partial class Main : Node
         _yearStartTreasury = _view.TreasuryBalance;
         _yearStartResidents = _view.TotalResidents;
         _simulation.BuildingCompleted += building => _events.Add(EventText.BuildingCompleted(_view, building));
+        // La Promesse : une trahison dans la barre du bas ; le pacte déchiré met en pause et ouvre ses trois choix.
+        _simulation.PromiseBetrayed += (engagement, cause) =>
+            _events.Add($"La Promesse est trahie : « {engagement.Text} » ({cause}). L'encre de l'article pâlit.");
+        _simulation.PactTorn += ShowPactTorn;
         _simulation.CompaniesNationalizedByLaw += taken => _events.Add(EventText.NationalizedByLaw(_view, taken));
         _simulation.SeasonPassed += () => _events.Add(EventText.SeasonStarted(_view));
         _simulation.YearPassed += () =>
@@ -113,6 +142,87 @@ public partial class Main : Node
             _yearStartResidents = _view.TotalResidents;
         };
         _started = true;
+
+        // L'arrivée en exil : le jeu est en pause, la fenêtre dit ce que les exilés ont et ce qui leur manque.
+        if (choice.Exile is not null)
+        {
+            var arrival = new AcceptDialog
+            {
+                Theme = UiTheme.Create(),
+                Title = "Arrivée en exil",
+                OkButtonText = "Commencer",
+                DialogAutowrap = true,
+                DialogText = ArrivalText.Of(_view, PrototypeScenario.FirstCommuneId),
+                MinSize = new Vector2I(620, 0),
+            };
+            AddChild(arrival);
+            arrival.PopupCentered();
+        }
+
+        // Essais : « --menu "La Promesse" » ouvre ce menu dès le départ (captures).
+        var args = OS.GetCmdlineUserArgs();
+        var menu = System.Array.IndexOf(args, "--menu");
+        if (menu >= 0 && menu + 1 < args.Length)
+            _hud.Menu.OpenMenu(args[menu + 1]);
+    }
+
+    /// <summary>
+    /// Le pacte vient de se déchirer : pause, et les trois choix (terminer avec un bilan, continuer sans promesse,
+    /// refonder avec un nouveau serment).
+    /// </summary>
+    private void ShowPactTorn()
+    {
+        _paused = true;
+        _pendingDays = 0;
+        var layer = new CanvasLayer { Layer = 10 };
+        AddChild(layer);
+        var screen = new PactTornScreen(_view);
+        layer.AddChild(screen);
+        screen.Ended += () =>
+        {
+            var summary = new AcceptDialog
+            {
+                Theme = UiTheme.Create(),
+                Title = "Fin de la partie",
+                OkButtonText = "Nouvelle partie",
+                DialogAutowrap = true,
+                DialogText = $"Le pacte est déchiré en l'An {_view.Today.Year - 1899} de l'exil.\n\n"
+                    + $"Habitants : {_view.TotalResidents:N0}. Trésor : {_view.TreasuryBalance:N0}.",
+                MinSize = new Vector2I(480, 0),
+            };
+            layer.AddChild(summary);
+            summary.Confirmed += () => GetTree().ReloadCurrentScene();
+            summary.Canceled += () => GetTree().ReloadCurrentScene();
+            summary.PopupCentered();
+        };
+        screen.Continued += () =>
+        {
+            _hud.ShowMessage(_desk.ContinueWithoutPromise());
+            layer.QueueFree();
+        };
+        screen.Refounding += () =>
+        {
+            screen.Visible = false;
+            var wizard = new PromiseWizard(_content.LoadPromises(), _content.LoadEngagements(), _content.LoadLawCatalogue(),
+                withLaws: false, peopleName: _view.Promise()?.PeopleName ?? "");
+            layer.AddChild(wizard);
+            wizard.Cancelled += () =>
+            {
+                wizard.QueueFree();
+                screen.Visible = true;
+            };
+            wizard.Finished += chosen =>
+            {
+                wizard.QueueFree();
+                var oath = new OathScreen(chosen, []);
+                layer.AddChild(oath);
+                oath.Signed += signature =>
+                {
+                    _hud.ShowMessage(_desk.Refound(chosen.Promise, chosen.Engagements, signature));
+                    layer.QueueFree();
+                };
+            };
+        };
     }
 
     public override void _Process(double delta)
@@ -200,14 +310,15 @@ public partial class Main : Node
             payingCommuneId,
             0,
             _desk.CommuneSiteProblem,
-            position =>
+            // Avant de fonder : le jeu prévient si fonder trahit La Promesse (« aucune nouvelle terre »), sans l'interdire.
+            position => PromiseWarning.Check(this, _view.PromiseBreachesOfFounding(), "Fonder", "fonder une commune", () =>
             {
                 var answer = _desk.FoundCommune(name, payingCommuneId, pole, position);
                 if (answer.Id is { } communeId)
                     _hud.Map.AddCommune(communeId, name.Trim(),
                         new Demos.Domain.Map.MapCoordinates((int)(position.X / 16.6), (int)(position.Y / 16.0)));
                 _hud.ShowMessage(answer.Message);
-            },
+            }),
             Balance.Current.CommuneMinDistance));
     }
 }

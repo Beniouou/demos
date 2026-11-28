@@ -1,0 +1,443 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using Demos.Application;
+using Demos.Domain.Politics;
+using Demos.Domain.Population;
+using Godot;
+using Orientation = Demos.Domain.Politics.Orientation;
+
+namespace Demos.Game;
+
+/// <summary>Ce que le joueur a choisi dans <see cref="PromiseWizard"/> : son peuple, La Promesse, ses engagements, ses lois de l'An I.</summary>
+public sealed record PromiseChoice(
+    string PeopleName,
+    PromiseDefinition Promise,
+    IReadOnlyList<EngagementDefinition> Engagements,
+    IReadOnlyList<ScenarioLaw> Laws);
+
+/// <summary>
+/// Les écrans de La Promesse avant le serment (décidés et maquettés le 27 novembre 2026, canevas « Démos — début de
+/// partie et Promesse ») : le nom du peuple, La Promesse axe par axe (le nom suit les axes et se renomme), un engagement
+/// par axe avec sa difficulté, puis les trois lois de l'An I (l'acte fondateur), une loi qui romprait un engagement
+/// étant grisée avec la raison. Sert aussi à la refondation, sans les lois et sans redemander le nom du peuple.
+/// </summary>
+public partial class PromiseWizard : Control
+{
+    /// <summary>Le nombre de lois de l'An I (décidé le 27 novembre 2026, proposition).</summary>
+    public const int FoundingLawCount = 3;
+
+    private static readonly string[] StepNames = ["Mode", "Peuple", "Promesse", "Engagements", "Lois de l'An I", "Serment"];
+
+    private static readonly IdeologicalAxis[] Axes = [IdeologicalAxis.Hierarchy, IdeologicalAxis.Production, IdeologicalAxis.Property];
+
+    private static readonly Dictionary<IdeologicalAxis, (string Name, string Question)> AxisTexts = new()
+    {
+        [IdeologicalAxis.Hierarchy] = ("Hiérarchie", "les gens ont-ils les mêmes droits et les mêmes conditions ?"),
+        [IdeologicalAxis.Production] = ("Production", "faut-il produire plus, ou ménager la terre ?"),
+        [IdeologicalAxis.Property] = ("Propriété", "à qui appartiennent les moyens de produire, et qui les gère ?"),
+    };
+
+    // Le pôle de chaque rang au départ d'exil, sur les axes libres (le départ du bac à sable, décidé le 27 novembre 2026).
+    private static readonly (Rank Rank, string Name, Ideology Ideology)[] Ranks =
+    [
+        (Rank.Workers, "Ouvriers", new Ideology(Pole.A, Pole.A, Pole.A)),
+        (Rank.Intermediate, "Intermédiaires", new Ideology(Pole.A, Pole.A, Pole.B)),
+        (Rank.Executives, "Cadres", new Ideology(Pole.B, Pole.A, Pole.B)),
+    ];
+
+    /// <summary>Le joueur a fini : reste le serment.</summary>
+    public event Action<PromiseChoice>? Finished;
+
+    /// <summary>Le joueur revient avant le premier écran.</summary>
+    public event Action? Cancelled;
+
+    private readonly IReadOnlyList<PromiseDefinition> _promises = [];
+    private readonly IReadOnlyList<EngagementDefinition> _engagements = [];
+    private readonly LawCatalogue _laws = null!;
+    private readonly bool _withLaws;
+    private readonly bool _askPeople;
+
+    private readonly Dictionary<IdeologicalAxis, Pole?> _poles = Axes.ToDictionary(a => a, _ => (Pole?)null);
+    private readonly Dictionary<IdeologicalAxis, EngagementDefinition?> _chosenEngagements = [];
+    private readonly HashSet<string> _chosenLaws = [];
+    private string _peopleName = "";
+    private string? _renamed;
+    private int _step;
+    private VBoxContainer _body = null!;
+    private Control _stepsBar = null!;
+    private Button _next = null!;
+
+    // Godot recrée les nœuds C# par ce constructeur sans paramètre (rechargement des scripts).
+    public PromiseWizard() { }
+
+    /// <param name="withLaws">Vrai à la création de la partie (les lois de l'An I), faux pour une refondation.</param>
+    /// <param name="peopleName">Le nom du peuple déjà connu (refondation) : l'écran du peuple est alors passé.</param>
+    public PromiseWizard(
+        IReadOnlyList<PromiseDefinition> promises,
+        IReadOnlyList<EngagementDefinition> engagements,
+        LawCatalogue laws,
+        bool withLaws,
+        string? peopleName = null)
+    {
+        _promises = promises;
+        _engagements = engagements.Where(e => e.Kept).ToList();
+        _laws = laws;
+        _withLaws = withLaws;
+        _askPeople = peopleName is null;
+        _peopleName = peopleName ?? "";
+        _step = _askPeople ? 1 : 2;
+
+        Theme = UiTheme.Create();
+        SetAnchorsAndOffsetsPreset(LayoutPreset.FullRect);
+        AddChild(new ColorRect { Color = UiTheme.Background, AnchorRight = 1, AnchorBottom = 1 });
+        var margin = UiTheme.Margin(32);
+        margin.SetAnchorsAndOffsetsPreset(LayoutPreset.FullRect);
+        AddChild(margin);
+        var column = new VBoxContainer();
+        column.AddThemeConstantOverride("separation", 14);
+        margin.AddChild(column);
+
+        var header = new HBoxContainer();
+        header.AddThemeConstantOverride("separation", 24);
+        column.AddChild(header);
+        header.AddChild(UiTheme.Title(withLaws ? "Nouvelle partie" : "Refonder La Promesse"));
+        _stepsBar = new Control();
+        header.AddChild(_stepsBar);
+
+        var scroll = new ScrollContainer { SizeFlagsVertical = SizeFlags.ExpandFill, HorizontalScrollMode = ScrollContainer.ScrollMode.Disabled };
+        column.AddChild(scroll);
+        _body = new VBoxContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill };
+        _body.AddThemeConstantOverride("separation", 10);
+        scroll.AddChild(_body);
+
+        var buttons = new HBoxContainer();
+        column.AddChild(buttons);
+        var back = new Button { Text = "Retour", CustomMinimumSize = new Vector2(140, 0) };
+        back.Pressed += Back;
+        buttons.AddChild(back);
+        buttons.AddChild(new Control { SizeFlagsHorizontal = SizeFlags.ExpandFill });
+        _next = new Button { Text = "Suivant", CustomMinimumSize = new Vector2(160, 0) };
+        _next.Pressed += Forward;
+        buttons.AddChild(_next);
+
+        ShowStep();
+    }
+
+    /// <summary>La barre des étapes, l'étape en cours en couleur (aussi pour l'écran du mode).</summary>
+    public static HBoxContainer Steps(int current, bool withLaws = true)
+    {
+        var bar = new HBoxContainer();
+        bar.AddThemeConstantOverride("separation", 8);
+        for (var i = 0; i < StepNames.Length; i++)
+        {
+            if (!withLaws && (i == 0 || i == 4))
+                continue;
+            if (bar.GetChildCount() > 0)
+                bar.AddChild(UiTheme.Caption("›"));
+            var label = i == current ? new Label { Text = StepNames[i] } : UiTheme.Caption(StepNames[i]);
+            if (i == current)
+                label.AddThemeColorOverride("font_color", UiTheme.Accent);
+            bar.AddChild(label);
+        }
+
+        return bar;
+    }
+
+    /// <summary>La Promesse des pôles choisis, renommée si le joueur l'a fait ; null sans axe choisi.</summary>
+    private PromiseDefinition? CurrentPromise()
+    {
+        var poles = _poles.Where(p => p.Value is not null).Select(p => new Orientation(p.Key, p.Value!.Value)).ToList();
+        if (poles.Count == 0)
+            return null;
+        var promise = _promises.FirstOrDefault(p => p.Id == PromiseDefinition.IdOf(poles));
+        return promise is not null && !string.IsNullOrWhiteSpace(_renamed) ? promise with { Name = _renamed.Trim() } : promise;
+    }
+
+    private IReadOnlyList<EngagementDefinition> CurrentEngagements() =>
+        CurrentPromise() is { } promise
+            ? promise.Orientations.Select(p => _chosenEngagements.GetValueOrDefault(p.Axis) is { } e && e.Orientation == p ? e : null).OfType<EngagementDefinition>().ToList()
+            : [];
+
+    private void ShowStep()
+    {
+        foreach (var child in _body.GetChildren())
+            child.QueueFree();
+        var bar = Steps(_step, _withLaws);
+        var old = _stepsBar;
+        old.ReplaceBy(bar);
+        old.QueueFree();
+        _stepsBar = bar;
+
+        switch (_step)
+        {
+            case 1: BuildPeople(); break;
+            case 2: BuildPromise(); break;
+            case 3: BuildEngagements(); break;
+            default: BuildLaws(); break;
+        }
+
+        _next.Text = _step == LastStep ? "Prêter serment" : "Suivant";
+        UpdateNext();
+    }
+
+    private int LastStep => _withLaws ? 4 : 3;
+
+    private void UpdateNext() => _next.Disabled = _step switch
+    {
+        1 => string.IsNullOrWhiteSpace(_peopleName),
+        2 => CurrentPromise() is null,
+        3 => CurrentPromise() is not { } promise || CurrentEngagements().Count != promise.Orientations.Count,
+        _ => _chosenLaws.Count > FoundingLawCount,
+    };
+
+    private void Back()
+    {
+        if (_step <= (_askPeople ? 1 : 2))
+        {
+            Cancelled?.Invoke();
+            return;
+        }
+
+        _step--;
+        ShowStep();
+    }
+
+    private void Forward()
+    {
+        if (_step < LastStep)
+        {
+            _step++;
+            ShowStep();
+            return;
+        }
+
+        if (CurrentPromise() is { } promise)
+            Finished?.Invoke(new PromiseChoice(_peopleName.Trim(), promise, CurrentEngagements(),
+                _chosenLaws.Select(id => new ScenarioLaw(id)).ToList()));
+    }
+
+    // ---- 2. Le peuple ----------------------------------------------------------------------------------------------
+
+    private void BuildPeople()
+    {
+        _body.AddChild(Big("Qui sont les exilés ?"));
+        _body.AddChild(UiTheme.Section("Nom du peuple"));
+        var name = new LineEdit { Text = _peopleName, PlaceholderText = "le nom de votre peuple", CustomMinimumSize = new Vector2(420, 0), SizeFlagsHorizontal = SizeFlags.ShrinkBegin };
+        name.AddThemeFontSizeOverride("font_size", UiTheme.TitleSize);
+        name.TextChanged += text =>
+        {
+            _peopleName = text;
+            UpdateNext();
+        };
+        name.TextSubmitted += _ =>
+        {
+            if (!_next.Disabled)
+                Forward();
+        };
+        _body.AddChild(name);
+        name.CallDeferred(Control.MethodName.GrabFocus);
+        _body.AddChild(Wrapped("Il paraît dans le serment, les titres et l'épilogue. Il se change plus tard dans la page La Promesse."));
+        _body.AddChild(UiTheme.Section("Ce peuple, à l'arrivée"));
+        _body.AddChild(new Label { Text = "900 ouvriers  ·  90 professions intermédiaires  ·  10 cadres" });
+        _body.AddChild(Wrapped("Leur idéologie se fixe à l'écran suivant : tous partagent La Promesse."));
+    }
+
+    // ---- 3. La Promesse --------------------------------------------------------------------------------------------
+
+    private void BuildPromise()
+    {
+        var row = new HBoxContainer();
+        row.AddThemeConstantOverride("separation", 32);
+        _body.AddChild(row);
+        var left = new VBoxContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill };
+        left.AddThemeConstantOverride("separation", 12);
+        row.AddChild(left);
+        var right = new VBoxContainer { CustomMinimumSize = new Vector2(420, 0) };
+        right.AddThemeConstantOverride("separation", 10);
+        row.AddChild(right);
+
+        left.AddChild(UiTheme.Section("Ce que promettent les exilés, axe par axe"));
+        foreach (var axis in Axes)
+        {
+            var (axisName, question) = AxisTexts[axis];
+            left.AddChild(new Label { Text = $"{axisName}  ·  {question}" });
+            var choices = new HBoxContainer();
+            choices.AddThemeConstantOverride("separation", 8);
+            left.AddChild(choices);
+            var group = new ButtonGroup();
+            foreach (var pole in new Pole?[] { Pole.A, null, Pole.B })
+            {
+                var text = pole is { } p ? WorldText.PoleName(new Orientation(axis, p)) : "Libre";
+                var button = new Button { Text = text, ToggleMode = true, ButtonGroup = group, SizeFlagsHorizontal = SizeFlags.ExpandFill, ButtonPressed = _poles[axis] == pole };
+                if (pole is { } colored)
+                    button.AddThemeColorOverride("font_pressed_color", UiTheme.PoleColor(new Orientation(axis, colored)));
+                button.Pressed += () =>
+                {
+                    _poles[axis] = pole;
+                    _renamed = null;
+                    ShowStep();
+                };
+                choices.AddChild(button);
+            }
+        }
+
+        var promise = CurrentPromise();
+        left.AddChild(UiTheme.Section("Vos exilés à l'arrivée"));
+        left.AddChild(Wrapped(string.Join("   ·   ", Ranks.Select(r => $"{r.Name} {IdeologyText(r.Ideology, promise)}"))));
+        left.AddChild(Wrapped("Sur les axes de La Promesse, tous sont au pôle promis ; sur un axe libre, chaque rang garde son pôle."));
+
+        if (promise is null)
+        {
+            right.AddChild(Wrapped("Choisissez un pôle sur un axe au moins."));
+            return;
+        }
+
+        right.AddChild(UiTheme.Section("La Promesse"));
+        var name = new LineEdit { Text = promise.Name };
+        name.AddThemeFontSizeOverride("font_size", UiTheme.TitleSize);
+        name.TooltipText = "Le nom suit les axes choisis ; vous pouvez le changer.";
+        name.TextChanged += text => _renamed = text;
+        right.AddChild(name);
+        var oath = PromiseOath.Of(promise, string.IsNullOrWhiteSpace(_peopleName) ? "…" : _peopleName.Trim());
+        right.AddChild(SignedText.Paper($"« {oath.First} »\n\n{oath.Middle}", 400));
+        var axes = promise.Orientations.Count;
+        right.AddChild(Wrapped($"{axes} axe{(axes > 1 ? "s" : "")} : difficulté {(axes switch { 1 => "faible", 2 => "moyenne", _ => "forte" })}. "
+            + "Moins d'axes, c'est une promesse plus facile à tenir. La jauge suit l'axe le plus faible."));
+    }
+
+    /// <summary>« EG · EC · CO », les pôles de La Promesse en premier, comme ils seront à l'arrivée.</summary>
+    private static string IdeologyText(Ideology ideology, PromiseDefinition? promise)
+    {
+        if (promise is not null)
+            foreach (var pole in promise.Orientations)
+                ideology = ideology.With(pole.Axis, pole.Pole);
+        return string.Join(" · ", Axes.Select(a => new Orientation(a, ideology[a]).Code));
+    }
+
+    // ---- 4. Les engagements ----------------------------------------------------------------------------------------
+
+    private void BuildEngagements()
+    {
+        if (CurrentPromise() is not { } promise)
+            return;
+
+        _body.AddChild(Wrapped("Un engagement par axe de La Promesse. Il porte sur un acte : le jeu vous préviendra avant, sans "
+            + "jamais l'interdire. Le rompre, c'est trahir."));
+        var columns = new HBoxContainer();
+        columns.AddThemeConstantOverride("separation", 28);
+        _body.AddChild(columns);
+        foreach (var pole in promise.Orientations)
+        {
+            var column = new VBoxContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill };
+            column.AddThemeConstantOverride("separation", 6);
+            columns.AddChild(column);
+            var title = new Label { Text = WorldText.PoleName(pole) };
+            title.AddThemeColorOverride("font_color", UiTheme.PoleColor(pole));
+            title.AddThemeFontSizeOverride("font_size", UiTheme.TitleSize);
+            column.AddChild(title);
+            var group = new ButtonGroup();
+            foreach (var kind in new[] { EngagementKind.Principle, EngagementKind.Concrete })
+            {
+                column.AddChild(UiTheme.Section(kind == EngagementKind.Principle ? "De principe" : "Concrets"));
+                foreach (var engagement in _engagements.Where(e => e.Orientation == pole && e.Kind == kind))
+                {
+                    var button = new Button
+                    {
+                        Text = $"{engagement.Text}   {Dots(engagement.Difficulty)}",
+                        ToggleMode = true,
+                        ButtonGroup = group,
+                        Alignment = HorizontalAlignment.Left,
+                        ButtonPressed = _chosenEngagements.GetValueOrDefault(pole.Axis)?.Id == engagement.Id,
+                        TooltipText = $"Rompu si : {engagement.Breach}",
+                    };
+                    button.Pressed += () =>
+                    {
+                        _chosenEngagements[pole.Axis] = engagement;
+                        // Une loi de l'An I qui romprait le nouvel engagement n'est plus permise.
+                        _chosenLaws.RemoveWhere(id => Breaches(id).Count > 0);
+                        ShowStep();
+                    };
+                    column.AddChild(button);
+                    if (button.ButtonPressed)
+                        column.AddChild(Wrapped($"Rompu si : {engagement.Breach}"));
+                }
+            }
+        }
+
+        var chosen = CurrentEngagements();
+        _body.AddChild(Wrapped(chosen.Count == promise.Orientations.Count
+            ? $"Difficulté de La Promesse : {chosen.Sum(e => e.Difficulty)} sur {3 * chosen.Count}  (● facile à tenir, ●●● exigeant)."
+            : "Choisissez un engagement sur chaque axe."));
+    }
+
+    private static string Dots(int difficulty) => new string('●', Math.Clamp(difficulty, 0, 3)) + new string('○', 3 - Math.Clamp(difficulty, 0, 3));
+
+    // ---- 5. Les lois de l'An I -------------------------------------------------------------------------------------
+
+    private IReadOnlyList<EngagementDefinition> Breaches(string templateId) =>
+        PrototypeScenario.FoundingLawBreaches(_laws, new ScenarioLaw(templateId), CurrentEngagements());
+
+    private void BuildLaws()
+    {
+        var header = new HBoxContainer();
+        _body.AddChild(header);
+        header.AddChild(Wrapped($"L'acte fondateur : {FoundingLawCount} lois de l'État, votées sans coût, le jour du serment. "
+            + "Une loi qui romprait un engagement de La Promesse est grisée."));
+        header.AddChild(new Label { Text = $"{_chosenLaws.Count} sur {FoundingLawCount}", SizeFlagsHorizontal = SizeFlags.ShrinkEnd });
+
+        var grid = new GridContainer { Columns = 3 };
+        grid.AddThemeConstantOverride("h_separation", 10);
+        grid.AddThemeConstantOverride("v_separation", 10);
+        _body.AddChild(grid);
+        foreach (var template in _laws.Templates)
+        {
+            var broken = Breaches(template.Id);
+            var domain = _laws.Domains.FirstOrDefault(d => d.Id == template.Domain)?.Name ?? template.Domain;
+            var box = new VBoxContainer { CustomMinimumSize = new Vector2(330, 0) };
+            var check = new CheckBox
+            {
+                Text = template.Name,
+                ButtonPressed = _chosenLaws.Contains(template.Id),
+                Disabled = broken.Count > 0 || (!_chosenLaws.Contains(template.Id) && _chosenLaws.Count >= FoundingLawCount),
+                TooltipText = template.Description ?? "",
+            };
+            check.Toggled += on =>
+            {
+                if (on)
+                    _chosenLaws.Add(template.Id);
+                else
+                    _chosenLaws.Remove(template.Id);
+                ShowStep();
+            };
+            box.AddChild(check);
+            var note = broken.Count > 0 ? UiTheme.Caption($"Rompt l'engagement « {broken[0].Text} »") : UiTheme.Caption(domain);
+            if (broken.Count > 0)
+                note.AddThemeColorOverride("font_color", UiTheme.Accent);
+            note.AutowrapMode = TextServer.AutowrapMode.WordSmart;
+            box.AddChild(note);
+            grid.AddChild(box);
+        }
+
+        if (!_chosenLaws.Contains("loi-extension"))
+            _body.AddChild(Wrapped("Sans loi d'extension : pas de nouvelle commune, ni de bâtiment d'extraction au-delà de "
+                + "8 km. Elle pourra être votée en jeu, à crédit de légitimité."));
+    }
+
+    // ---- Petits éléments -------------------------------------------------------------------------------------------
+
+    private static Label Big(string text)
+    {
+        var label = new Label { Text = text };
+        label.AddThemeFontSizeOverride("font_size", 26);
+        return label;
+    }
+
+    private static Label Wrapped(string text)
+    {
+        var label = UiTheme.Caption(text);
+        label.AutowrapMode = TextServer.AutowrapMode.WordSmart;
+        label.SizeFlagsHorizontal = SizeFlags.ExpandFill;
+        return label;
+    }
+}

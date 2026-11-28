@@ -245,7 +245,15 @@ public partial class BuildingsPage : HBoxContainer, IMenuPage
         _salePrice = new SpinBox { MinValue = 0, Step = 100, SizeFlagsHorizontal = SizeFlags.ExpandFill };
         priceRow.AddChild(_salePrice);
         _sell = Action("Vendre", id =>
-            _buyer.Selected >= 0 && _buyer.Selected < _buyerIds.Count ? _desk.Sell(id, _buyerIds[_buyer.Selected], _salePrice.Value) : null);
+        {
+            if (_buyer.Selected < 0 || _buyer.Selected >= _buyerIds.Count)
+                return null;
+            var buyer = _buyerIds[_buyer.Selected];
+            var price = _salePrice.Value;
+            // Avant de vendre : le jeu prévient si la vente trahit La Promesse, sans l'interdire.
+            PromiseWarning.Check(this, _view.PromiseBreachesOfSale(id), "Vendre", "vendre ce bâtiment", () => Report(_desk.Sell(id, buyer, price)));
+            return null;
+        });
         priceRow.AddChild(_sell);
     }
 
@@ -254,11 +262,20 @@ public partial class BuildingsPage : HBoxContainer, IMenuPage
         _nationalizationSection = Section(settings, "Nationalisation");
         _nationalizationNote = Note(_nationalizationSection);
         var row = Row(_nationalizationSection);
-        var buyout = Action("Racheter", id => _desk.Nationalize(id, expropriate: false));
-        var expropriate = Action("Exproprier", id => _desk.Nationalize(id, expropriate: true));
+        var buyout = Action("Racheter", id => Nationalize(id, expropriate: false));
+        var expropriate = Action("Exproprier", id => Nationalize(id, expropriate: true));
         buyout.SizeFlagsHorizontal = expropriate.SizeFlagsHorizontal = SizeFlags.ExpandFill;
         row.AddChild(buyout);
         row.AddChild(expropriate);
+    }
+
+    /// <summary>Nationaliser, après l'avertissement si l'acte trahit La Promesse.</summary>
+    private string? Nationalize(string id, bool expropriate)
+    {
+        var mode = expropriate ? Demos.Domain.Economy.NationalizationMode.Expropriation : Demos.Domain.Economy.NationalizationMode.Buyout;
+        PromiseWarning.Check(this, _view.PromiseBreachesOfNationalization(mode), expropriate ? "Exproprier" : "Racheter",
+            expropriate ? "exproprier ce bâtiment" : "racheter ce bâtiment", () => Report(_desk.Nationalize(id, expropriate)));
+        return null;
     }
 
     /// <summary>Un bouton de décision sur le bâtiment choisi : il appelle le bureau du joueur, puis affiche le résultat.</summary>

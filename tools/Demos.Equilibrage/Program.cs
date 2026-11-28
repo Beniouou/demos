@@ -37,8 +37,12 @@ switch (command)
             : SimulationReport.DefaultSecondCommuneDistance;
         SimulationReport.Write(content, years, secondCommuneDistance, paths.Report);
         return 0;
+    case "exil":
+        // Le départ d'exil, sans rien faire, mois par mois (décidé le 27 novembre 2026).
+        ExileReport.Write(content, args.Skip(1).Select(a => int.TryParse(a, out var y) ? y : 0).FirstOrDefault(y => y > 0, 1));
+        return 0;
     default:
-        Console.WriteLine("Commandes : generer, appliquer, simuler [années] [commune[=km]].");
+        Console.WriteLine("Commandes : generer, appliquer, simuler [années] [commune[=km]], exil [années].");
         return 1;
 }
 
@@ -850,7 +854,8 @@ internal sealed class Book(XLWorkbook workbook, World world, BalanceSettings bal
     public void WritePromises(IReadOnlyList<PromiseDefinition> promises)
     {
         var sheet = workbook.AddWorksheet("Promesses");
-        Header(sheet, 1, "Nom", "Axes", "Hiérarchie", "Production", "Propriété", "Clé (ne pas modifier)");
+        Header(sheet, 1, "Nom", "Axes", "Hiérarchie", "Production", "Propriété", "Clé (ne pas modifier)",
+            "Première phrase du serment (après « Nous, peuple de X, »)");
         var axes = new[] { IdeologicalAxis.Hierarchy, IdeologicalAxis.Production, IdeologicalAxis.Property };
         var row = 2;
         foreach (var promise in promises.OrderBy(p => p.Poles.Count))
@@ -860,11 +865,13 @@ internal sealed class Book(XLWorkbook workbook, World world, BalanceSettings bal
             for (var a = 0; a < axes.Length; a++)
                 sheet.Cell(row, 3 + a).Value = promise.PoleOn(axes[a]) is { } pole ? PoleName(pole.Code) : "libre";
             sheet.Cell(row, 6).Value = promise.Id;
+            Input(sheet.Cell(row, 7), promise.Opening ?? "");
             row++;
         }
 
         Finish(sheet, 1);
         sheet.Column(1).Width = 32;
+        sheet.Column(7).Width = 70;
     }
 
     /// <summary>

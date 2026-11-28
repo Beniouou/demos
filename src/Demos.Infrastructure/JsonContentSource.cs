@@ -112,6 +112,19 @@ public sealed class JsonContentSource(Func<string, string> readText, Func<string
         JsonSerializer.Deserialize<ScenarioDefinition>(readText("partie-depart.json"), Options)
         ?? throw new InvalidDataException("partie-depart.json est vide.");
 
+    /// <summary>La partie de départ d'exil (partie-exil.json) ; nulle si le fichier manque.</summary>
+    public ScenarioDefinition? LoadExileScenario()
+    {
+        try
+        {
+            return JsonSerializer.Deserialize<ScenarioDefinition>(readText("partie-exil.json"), Options);
+        }
+        catch (FileNotFoundException)
+        {
+            return null;
+        }
+    }
+
     /// <summary>La carte géographique vectorielle (carte.json) ; nulle si absente ou invalide.</summary>
     public VectorMapDefinition? LoadMap()
     {

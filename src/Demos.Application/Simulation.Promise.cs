@@ -20,13 +20,24 @@ public sealed partial class Simulation
     /// Action du joueur : choisir La Promesse et ses engagements (un par axe), en début de partie. Renvoie ce qui ne va pas,
     /// ou null si c'est fait.
     /// </summary>
-    public string? ChoosePromise(PromiseDefinition promise, IReadOnlyList<EngagementDefinition> engagements)
+    public string? ChoosePromise(PromiseDefinition promise, IReadOnlyList<EngagementDefinition> engagements, string peopleName = "")
     {
         if (PromiseState.ProblemWith(promise, engagements) is { } problem)
             return problem;
 
         World.PromiseState = new PromiseState(promise, engagements, founded: Clock.Today);
+        World.PromiseState.NamePeople(peopleName);
         return null;
+    }
+
+    /// <summary>Action du joueur : renommer son peuple (en jeu, depuis la page La Promesse).</summary>
+    public void NamePeople(string name) => World.PromiseState?.NamePeople(name);
+
+    /// <summary>La signature tracée au serment (création de la partie, refondation), redessinée sous le texte signé.</summary>
+    public void SignPromise(IReadOnlyList<IReadOnlyList<Demos.Domain.Map.Point2D>> signature)
+    {
+        if (World.PromiseState is { } state)
+            state.Signature = signature;
     }
 
     /// <summary>La part de la population qui vit dans une commune dont la charte va contre un pôle de La Promesse.</summary>
@@ -65,11 +76,50 @@ public sealed partial class Simulation
         if (World.PromiseState is not { Torn: false } state)
             return;
 
-        var movements = LawCost.MovementsOf(World.LawBook, before, draft.Kind == LawChangeKind.Repeal ? null : draft.Law);
         var cause = $"{(draft.Kind switch { LawChangeKind.Enact => "vote", LawChangeKind.Amend => "changement", _ => "abrogation" })} de la loi « {draft.Law.Name} »";
-        foreach (var engagement in state.Engagements.Where(e => movements.Any(m => e.IsBrokenBy(m, draft.Kind, draft.Law.Domain))))
+        foreach (var engagement in EngagementsBrokenBy(World.LawBook, state.Engagements, draft, before))
             Betray(state, engagement, cause);
     }
+
+    /// <summary>Les engagements qu'un changement de loi romprait, d'après les briques qui bougent.</summary>
+    public static IReadOnlyList<EngagementDefinition> EngagementsBrokenBy(
+        LawBook book, IEnumerable<EngagementDefinition> engagements, LawDraft draft, Law? before)
+    {
+        var movements = LawCost.MovementsOf(book, before, draft.Kind == LawChangeKind.Repeal ? null : draft.Law);
+        return engagements.Where(e => movements.Any(m => e.IsBrokenBy(m, draft.Kind, draft.Law.Domain))).ToList();
+    }
+
+    /// <summary>
+    /// Avant un vote (décidé le 21 novembre 2026, jamais bloquant) : les engagements de La Promesse que ce brouillon
+    /// romprait s'il entrait en vigueur avec les lois d'aujourd'hui ; vide sans Promesse ou après un pacte déchiré.
+    /// </summary>
+    public IReadOnlyList<EngagementDefinition> PromiseBreachesOfDraft(string draftId) =>
+        World.PromiseState is { Torn: false } state && World.LawCommission.DraftOf(draftId) is { } draft
+            ? EngagementsBrokenBy(World.LawBook, state.Engagements, draft, World.Laws.FirstOrDefault(l => l.Id == draft.Law.Id))
+            : [];
+
+    /// <summary>Avant un acte hors des lois : les engagements qu'il romprait ; vide sans Promesse ou après un pacte déchiré.</summary>
+    public IReadOnlyList<EngagementDefinition> PromiseBreachesOfAct(EngagementAct act, string? need = null, string? typeId = null) =>
+        World.PromiseState is { Torn: false } state ? state.Engagements.Where(e => e.IsBrokenBy(act, need, typeId)).ToList() : [];
+
+    /// <summary>Avant de vendre un bâtiment : les engagements que la vente romprait.</summary>
+    public IReadOnlyList<EngagementDefinition> PromiseBreachesOfSale(string buildingId) =>
+        World.Structures.TryGetValue(buildingId, out var building)
+            ? PromiseBreachesOfAct(EngagementAct.Sale, World.Products.FirstOrDefault(p => p.Id == building.Production?.ProductId)?.Need?.Id)
+            : [];
+
+    /// <summary>Avant de nationaliser un bâtiment, par rachat ou par expropriation.</summary>
+    public IReadOnlyList<EngagementDefinition> PromiseBreachesOfNationalization(NationalizationMode mode) =>
+        PromiseBreachesOfAct(mode == NationalizationMode.Expropriation ? EngagementAct.Expropriation : EngagementAct.Nationalization);
+
+    /// <summary>Avant de fonder une commune.</summary>
+    public IReadOnlyList<EngagementDefinition> PromiseBreachesOfFounding() => PromiseBreachesOfAct(EngagementAct.Founding);
+
+    /// <summary>Avant de poser un bâtiment : l'extraction au-delà du ressort de la commune peut rompre un engagement.</summary>
+    public IReadOnlyList<EngagementDefinition> PromiseBreachesOfConstruction(string typeId, string? productId, string communeId, Demos.Domain.Map.Point2D? position) =>
+        position is { } far && World.NeedsExtractionSite(typeId, productId) && IsBeyondCommune(communeId, far)
+            ? PromiseBreachesOfAct(EngagementAct.FarExtraction, typeId: typeId)
+            : [];
 
     /// <summary>Une trahison : la blessure de la jauge, et la méfiance des classes attachées au pôle trahi.</summary>
     private void Betray(PromiseState state, EngagementDefinition engagement, string cause)
@@ -113,7 +163,9 @@ public sealed partial class Simulation
         var settings = Balance.Current;
         foreach (var socialClass in World.Classes)
             socialClass.Distrust += settings.RefoundingAdhesionLoss;
+        var peopleName = World.PromiseState.PeopleName;
         World.PromiseState = new PromiseState(promise, engagements, settings.RefoundingScar, Clock.Today);
+        World.PromiseState.NamePeople(peopleName);
         return null;
     }
 }

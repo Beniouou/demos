@@ -1,0 +1,28 @@
+{
+  "startingTreasury": 5000,
+  "heatingFuel": "bois",
+  "communes": [
+    { "id": "commune-1", "name": "Camp des exilés" }
+  ],
+  "buildings": [
+    { "id": "camp-de-base-1", "type": "camp-de-base", "commune": "commune-1" },
+    { "id": "puits", "type": "puits", "commune": "commune-1" },
+    { "id": "ferme", "type": "ferme", "commune": "commune-1", "product": "ble", "jobs": 300 },
+    { "id": "moulin", "type": "atelier", "commune": "commune-1", "product": "farine", "jobs": 40 },
+    { "id": "boulangerie", "type": "atelier", "commune": "commune-1", "product": "pain", "jobs": 40 },
+    { "id": "camp-forestier", "type": "camp-forestier", "commune": "commune-1", "jobs": 100 },
+    { "id": "grenier", "type": "grenier", "commune": "commune-1" },
+    { "id": "abris", "type": "logements", "commune": "commune-1", "housingPlaces": 700, "dailyRent": 0 }
+  ],
+  "classes": [
+    { "id": "ouvriers", "name": "Ouvriers communistes", "rank": "Workers", "hierarchy": "A", "production": "A", "property": "A", "population": 900, "wealth": 9000, "commune": "commune-1" },
+    { "id": "intermediaires", "name": "Professions intermédiaires libertaires", "rank": "Intermediate", "hierarchy": "A", "production": "A", "property": "B", "population": 90, "wealth": 5400, "commune": "commune-1" },
+    { "id": "cadres", "name": "Cadres capitalistes", "rank": "Executives", "hierarchy": "B", "production": "A", "property": "B", "population": 10, "wealth": 4000, "commune": "commune-1" }
+  ],
+  "provisions": [
+    { "product": "farine", "days": 5 }
+  ],
+  "carts": 10,
+  "toolShare": 0.5,
+  "possessionShare": 0.5
+}

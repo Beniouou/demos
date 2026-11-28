@@ -19,16 +19,16 @@ public static class Consumption
 
     /// <summary>
     /// Donne à chaque groupe sa possession visée de chaque besoin durable, en objets du produit qui dure le plus
-    /// longtemps parmi ceux qui le couvrent (début de partie : chacun commence équipé).
+    /// longtemps parmi ceux qui le couvrent (début de partie : chacun commence équipé ; au départ d'exil, une part seulement).
     /// </summary>
-    public static void EquipFully(IEnumerable<SocialClass> classes, IReadOnlyList<ProductDefinition> products)
+    public static void EquipFully(IEnumerable<SocialClass> classes, IReadOnlyList<ProductDefinition> products, double share = 1)
     {
         foreach (var socialClass in classes)
         {
             foreach (var (need, perPerson) in Balance.Current.PossessionByRank.GetValueOrDefault(socialClass.Rank) ?? [])
             {
                 if (products.Where(p => p.Need == need && p.IsDurable).OrderByDescending(p => p.UsageDays).FirstOrDefault() is { } product)
-                    socialClass.Possessions.Add(product.Id, socialClass.Population * perPerson);
+                    socialClass.Possessions.Add(product.Id, socialClass.Population * perPerson * share);
             }
         }
     }

@@ -19,22 +19,46 @@ public static class PrototypeScenario
     public const string StateId = "etat";
 
     /// <param name="startingLaws">Les lois de départ : celles du départ préréglé si rien n'est donné.</param>
-    public static Simulation Create(IContentSource content, StartingLaws? startingLaws = null)
+    /// <param name="exile">
+    /// Le départ d'exil (décidé le 27 novembre 2026) : la partie de partie-exil.json, sur une terre d'exil tirée au
+    /// hasard, avec La Promesse si elle est donnée ; null pour le départ préréglé (départ riche du bac à sable).
+    /// </param>
+    public static Simulation Create(IContentSource content, StartingLaws? startingLaws = null, ExileStart? exile = null)
     {
         // Les réglages d'équilibrage d'abord : le catalogue, les prix et le monde en dépendent.
         Balance.Current = content.LoadBalance();
 
         var types = content.LoadBuildingTypes().ToDictionary(t => t.Id);
-        var scenario = content.LoadScenario();
+        var scenario = exile is null
+            ? content.LoadScenario()
+            : content.LoadExileScenario() ?? throw new InvalidDataException("partie-exil.json manque : pas de départ d'exil.");
+        var map = content.LoadMap();
+        // La terre d'exil est tirée au hasard parmi celles de la carte : on ne choisit pas où l'on échoue. Une carte sans
+        // terre d'exil garde sa commune de base.
+        var exileSite = exile is not null && map?.AllExileSites is { Count: > 0 } sites ? sites[new Random(exile.Seed).Next(sites.Count)] : null;
 
         // La capitale (chef-lieu de l'État) est la première commune de la partie de départ.
-        var structures = new List<Structure> { new(StateId, "État", StructureKind.PoliticalEntity, null, SeatId: scenario.Communes.FirstOrDefault()?.Id) };
-        structures.AddRange(scenario.Communes.Select(c => new Structure(c.Id, c.Name, StructureKind.PoliticalEntity, StateId)));
+        var firstCommuneId = scenario.Communes.FirstOrDefault()?.Id;
+        var structures = new List<Structure> { new(StateId, "État", StructureKind.PoliticalEntity, null, SeatId: firstCommuneId) };
+        structures.AddRange(scenario.Communes.Select(c => new Structure(
+            c.Id, exileSite is not null && c.Id == firstCommuneId ? exileSite.Name : c.Name, StructureKind.PoliticalEntity, StateId)));
         structures.AddRange(scenario.Buildings.Select(b => BuildingOf(b, types, scenario.HeatingFuel)));
 
         var classes = scenario.Classes.Select(c =>
         {
-            var socialClass = new SocialClass(c.Id, c.Name, c.Rank, new Ideology(c.Hierarchy, c.Production, c.Property), c.Population)
+            var ideology = new Ideology(c.Hierarchy, c.Production, c.Property);
+            var (id, name) = (c.Id, c.Name);
+            if (exile?.Promise is { } promise)
+            {
+                // Au départ, tous les exilés partagent La Promesse : sur ses axes, chacun est au pôle promis ; sur les axes
+                // libres, chaque rang garde son pôle (décidé le 27 novembre 2026). Le nom suit l'idéologie.
+                foreach (var pole in promise.Orientations)
+                    ideology = ideology.With(pole.Axis, pole.Pole);
+                var named = ClassTransitions.Create(c.Rank, ideology, c.Commune);
+                (id, name) = (named.Id, named.Name);
+            }
+
+            var socialClass = new SocialClass(id, name, c.Rank, ideology, c.Population)
             {
                 Wealth = c.Wealth,
             };
@@ -57,10 +81,10 @@ public static class PrototypeScenario
             world.FuelStockOf(building).Add(building.HeatingProductId ?? Energy.DefaultHeating, Energy.FuelReserveOf(building));
 
         // Chaque groupe commence avec sa possession visée d'objets durables (vêtements, meubles ; décidé le 20 novembre 2026).
-        Consumption.EquipFully(world.Classes, world.Products);
+        Consumption.EquipFully(world.Classes, world.Products, scenario.PossessionShare);
         // Chaque bâtiment de départ qui a une recette reçoit son stock d'outils visé au complet.
         foreach (var building in world.Structures.Values.Where(s => Tools.TargetOf(s) > 0))
-            Tools.Equip(building, world.ToolStockOf(building));
+            Tools.Equip(building, world.ToolStockOf(building), scenario.ToolShare);
 
         // Chaque entreprise privée ou coopérative part avec sa réserve (30 jours de salaires et d'énergie), prise à ses
         // propriétaires.
@@ -74,11 +98,12 @@ public static class PrototypeScenario
             world.CompanyFundOf(building).Deposit(reserve);
         }
 
-        var map = content.LoadMap();
         if (map is not null)
         {
             foreach (var commune in map.AllCommunes)
                 world.SetCommunePosition(commune.Id, commune.Position);
+            if (exileSite is not null && firstCommuneId is not null)
+                world.SetCommunePosition(firstCommuneId, exileSite.Position);
             world.SetMapZones([.. map.AllBiomes, .. map.AllResourceZones]);
             // Les lacs sont de l'eau pour la fondation et les routes (24 novembre 2026).
             var relief = content.LoadRelief();
@@ -91,24 +116,73 @@ public static class PrototypeScenario
         // Les communes de départ reçoivent la même réserve de chantier qu'une commune fondée en cours de partie.
         foreach (var commune in world.Communes)
             simulation.GiveFoundingMaterials(commune.Id);
+        if (firstCommuneId is not null)
+            GiveProvisions(world, firstCommuneId, scenario);
 
-        var chosen = (startingLaws ?? StartingLaws.Preset) switch
+        if (exile?.Promise is { } chosen
+            && simulation.ChoosePromise(chosen, exile.Engagements, exile.PeopleName) is { } promiseProblem)
+            throw new InvalidDataException($"La Promesse choisie ne va pas : {promiseProblem}.");
+        if (world.PromiseState is { } sworn && exile?.Signature is { } signature)
+            sworn.Signature = signature;
+
+        var startLaws = (startingLaws ?? StartingLaws.Preset) switch
         {
             { Mode: StartingLawsMode.Preset } => scenario.PresetLaws ?? [],
             { Mode: StartingLawsMode.Chosen, Chosen: { } laws } => laws,
             _ => [],
         };
-        foreach (var law in chosen)
+        foreach (var law in startLaws)
         {
-            if (world.LawCatalogue.TemplateOf(law.Template) is not { } template
-                || !simulation.EnactAtStart(template.ToLaw(world.LawCommission.NewId("loi"), law.Level)))
+            if (world.LawCatalogue.TemplateOf(law.Template) is not { } template)
+                throw new InvalidDataException($"Loi de départ impossible : « {law.Template} ».");
+            // Une loi de l'An I qui romprait un engagement est refusée (grisée à l'écran) : La Promesse et les lois
+            // fondatrices sont signées le même jour (décidé le 27 novembre 2026).
+            if (world.PromiseState is { } promiseState
+                && FoundingLawBreaches(world.LawCatalogue, law, promiseState.Engagements) is [var broken, ..])
+                throw new InvalidDataException($"La loi de départ « {template.Name} » rompt l'engagement « {broken.Text} ».");
+            if (!simulation.EnactAtStart(template.ToLaw(world.LawCommission.NewId("loi"), law.Level)))
                 throw new InvalidDataException($"Loi de départ impossible : « {law.Template} ».");
         }
+
+        if (world.PromiseState is { } signed)
+            signed.FoundingLaws = startLaws.Select(l => world.LawCatalogue.TemplateOf(l.Template)!.Name).ToList();
 
         // Sans loi qui les autorise, les entreprises privées de départ sont nationalisées dès le début.
         simulation.NationalizeForbiddenCompanies();
 
         return simulation;
+    }
+
+    /// <summary>
+    /// Les engagements qu'une loi de départ romprait (décidé le 27 novembre 2026 : elle est alors grisée, avec la raison).
+    /// Jugée comme une nouvelle loi votée sur une nation sans loi : ce que l'écran de création peut savoir avant la partie.
+    /// </summary>
+    public static IReadOnlyList<EngagementDefinition> FoundingLawBreaches(
+        LawCatalogue catalogue, ScenarioLaw law, IEnumerable<EngagementDefinition> engagements)
+    {
+        if (catalogue.TemplateOf(law.Template) is not { } template)
+            return [];
+
+        var state = new Structure(StateId, "État", StructureKind.PoliticalEntity, null);
+        var book = new LawBook(catalogue, [], new Dictionary<string, Structure> { [StateId] = state });
+        var draft = new LawDraft("loi-an-1", LawChangeKind.Enact, template.ToLaw("loi-an-1", law.Level));
+        return Simulation.EngagementsBrokenBy(book, engagements, draft, null);
+    }
+
+    /// <summary>
+    /// Les vivres et les charrettes du départ d'exil : chaque produit, en jours de nourriture de tout le peuple, est mis en
+    /// vente par l'État de la première commune (décidé le 27 novembre 2026 : 5 jours de farine, ce que tient le grenier).
+    /// </summary>
+    private static void GiveProvisions(World world, string communeId, ScenarioDefinition scenario)
+    {
+        var dailyFood = world.Classes.Sum(c => c.Population * Consumption.NeedsOf(c.Rank).GetValueOrDefault(NeedCategory.Food));
+        foreach (var provision in scenario.Provisions ?? [])
+            world.MarketOf(communeId).Offer(provision.Product, dailyFood * provision.Days, Market.StateSellerId(communeId));
+        if (scenario.Carts > 0)
+        {
+            world.CartStockOf(communeId).Add(Carts.ProductId, scenario.Carts);
+            world.SetWantedCarts(communeId, scenario.Carts);
+        }
     }
 
     /// <summary>Un bâtiment de départ : son type du catalogue, avec ce que la partie de départ change.</summary>

@@ -26,6 +26,9 @@ public interface IContentSource
     /// <summary>La partie de départ : communes, bâtiments, classes, trésor et lois du départ préréglé.</summary>
     ScenarioDefinition LoadScenario();
 
+    /// <summary>La partie de départ d'exil (game/data/partie-exil.json) ; nulle si le fichier manque.</summary>
+    ScenarioDefinition? LoadExileScenario() => null;
+
     /// <summary>La carte vectorielle géographique du monde ; nulle si le fichier n'existe pas.</summary>
     VectorMapDefinition? LoadMap() => null;
 

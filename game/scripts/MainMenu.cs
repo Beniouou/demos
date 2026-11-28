@@ -90,6 +90,11 @@ public partial class MainMenu : HBoxContainer
             [
                 new("Filtres", () => new MapPage(map)),
             ]),
+            // La Promesse (maquette du 27 novembre 2026) : le texte signé qui s'efface, la jauge, les blessures.
+            new("La Promesse",
+            [
+                new("Le texte signé", () => new PromisePage(view, desk)),
+            ], Wide: true),
             new("Lois",
             [
                 new("Code civil", () => new CivilCodePage(view, desk)),
@@ -306,6 +311,14 @@ public partial class MainMenu : HBoxContainer
         _tabs.CurrentTab = 0;
         if (_tabs.GetCurrentTabControl() is BuildingsPage page)
             page.Show(buildingId);
+    }
+
+    /// <summary>Ouvre un menu par son titre (essais en ligne de commande : « --menu "La Promesse" »).</summary>
+    public void OpenMenu(string title)
+    {
+        var menu = System.Array.FindIndex(_menus, m => m.Title == title);
+        if (menu >= 0 && _open != menu)
+            Toggle(menu);
     }
 
     private void Toggle(int menu)

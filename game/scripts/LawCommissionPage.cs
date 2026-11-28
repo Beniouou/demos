@@ -228,11 +228,13 @@ public partial class LawCommissionPage : HBoxContainer, IMenuPage
 
         var row = new HBoxContainer();
         row.AddThemeConstantOverride("separation", 8);
+        // Avant de voter : le jeu prévient si la loi trahit La Promesse, sans jamais l'interdire (décidé le 21 novembre 2026).
         row.AddChild(ActionButton($"Voter (en vigueur {_desk.NextEnactmentDay()})", () =>
-        {
-            var message = _desk.Vote(draft.Id);
-            Report(message, _view.VotedLawChanges().Any(v => v.Id == draft.Id) ? $"vote:{draft.Id}" : _schema.Selected);
-        }));
+            PromiseWarning.Check(this, _view.PromiseBreachesOfDraft(draft.Id), "Voter", "voter cette loi", () =>
+            {
+                var message = _desk.Vote(draft.Id);
+                Report(message, _view.VotedLawChanges().Any(v => v.Id == draft.Id) ? $"vote:{draft.Id}" : _schema.Selected);
+            })));
         row.AddChild(ActionButton("Supprimer le brouillon", () => Report(_desk.DeleteDraft(draft.Id), "brouillons")));
         _actions.AddChild(row);
     }
