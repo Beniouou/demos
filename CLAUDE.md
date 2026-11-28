@@ -277,7 +277,7 @@ désactivés : TVA sur la valeur ajoutée, épargne progressive des entreprises.
   puis `OathScreen` : recopier, signer, avec `SignaturePad`) ou bac à sable (départ riche ou terre d'exil) ; il donne un
   `NewGameChoice` à `Main.StartGame`, qui montre l'arrivée en exil (`ArrivalText`). Essais : `-- --carte origine --exil
   eg-ec-co` (départ d'exil direct, premier engagement de chaque pôle), `--menu "La Promesse"` (ouvre ce menu),
-  `--assistant` (passe l'écran du mode).
+  `--assistant` (passe l'écran du mode ; `--assistant promesse` va droit à l'écran de La Promesse).
 - La Promesse en jeu (28 novembre 2026) : menu « La Promesse » (`PromisePage` : texte signé `SignedText.Of`, qui pâlit
   par paliers et dont chaque article a son encre ; jauge `GaugeBar` et seuil ; alignement par axe ; blessures ; nom du
   peuple). Avertissement avant un acte qui trahit (`PromiseWarning.Check`, jamais bloquant, « Revenir » en avant) :

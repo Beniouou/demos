@@ -54,7 +54,7 @@ public partial class PactTornScreen : Control
         {
             var weakest = torn.Axes.OrderBy(a => a.Alignment).First();
             column.AddChild(Wrapped($"Depuis {torn.RuptureMonths} mois, presque plus personne ne vit selon {torn.Name}. "
-                + $"{WorldText.PoleName(weakest.Pole)} : {weakest.Alignment:P0} des habitants."));
+                + $"{char.ToUpperInvariant(WorldText.PoleName(weakest.Pole)[0])}{WorldText.PoleName(weakest.Pole)[1..]} : {weakest.Alignment:P0} des habitants."));
         }
 
         column.AddChild(Choice("Terminer la partie", "Bilan de la nation, de l'An I à aujourd'hui.", () => Ended?.Invoke()));

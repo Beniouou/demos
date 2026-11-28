@@ -85,7 +85,7 @@ public partial class PromisePage : HBoxContainer, IMenuPage
             var row = new HBoxContainer();
             row.AddThemeConstantOverride("separation", 10);
             parent.AddChild(row);
-            var name = new Label { Text = WorldText.PoleName(axis.Pole), CustomMinimumSize = new Vector2(140, 0) };
+            var name = new Label { Text = Capitalized(WorldText.PoleName(axis.Pole)), CustomMinimumSize = new Vector2(140, 0) };
             name.AddThemeColorOverride("font_color", UiTheme.PoleColor(axis.Pole));
             row.AddChild(name);
             row.AddChild(new GaugeBar(axis.Alignment, null, UiTheme.PoleColor(axis.Pole)) { CustomMinimumSize = new Vector2(0, 10), SizeFlagsHorizontal = SizeFlags.ExpandFill, SizeFlagsVertical = SizeFlags.ShrinkCenter });
@@ -137,6 +137,8 @@ public partial class PromisePage : HBoxContainer, IMenuPage
         row.AddChild(rename);
         parent.AddChild(message);
     }
+
+    private static string Capitalized(string text) => text.Length == 0 ? text : char.ToUpperInvariant(text[0]) + text[1..];
 
     private static Label Note(string text)
     {

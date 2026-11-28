@@ -26,6 +26,7 @@ public partial class NewGameScreen : Control
     private Control _modeScreen = null!;
     private Button _withPromise = null!;
     private CheckBox _richStart = null!;
+    private PromiseWizard? _wizard;
 
     public void Init()
     {
@@ -113,6 +114,9 @@ public partial class NewGameScreen : Control
     {
         _withPromise.ButtonPressed = true;
         Next();
+        // « --assistant promesse » : droit à l'écran de La Promesse, avec un peuple et deux axes choisis.
+        if (System.Array.IndexOf(OS.GetCmdlineUserArgs(), "promesse") >= 0)
+            _wizard?.ShowPromiseStepForTests();
     }
 
     private void Next()
@@ -132,6 +136,7 @@ public partial class NewGameScreen : Control
         var laws = content.LoadLawCatalogue();
         var wizard = new PromiseWizard(content.LoadPromises(), content.LoadEngagements(), laws, withLaws: true);
         AddChild(wizard);
+        _wizard = wizard;
         wizard.Cancelled += () =>
         {
             wizard.QueueFree();

@@ -102,7 +102,7 @@ public partial class PromiseWizard : Control
         header.AddThemeConstantOverride("separation", 24);
         column.AddChild(header);
         header.AddChild(UiTheme.Title(withLaws ? "Nouvelle partie" : "Refonder La Promesse"));
-        _stepsBar = new Control();
+        _stepsBar = new HBoxContainer();
         header.AddChild(_stepsBar);
 
         var scroll = new ScrollContainer { SizeFlagsVertical = SizeFlags.ExpandFill, HorizontalScrollMode = ScrollContainer.ScrollMode.Disabled };
@@ -163,11 +163,10 @@ public partial class PromiseWizard : Control
     {
         foreach (var child in _body.GetChildren())
             child.QueueFree();
-        var bar = Steps(_step, _withLaws);
-        var old = _stepsBar;
-        old.ReplaceBy(bar);
-        old.QueueFree();
-        _stepsBar = bar;
+        // La barre des étapes est refaite dans son support (ReplaceBy y déplacerait aussi les anciennes étiquettes).
+        foreach (var child in _stepsBar.GetChildren())
+            child.QueueFree();
+        _stepsBar.AddChild(Steps(_step, _withLaws));
 
         switch (_step)
         {
@@ -245,30 +244,28 @@ public partial class PromiseWizard : Control
 
     // ---- 3. La Promesse --------------------------------------------------------------------------------------------
 
+    /// <summary>
+    /// Les axes, puis les exilés à l'arrivée, puis La Promesse en dessous (nom, première phrase, difficulté) : une seule
+    /// colonne de largeur bornée, pour que rien ne déborde ni ne cache La Promesse (retour du 28 novembre 2026).
+    /// </summary>
     private void BuildPromise()
     {
-        var row = new HBoxContainer();
-        row.AddThemeConstantOverride("separation", 32);
-        _body.AddChild(row);
-        var left = new VBoxContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill };
-        left.AddThemeConstantOverride("separation", 12);
-        row.AddChild(left);
-        var right = new VBoxContainer { CustomMinimumSize = new Vector2(420, 0) };
-        right.AddThemeConstantOverride("separation", 10);
-        row.AddChild(right);
+        var column = new VBoxContainer { CustomMinimumSize = new Vector2(PromiseColumnWidth, 0), SizeFlagsHorizontal = SizeFlags.ShrinkBegin };
+        column.AddThemeConstantOverride("separation", 12);
+        _body.AddChild(column);
 
-        left.AddChild(UiTheme.Section("Ce que promettent les exilés, axe par axe"));
+        column.AddChild(UiTheme.Section("Ce que promettent les exilés, axe par axe"));
         foreach (var axis in Axes)
         {
             var (axisName, question) = AxisTexts[axis];
-            left.AddChild(new Label { Text = $"{axisName}  ·  {question}" });
+            column.AddChild(new Label { Text = $"{axisName}  ·  {question}" });
             var choices = new HBoxContainer();
             choices.AddThemeConstantOverride("separation", 8);
-            left.AddChild(choices);
+            column.AddChild(choices);
             var group = new ButtonGroup();
             foreach (var pole in new Pole?[] { Pole.A, null, Pole.B })
             {
-                var text = pole is { } p ? WorldText.PoleName(new Orientation(axis, p)) : "Libre";
+                var text = pole is { } p ? Capitalized(WorldText.PoleName(new Orientation(axis, p))) : "Libre";
                 var button = new Button { Text = text, ToggleMode = true, ButtonGroup = group, SizeFlagsHorizontal = SizeFlags.ExpandFill, ButtonPressed = _poles[axis] == pole };
                 if (pole is { } colored)
                     button.AddThemeColorOverride("font_pressed_color", UiTheme.PoleColor(new Orientation(axis, colored)));
@@ -283,27 +280,42 @@ public partial class PromiseWizard : Control
         }
 
         var promise = CurrentPromise();
-        left.AddChild(UiTheme.Section("Vos exilés à l'arrivée"));
-        left.AddChild(Wrapped(string.Join("   ·   ", Ranks.Select(r => $"{r.Name} {IdeologyText(r.Ideology, promise)}"))));
-        left.AddChild(Wrapped("Sur les axes de La Promesse, tous sont au pôle promis ; sur un axe libre, chaque rang garde son pôle."));
+        column.AddChild(UiTheme.Section("Vos exilés à l'arrivée"));
+        column.AddChild(Wrapped(string.Join("   ·   ", Ranks.Select(r => $"{r.Name} {IdeologyText(r.Ideology, promise)}"))));
+        column.AddChild(Wrapped("Sur les axes de La Promesse, tous sont au pôle promis ; sur un axe libre, chaque rang garde son pôle."));
 
+        column.AddChild(new HSeparator());
+        column.AddChild(UiTheme.Section("La Promesse"));
         if (promise is null)
         {
-            right.AddChild(Wrapped("Choisissez un pôle sur un axe au moins."));
+            column.AddChild(Wrapped("Choisissez un pôle sur un axe au moins."));
             return;
         }
 
-        right.AddChild(UiTheme.Section("La Promesse"));
-        var name = new LineEdit { Text = promise.Name };
+        var name = new LineEdit { Text = promise.Name, CustomMinimumSize = new Vector2(420, 0), SizeFlagsHorizontal = SizeFlags.ShrinkBegin };
         name.AddThemeFontSizeOverride("font_size", UiTheme.TitleSize);
         name.TooltipText = "Le nom suit les axes choisis ; vous pouvez le changer.";
         name.TextChanged += text => _renamed = text;
-        right.AddChild(name);
+        column.AddChild(name);
         var oath = PromiseOath.Of(promise, string.IsNullOrWhiteSpace(_peopleName) ? "…" : _peopleName.Trim());
-        right.AddChild(SignedText.Paper($"« {oath.First} »\n\n{oath.Middle}", 400));
+        var paper = SignedText.Paper($"« {oath.First} »\n\n{oath.Middle}", PromiseColumnWidth);
+        column.AddChild(paper);
         var axes = promise.Orientations.Count;
-        right.AddChild(Wrapped($"{axes} axe{(axes > 1 ? "s" : "")} : difficulté {(axes switch { 1 => "faible", 2 => "moyenne", _ => "forte" })}. "
+        column.AddChild(Wrapped($"{axes} axe{(axes > 1 ? "s" : "")} : difficulté {(axes switch { 1 => "faible", 2 => "moyenne", _ => "forte" })}. "
             + "Moins d'axes, c'est une promesse plus facile à tenir. La jauge suit l'axe le plus faible."));
+    }
+
+    /// <summary>La largeur de la colonne de l'écran de La Promesse, en pixels.</summary>
+    private const float PromiseColumnWidth = 760;
+
+    /// <summary>Essais (« --assistant promesse ») : un peuple nommé, l'écran de La Promesse avec deux axes choisis.</summary>
+    public void ShowPromiseStepForTests()
+    {
+        _peopleName = "Essai";
+        _poles[IdeologicalAxis.Hierarchy] = Pole.A;
+        _poles[IdeologicalAxis.Production] = Pole.B;
+        _step = 2;
+        ShowStep();
     }
 
     /// <summary>« EG · EC · CO », les pôles de La Promesse en premier, comme ils seront à l'arrivée.</summary>
@@ -332,7 +344,7 @@ public partial class PromiseWizard : Control
             var column = new VBoxContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill };
             column.AddThemeConstantOverride("separation", 6);
             columns.AddChild(column);
-            var title = new Label { Text = WorldText.PoleName(pole) };
+            var title = new Label { Text = Capitalized(WorldText.PoleName(pole)) };
             title.AddThemeColorOverride("font_color", UiTheme.PoleColor(pole));
             title.AddThemeFontSizeOverride("font_size", UiTheme.TitleSize);
             column.AddChild(title);
@@ -432,6 +444,8 @@ public partial class PromiseWizard : Control
         label.AddThemeFontSizeOverride("font_size", 26);
         return label;
     }
+
+    private static string Capitalized(string text) => text.Length == 0 ? text : char.ToUpperInvariant(text[0]) + text[1..];
 
     private static Label Wrapped(string text)
     {
